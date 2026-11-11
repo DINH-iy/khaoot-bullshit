@@ -1,0 +1,40 @@
+{
+  "name": "party-game-builder",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "npm run db:generate && npm run build -w @party/contracts && concurrently -k -n server,web \"npm run dev -w @party/server\" \"npm run dev -w @party/web\"",
+    "build": "npm run db:generate && npm run build -w @party/contracts && npm run build -w @party/server && npm run build -w @party/web",
+    "typecheck": "npm run db:generate && npm run build -w @party/contracts && npm run typecheck --workspaces --if-present",
+    "test": "npm run db:generate && npm run build -w @party/contracts && vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm test && npm run build",
+    "db:env": "node scripts/database/init-env.mjs",
+    "db:up": "node scripts/database/compose.mjs up -d --wait postgres",
+    "db:test:up": "node scripts/database/compose.mjs up -d --wait postgres-test",
+    "db:stop": "node scripts/database/compose.mjs stop",
+    "db:generate": "node scripts/database/prisma.mjs generate",
+    "db:validate": "node scripts/database/prisma.mjs validate",
+    "db:migrate:create": "node scripts/database/prisma.mjs migrate dev --create-only",
+    "db:migrate:dev": "node scripts/database/prisma.mjs migrate dev",
+    "db:migrate:deploy": "node scripts/database/prisma.mjs migrate deploy",
+    "db:status": "node scripts/database/prisma.mjs migrate status",
+    "db:test": "node scripts/database/test.mjs",
+    "db:drift": "node scripts/database/prisma.mjs migrate diff --from-config-datasource --to-schema database/schema.prisma --exit-code",
+    "db:test:stop": "node scripts/database/compose.mjs stop postgres-test"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.0",
+    "fast-check": "^4.3.0",
+    "concurrently": "^9.2.0",
+    "@types/node": "^24.0.0"
+  }
+}

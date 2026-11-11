@@ -4,7 +4,7 @@ Date: 9 November 2026
 
 Last updated: 11 November 2026 — reliability, fairness, scoring, security, mechanic validation, and frontend/backend architecture.
 
-Status: Planning only. This document records the agreed product scope and proposed technical setup. Implementation has not started. Build phases describe future work, not completed features.
+Status: Initial foundation scaffolding started with user authorization on 11 November 2026. The browser/server/shared-contract packages, tests, diagnostic logging, timing, and token-verification boundary are present locally; live sign-in, database persistence, multiplayer rooms, and gameplay remain unimplemented. See README.md for the implemented scope and verification. Build phases below describe the full intended outcome, not completed features.
 
 ## 1. Product overview
 
@@ -37,11 +37,11 @@ Twenty players is a baseline requirement. There will be no arbitrary player cap 
 
 ## 3. Game structure
 
-A game is an ordered timeline of rounds and presentation items. For example:
+A game is a directed flow of scenes and logic nodes. A simple game is an ordered sequence; games may also branch through explicit choices and rejoin later. For example:
 
 Opening → rules → individual quiz → team formation → team challenge → cutscene → voting round → finale.
 
-Supported timeline items:
+Supported scene and flow items:
 
 - Quiz rounds.
 - Room challenges.
@@ -51,8 +51,9 @@ Supported timeline items:
 - Cutscenes.
 - Breaks.
 - Scoreboards and final results.
+- Party route choices and explicit branch connections.
 
-Items can be reordered, duplicated, disabled, and grouped.
+Items can be reordered within a sequence, duplicated, disabled, grouped, and connected. Branches must remain explicit; moving, disabling, or deleting a node must not silently reconnect routes or discard authored branches.
 
 Configuration follows this hierarchy:
 
@@ -64,11 +65,23 @@ Every supported gameplay setting should be configurable at the appropriate round
 
 ## 4. Builder
 
-### Layout
+### Two synchronized editing views
+
+Accepted layout/interaction reference: [interactive dual-editor example](docs/design/editor-reference.html), with [reference notes and workspace-style images](docs/design/README.md). This is a saved design example, not implemented app functionality.
+
+- **Scene view:** a classic PowerPoint-style editor. A slide/scene list, editable scene content, device previews, and settings let the author focus on what happens in one scene.
+- **Flow view:** a high-level node canvas inspired by visual workflow editors. Drag connections between scenes, rounds, cutscenes, choice nodes, and results to define progression. Use labeled input/output ports with compatible-target highlighting and snap-to-port connections, zoom, pan, fit-to-game, groups, and a minimap when useful.
+- Both views edit one canonical game definition with stable scene/node identifiers. Changing a scene in one view updates the other; there are no separately maintained copies.
+- Double-clicking a scene node opens its scene editor. Returning to the flow retains canvas position and selection.
+- The classic list shows branch groups/routes and rejoin destinations instead of flattening every branch into a misleading linear playlist. The author can select a route to inspect and rehearse.
+- Store canvas positions and editor preferences separately from execution semantics. Moving a node visually does not change playback order; changing a connection does.
+- Provide a keyboard-accessible connection picker and explicit next-scene controls alongside drag-to-connect interactions.
+
+### Scene-view layout
 
 | Area | Function |
 | --- | --- |
-| Left: timeline | Add and arrange rounds and scenes. |
+| Left: scene list | Add and arrange scenes within sequences; expand route/branch groups. |
 | Center: preview | Preview the shared screen or a particular phone perspective. |
 | Right: settings | Edit the selected item's content and behavior. |
 
@@ -85,6 +98,7 @@ Inherited settings are clearly marked, with an option to reset an override to th
 | Cutscene | Play or display media → continue |
 | Team change | Form teams → preview carryover → confirm |
 | Scoreboard | Display selected standings → continue |
+| Party route choice | Present routes → collect eligible votes → resolve → enter selected branch |
 
 Customized rounds can be saved as reusable personal templates.
 
@@ -117,13 +131,13 @@ Rounds will be stored as sequences of stages from the beginning. Each stage defi
 - What ends the stage: host action, timer, or required submissions.
 - What happens next.
 
-The first builder exposes these through templates. A later advanced editor allows users to arrange stages themselves.
+The first builder supports template-based scene editing plus high-level node connections and explicit party-choice branches. A later advanced editor exposes the internal stages of a round for custom mechanics. Game-level flow nodes and round-internal stages are different levels of the same versioned definition.
 
 Example custom sequence:
 
 Create random teams → send private instructions → start timer → collect entries → vote → host bonus → results.
 
-A later rule editor can use an event → condition → action structure. For example:
+Party route-choice nodes are part of the initial builder. A later general rule editor can use an event → condition → action structure. For example:
 
 > When voting ends, if there is a tie, open a host tie-break stage.
 
@@ -307,26 +321,63 @@ Keep frontend and backend in separate packages, with shared public contracts in 
 | Backend | Node.js + TypeScript + Fastify | HTTP API and authoritative game engine |
 | Real-time communication | Socket.IO | Room communication, acknowledgements, and reconnection support |
 | Database | PostgreSQL | Games, versions, players, submissions, team history, and score records |
-| Data access | Prisma | Typed database access and migrations |
+| Data access and schema management | Prisma with version-controlled code-first definitions and migrations | Define models/relations/constraints in source, review generated database changes, and apply tracked migrations |
 | Validation | Zod | Validate game definitions and incoming commands |
-| Media storage | S3-compatible object storage | Keep large media outside the app server |
+| Media storage | Dedicated SSD-backed media directory initially; optional S3-compatible adapter | Keep media outside the database and gameplay messages without requiring an extra storage service on the Pi |
 | Testing | Vitest + fast-check + Playwright + Artillery | Engine properties/model tests, browser/device flows, and Socket.IO load/failure scenarios |
 | Structured logging | Pino through Fastify | Correlated JSON logs with redaction |
 | Observability | OpenTelemetry + centralized error tracking and metrics dashboards | Timings, traces, issue grouping, and operational alerts; backend providers to be selected |
 | Repository | One repository with web, server, and shared packages | Keep schemas and command types consistent |
 
+### Code-first database schema and migrations
+
+The database must be managed code-first, using Prisma as the selected direction. Model/contract definitions in source control describe the intended PostgreSQL structure; versioned migrations describe how existing databases reach that structure. The database is not designed by manually editing production tables.
+
+Required workflow:
+
+1. Update the version-controlled model/contract definitions.
+2. Generate a named migration with the pinned Prisma version's supported workflow.
+3. Review the generated operations/SQL and add explicit data transformations/backfills where needed. Renames must not silently become destructive drop-and-create operations.
+4. Test the migration on a fresh database and an existing-schema fixture containing representative data, including pending commands, scores, and recovery state where relevant.
+5. Commit the definitions, migration authoring files, and required generated migration artifacts together. Never commit credentials or database contents.
+6. Apply reviewed pending migrations as an explicit release step on the home server, then start the compatible application version. Track applied migrations so repeat deployment does not repeat changes.
+
+Keep schema definitions, migration history, and database configuration together in a dedicated backend-owned database directory. Runtime persistence code belongs in the backend's feature/persistence modules; the browser only receives public contracts. Final filenames and commands depend on the Prisma version selected during database setup; do not copy commands from a different major version. Pin and verify the version against Node 24 and the Pi's ARM64 environment.
+
+- Do not use untracked schema synchronization or destructive reset commands on the persistent home-server database as a replacement for migration history.
+- Do not modify a migration that has already been applied to a shared/persistent environment; append a corrective migration.
+- Keep schema migration execution out of request handlers and game-hosting actions. Do not run schema changes during a live quiz.
+- Define release serialization/locking, failure handling, and schema/application compatibility. Stop a release when migration application fails; do not start incompatible application code.
+- Use expand/backfill/contract steps where compatibility or existing data requires them. Backups and verified recovery procedures precede destructive changes; application rollback does not imply an automatic lossless database downgrade.
+- Keep development, test, and production database targets separate. CI verifies schema validity and migration application against disposable PostgreSQL.
+
+Database foundation implemented locally: PostgreSQL 18.6 and matching stable Prisma 7.10.1 CLI/client/adapter, version-controlled schema/migrations, a bounded client pool, connectivity diagnostics, and migration/integrity integration tests. [Database architecture and exact commands](docs/architecture/database.md) describe the 17 initial models and the limits of this foundation. Production deployment and gameplay command/recovery services remain unimplemented.
+
+Versioned references for the pinned Prisma 7 tooling: [development/deploy migrations](https://www.prisma.io/docs/orm/v7/prisma-migrate/workflows/development-and-production), [migration customization](https://www.prisma.io/docs/orm/v7/prisma-migrate/workflows/customizing-migrations). The unversioned documentation currently describes a different Prisma major; do not mix CLI workflows.
+
 ### Hosting
 
-Recommended starting deployment:
+Primary target: the user's home server, initially a Raspberry Pi 4 with 8 GB RAM, or a NUC/mini PC. Use a supported 64-bit Linux OS and native ARM64 dependencies on the Pi; a NUC requires its matching architecture. This replaces the earlier managed-hosting default.
 
-- One always-running Node service serving the web app, API, and real-time connections.
-- Managed PostgreSQL.
-- Object storage for uploaded media.
-- HTTPS and a single public domain.
+Recommended deployment shape:
 
-Render is one suitable deployment option because its web services accept WebSocket connections. The provider and paid plan will be selected before deployment. See [Render WebSocket documentation](https://render.com/docs/websocket).
+- Reverse proxy serving the built frontend and media, terminating HTTPS, and forwarding API/WebSocket requests.
+- One always-running Node backend with automatic restart and bounded shutdown.
+- PostgreSQL on the same machine, accessible only locally or on the private service network.
+- SSD-backed persistent database/media storage and separate off-device backups.
+- Optional lightweight telemetry export rather than a full monitoring cluster on the Pi.
 
-The first version is internet-hosted. Phones can use Wi-Fi or mobile data. Fully offline or laptop-hosted LAN operation is a separate possible extension.
+Docker Compose is a deployment option, not a requirement; system services are also valid. Deployment files will be added under infra/ when needed. Use explicit supported image versions, verify ARM64 availability, and build/reinstall native dependencies for the target architecture; never copy macOS node_modules onto the Pi.
+
+A Pi 4 with 8 GB is expected to be a plausible target for one room with around 20 players, but this is an unmeasured engineering estimate. Actual-device simultaneous-submission, reconnect, multi-hour, disk-write, and recovery tests are release requirements. A NUC may provide more headroom depending on its CPU/storage; no replacement hardware is required before measuring.
+
+Use a small bounded PostgreSQL connection pool and tune shared memory, per-query memory, and maintenance budgets against total host usage. Each phone connects to the backend, not to its own database connection. Do not interpret shared_buffers as PostgreSQL's entire memory requirement or disable durability to improve a benchmark.
+
+Build release assets on the development machine/CI where practical. Avoid server-side video transcoding and heavy processing during games. The host laptop/TV browser plays media; the home server serves files and game state. Plan for media bandwidth as well as API latency.
+
+Local-network versus internet access remains to be confirmed. Remote play requires a deliberate HTTPS/domain/reachability setup, potentially through a suitable tunnel or reverse proxy. Authentication/JWKS and YouTube may still require internet even when clients access the game over the LAN; fully offline operation is not promised by home hosting alone.
+
+See [Raspberry Pi deployment notes](docs/deployment/raspberry-pi.md) for hardware assumptions, database rationale, and readiness checks. No home network, firewall, or deployment settings are changed by this plan.
 
 ### Authoritative game engine
 
@@ -433,14 +484,14 @@ In single-screen mode, judging controls are visible to the room. In separate-dis
 | --- | --- | --- |
 | 1. Detailed design | Screen layouts, frontend/backend contracts, configuration schema, stage model, fairness/deadline rules, score invariants and rounding, role/credential model, failure policies, and initial performance budgets | Reference game, trust boundaries, validation rules, and failure/recovery behavior are specified without ambiguous score transitions |
 | 2. Multiplayer foundation | Rooms, joining, identity, host/display roles, late joining, durable commands, database constraints, outbox, reconnect/restart recovery, structured logs, error capture, and timing instrumentation | Twenty players can join; a confirmed submission survives server termination/restart; retries produce no duplicate effects |
-| 3. Playable game engine | Quiz, room challenge, voting, teams, timers, scoring, carryover, final results | Reference game runs end to end using a prepared definition |
-| 4. Builder and templates | Timeline editor, settings, defaults/overrides, previews, saving, duplication, reusable templates | A host can author the reference game without editing code |
+| 3. Playable game engine | Quiz, room challenge, voting, teams, timers, scoring, carryover, party-choice branch resolution/rejoin, final results | Reference game and a branching choice scenario run end to end using prepared definitions |
+| 4. Builder and templates | Synchronized scene/flow editors, drag-to-connect routes, branch-aware scene list, party-choice settings, theme separation, previews, saving, reusable templates | A host can author both a linear game and a party-voted branching game without code; both views stay consistent |
 | 5. Media and live controls | Cutscenes, uploads, YouTube embeds, audio layers, separate displays, phone hosting, upcoming-round editing | Full presentation and control flow works during play |
 | 6. Rehearsal and release validation | Simulation, validation, Socket.IO load/spike/soak tests, failure injection, device testing, backup restore drills, monitoring/alerts, and production deployment | A full game works with at least 20 phones; recovery and measured performance meet agreed release criteria |
 | 7. Custom mechanics | Stage editor, reusable stage sequences, additional supported inputs | Users can create mechanics beyond the starting templates |
-| 8. Advanced automation | Conditional rules, branching, richer cutscene sequences | More elaborate games run with fewer manual interventions |
+| 8. Advanced automation | General conditional rules, advanced branching beyond party choices, richer cutscene sequences | More elaborate games run with fewer manual interventions |
 
-Phases 1–6 constitute the first complete release. Custom mechanics are supported by the architecture from the start, with their editing tools delivered afterward.
+Phases 1–6 constitute the first complete release, including both builder views and basic party-choice branching. Round-internal custom mechanics are supported by the architecture from the start, with advanced stage-editing tools delivered afterward.
 
 Deployment occurs only once implementation is authorized and release prerequisites are satisfied; saving this plan does not authorize starting the build or deployment.
 
@@ -460,6 +511,7 @@ Before calling the app ready, verify:
 - Score conservation for transfers, exact rounding, corrections, deterministic history replay, and generated action sequences.
 - Role escalation attempts, cross-room access, credential recovery/revocation, origin checks, and shared-Wi-Fi rate limits.
 - Invalid stage graphs, empty voter/entry sets, automatic loops, and host fallback controls.
+- Scene/flow view consistency, branch-aware editing, route selection/rejoin, vote ties/timeouts, and recovery after a route is chosen but before it is displayed.
 - Mobile Safari and Chrome, plus laptop browsers.
 - Cutscene playback, blocked autoplay, and media failure.
 - A complete rehearsal and a real game-night trial.
@@ -479,7 +531,7 @@ The product direction is established. Remaining implementation details include:
 - Host recovery and device-reclaim interaction.
 - Behavior of timers across pauses and server restarts.
 - Initial media formats, upload limits, and external-link support.
-- Creator authentication provider, hosting provider, and operating budget.
+- Creator authentication provider, final home-server hardware, LAN versus internet access, and backup/operating budget.
 - Exact tie-break options and first-release automated rule capabilities.
 
 These details are addressed in Phase 1 or the relevant technical phase. They do not authorize implementation before the user requests it.
@@ -616,7 +668,7 @@ Measure timeouts/failures separately and publish the sample counts and slower pe
 ### 18.9 Optimization and overload control
 
 - Keep live commands small; use compact role-filtered updates and snapshots for recovery.
-- Serve media from object storage/CDN outside gameplay messages. Preload only a bounded amount of upcoming content.
+- Serve media through a dedicated file/static-serving path outside gameplay messages, using the local SSD-backed directory initially or optional object storage/CDN later. Preload only a bounded amount of upcoming content.
 - Keep media processing and heavy jobs off the live command path.
 - Bound input sizes, connection pools, queues, retries, and concurrent work. Reject excessive work clearly instead of allowing memory to grow indefinitely.
 - Use bounded exponential backoff with jitter and coordinate retry policy to avoid multiplying retries across layers.
@@ -684,7 +736,7 @@ Recommended next research pass: browser/media compatibility and venue connectivi
 
 ## 20. Approved research findings: fairness, scoring, security, and mechanics
 
-These recommendations were researched and approved for inclusion on 11 November 2026. They establish design requirements; implementation and testing have not started. Exact numerical policies, algorithms, and acceptance examples are finalized during detailed design.
+These recommendations were researched and approved for inclusion on 11 November 2026. They establish design requirements beyond the initial scaffold; implementation coverage is tracked in README.md. Exact numerical policies, algorithms, and acceptance examples are finalized during detailed design.
 
 ### 20.1 Timing fairness
 
@@ -825,3 +877,142 @@ This is a project-fit judgment, not a performance benchmark, universal ecosystem
 Sources: [React TypeScript support](https://react.dev/learn/typescript), [Socket.IO types and validation caveat](https://socket.io/docs/v4/typescript/), [TypeScript erased types](https://www.typescriptlang.org/docs/handbook/2/basic-types.html#erased-types), [TypeScript soundness limitations](https://www.typescriptlang.org/docs/handbook/type-compatibility), [checked indexed access](https://www.typescriptlang.org/tsconfig/noUncheckedIndexedAccess.html), [Node event-loop guidance](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop).
 
 Alternative platform references: [ASP.NET Core SignalR](https://learn.microsoft.com/en-us/aspnet/core/signalr/introduction?view=aspnetcore-10.0), [Blazor hosting](https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-10.0), [Go race detector](https://go.dev/doc/articles/race_detector), [Rust ownership](https://doc.rust-lang.org/stable/book/ch04-00-understanding-ownership.html).
+
+
+## 22. Project organization conventions
+
+Keep the existing frontend/backend/shared-package separation. Add folders by responsibility as features arrive, rather than putting the app into a single file or creating empty speculative modules.
+
+| Folder | Contents |
+| --- | --- |
+| apps/web/src | Browser entry points and feature folders; UI, hooks, and presentation helpers |
+| apps/server/src | Server bootstrap and feature modules for auth, rooms, games, scoring, and diagnostics |
+| apps/server/test | Backend unit/integration tests grouped by feature as they grow |
+| packages/contracts/src | Public runtime schemas and contract types only |
+| packages/contracts/test | Contract compatibility tests where needed |
+| docs/architecture | Design decisions and diagrams when introduced |
+| docs/deployment | Pi/NUC setup, recovery, and operations documentation |
+| infra | Deployment/proxy/container files when introduced |
+| .github/workflows | CI configuration |
+
+APP_PLAN.md remains at the root as requested. README.md is the quick start; detailed documents belong under docs/. Credentials, live database files, uploaded media, logs, and build output do not belong in tracked source. Small current bootstrap files can remain simple; split by feature/responsibility as implementation grows. Contributor conventions are recorded in AGENTS.md.
+
+
+## 23. Dual-view builder, party choices, and theme scope
+
+Added following the user's visual workflow reference on 11 November 2026. This is a planned feature expansion; no scene/flow editor has been implemented. The reference establishes drag-to-connect behavior and a high-level overview, not a requirement to copy another product's branding.
+
+The user-approved [dual-editor visual example](docs/design/editor-reference.html) is the interaction/layout reference for both editors. Its [editable source](docs/design/editor-reference.source.html) is preserved alongside it. The subsequently supplied [neutral workspace reference](docs/design/assets/builder-neutral-reference.png) and [restrained-accent workspace reference](docs/design/assets/builder-accent-reference.png) establish the builder visual direction. See [reference notes](docs/design/README.md) for scope and limitations.
+
+### 23.1 Two levels of authoring
+
+- Game flow nodes represent scenes, round groups, cutscenes, route choices, and results. Connections determine which node runs next.
+- A scene editor determines what a selected scene displays and how its configured stages behave on the shared screen and phones.
+- A quiz round may contain several questions/stages; the high-level canvas can collapse it into one round group and expand it when needed.
+- First-release scene tools cover text, answers, instructions, media, and supported layouts. Arbitrary freeform object animation or a complete PowerPoint implementation is not implied.
+- Both views support the same undoable edits, shared validation, stable identifiers, and versioned saves. Prevent deletion or rewiring from silently invalidating another route. Warn about a scene's references before removal.
+
+### 23.2 Party route-choice node
+
+Example flow:
+
+Opening → party chooses → Music Mayhem OR Physical Challenge → common finale.
+
+The first implementation routes the whole party together. Separate simultaneous team/player routes are a possible later extension requiring an explicit synchronization design; they are not assumed here.
+
+Each choice node configures:
+
+| Setting | Choices |
+| --- | --- |
+| Prompt and routes | Public prompt, labeled options, optional images, and connected destination for each option |
+| Decision method | One vote per eligible player, one captain vote per eligible team, or host decision |
+| Eligibility | Snapshot of participating voters/teams, defined late-join behavior, no duplicate votes |
+| Timing | Timed vote or host closure; configurable vote editing before close |
+| Visibility | Private votes; reveal labels/counts according to settings without exposing future-route spoilers |
+| Tie policy | Explicit host tie-break, runoff, configured default, or recorded random resolution |
+| No-vote/disconnect policy | Host resolution or configured fallback; never wait forever |
+| Resolution | Exactly one destination is chosen; optional announcement/cutscene before entering it |
+| Scoring | No points by default; any award is separately configured and auditable |
+
+Team-vote weighting and individual-vote weighting are different modes and must be clearly labeled. A runoff must be bounded with a final fallback. Random resolutions record their outcome so reconnecting or replaying cannot change the chosen route.
+
+The backend validates and saves votes, the resolution, selected edge/destination, and audit/outbox records transactionally as appropriate. Repeated closure commands cannot select or score twice. Recovery resumes the saved route, not a fresh vote. A later host override is an explicit recorded action with downstream-score/state consequences checked before application.
+
+Branches may rejoin a common scene. A rejoin means continuing after the one selected branch, not waiting for all alternative branches to run. Unselected paths receive no completion awards. In rehearsal, let the author exercise every route and the tie/no-response paths.
+
+If branches offer different point opportunities, show that in the builder and require an intentional scoring configuration. Do not silently normalize or award points from skipped branches.
+
+### 23.3 Graph validation and live editing
+
+- Require an explicit start, valid destinations, connected labeled choice outputs, and a reachable end or explicit host-managed exit.
+- Identify unreachable scenes and accidental dead ends; deliberate disabled/draft content can remain in authoring but cannot become an executable route unnoticed.
+- Reuse section 20's structural, semantic, flow, and runtime validation. Avoid unrestricted cycles initially; later loops require limits and exits.
+- A valid graph does not guarantee all players will respond. Provide timeout/no-response policies and host recovery controls.
+- Apply the existing live-edit rules to the graph: edit future content, preserve the active node and completed history, and validate connection changes before accepting them.
+- Protect already-resolved choices and active destinations from casual deletion/rewiring. Changes requiring rollback are separate audited host operations, not ordinary canvas edits.
+
+### 23.4 Independent workspace and game themes
+
+Keep workspace appearance separate from game themes. The user has selected a clean, professional, neutral builder direction: white/light or black/dark surfaces, rounded corners, subtle borders/shadows, readable sans-serif typography, consistent spacing, and restrained functional accents. The builder does not need multiple decorative skins or a creator-facing workspace theme designer. Game presentation remains themeable.
+
+| Theme scope | Saved with | Controls |
+| --- | --- | --- |
+| Builder workspace | Creator preferences | Light/dark/system mode; one consistent professional design system with rounded panels and controls. Density can be a usability preference, not a decorative theme. |
+| Game presentation | Game definition/version | Supported fonts, colors, backgrounds, answer-button styling, scoreboards, and transitions |
+| Round presentation | Explicit round override | Selected supported game-theme properties, with a reset-to-game-default option |
+
+Changing workspace appearance must not change the game preview's selected theme or player-facing output. Changing a game theme must not restyle the editor chrome. Keep theme tokens separate from mechanics; colors/fonts never change scoring or routing.
+
+Scene view previews shared-screen and phone results. Flow view can show small scene thumbnails without turning node layout into game presentation. Keep readable defaults, accessible non-color labels, reduced-motion support, and clear inheritance indications. Use accents to indicate selection, focus, route identity, and status without depending on color alone. The supplied dashboard images are visual-style references, not requests to add dashboard metrics, search, profiles, or unrelated widgets to the editor.
+
+The saved interactive example preserves the previously approved editor layout and behavior; its provisional purple accent is not a binding builder palette. Workspace styling follows the newer user-supplied references. No editor implementation or app restyling is authorized by saving these references.
+
+
+### 23.5 Connection handles, snapping, and node alignment
+
+Required planned behavior for the actual flow editor:
+
+- Drag from an explicit output handle to a compatible input handle. Render a live connection preview from the originating handle.
+- Highlight valid target handles while dragging. Within a configurable proximity radius, snap the preview endpoint to the nearest compatible handle; commit the connection only after a valid drop.
+- Base the effective snap/hit area on screen pixels so handles stay usable across zoom levels. Hit areas can be larger than the visible dot, including for touch/pen input.
+- Make the candidate target unmistakable before release. Resolve nearby/equidistant candidates deterministically rather than unexpectedly changing the target on drop.
+- Validate handle direction, scene/port compatibility, branch labels, duplicate-edge rules, and prohibited cycles. Show invalid targets with a reason; never silently connect to a nearby invalid point.
+- Keep party-choice outputs separately identifiable by stable IDs and route labels such as Music wins and Physical wins. Snapping must not swap the configured branch meanings.
+- Releasing on empty space or pressing Escape cancels without saving a dangling edge or changing the graph. Any future add-node-on-drop interaction must be explicit.
+- When reconnecting an existing edge, preserve the old connection until a valid replacement is confirmed. Cancellation leaves the original intact; successful edits are undoable.
+- Moving a node keeps its connections anchored to the handles and redraws paths. Optional grid/alignment guides help place nodes; node positioning alone never changes gameplay progression.
+- Provide keyboard-accessible source/destination selection and clear focus states alongside pointer dragging. Do not make drag precision the only way to connect nodes.
+- Revalidate the resulting graph on the backend when saving. Client snapping is an editing aid, not the authority for valid game flow.
+
+The saved example illustrates handles, routes, branch selection, and the two editor views. It does not implement dragging, snapping, node creation, or a production graph editor. Those remain future implementation work.
+
+Acceptance examples: near-target valid drops connect to the intended port; invalid/empty drops do nothing; Escape and cancelled reconnections preserve state; zoom and node movement preserve handle alignment; keyboard connections produce the same validated graph; choice routes remain correctly labeled after edits.
+
+
+## 24. Database boundaries and private admin health
+
+### 24.1 Database separation
+
+Use one PostgreSQL database per environment, with authoring and runtime tables in the same database. There is no separate database for each editor or game. Development (`party_dev`), disposable integration testing (`party_test`), and production use separate targets/credentials.
+
+Both editors update GameDraft; publishing creates immutable GameVersion. GameSession points to that fixed version. Runtime identities, team lineups, stage runs, submissions, decisions, command outcomes, exact score entries, audit, and pending outbox notifications are separate relational records. Definition/payload details use versioned JSONB documents where appropriate. See [database schema](docs/architecture/database.md) and [Prisma models](apps/server/database/schema.prisma).
+
+### 24.2 Private admin dashboard (planned, not built)
+
+Accepted visual reference: [interactive admin health example](docs/design/admin-health-reference.html), with its [editable source](docs/design/admin-health-reference.source.html) and [reference notes](docs/design/README.md#private-admin-health-reference). All values are illustrative and controls change the example only; this is not an implemented admin dashboard.
+
+Add an Admin → Health area for authorized operators, separate from the shared display and everyday host controls. A host sees only permitted session diagnostics; global infrastructure access requires operator permission. Existing `ops:read` protects the foundation metrics endpoint; future mutations need separate control permissions and server checks.
+
+Show scoped measurements with units, percentile/window/sample count where relevant:
+
+- Player end-to-end saved-confirmation latency, individual connection RTT and reconnect status.
+- Server command duration, event-loop delay, CPU, memory, queue pressure and uptime.
+- Database probe/commit/query timings, bounded pool use/waiters, persistence availability and migration status.
+- Session/stage, accepted submission counts, outbox backlog/oldest age, recovery state and recent grouped errors.
+- Storage/backup health and home-server capacity when those signals are implemented.
+
+Separate current values from p95/p99 over a window and successful operations from failures/timeouts. Server processing includes nested database work; do not add overlapping timings as if they were independent. Identify stale/unknown data rather than displaying reassuring zeros.
+
+Proposed controls: reconnect the shared display, retry/skip failed media, temporarily enable more diagnostic logging with automatic expiry, inspect sanitized command/error records, and pause/resume or extend a session through normal game commands. Every gameplay-affecting operation is authorized, validated, idempotent, and audited. Do not expose arbitrary SQL, raw tokens/private answers, unrestricted score writes, production resets, or unsafe durability/performance switches.
+
+Treat diagnostics and control availability separately. Monitoring failures do not block gameplay; unavailable persistence blocks confirmed state changes. Store durable session actions in the existing command/audit tables. Keep high-frequency metrics outside the gameplay tables. System-wide operational audit/retention and monitoring backend are future design work.

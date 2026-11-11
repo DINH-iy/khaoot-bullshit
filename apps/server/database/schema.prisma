@@ -1,0 +1,378 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SessionMode {
+  LIVE
+  REHEARSAL
+}
+
+enum SessionStatus {
+  LOBBY
+  RUNNING
+  PAUSED
+  RECOVERING
+  FINISHED
+}
+
+enum StageStatus {
+  ACTIVE
+  CLOSED
+  VOID
+}
+
+enum ScoreKind {
+  AWARD
+  ADJUSTMENT
+  REVERSAL
+  TRANSFER
+}
+
+enum DecisionReason {
+  VOTE
+  HOST
+  TIE_BREAK
+  FALLBACK
+}
+
+enum EventAudience {
+  HOST
+  DISPLAY
+  PLAYER
+}
+
+// Authoring: mutable drafts and immutable published versions share one database.
+model Creator {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issuer    String   @db.VarChar(512)
+  subject   String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  games     Game[]
+  versions  GameVersion[]
+  sessions  GameSession[]
+
+  @@unique([issuer, subject])
+  @@map("creators")
+}
+
+model Game {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creatorId  String    @db.Uuid
+  title      String    @db.VarChar(160)
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  creator  Creator       @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  draft    GameDraft?
+  versions GameVersion[]
+
+  @@index([creatorId, archivedAt])
+  @@map("games")
+}
+
+model GameDraft {
+  gameId           String   @id @db.Uuid
+  revision         Int      @default(0)
+  definitionFormat Int      @default(1)
+  definition       Json     @db.JsonB
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+
+  @@map("game_drafts")
+}
+
+model GameVersion {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gameId           String   @db.Uuid
+  number           Int
+  definitionFormat Int      @default(1)
+  definition       Json     @db.JsonB
+  contentHash      String   @db.Char(64)
+  createdById      String   @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  game      Game          @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  createdBy Creator       @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  sessions  GameSession[]
+
+  @@unique([gameId, number])
+  @@map("game_versions")
+}
+
+// Runtime: each session uses one immutable version, never the current draft.
+model GameSession {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gameVersionId  String        @db.Uuid
+  hostId         String        @db.Uuid
+  mode           SessionMode   @default(LIVE)
+  status         SessionStatus @default(LOBBY)
+  roomCode       String?       @unique @db.VarChar(12)
+  revision       Int           @default(0)
+  currentNodeKey String?       @db.VarChar(128)
+  state          Json          @default("{}") @db.JsonB
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+  endedAt        DateTime?     @db.Timestamptz(3)
+
+  gameVersion GameVersion  @relation(fields: [gameVersionId], references: [id], onDelete: Restrict)
+  host        Creator      @relation(fields: [hostId], references: [id], onDelete: Restrict)
+  players     SessionPlayer[]
+  teams       SessionTeam[]
+  lineups     TeamLineup[]
+  stages      StageRun[]
+  commands    GameCommand[]
+  auditEvents AuditEvent[]
+  outbox      OutboxEvent[]
+
+  @@index([hostId, status])
+  @@index([gameVersionId])
+  @@map("game_sessions")
+}
+
+model SessionPlayer {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String    @db.Uuid
+  displayName String    @db.VarChar(40)
+  joinedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  leftAt      DateTime? @db.Timestamptz(3)
+
+  session     GameSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  credentials PlayerCredential[]
+  memberships TeamMember[]
+  submissions Submission[]
+  scores      ScoreEntry[]
+
+  @@unique([sessionId, id])
+  @@map("session_players")
+}
+
+model PlayerCredential {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String    @db.Uuid
+  playerId  String    @db.Uuid
+  tokenHash String    @unique @db.Char(64)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  player SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+
+  @@index([sessionId, playerId])
+  @@map("player_credentials")
+}
+
+model SessionTeam {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String   @db.Uuid
+  name      String   @db.VarChar(60)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  session     GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  memberships TeamMember[]
+  submissions Submission[]
+  scores      ScoreEntry[]
+
+  @@unique([sessionId, id])
+  @@unique([sessionId, name])
+  @@map("session_teams")
+}
+
+model TeamLineup {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String   @db.Uuid
+  number    Int
+  carryover Json     @default("{}") @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  members TeamMember[]
+  stages  StageRun[]
+  scores  ScoreEntry[]
+
+  @@unique([sessionId, id])
+  @@unique([sessionId, number])
+  @@map("team_lineups")
+}
+
+model TeamMember {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String  @db.Uuid
+  lineupId  String  @db.Uuid
+  teamId    String  @db.Uuid
+  playerId  String  @db.Uuid
+  isCaptain Boolean @default(false)
+
+  lineup TeamLineup    @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
+  team   SessionTeam   @relation(fields: [sessionId, teamId], references: [sessionId, id], onDelete: Restrict)
+  player SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+
+  @@unique([lineupId, playerId])
+  @@index([sessionId, teamId])
+  @@map("team_members")
+}
+
+model StageRun {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId        String      @db.Uuid
+  number           Int
+  nodeKey          String      @db.VarChar(128)
+  stageKey         String      @db.VarChar(128)
+  status           StageStatus @default(ACTIVE)
+  lineupId         String?     @db.Uuid
+  eligibility      Json        @default("{}") @db.JsonB
+  presentation     Json        @default("{}") @db.JsonB
+  openedAt         DateTime    @default(now()) @db.Timestamptz(3)
+  deadlineAt       DateTime?   @db.Timestamptz(3)
+  pausedRemainingMs Int?
+  closedAt         DateTime?   @db.Timestamptz(3)
+
+  session     GameSession   @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  lineup      TeamLineup?   @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
+  submissions Submission[]
+  decision    RouteDecision?
+  scores      ScoreEntry[]
+
+  @@unique([sessionId, id])
+  @@unique([sessionId, number])
+  @@map("stage_runs")
+}
+
+model Submission {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId  String   @db.Uuid
+  stageRunId String   @db.Uuid
+  actorKey   String   @db.VarChar(160)
+  slotKey    String   @default("answer") @db.VarChar(128)
+  playerId   String?  @db.Uuid
+  teamId     String?  @db.Uuid
+  revision   Int      @default(0)
+  value      Json     @db.JsonB
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  stage  StageRun       @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  player SessionPlayer? @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  team   SessionTeam?   @relation(fields: [sessionId, teamId], references: [sessionId, id], onDelete: Restrict)
+
+  @@unique([stageRunId, actorKey, slotKey])
+  @@index([sessionId, stageRunId])
+  @@map("submissions")
+}
+
+model RouteDecision {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId          String         @db.Uuid
+  stageRunId         String         @unique @db.Uuid
+  commandId          String         @db.Uuid
+  selectedEdgeKey    String         @db.VarChar(128)
+  destinationNodeKey String         @db.VarChar(128)
+  reason             DecisionReason
+  voteSnapshot       Json           @db.JsonB
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+
+  stage   StageRun    @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  command GameCommand @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
+
+  @@unique([sessionId, stageRunId])
+  @@map("route_decisions")
+}
+
+// A row represents a committed outcome, written with its related state/audit/outbox.
+model GameCommand {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String   @db.Uuid
+  commandKey  String   @db.Uuid
+  actorKey    String   @db.VarChar(160)
+  type        String   @db.VarChar(80)
+  requestHash String   @db.Char(64)
+  result      Json     @db.JsonB
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  session   GameSession    @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  scores    ScoreEntry[]
+  decisions RouteDecision[]
+  audit     AuditEvent[]
+
+  @@unique([sessionId, id])
+  @@unique([sessionId, actorKey, commandKey])
+  @@map("game_commands")
+}
+
+// Signed fixed-point integers: 1,000 milli-points = 1 point. Never JS floats.
+model ScoreEntry {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId         String    @db.Uuid
+  commandId         String    @db.Uuid
+  awardKey          String    @db.VarChar(200)
+  stageRunId        String?   @db.Uuid
+  lineupId          String?   @db.Uuid
+  recipientPlayerId String?   @db.Uuid
+  recipientTeamId   String?   @db.Uuid
+  amountMilli       BigInt
+  kind              ScoreKind
+  reason            String    @db.VarChar(240)
+  reversesEntryId   String?   @db.Uuid
+  transferGroupId   String?   @db.Uuid
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+
+  command    GameCommand    @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
+  stage      StageRun?      @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  lineup     TeamLineup?    @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
+  player     SessionPlayer? @relation(fields: [sessionId, recipientPlayerId], references: [sessionId, id], onDelete: Restrict)
+  team       SessionTeam?   @relation(fields: [sessionId, recipientTeamId], references: [sessionId, id], onDelete: Restrict)
+  reverses   ScoreEntry?    @relation("ScoreCorrection", fields: [sessionId, reversesEntryId], references: [sessionId, id], onDelete: Restrict)
+  corrections ScoreEntry[] @relation("ScoreCorrection")
+
+  @@unique([sessionId, id])
+  @@unique([sessionId, awardKey])
+  @@index([sessionId, recipientPlayerId])
+  @@index([sessionId, recipientTeamId])
+  @@index([sessionId, transferGroupId])
+  @@map("score_entries")
+}
+
+model AuditEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String   @db.Uuid
+  commandId String?  @db.Uuid
+  revision  Int
+  eventIndex Int     @default(0)
+  kind      String   @db.VarChar(100)
+  details   Json     @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  session GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  command GameCommand? @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
+
+  @@unique([sessionId, revision, eventIndex])
+  @@map("audit_events")
+}
+
+model OutboxEvent {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String        @db.Uuid
+  revision    Int
+  eventIndex  Int           @default(0)
+  audience    EventAudience
+  audienceKey String        @db.VarChar(160)
+  type        String        @db.VarChar(100)
+  payload     Json          @db.JsonB
+  attempts    Int           @default(0)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  availableAt DateTime      @default(now()) @db.Timestamptz(3)
+  publishedAt DateTime?     @db.Timestamptz(3)
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, revision, eventIndex, audienceKey])
+  @@index([publishedAt, availableAt])
+  @@map("outbox_events")
+}

@@ -1,0 +1,314 @@
+<div id="dual-editor-branching">
+  <article class="builder" aria-label="Party game builder concept">
+    <header class="appbar"><div class="brand"><span class="brand-mark" aria-hidden="true">p.</span><div><strong>Friday Night Chaos</strong><span class="subtle">Your games / Draft</span></div></div><div class="app-actions"><span class="draft-pill">CONCEPT</span><button type="button" class="rehearse">Rehearse route <span aria-hidden="true">↗</span></button></div></header>
+    <div class="viewbar"><div class="view-tabs" role="tablist" aria-label="Editor view"><button id="branch-flow-tab" role="tab" aria-controls="branch-flow-view" aria-selected="true" type="button">Flow editor</button><button id="branch-scenes-tab" role="tab" aria-controls="branch-scenes-view" aria-selected="false" type="button">Scene editor</button></div><span class="view-context">Game overview · 5 scenes, 2 routes</span></div>
+    <div class="editor-body">
+      <main class="main-editor">
+        <section id="branch-flow-view" role="tabpanel" aria-labelledby="branch-flow-tab">
+          <div class="flow-tools"><span class="tool-caption">GAME FLOW</span><span class="flow-hint">Double-click a scene to edit</span></div>
+          <div class="flow-canvas" aria-label="Opening connects to party choice; Music Mayhem and Living Sculpture are alternative routes that both reconnect to the finale">
+            <svg class="connections" aria-hidden="true"><defs><marker id="branch-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 1 1 L 7 4 L 1 7" fill="none" stroke="context-stroke" stroke-width="1.2"></path></marker></defs><g class="edge-layer"></g></svg>
+            <button type="button" class="flow-node opening" data-node="opening"><span class="node-type">CUTSCENE</span><span class="node-art intro-art" aria-hidden="true">FRIDAY<br>NIGHT.</span><strong class="node-title">Opening</strong><span class="node-meta">30 sec · Host continues</span><span class="port out" aria-hidden="true"></span></button>
+            <button type="button" class="flow-node choice selected" data-node="choice"><span class="port in" aria-hidden="true"></span><span class="node-type choice-type">PARTY CHOICE</span><span class="choice-art" aria-hidden="true">↗<br>↘</span><strong class="node-title">Choose your challenge</strong><span class="node-meta">Everyone votes · 20 sec</span><span class="port out upper" aria-hidden="true"></span><span class="port out lower" aria-hidden="true"></span></button>
+            <button type="button" class="flow-node music" data-node="music"><span class="port in" aria-hidden="true"></span><span class="node-type">MUSIC ROUTE</span><span class="node-art music-art" aria-hidden="true">♪</span><strong class="node-title">Music Mayhem</strong><span class="node-meta">Quiz · Name that tune</span><span class="port out" aria-hidden="true"></span></button>
+            <button type="button" class="flow-node physical" data-node="physical"><span class="port in" aria-hidden="true"></span><span class="node-type">PHYSICAL ROUTE</span><span class="node-art physical-art" aria-hidden="true">LET'S<br>MOVE.</span><strong class="node-title">Living Sculpture</strong><span class="node-meta">Challenge · Host judges</span><span class="port out" aria-hidden="true"></span></button>
+            <button type="button" class="flow-node finale" data-node="finale"><span class="port in upper" aria-hidden="true"></span><span class="port in lower" aria-hidden="true"></span><span class="node-type">REJOIN · RESULTS</span><span class="node-art finale-art" aria-hidden="true">★</span><strong class="node-title">Shared finale</strong><span class="node-meta">Both routes finish here</span></button>
+          </div>
+          <div class="flow-bottom"><span><span class="status-dot"></span>Every route reaches the finale</span><button type="button" class="edit-selected">Edit selected scene →</button></div>
+        </section>
+        <section id="branch-scenes-view" role="tabpanel" aria-labelledby="branch-scenes-tab" hidden>
+          <div class="scene-workspace">
+            <nav class="slide-list" aria-label="Slides and branches">
+              <button class="slide-thumb" type="button" data-scene="opening"><span class="thumb-number">01</span><span><span class="mini-slide intro-mini">FRIDAY NIGHT</span><strong class="thumb-name">Opening</strong></span></button>
+              <button class="slide-thumb selected" type="button" data-scene="choice"><span class="thumb-number">02</span><span><span class="mini-slide choice-mini">YOU DECIDE.<span>Music / Physical</span></span><strong class="thumb-name">Party choice</strong></span></button>
+              <div class="branch-label">BRANCH A · MUSIC</div>
+              <button class="slide-thumb" type="button" data-scene="music"><span class="thumb-number">A</span><span><span class="mini-slide music-mini">NAME THAT TUNE</span><strong class="thumb-name">Music Mayhem</strong></span></button>
+              <div class="branch-label">BRANCH B · PHYSICAL</div>
+              <button class="slide-thumb" type="button" data-scene="physical"><span class="thumb-number">B</span><span><span class="mini-slide physical-mini">MAKE A SCULPTURE</span><strong class="thumb-name">Living Sculpture</strong></span></button>
+              <div class="branch-label">ROUTES REJOIN</div>
+              <button class="slide-thumb" type="button" data-scene="finale"><span class="thumb-number">03</span><span><span class="mini-slide finale-mini">THE WINNERS</span><strong class="thumb-name">Shared finale</strong></span></button>
+            </nav>
+            <div class="slide-workarea"><div class="slide-toolbar"><span class="tool-caption">SCENE CONTENT</span><div class="device-tabs" aria-label="Preview device"><button type="button" data-device="host" aria-pressed="true">Host</button><button type="button" data-device="phone" aria-pressed="false">Phone</button></div></div>
+              <div class="slide-stage" aria-label="Game presentation preview">
+                <div class="presentation"><div class="presentation-top"><span>FRIDAY NIGHT CHAOS</span><span class="presentation-kind">PARTY CHOICE</span></div><div class="slide-content"><span class="game-eyebrow">THE NEXT ROUND IS UP TO YOU</span><h2 class="game-title">Choose your challenge</h2><p class="game-description">One party. Two paths. What happens next?</p><div class="game-options"><button type="button" data-game-route="music"><span class="option-icon" aria-hidden="true">♪</span><strong>Music Mayhem</strong><span>Name that tune</span></button><button type="button" data-game-route="physical"><span class="option-icon" aria-hidden="true">↗</span><strong>Living Sculpture</strong><span>Get up. Get creative.</span></button></div><div class="generic-scene" hidden><span class="generic-symbol" aria-hidden="true">★</span></div></div><div class="presentation-bottom"><span class="game-footnote">Vote on your phone</span><span class="game-timer">20 seconds</span></div></div>
+              </div>
+              <div class="scene-sequence"><span class="stage-tag active">Show prompt</span><span aria-hidden="true">→</span><span class="stage-tag">Collect votes</span><span aria-hidden="true">→</span><span class="stage-tag">Choose route</span></div>
+              <div class="speaker-notes"><span>HOST NOTES</span><p>Tell everyone: “You choose what we play next.” Both routes lead to the same finale.</p></div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <aside class="inspector" aria-label="Selected scene settings"><div class="inspector-heading"><span class="tool-caption">SELECTED SCENE</span><span class="inspector-type">Party choice</span></div><label class="field">Scene title<input class="scene-title-input" type="text" value="Choose your challenge" maxlength="64"></label><div class="choice-settings"><label class="field">Who decides?<select class="decision-select"><option value="players">Everyone · one vote each</option><option value="teams">Teams · captain votes</option><option value="host">Host decides</option></select></label><div class="field-pair"><label class="field">Timer<select class="timer-select"><option value="20 seconds">20 s</option><option value="30 seconds">30 s</option><option value="Host closes">Manual</option></select></label><label class="field">On a tie<select class="tie-select"><option value="Host chooses">Host</option><option value="Runoff vote">Runoff</option><option value="Random route">Random</option></select></label></div><div class="settings-divider"></div><div class="tool-caption">CONNECTED ROUTES</div><div class="route-setting"><span class="route-dot music-dot"></span><div><strong>Music wins</strong><span class="music-destination">Music Mayhem</span></div><span aria-hidden="true">↗</span></div><div class="route-setting"><span class="route-dot physical-dot"></span><div><strong>Physical wins</strong><span class="physical-destination">Living Sculpture</span></div><span aria-hidden="true">↗</span></div><div class="rejoin-note">Both routes → <span class="finale-destination">Shared finale</span></div></div><div class="other-settings" hidden><span class="tool-caption">SCENE BEHAVIOR</span><p class="scene-behavior">Host-controlled presentation.</p></div><button type="button" class="back-to-choice">Select party choice</button></aside>
+    </div>
+    <div class="rehearsal-bar"><div class="rehearsal-picker"><span>TRY A ROUTE</span><button type="button" data-preview-route="music" aria-pressed="false">Music wins</button><button type="button" data-preview-route="physical" aria-pressed="false">Physical wins</button><button type="button" data-preview-route="none" class="clear-route">Clear</button></div><p class="route-summary" aria-live="polite">Opening → Party choice → selected route → Finale</p></div>
+    <footer class="editor-footer"><span class="edit-status" aria-live="polite">Same game, two editing views.</span><span>Workspace: Studio · Game: After Hours</span></footer>
+  </article>
+</div>
+<style>
+#dual-editor-branching {color-scheme:light dark;}
+#dual-editor-branching .builder {--e-bg:light-dark(#f7f7fa,#181a21);--e-panel:light-dark(#ffffff,#22252e);--e-ink:light-dark(#262b36,#eef0f5);--e-muted:light-dark(#656c7d,#b0b6c6);--e-line:light-dark(#e0e3eb,#3e4352);--e-accent:light-dark(#6844ca,#b9a2ff);--e-accent-ink:light-dark(#ffffff,#251645);--e-soft:light-dark(#f0eaff,#3a2d53);--e-grid:light-dark(#cbd0dd,#464b5a);--e-node:12px;--music:light-dark(#92610d,#edc76c);--music-soft:light-dark(#fff3d4,#42391e);--physical:light-dark(#1d776c,#82d2c2);--physical-soft:light-dark(#dcf4ee,#1c3936);font:13px/1.5 system-ui,sans-serif;background:var(--e-bg);color:var(--e-ink);border:1px solid var(--e-line);border-radius:15px;overflow:clip;}
+#dual-editor-branching .builder * {box-sizing:border-box;}
+#dual-editor-branching .builder p,#dual-editor-branching .builder h2 {margin:0;}
+#dual-editor-branching .builder button,#dual-editor-branching .builder input,#dual-editor-branching .builder select {font:inherit;}
+#dual-editor-branching .builder button,#dual-editor-branching .builder select {cursor:var(--cursor-interaction,pointer);}
+#dual-editor-branching .builder button:focus-visible,#dual-editor-branching .builder input:focus-visible,#dual-editor-branching .builder select:focus-visible {outline:3px solid var(--e-accent);outline-offset:3px;}
+#dual-editor-branching .appbar {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:19px 22px;background:var(--e-panel);border-bottom:1px solid var(--e-line);}
+#dual-editor-branching .brand {display:flex;gap:12px;align-items:center;min-width:0;}
+#dual-editor-branching .brand-mark {display:grid;place-items:center;width:36px;height:36px;background:var(--e-ink);color:var(--e-panel);border-radius:10px;font:700 25px/1 Georgia,serif;}
+#dual-editor-branching .brand strong {display:block;font-size:14px;}
+#dual-editor-branching .subtle {display:block;font-size:11px;color:var(--e-muted);margin-top:2px;}
+#dual-editor-branching .app-actions {display:flex;gap:15px;align-items:center;}
+#dual-editor-branching .draft-pill {font-size:10px;color:var(--e-muted);letter-spacing:.08em;}
+#dual-editor-branching .rehearse {background:var(--e-accent);color:var(--e-accent-ink);border:0;border-radius:7px;padding:9px 12px;font-size:12px;}
+#dual-editor-branching .viewbar {padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--e-panel);border-bottom:1px solid var(--e-line);}
+#dual-editor-branching .view-tabs {display:flex;padding:3px;background:var(--e-bg);border-radius:8px;gap:3px;}
+#dual-editor-branching .view-tabs button {border:0;background:transparent;color:var(--e-muted);padding:7px 13px;border-radius:6px;font-size:12px;}
+#dual-editor-branching .view-tabs [aria-selected=true] {background:var(--e-panel);color:var(--e-ink);box-shadow:0 1px 4px #00000012;font-weight:600;}
+#dual-editor-branching .view-context {font-size:11px;color:var(--e-muted);}
+#dual-editor-branching .editor-body {display:grid;grid-template-columns:minmax(0,1fr) 228px;}
+#dual-editor-branching .main-editor {min-width:0;}
+#dual-editor-branching [role=tabpanel] {min-height:578px;}
+#dual-editor-branching [hidden] {display:none!important;}
+#dual-editor-branching .flow-tools {padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;}
+#dual-editor-branching .tool-caption {font-size:10px;letter-spacing:.09em;font-weight:650;color:var(--e-muted);}
+#dual-editor-branching .flow-hint {font-size:11px;color:var(--e-muted);}
+#dual-editor-branching .flow-canvas {position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,126px);gap:17px 25px;padding:20px;align-items:center;background-image:radial-gradient(var(--e-grid) .7px,transparent .7px);background-size:17px 17px;isolation:isolate;}
+#dual-editor-branching .connections {position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:-1;pointer-events:none;}
+#dual-editor-branching .edge-path {fill:none;stroke:var(--e-grid);stroke-width:1.6;marker-end:url(#branch-arrow);transition:stroke 160ms;}
+#dual-editor-branching .edge-path.chosen {stroke:var(--e-accent);stroke-width:2.5;}
+#dual-editor-branching .edge-path.not-chosen {opacity:.3;}
+#dual-editor-branching .edge-label {font:11px system-ui,sans-serif;fill:var(--e-muted);paint-order:stroke;stroke:var(--e-bg);stroke-width:5px;stroke-linejoin:round;}
+#dual-editor-branching .flow-node {position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:100%;min-height:125px;padding:12px 10px;border:1px solid var(--e-line);border-radius:var(--e-node);color:var(--e-ink);background:var(--e-panel);box-shadow:0 3px 8px #00000008;}
+#dual-editor-branching .flow-node.selected {outline:2px solid var(--e-accent);outline-offset:3px;}
+#dual-editor-branching .flow-node.route-active {border-color:var(--e-accent);box-shadow:0 0 0 4px var(--e-soft);}
+#dual-editor-branching .flow-node.route-muted {opacity:.5;}
+#dual-editor-branching .node-type {font-size:9px;font-weight:650;letter-spacing:.04em;color:var(--e-muted);}
+#dual-editor-branching .node-title {font-size:12px;line-height:1.35;margin-top:7px;overflow-wrap:anywhere;}
+#dual-editor-branching .node-meta {font-size:10px;color:var(--e-muted);margin-top:4px;}
+#dual-editor-branching .node-art {margin-top:9px;width:100%;height:43px;border-radius:5px;display:grid;place-items:center;text-align:center;font-size:16px;line-height:1;font-weight:750;letter-spacing:-.05em;}
+#dual-editor-branching .intro-art {background:var(--e-ink);color:var(--e-panel);font-size:13px;}
+#dual-editor-branching .music-art {background:var(--music-soft);color:var(--music);font-size:30px;}
+#dual-editor-branching .physical-art {background:var(--physical-soft);color:var(--physical);font-size:13px;}
+#dual-editor-branching .finale-art {background:var(--e-soft);color:var(--e-accent);font-size:25px;}
+#dual-editor-branching .choice-art {font-size:26px;line-height:.66;margin-top:14px;color:var(--e-accent);height:39px;letter-spacing:-.2em;}
+#dual-editor-branching .choice-type {color:var(--e-accent);}
+#dual-editor-branching .opening {grid-column:1;grid-row:2;}
+#dual-editor-branching .choice {grid-column:2;grid-row:2;}
+#dual-editor-branching .music {grid-column:3;grid-row:1;}
+#dual-editor-branching .physical {grid-column:3;grid-row:3;}
+#dual-editor-branching .finale {grid-column:4;grid-row:2;}
+#dual-editor-branching .port {position:absolute;width:9px;height:9px;background:var(--e-panel);border:1.5px solid var(--e-muted);border-radius:50%;top:50%;transform:translateY(-50%);}
+#dual-editor-branching .port.in {left:-5px;}
+#dual-editor-branching .port.out {right:-5px;}
+#dual-editor-branching .port.upper {top:34%;}
+#dual-editor-branching .port.lower {top:71%;}
+#dual-editor-branching .choice .port {border-color:var(--e-accent);}
+#dual-editor-branching .flow-bottom {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:19px 20px;font-size:11px;color:var(--e-muted);}
+#dual-editor-branching .status-dot {display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--physical);margin-right:6px;}
+#dual-editor-branching .edit-selected {padding:7px 10px;background:var(--e-panel);border:1px solid var(--e-line);border-radius:6px;color:var(--e-accent);font-size:11px;}
+#dual-editor-branching .inspector {padding:20px 17px;background:var(--e-panel);border-left:1px solid var(--e-line);}
+#dual-editor-branching .inspector-heading {display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:20px;}
+#dual-editor-branching .inspector-type {font-size:10px;color:var(--e-accent);}
+#dual-editor-branching .field {display:block;font-size:11px;color:var(--e-muted);margin:15px 0;}
+#dual-editor-branching .field input,#dual-editor-branching .field select {display:block;width:100%;min-width:0;margin-top:6px;padding:8px 7px;font-size:11px;border:1px solid var(--e-line);border-radius:6px;color:var(--e-ink);background:var(--e-panel);}
+#dual-editor-branching .field-pair {display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+#dual-editor-branching .field-pair .field {margin-top:0;}
+#dual-editor-branching .settings-divider {height:1px;background:var(--e-line);margin:22px 0;}
+#dual-editor-branching .route-setting {display:flex;align-items:center;gap:9px;padding:14px 0;border-bottom:1px solid var(--e-line);font-size:11px;}
+#dual-editor-branching .route-setting>div {flex:1;min-width:0;}
+#dual-editor-branching .route-setting strong {display:block;font-weight:550;}
+#dual-editor-branching .route-setting>div>span {display:block;color:var(--e-muted);margin-top:3px;overflow-wrap:anywhere;}
+#dual-editor-branching .route-dot {width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
+#dual-editor-branching .music-dot {background:var(--music);}
+#dual-editor-branching .physical-dot {background:var(--physical);}
+#dual-editor-branching .rejoin-note {font-size:11px;color:var(--e-muted);margin-top:15px;}
+#dual-editor-branching .back-to-choice {margin-top:23px;padding:7px 9px;background:var(--e-bg);border:1px solid var(--e-line);border-radius:6px;font-size:11px;color:var(--e-ink);}
+#dual-editor-branching .scene-behavior {font-size:12px;margin-top:12px!important;}
+#dual-editor-branching .scene-workspace {display:grid;grid-template-columns:137px minmax(0,1fr);min-height:578px;}
+#dual-editor-branching .slide-list {padding:14px 9px;background:var(--e-panel);border-right:1px solid var(--e-line);}
+#dual-editor-branching .slide-thumb {display:flex;gap:7px;padding:7px 4px;background:transparent;border:0;width:100%;color:var(--e-ink);text-align:left;border-radius:6px;}
+#dual-editor-branching .slide-thumb.selected {background:var(--e-soft);}
+#dual-editor-branching .thumb-number {font-size:10px;color:var(--e-muted);width:12px;flex:0 0 auto;}
+#dual-editor-branching .slide-thumb>span:last-child {flex:1;min-width:0;}
+#dual-editor-branching .mini-slide {display:flex;flex-direction:column;justify-content:center;align-items:center;width:100%;height:48px;font-size:9px;font-weight:750;line-height:1.3;letter-spacing:-.03em;text-align:center;border-radius:3px;}
+#dual-editor-branching .mini-slide>span {font-size:8px;margin-top:4px;font-weight:400;letter-spacing:0;}
+#dual-editor-branching .intro-mini {background:var(--e-ink);color:var(--e-panel);}
+#dual-editor-branching .choice-mini {background:var(--e-soft);color:var(--e-accent);border:1px solid var(--e-accent);}
+#dual-editor-branching .music-mini {background:var(--music-soft);color:var(--music);}
+#dual-editor-branching .physical-mini {background:var(--physical-soft);color:var(--physical);}
+#dual-editor-branching .finale-mini {background:var(--e-soft);color:var(--e-accent);}
+#dual-editor-branching .thumb-name {display:block;font-size:10px;font-weight:450;line-height:1.3;margin-top:5px;overflow-wrap:anywhere;}
+#dual-editor-branching .branch-label {font-size:8px;color:var(--e-muted);letter-spacing:.03em;margin:12px 0 4px 20px;}
+#dual-editor-branching .slide-workarea {padding:18px;min-width:0;}
+#dual-editor-branching .slide-toolbar {display:flex;justify-content:space-between;align-items:center;gap:10px;}
+#dual-editor-branching .device-tabs {display:flex;gap:2px;}
+#dual-editor-branching .device-tabs button {font-size:10px;padding:5px 8px;border:0;border-radius:4px;color:var(--e-muted);background:transparent;}
+#dual-editor-branching .device-tabs [aria-pressed=true] {background:var(--e-panel);color:var(--e-ink);}
+#dual-editor-branching .slide-stage {--g-accent:#c9b5ff;--g-bg:#231444;--g-ink:#faf6ff;--g-muted:#d1c1e7;--g-panel:#372255;--g-border:#695181;margin-top:24px;display:flex;justify-content:center;min-height:333px;align-items:center;}
+#dual-editor-branching .presentation {background:var(--g-bg);color:var(--g-ink);border-radius:10px;width:100%;padding:18px;box-shadow:0 6px 15px #00000012;min-height:310px;display:flex;flex-direction:column;}
+#dual-editor-branching .presentation-top {display:flex;justify-content:space-between;gap:12px;font-size:8px;letter-spacing:.08em;color:var(--g-muted);padding-bottom:16px;border-bottom:1px solid var(--g-border);}
+#dual-editor-branching .slide-content {padding-top:26px;}
+#dual-editor-branching .game-eyebrow {font-size:8px;letter-spacing:.09em;color:var(--g-accent);}
+#dual-editor-branching .game-title {font-size:clamp(22px,3vw,35px);line-height:1.12;letter-spacing:-.04em;margin:9px 0!important;overflow-wrap:anywhere;}
+#dual-editor-branching .game-description {font-size:11px;color:var(--g-muted);}
+#dual-editor-branching .game-options {display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px;}
+#dual-editor-branching .game-options button {display:flex;flex-direction:column;text-align:left;gap:6px;padding:13px 12px;color:var(--g-ink);background:var(--g-panel);border:1px solid var(--g-border);border-radius:8px;}
+#dual-editor-branching .game-options button.route-picked {border-color:var(--g-accent);box-shadow:0 0 0 2px var(--g-accent);}
+#dual-editor-branching .option-icon {font-size:25px;line-height:1;color:var(--g-accent);}
+#dual-editor-branching .game-options strong {font-size:13px;font-weight:550;}
+#dual-editor-branching .game-options button>span:last-child {font-size:10px;color:var(--g-muted);}
+#dual-editor-branching .presentation-bottom {margin-top:auto;padding-top:24px;display:flex;justify-content:space-between;gap:8px;font-size:9px;color:var(--g-muted);}
+#dual-editor-branching .generic-symbol {display:block;text-align:center;font-size:64px;padding:20px;color:var(--g-accent);}
+#dual-editor-branching .slide-stage.phone-mode .presentation {width:195px;border:5px solid var(--e-ink);border-radius:25px;min-height:350px;padding:16px 13px;}
+#dual-editor-branching .slide-stage.phone-mode .presentation-top {font-size:8px;}
+#dual-editor-branching .slide-stage.phone-mode .presentation-top>span:first-child {display:none;}
+#dual-editor-branching .slide-stage.phone-mode .game-title {font-size:23px;}
+#dual-editor-branching .slide-stage.phone-mode .game-options {grid-template-columns:1fr;gap:9px;margin-top:18px;}
+#dual-editor-branching .slide-stage.phone-mode .option-icon {display:none;}
+#dual-editor-branching .slide-stage.phone-mode .game-options button {padding:12px 10px;}
+#dual-editor-branching .slide-stage.phone-mode .game-description {display:none;}
+#dual-editor-branching .slide-stage.phone-mode .slide-content {padding-top:18px;}
+#dual-editor-branching .scene-sequence {display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;color:var(--e-muted);margin-top:22px;}
+#dual-editor-branching .stage-tag {padding:5px 7px;}
+#dual-editor-branching .stage-tag.active {background:var(--e-panel);color:var(--e-ink);border-radius:4px;}
+#dual-editor-branching .speaker-notes {margin-top:20px;padding-top:15px;border-top:1px solid var(--e-line);}
+#dual-editor-branching .speaker-notes>span {font-size:9px;letter-spacing:.08em;color:var(--e-muted);}
+#dual-editor-branching .speaker-notes p {font-size:11px;color:var(--e-muted);margin-top:7px;}
+#dual-editor-branching .rehearsal-bar {padding:15px 20px;border-top:1px solid var(--e-line);display:flex;flex-direction:column;gap:10px;background:var(--e-panel);}
+#dual-editor-branching .rehearsal-picker {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#dual-editor-branching .rehearsal-picker>span {font-size:10px;letter-spacing:.07em;color:var(--e-muted);margin-right:5px;}
+#dual-editor-branching .rehearsal-picker button {font-size:11px;padding:6px 10px;border:1px solid var(--e-line);border-radius:6px;color:var(--e-ink);background:var(--e-panel);}
+#dual-editor-branching .rehearsal-picker [aria-pressed=true] {background:var(--e-soft);border-color:var(--e-accent);color:var(--e-accent);}
+#dual-editor-branching .rehearsal-picker .clear-route {border-color:transparent;color:var(--e-muted);}
+#dual-editor-branching .route-summary {font-size:11px;color:var(--e-muted);}
+#dual-editor-branching .editor-footer {display:flex;justify-content:space-between;gap:15px;padding:11px 20px;border-top:1px solid var(--e-line);font-size:10px;color:var(--e-muted);}
+@media(max-width:900px){#dual-editor-branching .editor-body {grid-template-columns:1fr;}#dual-editor-branching .inspector {border-left:0;border-top:1px solid var(--e-line);display:grid;grid-template-columns:1fr 1fr;gap:0 24px;}#dual-editor-branching .inspector-heading {grid-column:1/-1;margin-bottom:0;}#dual-editor-branching .inspector>.field {grid-column:1;}#dual-editor-branching .choice-settings {grid-column:2;grid-row:2/5;}#dual-editor-branching .back-to-choice {grid-column:1;align-self:start;margin-top:4px;width:fit-content;}#dual-editor-branching .inspector .settings-divider {margin:12px 0;}#dual-editor-branching [role=tabpanel] {min-height:578px;}}
+@media(max-width:620px){#dual-editor-branching .appbar {padding:13px;gap:8px;}#dual-editor-branching .brand strong {font-size:12px;}#dual-editor-branching .brand-mark {display:none;}#dual-editor-branching .draft-pill {display:none;}#dual-editor-branching .rehearse {font-size:11px;padding:8px;}#dual-editor-branching .viewbar {padding:10px 12px;}#dual-editor-branching .view-context {display:none;}#dual-editor-branching .flow-tools {padding:14px 12px;flex-wrap:wrap;}#dual-editor-branching .flow-hint {font-size:10px;}#dual-editor-branching .flow-canvas {grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,132px);gap:32px 28px;padding:18px 24px;}#dual-editor-branching .opening {grid-column:1/-1;grid-row:1;max-width:180px;justify-self:center;}#dual-editor-branching .choice {grid-column:1/-1;grid-row:2;max-width:200px;justify-self:center;}#dual-editor-branching .music {grid-column:1;grid-row:3;}#dual-editor-branching .physical {grid-column:2;grid-row:3;}#dual-editor-branching .finale {grid-column:1/-1;grid-row:4;max-width:180px;justify-self:center;}#dual-editor-branching .node-type {font-size:10px;}#dual-editor-branching .node-meta {font-size:11px;}#dual-editor-branching .port.in {top:-5px;left:50%;transform:translateX(-50%);}#dual-editor-branching .port.out {top:auto;bottom:-5px;left:50%;right:auto;transform:translateX(-50%);}#dual-editor-branching .choice .port.upper {left:30%;}#dual-editor-branching .choice .port.lower {left:70%;}#dual-editor-branching .finale .port.upper {left:30%;}#dual-editor-branching .finale .port.lower {left:70%;}#dual-editor-branching .flow-bottom {padding:16px 12px;flex-wrap:wrap;}#dual-editor-branching .inspector {grid-template-columns:1fr;padding:16px;}#dual-editor-branching .choice-settings {grid-column:1;grid-row:auto;}#dual-editor-branching .inspector-heading {grid-column:1;}#dual-editor-branching .back-to-choice {grid-column:1;}#dual-editor-branching .scene-workspace {grid-template-columns:1fr;}#dual-editor-branching .slide-list {display:flex;flex-wrap:wrap;gap:6px;padding:10px;border-right:0;border-bottom:1px solid var(--e-line);}#dual-editor-branching .slide-thumb {width:calc(33.333% - 4px);padding:5px;gap:4px;}#dual-editor-branching .thumb-number {width:10px;}#dual-editor-branching .branch-label {display:none;}#dual-editor-branching .thumb-name {font-size:10px;}#dual-editor-branching .slide-workarea {padding:15px 12px;}#dual-editor-branching .game-options {gap:8px;}#dual-editor-branching .game-options button {padding:12px 9px;}#dual-editor-branching .game-options strong {font-size:12px;}#dual-editor-branching .presentation {padding:15px;}#dual-editor-branching .slide-stage {min-height:350px;}#dual-editor-branching .editor-footer {flex-direction:column;gap:4px;}#dual-editor-branching [role=tabpanel] {min-height:780px;}}
+@media(pointer:coarse){#dual-editor-branching .builder button,#dual-editor-branching .builder select,#dual-editor-branching .builder input {min-height:44px;}#dual-editor-branching .field input,#dual-editor-branching .field select {font-size:16px;}}
+@media(prefers-reduced-motion:reduce){#dual-editor-branching .edge-path {transition:none;}}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('dual-editor-branching');
+  const state = { view:'flow', selected:'choice', route:'none', device:'host', decision:'players', timer:'20 seconds', tie:'Host chooses', titles:{opening:'Opening',choice:'Choose your challenge',music:'Music Mayhem',physical:'Living Sculpture',finale:'Shared finale'} };
+  const types = {opening:'Cutscene',choice:'Party choice',music:'Music quiz',physical:'Room challenge',finale:'Final results'};
+  const canvas = root.querySelector('.flow-canvas');
+  const svg = root.querySelector('.connections');
+  const edgeLayer = svg.querySelector('.edge-layer');
+  const input = root.querySelector('.scene-title-input');
+  const edges = [
+    {from:'opening',to:'choice',out:'.out',into:'.in',route:'base'},
+    {from:'choice',to:'music',out:'.out.upper',into:'.in',route:'music',label:'Music'},
+    {from:'choice',to:'physical',out:'.out.lower',into:'.in',route:'physical',label:'Physical'},
+    {from:'music',to:'finale',out:'.out',into:'.in.upper',route:'music'},
+    {from:'physical',to:'finale',out:'.out',into:'.in.lower',route:'physical'}
+  ];
+  function save() {
+    if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{editorExample:{view:state.view,selectedScene:state.selected,previewRoute:state.route,device:state.device,choiceSettings:{decision:state.decision,timer:state.timer,tie:state.tie},sceneTitles:state.titles}},privateContent:{device:state.device}}).catch(() => {});
+  }
+  function restore(snapshot) {
+    const saved = snapshot?.modelContent?.editorExample || snapshot?.editorExample;
+    if (!saved) return;
+    if (['flow','scenes'].includes(saved.view)) state.view=saved.view;
+    if (Object.hasOwn(types,saved.selectedScene)) state.selected=saved.selectedScene;
+    if (['none','music','physical'].includes(saved.previewRoute)) state.route=saved.previewRoute;
+    if (['host','phone'].includes(saved.device)) state.device=saved.device;
+    if (['players','teams','host'].includes(saved.choiceSettings?.decision)) state.decision=saved.choiceSettings.decision;
+    if (['20 seconds','30 seconds','Host closes'].includes(saved.choiceSettings?.timer)) state.timer=saved.choiceSettings.timer;
+    if (['Host chooses','Runoff vote','Random route'].includes(saved.choiceSettings?.tie)) state.tie=saved.choiceSettings.tie;
+    for (const key of Object.keys(types)) if (typeof saved.sceneTitles?.[key] === 'string') state.titles[key]=saved.sceneTitles[key].slice(0,64);
+  }
+  restore(window.openai?.widgetState);
+  function drawConnections() {
+    if (state.view !== 'flow') return;
+    const bounds = canvas.getBoundingClientRect();
+    const vertical = bounds.width <= 620 && root.getBoundingClientRect().width <= 620;
+    svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
+    edgeLayer.replaceChildren();
+    for (const edge of edges) {
+      const from = root.querySelector(`.flow-node[data-node="${edge.from}"] ${edge.out}`).getBoundingClientRect();
+      const into = root.querySelector(`.flow-node[data-node="${edge.to}"] ${edge.into}`).getBoundingClientRect();
+      const a={x:from.left+from.width/2-bounds.left,y:from.top+from.height/2-bounds.top};
+      const b={x:into.left+into.width/2-bounds.left,y:into.top+into.height/2-bounds.top};
+      const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+      const bend=vertical ? Math.max(16,Math.abs(b.y-a.y)/2) : Math.max(18,Math.abs(b.x-a.x)*.55);
+      path.setAttribute('d',vertical ? `M ${a.x} ${a.y} C ${a.x} ${a.y+bend}, ${b.x} ${b.y-bend}, ${b.x} ${b.y}` : `M ${a.x} ${a.y} C ${a.x+bend} ${a.y}, ${b.x-bend} ${b.y}, ${b.x} ${b.y}`);
+      path.setAttribute('class','edge-path'+(state.route!=='none' && (edge.route==='base'||edge.route===state.route) ? ' chosen' : state.route!=='none' ? ' not-chosen' : ''));
+      edgeLayer.append(path);
+      if (edge.label) {
+        const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+        label.textContent=edge.label;label.setAttribute('class','edge-label');label.setAttribute('text-anchor','middle');
+        label.setAttribute('text-anchor',vertical ? 'middle' : 'end');label.setAttribute('x',String(vertical ? (a.x+b.x)/2 : b.x-10));label.setAttribute('y',String(vertical ? (a.y+b.y)/2-5 : b.y-12));edgeLayer.append(label);
+      }
+    }
+  }
+  function render() {
+    const isChoice=state.selected==='choice';
+    root.querySelector('.decision-select').value=state.decision;
+    root.querySelector('.timer-select').value=state.timer;
+    root.querySelector('.tie-select').value=state.tie;
+    root.querySelector('.choice .node-meta').textContent=state.decision==='players' ? 'Everyone votes · '+state.timer : state.decision==='teams' ? 'Captains vote · '+state.timer : 'Host chooses the route';
+    root.querySelector('#branch-flow-view').hidden=state.view!=='flow';
+    root.querySelector('#branch-scenes-view').hidden=state.view!=='scenes';
+    root.querySelector('#branch-flow-tab').setAttribute('aria-selected',String(state.view==='flow'));
+    root.querySelector('#branch-scenes-tab').setAttribute('aria-selected',String(state.view==='scenes'));
+    root.querySelector('.view-context').textContent=state.view==='flow' ? 'Game overview · 5 scenes, 2 routes' : 'Scene content · host and phone previews';
+    root.querySelectorAll('.flow-node').forEach(node => {
+      const id=node.dataset.node;node.classList.toggle('selected',state.selected===id);node.querySelector('.node-title').textContent=state.titles[id];
+      const branch=['music','physical'].includes(id);node.classList.toggle('route-active',branch&&state.route===id);node.classList.toggle('route-muted',branch&&state.route!=='none'&&state.route!==id);
+    });
+    root.querySelectorAll('.slide-thumb').forEach(node => {node.classList.toggle('selected',node.dataset.scene===state.selected);node.querySelector('.thumb-name').textContent=state.titles[node.dataset.scene];});
+    root.querySelector('.inspector-type').textContent=types[state.selected];
+    if (document.activeElement!==input) input.value=state.titles[state.selected];
+    root.querySelector('.choice-settings').hidden=!isChoice;
+    root.querySelector('.other-settings').hidden=isChoice;
+    root.querySelector('.back-to-choice').hidden=isChoice;
+    root.querySelector('.scene-behavior').textContent=state.selected==='music' ? 'Private answers on phones. Correct answers award points.' : state.selected==='physical' ? 'Teams perform in the room. Host judges the result.' : state.selected==='finale' ? 'Both alternative routes continue here. Show individual and team winners.' : 'Play the introduction, then continue to the party choice.';
+    root.querySelector('.game-title').textContent=state.titles[state.selected];
+    root.querySelector('.presentation-kind').textContent=types[state.selected].toUpperCase();
+    root.querySelector('.game-eyebrow').textContent=isChoice ? 'THE NEXT ROUND IS UP TO YOU' : state.selected==='music' ? 'LISTEN CLOSELY' : state.selected==='physical' ? 'GET YOUR TEAM TOGETHER' : state.selected==='finale' ? 'ONE LAST ROUND OF APPLAUSE' : 'WELCOME TO GAME NIGHT';
+    root.querySelector('.game-description').textContent=isChoice ? 'One party. Two paths. What happens next?' : state.selected==='music' ? 'Can you name the song before the timer ends?' : state.selected==='physical' ? 'Create a famous landmark with your teammates.' : state.selected==='finale' ? 'Your individual and team champions.' : 'A pub quiz with a few unexpected turns.';
+    root.querySelector('.game-options').hidden=!isChoice;
+    root.querySelector('.generic-scene').hidden=isChoice;
+    root.querySelector('.generic-symbol').textContent=state.selected==='music' ? '♪' : state.selected==='physical' ? '↗' : state.selected==='opening' ? 'LET’S PLAY' : '★';
+    root.querySelector('.game-footnote').textContent=isChoice ? (state.decision==='host' ? 'The host chooses the route' : state.decision==='teams' ? 'Team captains vote' : state.device==='phone' ? 'Your vote is private' : 'Vote on your phone') : state.selected==='physical' ? 'Host judges' : state.selected==='finale' ? 'Everyone is back together' : 'Follow the host';
+    root.querySelector('.game-timer').textContent=isChoice && state.decision!=='host' ? state.timer : '';
+    root.querySelector('.slide-stage').classList.toggle('phone-mode',state.device==='phone');
+    root.querySelectorAll('[data-device]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.device===state.device)));
+    root.querySelectorAll('[data-preview-route]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.previewRoute===state.route)));
+    root.querySelectorAll('[data-game-route]').forEach(button=>{button.classList.toggle('route-picked',button.dataset.gameRoute===state.route);button.querySelector('strong').textContent=state.titles[button.dataset.gameRoute];});
+    root.querySelector('.music-destination').textContent=state.titles.music;
+    root.querySelector('.physical-destination').textContent=state.titles.physical;
+    root.querySelector('.finale-destination').textContent=state.titles.finale;
+    const routeTitle=state.route==='none' ? 'selected route' : state.titles[state.route];
+    root.querySelector('.route-summary').textContent=`${state.titles.opening} → ${state.titles.choice} → ${routeTitle} → ${state.titles.finale}`;
+    requestAnimationFrame(drawConnections);
+  }
+  function selectScene(id,open=false) {state.selected=id;if(open)state.view='scenes';render();save();}
+  root.querySelector('#branch-flow-tab').addEventListener('click',()=>{state.view='flow';render();save();});
+  root.querySelector('#branch-scenes-tab').addEventListener('click',()=>{state.view='scenes';render();save();});
+  root.querySelectorAll('.flow-node').forEach(button=>{button.addEventListener('click',()=>selectScene(button.dataset.node));button.addEventListener('dblclick',()=>selectScene(button.dataset.node,true));});
+  root.querySelectorAll('.slide-thumb').forEach(button=>button.addEventListener('click',()=>selectScene(button.dataset.scene)));
+  root.querySelector('.edit-selected').addEventListener('click',()=>{state.view='scenes';render();save();});
+  root.querySelector('.back-to-choice').addEventListener('click',()=>selectScene('choice'));
+  input.addEventListener('input',()=>{state.titles[state.selected]=input.value;root.querySelector('.edit-status').textContent='Scene title updated in both views.';render();save();});
+  root.querySelectorAll('[data-device]').forEach(button=>button.addEventListener('click',()=>{state.device=button.dataset.device;render();save();}));
+  root.querySelectorAll('[data-preview-route]').forEach(button=>button.addEventListener('click',()=>{state.route=button.dataset.previewRoute;render();save();}));
+  root.querySelectorAll('[data-game-route]').forEach(button=>button.addEventListener('click',()=>{state.route=button.dataset.gameRoute;root.querySelector('.edit-status').textContent='Previewing this route; no live votes are submitted.';render();save();}));
+  root.querySelector('.timer-select').addEventListener('change',event=>{state.timer=event.target.value;render();save();root.querySelector('.edit-status').textContent='Choice timer updated in both views.';});
+  root.querySelector('.decision-select').addEventListener('change',event=>{state.decision=event.target.value;render();save();root.querySelector('.edit-status').textContent='Decision method updated in both views.';});
+  root.querySelector('.tie-select').addEventListener('change',event=>{state.tie=event.target.value;render();save();root.querySelector('.edit-status').textContent='Tie policy: '+state.tie+'.';});
+  root.querySelector('.rehearse').addEventListener('click',()=>{if(state.route==='none')state.route='music';render();root.querySelector('.edit-status').textContent='Rehearsal path highlighted. Only the selected branch runs.';save();});
+  window.addEventListener('openai:set_globals',event=>{restore(event.detail?.globals?.widgetState);render();});
+  if (globalThis.ResizeObserver) new ResizeObserver(()=>requestAnimationFrame(drawConnections)).observe(canvas);
+  render();
+  if (globalThis.Tweak) {
+    const ui={radius:12};
+    const workspaceTweak=new Tweak({container:root.querySelector('.builder'),onChange:()=>root.querySelector('.builder').style.setProperty('--e-node',ui.radius+'px')});
+    workspaceTweak.addSlider(ui,'radius',{label:'Node corners',min:0,max:24,unit:'px'});
+    const game={accent:'#c9b5ff'};
+    const gameTweak=new Tweak({container:root.querySelector('.slide-stage'),onChange:()=>root.querySelector('.slide-stage').style.setProperty('--g-accent',game.accent)});
+    gameTweak.addColorPicker(game,'accent',{label:'Game accent',reference:'--g-accent'});
+  }
+})();
+</script>
