@@ -2,6 +2,8 @@
 
 Date: 9 November 2026
 
+Last updated: 11 November 2026 — reliability, fairness, scoring, security, mechanic validation, and frontend/backend architecture.
+
 Status: Planning only. This document records the agreed product scope and proposed technical setup. Implementation has not started. Build phases describe future work, not completed features.
 
 ## 1. Product overview
@@ -281,9 +283,23 @@ The media library supports uploads and supported external sources. YouTube uses 
 
 Uploaded audio is the primary option for dependable background music. YouTube is supported as video playback, rather than promised as an interchangeable audio-only source.
 
-## 12. Proposed technical setup
+## 12. Technical setup and frontend/backend boundary
 
-These are implementation recommendations, distinct from the agreed product requirements. Exact dependency versions will be selected when implementation begins.
+Selected direction: a separate browser frontend and authoritative backend, using TypeScript for both. The server runtime is Node.js; TypeScript is the implementation language. Fastify remains the recommended server framework. Exact dependency versions and infrastructure providers will be selected when implementation begins.
+
+All host and player interaction remains browser-based. The backend runs on hosting infrastructure; nobody needs to install a client or local server.
+
+### Responsibility boundary
+
+| Layer | Responsibilities |
+| --- | --- |
+| Browser frontend | Builder forms, previews, host/player interfaces, media playback, local countdown display, command submission, and presentation of server-confirmed state |
+| Authoritative backend | Authentication and authorization, game-definition validation, stage transitions, eligibility, deadlines, judging permissions, score calculation, team assignment/carryover, durable writes, and recovery |
+| Shared contracts | Public command/event schemas, identifiers, types, and safe presentation models; no credentials, correct-answer data, or privileged engine implementation in browser bundles |
+
+Frontend validation provides immediate feedback, but the backend repeats all authoritative checks. A host browser is also a client: it requests a permitted action rather than directly changing database records or calculating authoritative results. Rehearsal uses the backend engine with isolated session data.
+
+Keep frontend and backend in separate packages, with shared public contracts in a third package. They may initially be served from one deployment and public origin. Logical separation does not require separate domains or microservices; deployment can be split later if measured needs justify it. The browser has no direct access to authoritative game tables.
 
 | Component | Proposed choice | Reason |
 | --- | --- | --- |
@@ -294,7 +310,9 @@ These are implementation recommendations, distinct from the agreed product requi
 | Data access | Prisma | Typed database access and migrations |
 | Validation | Zod | Validate game definitions and incoming commands |
 | Media storage | S3-compatible object storage | Keep large media outside the app server |
-| Testing | Vitest + Playwright | Engine tests and browser/device-flow tests |
+| Testing | Vitest + fast-check + Playwright + Artillery | Engine properties/model tests, browser/device flows, and Socket.IO load/failure scenarios |
+| Structured logging | Pino through Fastify | Correlated JSON logs with redaction |
+| Observability | OpenTelemetry + centralized error tracking and metrics dashboards | Timings, traces, issue grouping, and operational alerts; backend providers to be selected |
 | Repository | One repository with web, server, and shared packages | Keep schemas and command types consistent |
 
 ### Hosting
@@ -413,12 +431,12 @@ In single-screen mode, judging controls are visible to the room. In separate-dis
 
 | Phase | Deliverables | Completion condition |
 | --- | --- | --- |
-| 1. Detailed design | Screen layouts, configuration schema, stage model, scoring examples, recovery behavior | One complete example game is specified without ambiguous score transitions |
-| 2. Multiplayer foundation | Rooms, QR/code joining, player identity, host/display roles, late joining, reconnection, persistence | Twenty players can join and recover correctly |
+| 1. Detailed design | Screen layouts, frontend/backend contracts, configuration schema, stage model, fairness/deadline rules, score invariants and rounding, role/credential model, failure policies, and initial performance budgets | Reference game, trust boundaries, validation rules, and failure/recovery behavior are specified without ambiguous score transitions |
+| 2. Multiplayer foundation | Rooms, joining, identity, host/display roles, late joining, durable commands, database constraints, outbox, reconnect/restart recovery, structured logs, error capture, and timing instrumentation | Twenty players can join; a confirmed submission survives server termination/restart; retries produce no duplicate effects |
 | 3. Playable game engine | Quiz, room challenge, voting, teams, timers, scoring, carryover, final results | Reference game runs end to end using a prepared definition |
 | 4. Builder and templates | Timeline editor, settings, defaults/overrides, previews, saving, duplication, reusable templates | A host can author the reference game without editing code |
 | 5. Media and live controls | Cutscenes, uploads, YouTube embeds, audio layers, separate displays, phone hosting, upcoming-round editing | Full presentation and control flow works during play |
-| 6. Rehearsal and release validation | Simulation, validation, load checks, device testing, restart recovery, production deployment | A complete game night works with at least 20 phones |
+| 6. Rehearsal and release validation | Simulation, validation, Socket.IO load/spike/soak tests, failure injection, device testing, backup restore drills, monitoring/alerts, and production deployment | A full game works with at least 20 phones; recovery and measured performance meet agreed release criteria |
 | 7. Custom mechanics | Stage editor, reusable stage sequences, additional supported inputs | Users can create mechanics beyond the starting templates |
 | 8. Advanced automation | Conditional rules, branching, richer cutscene sequences | More elaborate games run with fewer manual interventions |
 
@@ -438,9 +456,18 @@ Before calling the app ready, verify:
 - Late joining, refreshes, network changes, and device recovery.
 - Host/display reconnection and server restart recovery.
 - Answer privacy and voting restrictions.
+- Deadline boundaries, queued on-time submissions, speed-scoring behavior, and interrupted-question policies.
+- Score conservation for transfers, exact rounding, corrections, deterministic history replay, and generated action sequences.
+- Role escalation attempts, cross-room access, credential recovery/revocation, origin checks, and shared-Wi-Fi rate limits.
+- Invalid stage graphs, empty voter/entry sets, automatic loops, and host fallback controls.
 - Mobile Safari and Chrome, plus laptop browsers.
 - Cutscene playback, blocked autoplay, and media failure.
 - A complete rehearsal and a real game-night trial.
+- Server termination before and after commits, lost acknowledgements, and duplicate/stale commands.
+- Database interruptions, slow queries, simultaneous host actions, and reconnect storms.
+- Multi-hour soak testing, memory/listener cleanup, bounded queues, and measured capacity headroom.
+- Monitoring outages, media failure isolation, and successful database backup restoration.
+- Performance budgets measured with timeouts and failures reported separately from successful latency.
 
 ## 17. Details to settle during design
 
@@ -456,3 +483,345 @@ The product direction is established. Remaining implementation details include:
 - Exact tie-break options and first-release automated rule capabilities.
 
 These details are addressed in Phase 1 or the relevant technical phase. They do not authorize implementation before the user requests it.
+
+
+## 18. Reliability, logging, and performance requirements
+
+These requirements were approved for inclusion after research. They apply from the multiplayer foundation phase, rather than being added only before release. Tools and numerical targets remain implementation proposals until validated.
+
+The objective is to prevent avoidable failures, contain failures that occur, preserve confirmed gameplay, and let the host resume. No system can promise that every failure will be predicted, caught, or logged; abrupt process termination, device loss, and infrastructure failure must also be handled through persisted state and recovery.
+
+### 18.1 Durable commands and confirmations
+
+- Assign every submission and host command a unique identifier scoped to its session and actor.
+- Validate authorization, payload, active stage, state revision, and eligibility on the server.
+- Commit the accepted action, its result, and essential game audit records in one database transaction.
+- Confirm success only after the transaction commits. A phone distinguishes Sending, Saved, and Not confirmed—reconnecting.
+- Retrying a committed command returns its stored result without repeating its effect. Reject reuse of an identifier with different content.
+- Use database uniqueness constraints for command records, eligible submissions/votes, and score awards, respecting configured editing and voting limits.
+- Bind pending submissions to their original stage. Reconnection must not blindly submit an old answer into a new question.
+- If pending commands are retained locally across refreshes, reconcile them with server status and deadlines before retrying. A locally stored answer is not a saved server submission.
+
+Socket.IO does not supply these application-level guarantees automatically: [delivery guarantees](https://socket.io/docs/v4/delivery-guarantees/).
+
+### 18.2 Notifications and concurrent changes
+
+- Store important outgoing notifications alongside state changes using a transactional outbox.
+- Publish only committed changes; retry pending notifications after recovery.
+- Preserve logical ordering and include event identifiers and state revisions. Consumers ignore duplicates and resynchronize when revisions are missing or outdated.
+- Keep outbox processing bounded, monitored, and recoverable. A full state snapshot remains the recovery fallback.
+- Define allowed stage transitions explicitly. Coordinate simultaneous host actions, timer expiry, and submissions through short transactions with appropriate row locking or conditional revision checks.
+- Use consistent lock ordering, database timeouts, and bounded retries for transient transaction conflicts. Do not retry invalid, unauthorized, or expired actions.
+
+Sources: [AWS transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html), [PostgreSQL locking](https://www.postgresql.org/docs/current/explicit-locking.html).
+
+### 18.3 Recovery and persistence failures
+
+Persist current round/stage/revision, deadlines and pause state, players and lineups, accepted submissions and votes, score changes, live edits, command outcomes, and pending important notifications.
+
+- Reconnecting devices receive a current role-filtered snapshot, even when short-term transport recovery fails.
+- An application restart restores the session into Recovered—waiting for host. Do not automatically close an interrupted question or issue awards before reconciliation.
+- If persistence is unavailable, stop confirming authoritative changes and show a recovery state. Do not pretend that an answer or score was saved.
+- Define how in-flight commands are reconciled when their outcome is initially unknown; query by command identifier rather than issue a new award.
+- Recovery preserves confirmed actions under the application's database durability assumptions. Database loss/failover requires its own backup and durability policy; an acknowledgement is not protection against every infrastructure disaster.
+- Configure backups and point-in-time recovery where supported, document recovery time/data-loss objectives for the selected service, and perform actual restore drills.
+
+Sources: [Socket.IO recovery limitations](https://socket.io/docs/v4/connection-state-recovery/), [PostgreSQL point-in-time recovery](https://www.postgresql.org/docs/current/continuous-archiving.html).
+
+### 18.4 Timers and phone lifecycle
+
+- The server owns deadlines, pause state, and eligibility decisions.
+- Clients render countdowns locally rather than receiving a network update every tick.
+- Resynchronize when a page becomes visible, resumes, or reconnects. Phone sleep and tab suspension are expected.
+- Log timer extensions and pauses as game actions.
+- Decide deadline boundary semantics during design, including the race between submission and stage closure. A client-provided timestamp is not sufficient proof of timely receipt.
+- Interrupted questions require host review, with explicit restart/extension controls and audit records.
+
+Source: [browser page lifecycle](https://developer.chrome.com/docs/web-platform/page-lifecycle-api).
+
+### 18.5 Error containment and process recovery
+
+| Failure | Required behavior |
+| --- | --- |
+| Media cannot load or play | Retry/skip fallback; host navigation remains available |
+| Phone rendering fails | Recovery UI and reload/rejoin without losing server identity |
+| Host interface fails | Restore controls from persisted session state |
+| Round configuration is invalid | Explain the problem and prevent that round from starting |
+| Database cannot persist changes | Stop authoritative confirmations and show recovery status |
+| Fatal server error | Capture available diagnostics, terminate, restart externally, and recover persisted sessions |
+| Monitoring service fails | Gameplay continues without unbounded telemetry buffering |
+
+Use React error boundaries around meaningful UI regions, plus explicit handling for event-handler, network, and asynchronous failures. Do not swallow errors or continue normal server operation after an uncaught fatal exception. Planned shutdowns should stop accepting new work, drain within a bounded deadline, and flush diagnostics when possible. Recovery must also work when cleanup cannot run.
+
+Sources: [React error boundaries and limitations](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary), [Node.js uncaught exceptions](https://nodejs.org/api/process.html#warning-using-uncaughtexception-correctly).
+
+### 18.6 Audit history, diagnostic logs, and error registration
+
+Maintain distinct records:
+
+| Record | Purpose |
+| --- | --- |
+| Durable game audit history | Explain team changes, awards, corrections, timer changes, and live edits |
+| Structured diagnostic logs | Investigate application, network, persistence, validation, and media problems |
+| Centralized error issues | Group failures, record first/latest occurrence, affected sessions, release, and regressions |
+| Metrics and traces | Measure frequency, latency, resource saturation, and time spent in each operation |
+
+- Include timestamp, severity, release version, outcome, duration, and relevant internal session/stage/command/trace identifiers.
+- Register expected failures with useful reason codes; distinguish rejected gameplay actions from unexpected server failures.
+- Record starts/stops, recovery attempts, database failures, dropped telemetry, authorization failures, and media failures with appropriate severity.
+- Capture frontend errors on a best-effort basis with release mapping; complete browser/device crashes may prevent final reports.
+- Redact credentials, recovery codes, tokens, and sensitive session values. Store answers in game records instead of copying them into diagnostic logs.
+- Sanitize user-controlled log fields; protect diagnostic access and define retention/deletion policies.
+- Bound logging queues and storage; aggregate repeated errors to prevent floods while retaining counts and representative context.
+- Essential game audit writes participate in gameplay transactions. External diagnostics never block gameplay indefinitely.
+- Test logging failures, redaction, queue overflow, and monitoring outages.
+
+Sources: [OWASP logging guidance](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html), [Fastify/Pino logging](https://fastify.dev/docs/latest/Reference/Logging/), [OpenTelemetry signals](https://opentelemetry.io/docs/concepts/signals/).
+
+### 18.7 Built-in performance instrumentation
+
+Measure latency, traffic, errors, and saturation. Instrument critical paths from the beginning:
+
+| Measurement | What it reveals |
+| --- | --- |
+| Answer tap to saved confirmation | Player-perceived submission latency |
+| Command receipt to database commit | Server processing and storage cost |
+| Host advance to client update | Stage-transition responsiveness |
+| Re-established connection to synchronized state | Recovery cost after connectivity returns |
+| Database queries, lock waits, and pool wait | Database contention and bottlenecks |
+| Event-loop delay and utilization | Server stalls and processing pressure |
+| CPU, memory, queue depth, active connections | Capacity, backlog, and potential leaks |
+| Media startup and playback failures | Presentation reliability |
+
+Use monotonic duration measurements such as performance.now() and correlated traces. Do not subtract unsynchronized device timestamps to claim end-to-end latency. Separate successful, failed, timed-out, and cancelled operations. Track distributions, p95/p99 where sample counts are sufficient, and trends rather than averages alone.
+
+Use bounded metric labels such as operation, outcome, and round type. Put session/player identifiers in controlled logs/traces, not unbounded metric labels. Bound browser performance entries and telemetry buffers; use configurable trace sampling and measure instrumentation overhead.
+
+Sources: [Google SRE monitoring](https://sre.google/sre-book/monitoring-distributed-systems/), [monotonic timing](https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/High_precision_timing), [Node performance APIs](https://nodejs.org/api/perf_hooks.html), [Prometheus label guidance](https://prometheus.io/docs/practices/naming/).
+
+### 18.8 Initial performance and recovery budgets
+
+These are proposed acceptance targets, not benchmark results or guarantees. Define the test network, device mix, hosting resources, workload, and measurement boundaries before evaluating them.
+
+| Operation | Initial target |
+| --- | --- |
+| Answer tap to saved confirmation | p95 at or below 500 ms on the defined test network |
+| Server command processing including commit | p95 at or below 100 ms |
+| Host advance to active-client update | p95 at or below 500 ms |
+| Synchronization after connection is re-established | p95 at or below 2 seconds |
+| Application restart recovery | Host can resume within 60 seconds when database and other required dependencies are healthy |
+
+Measure timeouts/failures separately and publish the sample counts and slower percentiles. Network reconnection delay and browser suspension must not be hidden inside a misleading server-only metric. Final budgets and alert windows will be confirmed using actual hosting and phones.
+
+### 18.9 Optimization and overload control
+
+- Keep live commands small; use compact role-filtered updates and snapshots for recovery.
+- Serve media from object storage/CDN outside gameplay messages. Preload only a bounded amount of upcoming content.
+- Keep media processing and heavy jobs off the live command path.
+- Bound input sizes, connection pools, queues, retries, and concurrent work. Reject excessive work clearly instead of allowing memory to grow indefinitely.
+- Use bounded exponential backoff with jitter and coordinate retry policy to avoid multiplying retries across layers.
+- Clean up timers, socket listeners, and session resources; test cleanup through long sessions and repeated reconnects.
+- Inspect database query plans and add indexes for measured access patterns before adding caching or extra services.
+- Start with a simple deployment and measured headroom. Any later multi-instance setup must explicitly solve room ownership, concurrent writes, routing, and recovery rather than assume an in-memory room can be copied safely.
+
+Source: [AWS timeouts, retries, and jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/).
+
+### 18.10 Host diagnostics and operational readiness
+
+Provide a compact private host health panel with connection/synchronization counts, recent command latency, persistence status, and recovery warnings. Keep technical detail out of the shared game display.
+
+Recovery controls include reconnecting the display, retrying/skipping media, reviewing the last confirmed action, and audited question restart/extension.
+
+- Use independent external availability monitoring, not only a status reported by the app itself.
+- Distinguish process responsiveness from ability to accept durable gameplay actions. Avoid restart loops caused solely by a shared dependency outage.
+- Add a safe synthetic gameplay check in an isolated test room where practical.
+- Alert on sustained errors, growing backlog, failing persistence, memory pressure, and prolonged recovery. Use windows and deduplication to avoid alert noise.
+- Define a short recovery runbook and a pre-game readiness check.
+- Avoid planned deployments during live games; test shutdown, migration compatibility, and rollback before release.
+
+Source: [hosting health checks](https://render.com/docs/health-checks).
+
+### 18.11 Failure and capacity testing
+
+Use protocol-aware tests with Socket.IO clients. Artillery provides a Socket.IO engine and acknowledgement validation; a raw WebSocket test alone does not exercise the full application protocol.
+
+Required scenarios:
+
+- At least 20 players plus host/display; higher loads to establish headroom.
+- Simultaneous answers near the deadline and simultaneous reconnects.
+- Several hours of play to detect memory, listener, and timer leaks.
+- Server termination immediately before and after commit and notification.
+- Lost acknowledgements, duplicate commands, stale revisions, and expired submissions.
+- Database interruption, pool exhaustion, slow queries, and conflicting host actions.
+- Phone sleep, refresh, browser suspension, network switching, and device reclaim.
+- Broken media, monitoring failure, and telemetry/logging backpressure.
+- Backup restoration and restart recovery with score/history verification.
+
+Pass criteria include correct final state, no duplicate effects, preserved confirmed actions within the documented durability model, understandable recovery, and performance within agreed budgets.
+
+The first playable milestone must demonstrate: submit an answer, terminate the server, restart it, reconnect, recover the confirmed answer, and apply any resulting points only once.
+
+Source: [Artillery Socket.IO testing](https://www.artillery.io/docs/reference/engines/socketio).
+
+## 19. Further research backlog
+
+The first four priority topics have been researched and their approved recommendations are recorded in section 20. Their detailed policies and test cases still need design work. The remaining topics below are research questions, not settled decisions; findings should be presented before promotion into requirements.
+
+| Priority | Topic | Questions and expected output |
+| --- | --- | --- |
+| Researched — finalize in Phase 1 | Timing fairness on mixed networks | How should receipt deadlines, late packets, disconnections, and optional speed bonuses work fairly? Define authoritative timestamp semantics and a testable fairness policy without trusting client clocks. |
+| Researched — finalize in Phase 1 | Scoring correctness and team transitions | How do rounding, unequal teams, negative points, late joiners, departures, and repeated carryover interact? Produce worked examples, invariants, and property-based test cases. |
+| Researched — finalize in Phase 1 | Room security and player recovery | How do we prevent room-code enumeration, host takeover, identity theft, unauthorized commands, and reconnect abuse? Specify credentials, reclaim, origin validation, payload limits, and venue-friendly rate limits; shared Wi-Fi must not be treated as one player. |
+| Researched — finalize in Phase 1 | Safe custom mechanics | How do stage graphs terminate, validate required inputs, prevent impossible votes/deadlocks, and constrain automated rules? Define typed stage contracts, validation, execution limits, and a host escape route without arbitrary code execution. |
+| P1 — before media integration | Browser, display, and media compatibility | Test mobile Safari/Chrome, autoplay, external embeds, fullscreen, host phone controls, display sleep, and audio ownership. Produce a supported-device matrix and fallback policy. |
+| P1 — before hosting selection | Venue connectivity and outage scope | What happens when venue Wi-Fi fails but mobile data works, or all internet access disappears? Define hosting expectations, preflight checks, and whether a future LAN mode is worth the added architecture. |
+| P1 — before release | Deployment and database disaster recovery | What are acceptable outage/data-loss budgets, compatible migration rules, maintenance behavior, restore procedures, and costs? Distinguish app restarts from database failover or loss. |
+| P1 — before data collection | Privacy, retention, and uploads | Which player data is necessary, how long should submissions/logs remain, and how are games deleted? Research applicable requirements separately; specify upload validation and external-media handling. |
+| P1 — before visual design is finalized | Accessibility and party-room usability | Test readable TV text, touch targets, color-independent cues, reduced motion, caption options, readable timers, and volume controls with actual group play. |
+
+Recommended next research pass: browser/media compatibility and venue connectivity, followed by hosting/disaster-recovery tradeoffs. The researched foundation topics now move into detailed design rather than being treated as unanswered research. Research into legal requirements, external-media policies, and current service capabilities must use current authoritative sources rather than assumptions.
+
+
+## 20. Approved research findings: fairness, scoring, security, and mechanics
+
+These recommendations were researched and approved for inclusion on 11 November 2026. They establish design requirements; implementation and testing have not started. Exact numerical policies, algorithms, and acceptance examples are finalized during detailed design.
+
+### 20.1 Timing fairness
+
+- Default to correctness-only scoring. Speed bonuses remain an explicit per-round option, with a clear explanation that connection quality and delivery delay can affect results.
+- The server owns deadlines and records message receipt before database/processing delays. Validate eligibility and reconcile queued eligible submissions before finalizing results.
+- Specify the exact deadline comparison, stage-close ordering, and handling of explicit host closure. A late database write must not automatically mean a message arrived late.
+- Never trust a client timestamp as proof that an answer was submitted on time. Client clocks and countdowns are display aids.
+- Avoid automatic per-player ping compensation in the initial release. Round-trip latency does not establish exactly when a player saw a question or tapped an answer.
+- If a delivery grace period is offered, use an explicit, consistent policy and withhold answer reveals until acceptance closes. Do not claim perfect fairness across differing connections.
+- Define how question content is released so preloading does not reveal it or its answer early.
+- For interruptions, offer audited host extension, restart, or void actions. Reopening submissions after revealing the answer requires restarting/voiding the question rather than quietly accepting newly informed answers.
+- Use monotonic elapsed-time measurement and resynchronization for displays, while retaining persisted deadlines/pause state for recovery.
+- Test exact boundary cases, delayed/reordered messages, processing stalls, phone sleep, and reconnection near the deadline.
+
+Sources: [Kahoot speed scoring](https://support.kahoot.com/hc/en-us/articles/115002303908-How-points-work), [server authority](https://docs.unity.com/en-us/cloud-code/3.0.0/cheat-prevention), [monotonic timing and clock origins](https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/High_precision_timing). The specific fairness policy above is a project design recommendation, not a guarantee supplied by those platforms.
+
+### 20.2 Exact, auditable scoring
+
+Use append-only score operations and traceable corrections. Authoritative standings must be reproducible from the recorded history; cached totals may be maintained transactionally for performance.
+
+Distinguish:
+
+| Operation | Meaning |
+| --- | --- |
+| Award | Creates points under the round's configured rules |
+| Transfer | Redistributes existing points without creating more |
+| Derived standing | Calculates a view, such as a member-score average, without issuing new awards |
+| Correction | Appends an explicit reversal/adjustment referencing the affected operation |
+
+Requirements:
+
+- Use whole-number points by default and exact integer/fixed-precision decimal arithmetic where supported allocations require it. Bound supported values and preserve exactness across database, server, and serialized messages.
+- Do not rely on binary floating-point arithmetic for exact redistribution.
+- Define supported precision, rounding, and deterministic remainder allocation. Preview allocations before confirmation.
+- Example: 100 whole points divided across three members must not silently become 99. An allocation of 34/33/33 preserves 100 but needs an explicit remainder policy. This example is not yet the chosen algorithm.
+- Define negative-score rounding, departures, late joins, zero-member teams, unequal team sizes, and repeated transfers.
+- Specify which lineup and eligibility snapshot each award uses.
+- Keep sums and averages distinct and explain their effect on uneven teams; neither is universally fair.
+- Team membership changes never rewrite historical lineups or issue an award merely because a derived total was recalculated.
+- Preserve the difference between intentional individual-and-team awards and conservation of existing points during transfers.
+
+Required invariants and tests:
+
+- Retrying a command produces no duplicate effect.
+- Replaying the same ordered history produces the same totals.
+- Transfers preserve the exact total being transferred, or explicitly record a configured reset/adjustment instead.
+- Corrections are traceable and do not apply twice.
+- Completed results preserve their applicable lineup and rules version.
+- Use worked examples plus property-based/model-based sequences of awards, retries, departures, reshuffles, and corrections. Test an independently specified model rather than duplicating implementation logic; generated tests are not a formal proof.
+
+Sources: [PostgreSQL exact numeric types](https://www.postgresql.org/docs/current/datatype-numeric.html), [fast-check properties](https://fast-check.dev/docs/core-blocks/properties/), [model-based testing](https://fast-check.dev/docs/advanced/model-based-testing/).
+
+### 20.3 Room security and identity recovery
+
+| Role | Permitted access |
+| --- | --- |
+| Player | Own instructions, permitted submissions, and allowed results |
+| Captain | Current team's submission rights where configured |
+| Shared display | Public presentation content only |
+| Host | Authorized controls and explicitly permitted private information |
+
+- A public room code permits joining; it is not a host or recovery credential.
+- Use unpredictable player/host credentials with expiry, revocation, and protected transport/storage. Define credential delivery and browser storage during detailed security design.
+- Recovery codes expire and can be revoked. Moving to another device explicitly replaces or invalidates the prior controller; a nickname alone never proves identity.
+- Recheck room membership, current role/captain status, stage eligibility, and permissions for each action. Do not trust caller-provided player/team identifiers.
+- Use HTTPS/WSS and explicit trusted-origin checks for real-time connection admission. CORS alone does not protect WebSocket connections; origin checks complement authentication and cannot authenticate arbitrary non-browser clients.
+- Handle expired/revoked credentials on existing connections, not only new handshakes.
+- Keep correct answers, unrevealed submissions, credentials, and private instructions out of unauthorized payloads and browser bundles.
+- Render player text safely and restrict rich content. House rules and templates must not inject arbitrary HTML or JavaScript.
+- Validate message shapes and lengths; bound payloads and connection/command rates. Apply per-player/session controls alongside broader abuse controls so shared venue Wi-Fi is not treated as one participant.
+- Protect room discovery/joining against enumeration and flooding, and allow the host to lock admissions or remove/revoke an abusive participant without disabling legitimate recovery.
+- Avoid credentials in query strings or logs; keep audit identifiers separate from secrets.
+- Test role escalation, cross-room access, unauthorized origins, forged/replayed commands, recovery takeover, expiry/revocation, malicious text, and message floods.
+
+Sources: [OWASP WebSocket security](https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html), [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [Socket.IO CORS limitations](https://socket.io/docs/v4/handling-cors/).
+
+### 20.4 Custom mechanic validation
+
+Represent custom mechanics as declarative, versioned stage definitions using supported actions. Do not execute user-authored JavaScript or arbitrary validators on the server or player devices.
+
+Use four validation layers:
+
+| Layer | Checks |
+| --- | --- |
+| Structure | Supported stage/action types, required fields, bounds, and valid references |
+| Semantics | Required entries, eligible voters, captains, teams, inputs, and compatible scoring settings |
+| Flow | Reachability, explicit transition priority, usable exits, and host fallback |
+| Runtime | Current eligibility, transition budgets, repeated-award prevention, and resource bounds |
+
+Examples to detect:
+
+- A vote with only one participating team when self-voting is forbidden.
+- A captain-submission stage with no eligible captain.
+- A branch pointing to a missing stage.
+- A stage waiting indefinitely after required participants disconnect.
+- An automatic loop repeatedly issuing points.
+
+Requirements:
+
+- Validate at authoring/start time and recheck dynamic conditions when the stage runs; attendance and eligible entries can change.
+- Require an explicit no-response/no-eligible-entry fallback or host resolution path.
+- Define deterministic priority when multiple transitions match.
+- Initially prefer simple sequences; later loops need explicit exit conditions and execution limits. Static validation cannot prove every dynamic game terminates.
+- Bound automatic transitions, rule nesting, and repeated actions. Provide host pause/skip controls without silently fabricating results.
+- Keep random assignment outcomes and relevant definition versions in history so recovery/replay is deterministic.
+- Simulate zero submissions, no eligible votes, ties, disconnections, and expired timers in rehearsal.
+- Evaluate XState as an implementation option, not a replacement for persistence, validation, or runtime limits. Select a stable version if adopted.
+- Keep validation schemas controlled by the application. Users configure approved blocks rather than upload arbitrary validation code or expensive schemas.
+
+Sources: [state machines](https://stately.ai/docs/editor-states-and-transitions), [automatic-transition loop risks](https://stately.ai/docs/eventless-transitions), [Ajv validation security](https://ajv.js.org/security.html).
+
+## 21. Language decision and safety practices
+
+Selected language: TypeScript for the frontend and backend. Browser code compiles to JavaScript; server code runs on Node.js. Use React for browser interfaces and the recommended Fastify/Socket.IO backend stack. This remains an entirely browser-operated product for hosts and players.
+
+### Comparison considered
+
+| Option | Strength | Project tradeoff |
+| --- | --- | --- |
+| TypeScript + Node.js | Shared public contracts, static checks, and documented React/Socket.IO integration | Requires runtime validation, exact scoring rules, and event-loop discipline |
+| Plain JavaScript | Direct browser ecosystem integration | Fewer compile-time safeguards for configurable stages and commands |
+| C#/.NET | Typed backend, SignalR, and browser options through Blazor | Different stack and cross-language contracts unless adopting Blazor throughout |
+| Go backend + TypeScript frontend | Concurrency support and race-detection tooling | Two languages and explicit cross-language contract management |
+| Rust backend + TypeScript frontend | Ownership-based memory safety | Additional implementation complexity without a measured requirement here |
+
+This is a project-fit judgment, not a performance benchmark, universal ecosystem ranking, or claim that any language prevents crashes. Backend language choice does not require players to install anything. Memory safety, type safety, authorization, persistence, and game-rule correctness are different concerns.
+
+### Required implementation discipline
+
+- Enable strict TypeScript checks, including checked indexed access, and fail the build on type errors.
+- Model commands/stages with explicit variants and exhaustive handling.
+- Treat external messages and stored/imported game definitions as untrusted until runtime validation succeeds.
+- Infer public types from validated schemas where practical; share contracts without shipping server internals or secrets.
+- Restrict unchecked casts and any; do not treat successful compilation as proof of runtime safety.
+- Keep database constraints, transactions, generated scoring tests, fault injection, and monitoring regardless of language.
+- Keep CPU-heavy operations off the live event loop, bound inputs/work, and measure performance before adding services or changing languages.
+
+Sources: [React TypeScript support](https://react.dev/learn/typescript), [Socket.IO types and validation caveat](https://socket.io/docs/v4/typescript/), [TypeScript erased types](https://www.typescriptlang.org/docs/handbook/2/basic-types.html#erased-types), [TypeScript soundness limitations](https://www.typescriptlang.org/docs/handbook/type-compatibility), [checked indexed access](https://www.typescriptlang.org/tsconfig/noUncheckedIndexedAccess.html), [Node event-loop guidance](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop).
+
+Alternative platform references: [ASP.NET Core SignalR](https://learn.microsoft.com/en-us/aspnet/core/signalr/introduction?view=aspnetcore-10.0), [Blazor hosting](https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-10.0), [Go race detector](https://go.dev/doc/articles/race_detector), [Rust ownership](https://doc.rust-lang.org/stable/book/ch04-00-understanding-ownership.html).
