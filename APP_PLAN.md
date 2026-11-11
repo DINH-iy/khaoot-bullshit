@@ -2,9 +2,9 @@
 
 Date: 9 November 2026
 
-Last updated: 11 November 2026 — reliability, fairness, scoring, security, mechanic validation, and frontend/backend architecture.
+Last updated: 11 November 2026 — creative minigames, player customization, researched browser constraints, build order, testing, and accessibility.
 
-Status: Initial foundation scaffolding started with user authorization on 11 November 2026. The browser/server/shared-contract packages, tests, diagnostic logging, timing, and token-verification boundary are present locally; live sign-in, database persistence, multiplayer rooms, and gameplay remain unimplemented. See README.md for the implemented scope and verification. Build phases below describe the full intended outcome, not completed features.
+Status: Browser/server/shared-contract scaffolding, tests, diagnostic logging, timing, token verification, PostgreSQL/Prisma models, migrations, and database integration tests are present. Live sign-in, gameplay command/persistence services, multiplayer rooms, editors, and the admin dashboard remain unimplemented. See README.md for implemented scope and verification. Build phases below describe intended outcomes, not completed features. This planning update does not start implementation.
 
 ## 1. Product overview
 
@@ -14,8 +14,11 @@ A browser-based platform for creating and hosting custom pub quizzes and party g
 - Team and individual competition.
 - Physical challenges judged by the host.
 - Player submissions and voting.
+- Drawing, jokes, captions, memory games, secret choices, and team creation.
+- Custom player names and built-in, uploaded, or hand-drawn identity images.
 - Custom house rules.
 - Cutscenes, music, and sound effects.
+- An optional customizable puppet/mascot character that presents the show.
 - Eventually, user-created round mechanics.
 
 A laptop provides the shared game display. Players join using their phones without installing an app.
@@ -52,6 +55,7 @@ Supported scene and flow items:
 - Breaks.
 - Scoreboards and final results.
 - Party route choices and explicit branch connections.
+- Creative and minigame rounds assembled from supported stage mechanics (section 25).
 
 Items can be reordered within a sequence, duplicated, disabled, grouped, and connected. Branches must remain explicit; moving, disabling, or deleting a node must not silently reconnect routes or discard authored branches.
 
@@ -99,6 +103,9 @@ Inherited settings are clearly marked, with an option to reset an override to th
 | Team change | Form teams → preview carryover → confirm |
 | Scoreboard | Display selected standings → continue |
 | Party route choice | Present routes → collect eligible votes → resolve → enter selected branch |
+| Drawing and voting | Private prompt → draw → save → reveal → eligible votes → results |
+| Jokes/captions | Private prompt → write → save → anonymous reveal → vote/judge → results |
+| Secret-choice minigame | Instructions → private choices → lock → resolve → animate outcome → points |
 
 Customized rounds can be saved as reusable personal templates.
 
@@ -146,6 +153,8 @@ Written house rules are available immediately. Automated rules must use supporte
 ## 6. Players and teams
 
 Every participant has a persistent player identity within the session, regardless of team changes.
+
+Players choose a custom display name and a built-in icon, uploaded picture, or drawing made on their phone. These are display properties, never authentication credentials. Host moderation, reconnect persistence, upload validation, and privacy rules are specified in section 25.1. Cross-game profiles are optional later work, not a requirement to create an account as a guest.
 
 Each round can use:
 
@@ -229,13 +238,15 @@ Edits to a live session do not silently overwrite the saved game. Saving those e
 
 | Situation | Phone behavior |
 | --- | --- |
-| Joining | Scan a QR code or enter a room code, then choose a nickname |
+| Joining | Scan a QR code or enter a room code, then choose a name and identity image; optional image setup can be skipped |
 | Lobby | Nickname, connection status, and team information |
 | Team selection | Available teams and membership counts |
 | Quiz | Private answer controls and submission confirmation |
 | Captain submission | Captain gets controls; teammates get instructions and status |
 | Room challenge | Instructions, team details, and timer |
 | Voting | Eligible entries and private voting controls |
+| Creative rounds | Drawing pad, joke/caption entry, private prompts, and explicit local/server save status |
+| Minigames | Supported tap/choice/turn controls, role information, and reconnect state |
 | Cutscene | Companion content or “Watch the main screen” |
 | Results | Individual points, team outcome, and standings |
 
@@ -296,6 +307,8 @@ The shared-display browser gets an initial Enable sound action. Playback failure
 The media library supports uploads and supported external sources. YouTube uses its embedded video player, with play, pause, volume, and playback-state controls where available. The app handles blocked autoplay and unavailable embeds. See the [YouTube player documentation](https://developers.google.com/youtube/iframe_api_reference).
 
 Uploaded audio is the primary option for dependable background music. YouTube is supported as video playback, rather than promised as an interchangeable audio-only source.
+
+An optional customizable show-host character can introduce scenes and react to results using authored art, dialogue, poses, and voice clips. It is presentation, separate from the human host and authoritative game engine. See section 25.5 for scope, fallbacks and build order.
 
 ## 12. Technical setup and frontend/backend boundary
 
@@ -482,16 +495,20 @@ In single-screen mode, judging controls are visible to the room. In separate-dis
 
 | Phase | Deliverables | Completion condition |
 | --- | --- | --- |
-| 1. Detailed design | Screen layouts, frontend/backend contracts, configuration schema, stage model, fairness/deadline rules, score invariants and rounding, role/credential model, failure policies, and initial performance budgets | Reference game, trust boundaries, validation rules, and failure/recovery behavior are specified without ambiguous score transitions |
-| 2. Multiplayer foundation | Rooms, joining, identity, host/display roles, late joining, durable commands, database constraints, outbox, reconnect/restart recovery, structured logs, error capture, and timing instrumentation | Twenty players can join; a confirmed submission survives server termination/restart; retries produce no duplicate effects |
-| 3. Playable game engine | Quiz, room challenge, voting, teams, timers, scoring, carryover, party-choice branch resolution/rejoin, final results | Reference game and a branching choice scenario run end to end using prepared definitions |
+| 1. Detailed design | Versioned stage/input contracts, role-filtered views, deadline/scoring rules, credentials, accessibility criteria, asset lifecycle, and test scenarios | Contracts and acceptance examples are reviewable; existing scaffolding/schema are distinguished from still-missing services |
+| 2. Multiplayer foundation | Durable command handlers first, then rooms, guest identity/names/icons, host/display permissions, late joining, outbox, reconnect/restart recovery, and initial browser E2E tests | Twenty players can join; a confirmed submission survives server termination/restart; retries produce no duplicate effects; critical screens pass keyboard/touch checks |
+| 3. Playable game engine | Quiz, room challenge, text/jokes/captions, voting, teams, timers, scoring/carryover, party-choice resolution/rejoin, results | Prepared reference game and branching scenario run end to end; core correctness and privacy regressions pass |
+| 3A. First creative mechanics | Bounded drawing document/pad, hand-drawn avatars, validated picture uploads, asset recovery, draw/reveal/vote, one simultaneous secret-choice minigame | Accepted artwork survives restart, private assets stay private, upload failures are recoverable, and all supported device/input checks pass |
+| 3B. Pre-editor verification | Multi-device browser tests, accessibility review, representative 20-player creative load, failure injection and target-hardware measurements | No unresolved critical privacy, score, recovery, or accessibility defects; measured results and limitations recorded before editor work |
 | 4. Builder and templates | Synchronized scene/flow editors, drag-to-connect routes, branch-aware scene list, party-choice settings, theme separation, previews, saving, reusable templates | A host can author both a linear game and a party-voted branching game without code; both views stay consistent |
-| 5. Media and live controls | Cutscenes, uploads, YouTube embeds, audio layers, separate displays, phone hosting, upcoming-round editing | Full presentation and control flow works during play |
-| 6. Rehearsal and release validation | Simulation, validation, Socket.IO load/spike/soak tests, failure injection, device testing, backup restore drills, monitoring/alerts, and production deployment | A full game works with at least 20 phones; recovery and measured performance meet agreed release criteria |
-| 7. Custom mechanics | Stage editor, reusable stage sequences, additional supported inputs | Users can create mechanics beyond the starting templates |
-| 8. Advanced automation | General conditional rules, advanced branching beyond party choices, richer cutscene sequences | More elaborate games run with fewer manual interventions |
+| 5. Media and live controls | Cutscenes, creator media uploads, YouTube embeds, audio layers, separate displays, phone hosting, upcoming-round editing, and optional static-pose show-host character/cues | Full presentation/control flow works; custom character supports text/captions, mute, skip, reduced motion and failure fallback |
+| 6. Rehearsal and release validation | Extend ongoing tests to authoring/rehearsal/media; full soak/failure suites, real phones, backup restore drills, alerts, and production readiness | Complete authored game works with at least 20 phones; accessibility, recovery, and measured performance meet release criteria |
+| 7. More creative mechanics and custom stages | Turn-based drawing/guessing, creation chains, team relay, frame-by-frame animation, stage editor and reusable sequences, in that dependency order | Each mechanic has supported participation ranges, accessible controls/alternatives, recovery behavior, and its own tests |
+| 8. Advanced automation and live collaboration | General rules, advanced branches/cutscenes; simultaneous shared canvases or precision/rhythm games only after dedicated research/prototypes | Complex mechanics meet explicit consistency, fairness, device, and resource budgets; deferred features are not assumed safe by reuse |
 
 Phases 1–6 constitute the first complete release, including both builder views and basic party-choice branching. Round-internal custom mechanics are supported by the architecture from the start, with advanced stage-editing tools delivered afterward.
+
+Testing and accessibility start with the first feature and gate every phase; phase 6 expands coverage rather than introducing it. Section 26 gives the concrete next-phase sequence and links the testing/device strategy. The private admin dashboard follows real operational signals; it is not a prerequisite for the first reliable loop and is not implemented by this update.
 
 Deployment occurs only once implementation is authorized and release prerequisites are satisfied; saving this plan does not authorize starting the build or deployment.
 
@@ -520,6 +537,9 @@ Before calling the app ready, verify:
 - Multi-hour soak testing, memory/listener cleanup, bounded queues, and measured capacity headroom.
 - Monitoring outages, media failure isolation, and successful database backup restoration.
 - Performance budgets measured with timeouts and failures reported separately from successful latency.
+- Creative asset privacy, validated uploads, missing/corrupt-file recovery, drawing revisions, deadline behavior during upload, and storage-full handling.
+- Keyboard, screen-reader, touch, zoom/reflow, reduced-motion, target-size, and contrast checks across supported screens; responsive phone controls and desktop-first editor alternatives.
+- Unit/property, real-database integration, multi-role E2E, accessibility and selected visual regressions as detailed in [testing strategy](docs/architecture/testing-and-accessibility.md).
 
 ## 17. Details to settle during design
 
@@ -732,6 +752,8 @@ The first four priority topics have been researched and their approved recommend
 | P1 — before visual design is finalized | Accessibility and party-room usability | Test readable TV text, touch targets, color-independent cues, reduced motion, caption options, readable timers, and volume controls with actual group play. |
 
 Recommended next research pass: browser/media compatibility and venue connectivity, followed by hosting/disaster-recovery tradeoffs. The researched foundation topics now move into detailed design rather than being treated as unanswered research. Research into legal requirements, external-media policies, and current service capabilities must use current authoritative sources rather than assumptions.
+
+Creative/browser constraints, upload safety, testing, and accessibility received an additional research pass on 11 November 2026 (sections 25–26). This does not close the venue-connectivity, legal/retention, media-policy, or disaster-recovery questions. Precise reaction/rhythm fairness and simultaneous canvas collaboration remain separate prototype/research gates.
 
 
 ## 20. Approved research findings: fairness, scoring, security, and mechanics
@@ -1016,3 +1038,83 @@ Separate current values from p95/p99 over a window and successful operations fro
 Proposed controls: reconnect the shared display, retry/skip failed media, temporarily enable more diagnostic logging with automatic expiry, inspect sanitized command/error records, and pause/resume or extend a session through normal game commands. Every gameplay-affecting operation is authorized, validated, idempotent, and audited. Do not expose arbitrary SQL, raw tokens/private answers, unrestricted score writes, production resets, or unsafe durability/performance switches.
 
 Treat diagnostics and control availability separately. Monitoring failures do not block gameplay; unavailable persistence blocks confirmed state changes. Store durable session actions in the existing command/audit tables. Keep high-frequency metrics outside the gameplay tables. System-wide operational audit/retention and monitoring backend are future design work.
+
+## 25. Player customization and creative minigames
+
+Added after the user's creative-game requests and online research on 11 November 2026. These are planned features, not implemented capabilities. Detailed findings, storage boundaries, technical-debt risks, sources and unresolved policies are in [creative minigames research](docs/architecture/creative-minigames.md).
+
+### 25.1 Names and identity images
+
+Players can choose a custom display name and a bundled icon, uploaded picture, or phone-drawn avatar. Image setup is skippable. Stable session IDs/credentials remain independent of names/images; reconnect restores confirmed customization. Guests do not need permanent accounts. Hosts can rename/reset/hide inappropriate content. Names are safely rendered and bounded, duplicate names are distinguishable, and avatar failures fall back to a built-in icon. Persistent cross-game profiles are optional later work.
+
+### 25.2 Mechanics and inspiration
+
+Use original content inspired by the variety of [Nintendo's Mario Party formats](https://media.nintendo.com/supermarioparty/minigames/), private mobile creation/reveal in [Drawful](https://www.jackboxgames.com/games/drawful), and drawing/guessing turns in [skribbl.io](https://skribbl.io/). This is inspiration for mechanics, not a plan to copy their assets, branding or implementations, or to inherit their capacity claims.
+
+| Family | Proposed original examples | Delivery order |
+| --- | --- | --- |
+| Text creativity | Jokes, captions, best excuse, finish the sentence | With basic submissions/reveal/voting |
+| Independent drawing | Draw a prompt; reveal and vote | First creative slice; reuse avatar pad |
+| Simultaneous secret choice | Bank points or risk a hazard; choose a concealed route | First creative slice; server resolves once |
+| Memory and observation | Recreate a sequence; identify a changed detail | Follow supported choice/input primitives |
+| Drawing and guessing | Rotating artist with private prompt and eligible guesses | After bounded live updates/checkpoint recovery |
+| Team relay/creation chain | Draw → pass → caption; contribute one piece each | After persisted turn assignments and lineage |
+| Team animation | Each teammate creates a frame; play the combined sequence | Turn-based first, after frame/contribution storage |
+| Precision/coordinated live games | Stop near a target, rhythm, continuous movement, simultaneous shared drawing | Dedicated prototypes/research first; not promised in initial release |
+
+Participation can be free-for-all, teams, cooperative, rotating representatives, or one-versus-many where supported. It is separate from awarding individual/team/both scores. Supported participation ranges and balancing are explicit per mechanic. Twenty people need simultaneous creation, short showcases/batches or representative rotation; a four-player game cannot simply be stretched to twenty without pacing/fairness design. Room/player capacity is distinct from a mechanic's required roles.
+
+### 25.3 Shared stage architecture and per-round configuration
+
+Mechanics declare compatible inputs, roles, views and stages: instruct → create/choose → lock → reveal → judge/vote → resolve → score, with optional/repeated stages explicit. Configure participants, captain/individual/turn ownership, contribution count, private prompts, tools/limits, timers, editing window, visibility, vote eligibility, ties, judging, individual/team awards, late joins, departures and fallback behavior. Unsupported combinations are rejected rather than exposed as arbitrary toggles.
+
+Version definitions and creation payloads. Reuse durable commands, lineup snapshots, score ledger and privacy-filtered views; do not couple engine execution to slide order or node coordinates. Begin with a few application-owned typed mechanic handlers. Arbitrary scripts, general runtime plugins and simultaneous collaborative editing are deferred.
+
+### 25.4 Browser, persistence and performance requirements
+
+- One reusable touch/mouse/pen drawing pad with bounded pixels/strokes/undo, resize-safe logical coordinates, clear tools and controlled local rendering.
+- Local asynchronous draft checkpoints are distinct from server-saved/final acceptance. Browser eviction, storage errors, hard kills and sleep can lose unconfirmed work; reconcile by stage/identity/revision on return.
+- Store file metadata/references in the existing PostgreSQL database; raster files in managed SSD-backed storage. Add asset/profile/creation/turn models through reviewed new Prisma migrations when needed; no schema changes are made by this plan.
+- Validate images on the server, constrain decode/processing/storage work, preserve privacy through authorized delivery, and use staged finalization/reconciliation because files and database writes are not one atomic transaction.
+- Initially freeze drawing controls at the drawing deadline and use an explicit bounded final-submit stage before reveal. Server eligibility/receipt remains authoritative; a client freeze cannot prove an untrusted device stopped drawing on time.
+- Live preview and durable final results have different delivery requirements. Bound/coalesce previews, checkpoint accepted operations where required, and prevent unbounded queues/fan-out; never confirm content that only exists in memory.
+- Guessing and voting protect prompts/authorship, define eligibility/normalization/ties, and cannot award points twice after retry/reconnect.
+- Team animation starts with ordered frames and one owner per turn. Playback is browser-side; server video encoding, CRDTs, WebRTC and precision timing compensation are not baseline dependencies.
+- Add content moderation, coordinated asset/database backups, missing-file recovery, retention/tombstone design and storage-pressure diagnostics before shipping uploads.
+
+Research confirms background browser timers/animation can be paused/throttled, local storage can be evicted, and Socket.IO needs application-level recovery. The [research document](docs/architecture/creative-minigames.md#research-findings-and-project-decisions) links the primary browser, Socket.IO and OWASP sources and translates them into decisions. Actual-device measurements remain required; twenty drawing clients on a Pi have not been benchmarked.
+
+### 25.5 Optional customizable show-host character
+
+Allow a puppet, minion, mascot or other character to present the entire show. Customize its name, original/uploaded artwork, poses/expressions, dialogue, voice clips, sounds, position/size and supported animation/cues, with game defaults and per-round overrides. Keep this independent of builder workspace styling, human-host permissions and game scoring.
+
+Start with static poses, text/captions and optional prerecorded voice clips. Add bounded authored pose/sprite animation after basic media reliability. Rigging, TTS, generated dialogue, lip sync and conversational AI are future options requiring separate research/provider choices; none is required for the baseline. Customization uses supported validated content rather than arbitrary executable code.
+
+Trigger cues at introductions, stage changes, reveals, results and finale. Deduplicate/limit queued cues and restore current presentation after reconnect without replaying the entire show. One selected display owns shared voice/audio. Provide text fallback, captions/transcript, mute/skip, reduced motion, and layouts that do not cover controls. Decorative character failures never block scoring or progression; intentional character cutscenes use ordinary stage timeout/skip rules.
+
+## 26. Next-phase build order and quality gates
+
+The existing scaffold/database is the starting point, not a completed multiplayer engine. Build a small playable game from prepared versioned definitions before either editor. This sequence refines phases 1–3B; no implementation is started by this document update.
+
+| Order | Slice | Evidence required before moving on |
+| --- | --- | --- |
+| 1 | Finalize versioned input/stage contracts, deadline rules, exact score invariants, role-filtered views and test scenarios; choose creator sign-in approach | Reviewable examples for quiz, judged challenge, text, drawing reference and choice without implementing all mechanics |
+| 2 | Durable session/stage/submission/judging/score commands with idempotency, revision checks, transactional outbox and recovery | Unit/property and real-PostgreSQL tests; real server-kill/lost-ack test proves one accepted result and no duplicate score effects |
+| 3 | Guest names/bundled icons, room admission, host/display/player authorization, late join/reclaim and Socket.IO state synchronization | Reconnect/permission tests and twenty-client protocol test; no reliance on socket IDs as identity |
+| 4 | Minimal responsive lobby/phone controls, host controls and shared display for a quiz → judged challenge → results | First Playwright multi-role E2E tests, keyboard/touch/error-state checks and real-phone smoke test; no decorative editor work |
+| 5 | Text/jokes/captions, reveal/vote, fixed teams, then team changes/carryover and route choices | Deterministic vote/score/lineup regressions; prepared reference and branching games run end to end |
+| 6 | Bounded asset lifecycle/storage, reusable avatar drawing pad, hand-drawn/profile picture customization, draft checkpoints | Validated uploads, protected downloads, retry/failure/storage/restore integration tests and device drawing checks |
+| 7 | Draw → save → reveal → vote and one simultaneous secret-choice minigame | Multi-role E2E, artwork/privacy/recovery regressions, realistic simultaneous upload/save load and accessible alternatives |
+| 8 | Pre-editor verification on actual phones and Pi/NUC, representative load plus headroom, crash/reconnect/soak tests and manual accessibility review | Measured budgets, documented browser support/limitations, and no unresolved critical integrity/privacy/accessibility defects |
+| 9 | Scene editor using the proven definition, then Flow editor using that same draft/validation/publishing service | Saved/published semantics agree across views; keyboard and non-drag alternatives, snapping and branch regressions pass |
+| 10 | Presentation/media/live editing/rehearsal; optional show-host character; private admin UI once real metrics/actions exist | Media/character failure isolation, permissioned controls, editor regression/device/accessibility suites and pre-release recovery drills |
+| 11 | Single-author live drawing/guessing → turn-based relays → frame animation → advanced stage tools | Each addition has explicit ownership, recovery, supported player formats and tests before the next complexity increase |
+| 12 | Precision/rhythm games, simultaneous canvases and more advanced automation | Separate feasibility/fairness/conflict prototype and measured device/server budgets; not an assumed first-release commitment |
+
+Steps are dependency order rather than deadlines. Backend APIs and minimal UI may advance together within a slice; durability and authorization must exist before real accepted submissions. Start browser E2E with the first interactive slice, not after the editors. Incremental diagnostics ship throughout; a full admin interface follows real signals.
+
+The [testing, accessibility and device strategy](docs/architecture/testing-and-accessibility.md) specifies unit/property, API/database/migration, component, Playwright E2E, selected visual regressions, protocol/load/failure tests and manual accessibility checks. Proposed tools are not installed by this update. Regression cases accompany bug fixes at the cheapest realistic layer.
+
+Controllers are mobile first; host controls work on laptop and phone/tablet; shared display is readable on a TV; editors are desktop first. Target WCAG 2.2 AA for ordinary application UI, with keyboard/screen-reader support, visible focus, adequate contrast/targets, zoom/reflow, reduced motion, timing accommodations and non-drag editing alternatives. Spatial/drawing mechanics need documented alternative roles/rounds and real-user evaluation; no conformance claim follows from an automated scan alone.
+
+Every slice must include relevant automated checks and keyboard/touch/responsive review. Browser emulation complements real iOS Safari/Android Chrome checks; it does not replace them. Preserve CI test isolation and sanitized artifacts, never run crash/load tests against live party data, and treat confirmed-data loss, authorization leaks or essential inaccessible controls as release blockers.

@@ -63,6 +63,8 @@ CI runs type checking, offline tests and builds. Tests cover signed tokens and i
 
 PostgreSQL schema, code-first migrations, typed client, and integration tests are now present. Next: choose creator authentication and implement durable command handlers, then guest sessions and real-time rooms. The first persistence milestone is a saved submission that survives a server kill/restart without duplicate effects. Integration tests prove database constraints and transaction behavior, not the full server-kill/reconnect recovery milestone.
 
+The [next-phase sequence](APP_PLAN.md#26-next-phase-build-order-and-quality-gates) puts a small playable loop and basic creative mechanics before the editors. [Creative minigame research](docs/architecture/creative-minigames.md) covers avatars, drawing, jokes, team creation/animation and a customizable show-host character. The [testing/accessibility strategy](docs/architecture/testing-and-accessibility.md) defines planned E2E/regression coverage, responsive devices and accessibility gates. Those features and browser test suites are planned, not implemented.
+
 ## Editor design reference
 
 The approved [interactive example](docs/design/editor-reference.html) shows Flow and Scene views of the same branching game. [Design notes](docs/design/README.md) preserve the user-supplied workspace styling references and explain the mockup limitations. Actual editors and snap-to-port interactions remain unimplemented.

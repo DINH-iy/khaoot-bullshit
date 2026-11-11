@@ -129,3 +129,7 @@ Not yet implemented: authenticated authoring endpoints, runtime command processo
 Liveness never probes PostgreSQL. Readiness checks database connectivity plus authentication configuration; it does not prove provider availability or complete schema compatibility. Deployment must check migration status/drift separately. Protected `/api/ops/metrics` now includes pool capacity/usage, waiters, last connectivity-probe duration and last known health. These are not timings for every gameplay query.
 
 Game history stays in PostgreSQL. High-frequency performance metrics/logs should remain in bounded telemetry storage, not become extra game-table writes per animation or timer tick. A private admin dashboard is planned separately; no dashboard UI or privileged controls are built by this change.
+
+## Planned creative-content extensions
+
+Player avatars, upload metadata, drawing checkpoints, creation lineage and frame/turn ownership are not present in the initial 17-model schema. The [creative-content plan](creative-minigames.md#storage-and-database-evolution) describes proposed additions and a staged file/database lifecycle. Add reviewed new migrations only when implementing those slices; do not rewrite the existing applied migrations. Use the same environment database and separate managed file storage, with authorized access and coordinated backups. Design retention/tombstones around immutable history rather than embedding personal images in append-only records.
