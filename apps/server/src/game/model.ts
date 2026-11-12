@@ -37,3 +37,6 @@ export function checkRevision(session: GameSession, command: GameCommand): void 
   requireGame(session.revision < 2_147_483_646, 'INVALID_STATE');
 }
 export const EligibilitySchema = z.object({ formatVersion: z.literal(1), playerIds: z.array(GameIdSchema) }).strict();
+
+// Stored on a vote stage run when it opens: the exact earlier stage run whose answers form the ballot.
+export const VotePresentationSchema = z.object({ sourceStageRunId: GameIdSchema }).passthrough();

@@ -14,6 +14,13 @@ describe('startup configuration', () => {
   it('refuses production startup without authentication', () => {
     expect(() => readConfig({ NODE_ENV: 'production' })).toThrow('Production requires');
   });
+  it('refuses local owner hosting in production and without room credentials', () => {
+    const production = { NODE_ENV: 'production', DATABASE_URL: 'postgresql://party@127.0.0.1/party', AUTH_ISSUER: 'https://identity.example/', AUTH_AUDIENCE: 'api', AUTH_JWKS_URL: 'https://identity.example/keys', ROOM_TOKEN_SECRET: 'a'.repeat(64), PUBLIC_ORIGIN: 'https://party.example' };
+    expect(readConfig(production).NODE_ENV).toBe('production');
+    expect(() => readConfig({ ...production, LOCAL_OWNER_TOKEN: 'o'.repeat(43) })).toThrow('Production does not allow local owner access');
+    expect(() => readConfig({ LOCAL_OWNER_TOKEN: 'o'.repeat(43) })).toThrow('requires room credentials');
+    expect(() => readConfig({ LOCAL_OWNER_TOKEN: 'short', ROOM_TOKEN_SECRET: 'a'.repeat(64) })).toThrow('Invalid configuration');
+  });
   it('rejects plaintext identity endpoints without disclosing their values', () => {
     expect(() => readConfig({ AUTH_ISSUER: 'http://secret.example/' })).toThrow('HTTPS is required');
     try { readConfig({ AUTH_ISSUER: 'http://secret.example/' }); }

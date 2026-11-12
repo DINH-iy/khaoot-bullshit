@@ -9,13 +9,16 @@ import { AuthenticationUnavailable, createTokenVerifier, type TokenVerifier } fr
 import { RequestMetrics, now } from './observability.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 import { registerRoomNetworking } from './rooms/network.js';
+import { registerLocalHosting } from './hosting/local-owner.js';
+import { registerAssetRoutes } from './assets/routes.js';
 import staticFiles from '@fastify/static';
 import { fileURLToPath } from 'node:url';
 
 export function buildApp(config: Config, options: { verifyToken?: TokenVerifier; logStream?: NodeJS.WritableStream; database?: DatabaseHealth & { client?: PrismaClient } } = {}) {
   const app = Fastify({
     bodyLimit: 16 * 1024,
-    requestTimeout: 10000,
+    // Long enough for a phone to upload a video over mobile data; idle sockets still time out after 10 s.
+    requestTimeout: 120000,
     connectionTimeout: 10000,
     trustProxy: false,
     requestIdHeader: false,
@@ -102,6 +105,8 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     return { ...metrics.snapshot(), database: options.database?.snapshot() ?? null };
   });
   if (options.database?.client && config.ROOM_TOKEN_SECRET) registerRoomNetworking(app, options.database.client, config, verifier);
+  if (options.database?.client && config.ROOM_TOKEN_SECRET) registerAssetRoutes(app, options.database.client, config);
+  if (options.database?.client) registerLocalHosting(app, options.database.client, config);
   if (config.SERVE_WEB) {
     void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: false, index: false, cacheControl: false });
     app.get('/', async (_request, reply) => reply.sendFile('index.html'));

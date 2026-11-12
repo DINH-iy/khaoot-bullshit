@@ -9,6 +9,10 @@ const EnvironmentSchema = z.object({
   APP_VERSION: z.string().min(1).max(100).default('local'),
   PUBLIC_ORIGIN: z.url().refine(value => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && url.origin === value; }, 'A plain HTTP(S) origin is required').default('http://127.0.0.1:5173'),
   ROOM_TOKEN_SECRET: z.string().regex(/^[0-9a-f]{64}$/, 'Use a generated 32-byte hex room secret').optional(),
+  // Explicit local owner access for hosting from the browser. Never valid in production.
+  LOCAL_OWNER_TOKEN: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Use a generated 32-byte base64url owner token').optional(),
+  // Where uploaded pictures and videos are stored. Defaults to the ignored .local/media folder.
+  MEDIA_DIR: z.string().min(1).max(1024).refine(value => value.startsWith('/'), 'Use an absolute path').optional(),
   SERVE_WEB: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   DATABASE_URL: z.url().refine(value => ['postgresql:', 'postgres:'].includes(new URL(value).protocol), 'PostgreSQL URL is required').optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
@@ -22,6 +26,8 @@ const EnvironmentSchema = z.object({
   if (env.NODE_ENV === 'production' && !env.DATABASE_URL) ctx.addIssue({ code: 'custom', message: 'Production requires database configuration', path: ['DATABASE_URL'] });
   if (env.NODE_ENV === 'production' && configured !== 3) ctx.addIssue({ code: 'custom', message: 'Production requires authentication configuration', path: ['AUTH_ISSUER'] });
   if (env.NODE_ENV === 'production' && !env.ROOM_TOKEN_SECRET) ctx.addIssue({ code: 'custom', message: 'Production requires room credentials configuration', path: ['ROOM_TOKEN_SECRET'] });
+  if (env.NODE_ENV === 'production' && env.LOCAL_OWNER_TOKEN) ctx.addIssue({ code: 'custom', message: 'Production does not allow local owner access; configure creator sign-in', path: ['LOCAL_OWNER_TOKEN'] });
+  if (env.LOCAL_OWNER_TOKEN && !env.ROOM_TOKEN_SECRET) ctx.addIssue({ code: 'custom', message: 'Local owner access requires room credentials configuration', path: ['ROOM_TOKEN_SECRET'] });
   if (env.NODE_ENV === 'production' && new URL(env.PUBLIC_ORIGIN).protocol !== 'https:') ctx.addIssue({ code: 'custom', message: 'Production requires HTTPS', path: ['PUBLIC_ORIGIN'] });
 });
 

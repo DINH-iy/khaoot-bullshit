@@ -9,9 +9,10 @@ export const tokenHash = (token: string) => createHash('sha256').update(token).d
 export const newToken = () => randomBytes(32).toString('base64url');
 export function joinToken(secret: string, sessionId: string, joinId: string): string { return createHmac('sha256', secret).update(`join:${sessionId}:${joinId}`).digest('base64url'); }
 export const cookieName = (sessionId: string, display = false) => `party_${sessionId.replaceAll('-', '')}${display ? '_display' : ''}`;
-export function cookieToken(header: string | undefined, sessionId: string, display = false): string | undefined {
+export const cookieToken = (header: string | undefined, sessionId: string, display = false) => namedCookie(header, cookieName(sessionId, display));
+export function namedCookie(header: string | undefined, name: string): string | undefined {
   if (!header || header.length > 16384) return undefined;
-  const prefix = `${cookieName(sessionId, display)}=`;
+  const prefix = `${name}=`;
   const matches = header.split(';').map(value => value.trim()).filter(value => value.startsWith(prefix));
   if (matches.length !== 1) return undefined;
   const value = matches[0]!.slice(prefix.length);

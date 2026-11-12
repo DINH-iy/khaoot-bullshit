@@ -3,10 +3,13 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { loadLocalEnvironment, projectRoot } from '../database/environment.mjs';
+import { ensureHostSecrets, hostMenuUrl, openBrowser } from '../host/owner.mjs';
 loadLocalEnvironment();
 if (process.env.NODE_ENV === 'production') throw new Error('This is a temporary rehearsal launcher, not production deployment.');
-const access = JSON.parse(await readFile(resolve(projectRoot, '.local/network-rehearsal.json'), 'utf8'));
-if (new Date(access.expiresAt).getTime() <= Date.now()) throw new Error('Prepare a fresh rehearsal room first.');
+// A prepared rehearsal room is optional now: the owner can open rooms from the host menu.
+const access = await readFile(resolve(projectRoot, '.local/network-rehearsal.json'), 'utf8').then(JSON.parse).catch(() => undefined);
+const rehearsal = access && new Date(access.expiresAt).getTime() > Date.now() ? access : undefined;
+const ownerToken = await ensureHostSecrets();
 const executable = process.env.CLOUDFLARED_BIN || resolve(projectRoot, '.local/tools/cloudflared');
 const children = new Set(); let stopping = false; let server; let origin; let buffer = ''; let restarting = false; let generation = 0;
 const runId = randomUUID();
@@ -47,7 +50,10 @@ tunnel.stderr.on('data', chunk => {
     await startServer();
     const ends = Date.now() + 20000;
     while (!stopping && Date.now() < ends) {
-      try { const response = await fetch('http://127.0.0.1:3001/api/health/live'); if (response.ok) { console.log(`\nPHONE PLAYER LINK: ${origin}/?code=${access.roomCode}\nOpen the host on this laptop with: npm run network:host\nKeep this process running. Wi-Fi and 5G use the same HTTPS link.\n`); return; } } catch { /* bounded readiness retry */ }
+      try { const response = await fetch('http://127.0.0.1:3001/api/health/live'); if (response.ok) {
+        const opened = await openBrowser(hostMenuUrl(origin, ownerToken));
+        console.log(`\nPUBLIC ADDRESS: ${origin}\n${opened ? 'The host menu is open in your browser.' : 'Could not open a browser for the host menu.'} Open a room there; players join with its code or QR.${rehearsal ? `\nPrepared rehearsal room: ${origin}/?code=${rehearsal.roomCode} (host: npm run network:host)` : ''}\nKeep this process running. Wi-Fi and 5G use the same HTTPS link.\n`); return;
+      } } catch { /* bounded readiness retry */ }
       await new Promise(resolve => setTimeout(resolve, 250));
     }
     console.error('Backend did not become ready.'); process.exitCode = 1; stop();

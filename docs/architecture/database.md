@@ -84,6 +84,14 @@ The second migration owns CHECK constraints, partial unique indexes, and immutab
 
 The third migration adds StageJudgment, its nonnegative-amount check and immutable-history trigger. It is a new additive migration; the first two applied migrations are unchanged. Zero-point judgments need their own durable record because the score ledger intentionally rejects zero-value entries.
 
+The fifth migration (`stage_reveal`) adds the nullable `stage_runs.revealedAt`, marks already closed stages as revealed so their scores stay visible, and adds a check that only a closed stage can be revealed, never before it closed.
+
+Route choices use the existing `route_decisions` table (one immutable row per decided choice, written with its deciding command); votes are ordinary submissions. No migration was needed. Built-in games now store their real `definitionFormat` (previously always 1).
+
+Teams use the existing `session_teams`, `team_lineups` and `team_members` tables; no migration was needed. `team_lineups.carryover` stores whether the lineup is for the game or one round, its carryover rule and the team order. Team score entries carry their lineup.
+
+The sixth migration (`media_assets`) adds the `assets` table for uploaded pictures, GIFs and videos: uploader, stage, verified type and size, SHA-256, and the answer it belongs to. A check restricts it to the supported types and keeps kind and type consistent. The file bytes are stored outside PostgreSQL in the media folder; backups must include both.
+
 The fourth migration adds room credentials and a nullable unique player join-key hash. Existing players remain intact with null join hashes. Tokens and join keys are never stored raw in PostgreSQL. Reviewed lifetime/hash checks supplement the Prisma schema. This migration is additive; earlier applied migrations remain unchanged.
 
 ## Local setup
@@ -128,7 +136,7 @@ The test wrapper requires an explicitly configured local `TEST_DATABASE_URL` end
 
 Coverage: draft/version isolation and immutability, duplicate commands/submissions/awards, cross-session references, actor consistency, one active stage, team captain constraints, exact scores and corrections, atomic rollback across command/submission/audit/outbox, record persistence across client recreation, immutable branch resolution, and populated-schema upgrade preservation.
 
-The command service now has a [verified room/network gateway](../testing/network-checkpoint.md): guest/host/display credentials, HTTP admission, Socket.IO snapshots/receipts, bounded outbox publication and single-backend startup pausing. Tests exercise real transports, 20 clients and browser recovery. Real-phone acceptance is pending. Still unimplemented: full creator sign-in/authoring, cross-device reclaim, timed admission/close policy, team/carryover/correction services, purge/retention and a production migration role. Table availability alone does not establish those guarantees.
+The command service now has a [verified room/network gateway](../testing/network-checkpoint.md): guest/host/display credentials, HTTP admission, Socket.IO snapshots/receipts, bounded outbox publication and single-backend startup pausing. Tests exercise real transports, 20 clients and browser recovery. Real-phone acceptance is pending. Still unimplemented: full creator sign-in/authoring, team/carryover services, purge/retention and a production migration role. Table availability alone does not establish those guarantees.
 
 ## Health and administration
 

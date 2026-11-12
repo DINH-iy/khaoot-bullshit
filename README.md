@@ -22,7 +22,16 @@ npm run build
 npm start -w @party/server
 ```
 
-Build contracts before standalone package development/tests; the root commands handle this. Restart development after changing contracts, or rebuild contracts while watching. Production web files land in `apps/web/dist`; the API currently does not serve them. Deployment/static serving comes in a later slice.
+Build contracts before standalone package development/tests; the root commands handle this. Restart development after changing contracts, or rebuild contracts while watching. Production web files land in `apps/web/dist`. The API serves them only when `SERVE_WEB=true`, which the host launcher, the public rehearsal launcher and the browser tests set; it is off by default. Permanent deployment comes in a later slice.
+
+## Hosting a room
+
+```sh
+npm run db:up && npm run db:migrate:deploy   # once, or after new migrations
+npm run host
+```
+
+`npm run host` builds the app, starts it on this computer and opens the host menu in your browser, already signed in as the owner. Pick a built-in game, open a room, and share the room code or QR. The first run generates `ROOM_TOKEN_SECRET` and `LOCAL_OWNER_TOKEN` into the ignored `.env`. This mode only reaches browsers on the same computer; `npm run network:public` opens the same menu on a temporary public address for phones on other networks. Built-in games are "Friday Night Chaos" (a route vote), "Timed quiz", "Team party", "Picture party" (uploads and a vote) and the untimed "First reliable game"; there is no editor yet.
 
 ## Package boundaries
 
@@ -44,7 +53,11 @@ The backend can verify API access tokens from a configured OIDC provider using H
 
 With no provider in development, protected endpoints return 503 and readiness is 503. Production startup refuses missing authentication configuration. Liveness stays 200 so a deployment does not endlessly restart just because sign-in is unconfigured.
 
-Room networking now separately verifies expiring/revocable opaque host/display/player credentials in HttpOnly cookies, checks roles/origins and bounds admission/messages. Normal room creation requires verified OIDC identity and ownership. The owner-run rehearsal CLI explicitly provisions a short-lived host grant for one test room; production rejects those local rehearsal grants. Full creator browser sign-in/provider integration and host-approved cross-device player reclaim remain future work.
+Room networking now separately verifies expiring/revocable opaque host/display/player credentials in HttpOnly cookies, checks roles/origins and bounds admission/messages. Normal room creation requires verified OIDC identity and ownership. The owner-run rehearsal CLI explicitly provisions a short-lived host grant for one test room; production rejects those local rehearsal grants. Full creator browser sign-in/provider integration remains future work.
+
+Seat takeover: a player whose phone died opens the room on another phone, chooses "Take over my seat" and picks their seat. Only seats with no phone connected are offered. A room setting decides whether the host must approve first (off by default); either way the old phone's access is cancelled and the score and answers stay with the seat.
+
+Local owner hosting is the explicit non-production stand-in for creator sign-in. The owner link carries a generated key once; the browser then holds it in an HttpOnly, SameSite=Strict cookie scoped to `/api/host`. Startup refuses `LOCAL_OWNER_TOKEN` in production, and rooms opened this way use rehearsal grants that production rejects. Hosting on a production deployment therefore still needs a chosen sign-in provider.
 
 ## Logs, timing, and health
 
@@ -63,9 +76,9 @@ CI runs type checking, offline tests and builds. Tests cover signed tokens and i
 
 Game contracts and the first internal durable command service now support prepared untimed individual choice/text stages, host-judged challenges, exact score effects, receipts/retries, safe views, and transactional audit/outbox persistence. See [contracts and command services](docs/architecture/game-commands.md) for trust boundaries and limitations. A new migration records zero-point judgments as immutable decisions.
 
-Real process-kill tests verify rollback/retry without duplicate scoring. The room gateway, real WebSocket/polling tests, bounded outbox publication, startup pausing, and browser host/phone refresh/offline/recovery tests are now implemented. Trusted actor IDs are derived from verified credentials, never accepted as authentication from a request. Timed admission/closing, teams, drawing, voting and the editors remain later slices.
+Real process-kill tests verify rollback/retry without duplicate scoring. The room gateway, real WebSocket/polling tests, bounded outbox publication, startup pausing, and browser host/phone refresh/offline/recovery tests are now implemented. Trusted actor IDs are derived from verified credentials, never accepted as authentication from a request. Timed stages now run with server deadlines, a delivery grace period, automatic closing, and host controls to add time, replace it, remove the limit, pause and reopen. Each round sets its own answer style on the phone: a list, large tiles, or putting items in order. Players can also answer by uploading a picture, GIF or short video, and vote anonymously on each other's text answers or uploads. Rounds can be solo or team-based: the game sets a default and each round can override it with its own split (2v2, 1v3, 1 vs everyone, a number of teams), made randomly, by the host or by the players, always confirmed by the host. Captains can answer for their team, and points go to the team, each member or both. Games can branch: a route choice lets the players, the team captains or the host pick one of several routes, which can join back together; ties and empty votes follow the game's rules, and the host can always choose. Closed stages are revealed by the host (correct answer, answer tally, points, scoreboard), the host can judge challenges from the browser, and score corrections are new ledger entries. Teams, drawing, voting and the editors remain later slices.
 
-**Current gate: actual Android Chrome phone testing over public HTTPS, including 5G and Wi-Fi switching. Do not continue product features until this networking review passes.** See [network checkpoint and test steps](docs/testing/network-checkpoint.md). Temporary public rehearsal uses the built app through a Cloudflare tunnel; database ports remain private. Run `npm run network:prepare`, `npm run network:public`, and separately `npm run network:host` after the documented build/database setup. No cloud account/domain or permanent production deployment is created.
+**Current gate: actual Android Chrome phone testing over public HTTPS, including 5G and Wi-Fi switching. Do not continue product features until this networking review passes.** On 12 November 2026 the owner lifted this gate for two slices only, timed stages and browser hosting; the phone review itself is still parked and not passed. See [network checkpoint and test steps](docs/testing/network-checkpoint.md). Temporary public rehearsal uses the built app through a Cloudflare tunnel; database ports remain private. Run `npm run network:prepare`, `npm run network:public`, and separately `npm run network:host` after the documented build/database setup. No cloud account/domain or permanent production deployment is created.
 
 Browser regressions: start `npm run db:test:up`, install Chromium with `npx playwright install chromium`, then `npm run test:e2e` after building. These use a dedicated `_test` database; phone rehearsal uses local `_dev`. Automated emulation does not replace real-phone/5G evidence.
 
@@ -91,4 +104,4 @@ npm run db:test           # migration and integration checks
 npm run db:test:stop
 ```
 
-Use Prisma **7.10.1** commands, not the current Prisma 8 prerelease workflow. `npm run db:migrate:create -- --name describe_change` generates SQL for review; `npm run db:migrate:dev` applies it to a guarded local development database. `npm run db:generate` is also run by root build/test/typecheck commands. No database is reset or migrated automatically by the web server.
+Use Prisma **7.10.1** commands, not the current Prisma 8 prerelease workflow. There are six migrations; the latest two add the stage reveal time and uploaded media. Uploaded files are stored in `.local/media` (or `MEDIA_DIR`), not in the database. `npm run db:migrate:create -- --name describe_change` generates SQL for review; `npm run db:migrate:dev` applies it to a guarded local development database. `npm run db:generate` is also run by root build/test/typecheck commands. No database is reset or migrated automatically by the web server.

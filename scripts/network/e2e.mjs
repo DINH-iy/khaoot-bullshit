@@ -1,5 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
 import { loadLocalEnvironment, projectRoot, testDatabaseUrl } from '../database/environment.mjs';
 loadLocalEnvironment();
@@ -7,7 +10,9 @@ const base = testDatabaseUrl(process.env.TEST_DATABASE_URL);
 const name = `network_e2e_${randomUUID().replaceAll('-', '')}_test`;
 const target = new URL(base); target.pathname = `/${name}`;
 const admin = new pg.Client({ connectionString: base, connectionTimeoutMillis: 3000 });
-const env = { ...process.env, NODE_ENV: 'test', DATABASE_URL: target.toString(), ROOM_TOKEN_SECRET: 'b'.repeat(64),
+// Uploads made by browser tests go to a throwaway folder, never the real media folder.
+const mediaDirectory = await mkdtemp(join(tmpdir(), 'party-media-e2e-'));
+const env = { ...process.env, MEDIA_DIR: mediaDirectory, NODE_ENV: 'test', DATABASE_URL: target.toString(), ROOM_TOKEN_SECRET: 'b'.repeat(64), LOCAL_OWNER_TOKEN: 'e2e-owner-'.padEnd(43, 'x'),
   HOST: '127.0.0.1', PORT: '4173', PUBLIC_ORIGIN: 'http://127.0.0.1:4173', SERVE_WEB: 'true', LOG_LEVEL: 'warn' };
 let created = false;
 try {
@@ -23,4 +28,5 @@ try {
   // Drop only the unique disposable DB successfully created by this invocation.
   if (created) await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`);
   await admin.end();
+  await rm(mediaDirectory, { recursive: true, force: true });
 }

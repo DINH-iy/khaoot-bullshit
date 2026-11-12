@@ -29,6 +29,7 @@
     "db:test": "node scripts/database/test.mjs",
     "db:drift": "node scripts/database/prisma.mjs migrate diff --from-config-datasource --to-schema database/schema.prisma --exit-code",
     "db:test:stop": "node scripts/database/compose.mjs stop postgres-test",
+    "host": "node scripts/host/start.mjs",
     "network:prepare": "node --import tsx scripts/network/prepare.mjs",
     "network:public": "node scripts/network/public.mjs",
     "network:host": "node scripts/network/host.mjs",

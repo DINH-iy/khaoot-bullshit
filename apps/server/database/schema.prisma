@@ -27,6 +27,12 @@ enum StageStatus {
   VOID
 }
 
+enum AssetKind {
+  IMAGE
+  GIF
+  VIDEO
+}
+
 enum ScoreKind {
   AWARD
   ADJUSTMENT
@@ -163,6 +169,7 @@ model SessionPlayer {
   submissions Submission[]
   scores      ScoreEntry[]
   judgments   StageJudgment[]
+  assets      Asset[]
 
   @@unique([sessionId, id])
   @@map("session_players")
@@ -263,6 +270,8 @@ model StageRun {
   deadlineAt        DateTime?   @db.Timestamptz(3)
   pausedRemainingMs Int?
   closedAt          DateTime?   @db.Timestamptz(3)
+  // Results (answer, awards, scores) of a closed stage become public only once revealed.
+  revealedAt        DateTime?   @db.Timestamptz(3)
 
   session     GameSession     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   lineup      TeamLineup?     @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
@@ -270,6 +279,7 @@ model StageRun {
   decision    RouteDecision?
   scores      ScoreEntry[]
   judgments   StageJudgment[]
+  assets      Asset[]
 
   @@unique([sessionId, id])
   @@unique([sessionId, number])
@@ -291,10 +301,35 @@ model Submission {
   stage  StageRun       @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
   player SessionPlayer? @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
   team   SessionTeam?   @relation(fields: [sessionId, teamId], references: [sessionId, id], onDelete: Restrict)
+  asset  Asset?
 
   @@unique([stageRunId, actorKey, slotKey])
   @@index([sessionId, stageRunId])
   @@map("submissions")
+}
+
+// An uploaded picture, GIF or video. The bytes live on disk under the media
+// directory; this row is the authority on who uploaded it, for which stage,
+// what it was verified to be, and which saved answer uses it.
+model Asset {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId    String    @db.Uuid
+  stageRunId   String    @db.Uuid
+  playerId     String    @db.Uuid
+  kind         AssetKind
+  contentType  String    @db.VarChar(64)
+  byteSize     Int
+  sha256       String    @db.Char(64)
+  submissionId String?   @unique @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+
+  stage      StageRun      @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  player     SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  submission Submission?   @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, id])
+  @@index([stageRunId, playerId])
+  @@map("assets")
 }
 
 model RouteDecision {

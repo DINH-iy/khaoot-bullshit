@@ -30,6 +30,23 @@ Use one coherent professional builder design system in light, dark, or system mo
 
 The earlier interactive example's purple workspace accent is provisional. Follow the newer screenshot direction for workspace styling while retaining the accepted editor structure. Game themes and per-round presentation overrides remain separately configurable and may be much more expressive than the workspace.
 
+## Flow editor look (12 November 2026)
+
+The owner supplied this screenshot as how they imagine the Flow editor:
+
+![Flow editor as imagined by the owner: Friday Night Chaos with an opening cutscene, a party choice splitting into Music and Physical routes, and a shared finale](assets/flow-editor-reference.png)
+
+What it shows:
+
+- **Header:** game name with "Your games / Draft", a concept label, and a **Rehearse route** button.
+- **Tabs:** Flow editor and Scene editor, plus a summary on the right ("Game overview · 5 scenes, 2 routes").
+- **Canvas:** a dark dotted grid, "Game flow" label, and the hint "Double-click a scene to edit".
+- **Scene cards:** a type label (Cutscene, Party choice, Music route, Physical route, Rejoin · Results), a thumbnail strip, the scene name, and a one-line summary such as "Everyone votes · 20 seconds", "Quiz · Name that tune" or "Challenge · Host judges".
+- **Connections:** round ports on the left and right of each card, curved lines between them, and the route label ("Music", "Physical") written beside each party-choice output.
+- **Rejoin:** the shared finale takes both routes into one card; the selected card has an accent outline.
+
+Treat it like the other references: it fixes structure and tone, not exact colours or measurements. The bottom of the screenshot shows part of a chat input; that is not part of the design.
+
 ## Connection interaction requirements
 
 Snap-to-port behavior, valid-target highlighting, zoom-independent hit areas, cancellation, reconnection, alignment, accessible alternatives, and graph validation are specified in [APP_PLAN.md, section 23.5](../../APP_PLAN.md#235-connection-handles-snapping-and-node-alignment). These are requirements for later implementation, not capabilities of the saved example.

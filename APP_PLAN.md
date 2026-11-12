@@ -276,7 +276,7 @@ Refreshing, locking the phone, or losing connection should preserve:
 - Accepted submissions.
 - Current stage status.
 
-A stored player credential handles normal reconnection. Switching devices uses a recovery code or host-approved reclaim process. Entering a nickname alone must not allow someone to take another player's identity.
+A stored player credential handles normal reconnection. Switching devices uses a host-approved reclaim process. Entering a nickname alone must not allow someone to take another player's identity. Owner decision (12 November 2026): host approval is a room setting, off by default for groups of friends; only seats without a connected phone can be requested.
 
 Disconnected players remain part of the session. The host can continue without waiting indefinitely.
 
@@ -1099,6 +1099,27 @@ Current work status: the user parked the manual networking checkpoint on 11 Nove
 The existing scaffold/database is the starting point, not a completed multiplayer engine. Build a small playable game from prepared versioned definitions before either editor. This sequence refines phases 1–3B; no implementation is started by this document update.
 
 Implementation progress (11 November 2026): steps 1–2 have an executable untimed individual subset. Step 3 and the minimal step-4 test UI now include host/player/display credentials, guest admission, safe Socket.IO snapshots/receipts, bounded notification publication and single-backend restart pausing. Automated real-client and browser regressions exist. Creator provider sign-in, cross-device reclaim, icons and full gameplay/phone usability remain incomplete. See [command boundaries](docs/architecture/game-commands.md) and [network gate](docs/testing/network-checkpoint.md).
+
+Implementation progress (12 November 2026): at the owner's explicit request the hold below was lifted for two slices only. Timed stages now execute with server deadlines, a one-second delivery grace, automatic durable closing and host timer control (add, replace, remove, pause, reopen). The owner can open rooms from a browser host menu with built-in games through non-production local owner access. Decided rule: the host always controls timing, except in future minigame stages designed to run without intervention. Creator provider sign-in is still not chosen, and timed play has not been checked on a real phone.
+
+Owner direction (12 November 2026): build the mechanics needed to run a game before the builder; creator sign-in, Pi deployment and polished play screens come later; the owner commits changes personally. Agreed mechanics order and status:
+
+| # | Mechanic | Status |
+| --- | --- | --- |
+| 0 | Per-round answer styles: list, tiles, ordering | Built. Ordering is all-or-nothing, moved with buttons (no drag yet). |
+| 1 | Reveal and results | Built. Host reveal step, answer tally, round points, scoreboard, browser judging of challenges. |
+| 2 | Score corrections | Built. Signed ledger adjustments; not yet linked to the specific entry they correct. |
+| 3 | Voting on jokes/captions | Built. Anonymous ballot from an earlier text or upload round, no self-votes, points per vote; the vote's reveal shows authors. |
+| 3a | Pictures, GIFs and videos as answers | Built. Content-checked uploads with size limits, private until a vote or reveal. No cleanup of old media yet. |
+| 4 | Cross-device seat reclaim | Built. Room setting for host approval (off by default), approve/deny on the host screen. Decided: only seats whose phone is disconnected can be taken; whether the host must approve is a per-game setting. Shared-display links now last as long as the host's access (was one hour). |
+| 5 | Teams and score carryover | Built. Game default plus per-round override (solo, game teams, round-only split, re-form); any split by count or exact sizes; random/host/players formation, host always confirms; captain or everyone answers; points to team/members/both; team judging and votes; carryover rules keep/fresh/members. Not yet: redistribute and manual carryover, team winners. |
+| 6 | Branching routes | Built. Definition format 2: route-choice nodes with labelled options, rejoining routes, decided by players, captains or the host; tie and no-vote rules; host can always choose; decision final and restart-safe. Owner defaults recorded below. |
+
+Branching defaults chosen on 12 November 2026 (owner can change them): a game where a writing round is voted on in only some routes cannot be saved; a decided route is final; a tie where the default route is not among the tied routes is settled by a recorded random pick among them; a team whose captain is absent when voting opens gets no vote; the host always sees live counts, while phones and the shared screen see them as each choice is configured (the built-in game shows them at the announcement).
+
+Found while building: per-address request limits are shared by every player when traffic arrives through the Cloudflare tunnel or one home router, because the server then sees one address; this needs revisiting with the Pi ingress. A host-menu limit sharing counters with the sign-in check was fixed. Host buttons re-enabled before the screen refreshed, so a quick second press was refused; they now wait for the refresh. Built-in games were stored without their format number, which would have broken any newer-format game; fixed. An independent review of branching (four reviewers, each finding checked twice) confirmed six issues, all fixed with tests: the host could close a team round before confirming its teams, which could leave later team rounds stuck (closing now waits for confirmed teams); paused rooms told voters they joined too late; captain votes were offered to teammates; route rounds showed a stray answer count; route votes could not handle more than 1,000 players.
+
+All of the above has automated and emulated-browser coverage only; none has been checked on a real phone.
 
 **Required hold before more product features:** the user prioritizes networking as vital and requires testing on their Android Chrome phone, including joining over 5G, Wi-Fi/mobile-data switching, saved-answer refresh, sleep/foreground and backend restart recovery. No shared LAN is required. Automated tests complement this review; they cannot mark real-phone acceptance complete. Editors and admin dashboard remain out of scope. Track results in [network checkpoint](docs/testing/network-checkpoint.md).
 

@@ -25,6 +25,48 @@ dt { font-size: .9rem; } dd { margin: 8px 0; font-size: 1.4rem; font-variant-num
 fieldset { border: 1px solid light-dark(#bbb, #777); border-radius: 8px; }
 li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 .error { color: light-dark(#9d1717, #ffb4b4); }
+.timer { font-size: 1.6rem; font-variant-numeric: tabular-nums; font-weight: 600; margin: 8px 0 16px; }
+.timer-ending { color: light-dark(#9d1717, #ffb4b4); }
+.timer-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 20px; }
+.inline-form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.inline-form input { width: 7rem; }
+.game-choice { align-items: flex-start; } .game-choice input { flex: none; margin-top: 4px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 12px; }
+.tiles legend { margin-bottom: 4px; }
+.tile { position: relative; display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 14px; border: 2px solid light-dark(#767676, #999); border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; }
+.tile input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.tile:has(input:checked) { background: light-dark(#222, #eee); color: light-dark(#fff, #161616); border-color: light-dark(#222, #eee); }
+.tile:has(input:focus-visible) { outline: 3px solid light-dark(#195fc0, #82b5ff); outline-offset: 3px; }
+.tile-mark { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid currentColor; font-size: .95rem; }
+.order-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: order; }
+.order-list li { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 8px 8px 14px; border: 1px solid light-dark(#767676, #999); border-radius: 10px; counter-increment: order; }
+.order-list li::before { content: counter(order) '.'; font-variant-numeric: tabular-nums; font-weight: 600; }
+.order-label { flex: 1; }
+.order-move { min-width: 48px; min-height: 48px; padding: 0; font-size: 1.2rem; }
+.plain-list { list-style: none; padding: 0; }
+.results { margin: 16px 0; padding: 16px; border: 1px solid light-dark(#bbb, #777); border-radius: 12px; }
+.scoreboard { list-style: none; padding: 0; counter-reset: rank; }
+.scoreboard li::before { counter-increment: rank; content: counter(rank) '.'; font-variant-numeric: tabular-nums; }
+.scoreboard li { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 16px; padding: 8px 0; border-bottom: 1px solid light-dark(#ddd, #444); }
+.score-name { flex: 1 1 8rem; } .score-points { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 4rem; text-align: right; }
+.media { display: block; max-width: 100%; max-height: 60vh; border-radius: 10px; background: light-dark(#eee, #111); }
+.media-upload { display: grid; gap: 12px; } .media-upload progress { width: 100%; height: 14px; }
+.gallery { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 16px; }
+.gallery li { display: grid; gap: 6px; margin: 0; }
+.ballot { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.ballot-entry { display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid light-dark(#bbb, #777); border-radius: 10px; }
+.ballot-text { font-weight: 600; white-space: pre-wrap; }
+.link-button { min-height: 44px; padding: 0 4px; border: 0; background: none; color: light-dark(#174e9b, #a1c6ff); text-decoration: underline; }
+.seat-requests { margin: 16px 0; }
+.team-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 12px; }
+.team-card { margin: 0; padding: 12px; border: 1px solid light-dark(#bbb, #777); border-radius: 12px; }
+.team-card p { margin: 6px 0; }
+.team-forming select { min-height: 44px; font: inherit; border-radius: 8px; padding: 6px 10px; }
+.team-summary { font-size: 1.05rem; }
+.route-choice { margin: 12px 0; }
+.route-decision { font-size: 1.15rem; }
+.route-pending { font-weight: 600; }
 .join-qr { margin: 20px 0; }
 .join-qr img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
 @media (max-width: 480px) { main { margin: 12px auto; padding: 12px; } section { padding: 16px; } .actions button { flex: 1 1 140px; } }

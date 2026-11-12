@@ -77,6 +77,9 @@ describe('durable game commands', () => {
     const outbox = await prisma.outboxEvent.findMany({ where: { sessionId: f.sessionId } });
     expect(JSON.stringify(outbox)).not.toContain('canberra');
     await hostCommand(f, 'stage.close', { stageRunId });
+    const locked = await readSessionView(prisma, actor, f.sessionId);
+    expect(locked.standings).toEqual([]); expect(JSON.stringify(locked)).not.toContain('correctChoiceKey');
+    await hostCommand(f, 'stage.reveal', { stageRunId });
     expect((await readSessionView(prisma, actor, f.sessionId)).standings).toEqual([{ playerId: actor.playerId, amountMilli: '10000' }]);
   });
   it('records zero/nonzero judgments once and completes a prepared game without duplicate scoring', async () => {

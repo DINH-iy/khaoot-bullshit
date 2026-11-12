@@ -5,8 +5,11 @@ import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnap
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
   const [message, setMessage] = useState(''); const [samples, setSamples] = useState<number[]>([]); const [reconnects, setReconnects] = useState(0);
-  const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false);
+  const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false); const [clockOffset, setClockOffset] = useState(0);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
+  // What the host was looking at when acting: used to decide whether a conflicting action is still meant.
+  const latestRef = useRef<RoomSnapshot | undefined>(undefined); const basisRef = useRef('');
+  const basisOf = (state: RoomSnapshot | undefined) => state ? `${state.view.status}:${state.view.stage?.id ?? ''}:${state.view.stage?.status ?? ''}:${state.view.stage?.revealed ?? ''}` : '';
   const storageKey = `party_pending_${sessionId ?? ''}`;
   const remember = useCallback((command?: GameCommand) => {
     pendingRef.current = command; setPending(command);
@@ -26,16 +29,30 @@ export function useRoom(sessionId: string | undefined, display = false) {
         else if (!reply?.ok) reject(new Error(reply && !reply.ok ? reply.error.code : 'Invalid server reply')); else resolve(reply.data);
       });
     });
-    const transmit = (command: GameCommand) => {
+    const transmit = (command: GameCommand, attempt = 0) => {
       if (!socket.connected) { setSaving(false); setMessage('Not confirmed — reconnecting. Your action is retained.'); return; }
       setSaving(true); const start = performance.now();
       void emit('room.command', command).then(data => {
         const receipt = CommandReceiptSchema.parse(data);
         if (!mounted || receipt.commandId !== pendingRef.current?.commandId) return;
-        remember(); setMessage(`Saved · ${Math.round(performance.now() - start)} ms confirmation`); requestSync();
+        // Buttons stay disabled until the screen shows the result, so a quick next press is based on the new state.
+        remember(); setMessage(`Saved · ${Math.round(performance.now() - start)} ms confirmation`); return sync();
       }).catch(error => {
-        if (!mounted) return; setMessage(error instanceof Error ? error.message : 'Not confirmed');
-        if (error instanceof Error && ['REVISION_CONFLICT', 'INVALID_STATE', 'ALREADY_SUBMITTED', 'ALREADY_JUDGED', 'INELIGIBLE', 'FORBIDDEN', 'INVALID_SUBMISSION', 'COMMAND_KEY_REUSED'].includes(error.message)) { remember(); requestSync(); }
+        if (!mounted) return;
+        // Every saved answer advances the room revision, so a host action often
+        // arrives one revision late. If the round is otherwise as the host saw it,
+        // the same action is re-sent against the new revision instead of failing.
+        if (error instanceof Error && error.message === 'REVISION_CONFLICT' && 'expectedRevision' in command && basisRef.current && attempt < 3) {
+          void emit('room.sync', { sessionId }).then(data => {
+            const state = RoomSnapshotSchema.parse(data); if (!mounted) return;
+            latestRef.current = state; setSnapshot(state);
+            if (basisOf(state) !== basisRef.current) { remember(); setMessage('The room changed just before your action arrived. Check the screen and try again.'); return; }
+            const next = { ...command, commandId: crypto.randomUUID(), expectedRevision: state.view.revision } as GameCommand;
+            remember(next); transmit(next, attempt + 1);
+          }).catch(() => { if (mounted) { remember(); setMessage('Not confirmed. Check the screen and try again.'); requestSync(); } });
+          return;
+        } setMessage(error instanceof Error ? (error.message === 'TOO_LATE' ? 'Time was up before your answer reached the server.' : error.message) : 'Not confirmed');
+        if (error instanceof Error && ['REVISION_CONFLICT', 'INVALID_STATE', 'ALREADY_SUBMITTED', 'ALREADY_JUDGED', 'INELIGIBLE', 'FORBIDDEN', 'INVALID_SUBMISSION', 'COMMAND_KEY_REUSED', 'TOO_LATE', 'ALREADY_DECIDED', 'DECISION_PENDING'].includes(error.message)) { remember(); requestSync(); }
       }).finally(() => { if (mounted) setSaving(false); });
     };
     sendRef.current = transmit;
@@ -50,7 +67,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
       if (!mounted || !socket.connected) return; if (syncing) { syncAgain = true; return; } syncing = true;
       try {
         const state = RoomSnapshotSchema.parse(await emit('room.sync', { sessionId })); if (!mounted) return;
-        setSnapshot(previous => !previous || state.view.revision >= previous.view.revision ? state : previous);
+        setSnapshot(previous => { const next = !previous || state.view.revision >= previous.view.revision ? state : previous; latestRef.current = next; return next; });
+        setClockOffset(Date.parse(state.view.serverTime) - Date.now());
         if (!reconciled) { reconciled = true; await reconcile(state); }
       } catch (error) { if (mounted) setMessage(error instanceof Error ? error.message : 'Could not synchronize.'); }
       finally { syncing = false; if (syncAgain) { syncAgain = false; requestSync(); } }
@@ -66,7 +84,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('connect_error', (error: Error & { data?: { code?: string } }) => {
       if (!mounted) return; setConnection('Connection unavailable');
       const denied = ['UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'FORBIDDEN', 'ORIGIN_REJECTED'].includes(error.data?.code ?? '');
-      if (denied) { setSnapshot(undefined); setMessage('Room access denied. Your access may have expired or been revoked.'); return; }
+      if (denied) { setSnapshot(undefined); setMessage('Room access denied. Your access may have expired, been revoked, or your seat was taken over on another phone.'); return; }
       setMessage('Cannot reach the server. Retrying with backoff.');
       // Socket.IO retries transport failures itself, but namespace middleware
       // rejection needs an explicit bounded retry for temporary DB/rate failures.
@@ -82,8 +100,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
     return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
   }, [sessionId, display, remember, storageKey]);
-  return { snapshot, connection, message, samples, reconnects, pending, saving,
-    send(command: GameCommand) { if (pendingRef.current) return; remember(command); sendRef.current(command); }, retry() { if (pendingRef.current) sendRef.current(pendingRef.current); },
+  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset,
+    send(command: GameCommand) { if (pendingRef.current) return; basisRef.current = basisOf(latestRef.current); remember(command); sendRef.current(command); }, retry() { if (pendingRef.current) sendRef.current(pendingRef.current); },
     discard() { remember(); setMessage('Pending action discarded locally. Already saved actions remain on the server.'); }, reconnect() { socketRef.current?.disconnect().connect(); },
   };
 }

@@ -151,3 +151,73 @@ describe('verified HTTP admission and actual Socket.IO networking', () => {
     const fresh = await socketFor(f.sessionId, p.cookie); expect((await sync(fresh, f.sessionId)).role).toBe('player');
   });
 });
+
+describe('taking over a seat from a new phone', () => {
+  const seatsOf = async (code: string) => (await app.inject({ method: 'GET', url: `/api/rooms/seats/${code}`, headers })).json().data as { approval: boolean; seats: { id: string; displayName: string }[] };
+  const reclaim = (roomCode: string, playerId: string, requestId: string) => api('/api/rooms/reclaim', { roomCode, playerId, requestId });
+  const hostPost = (f: Awaited<ReturnType<typeof room>>, path: string, body: unknown) => api(`/api/rooms/${f.sessionId}/${path}`, body, f.cookie);
+  const seatOf = async (f: Awaited<ReturnType<typeof room>>, name: string) => (await prisma.sessionPlayer.findFirstOrThrow({ where: { sessionId: f.sessionId, displayName: name } })).id;
+
+  it('offers only seats without a connected phone, and moves the seat with its score to the new phone', async () => {
+    const f = await room(); const host = await socketFor(f.sessionId, f.cookie);
+    const ada = await player(f, 'Ada'); const ben = await player(f, 'Ben');
+    const adaSocket = await socketFor(f.sessionId, ada.cookie); await socketFor(f.sessionId, ben.cookie);
+    const stageRunId = (await hostCommand(host, f.sessionId, 'session.start')).stageRunId!;
+    const receipt = await emit<CommandReceipt>(adaSocket, 'room.command', answer(f.sessionId, stageRunId));
+    expect((await seatsOf(f.roomCode)).seats).toEqual([]);
+    const adaId = await seatOf(f, 'Ada');
+    expect((await reclaim(f.roomCode, adaId, randomUUID())).json()).toEqual({ ok: false, error: { code: 'SEAT_UNAVAILABLE' } });
+
+    const gone = socketEvent(adaSocket, 'disconnect'); adaSocket.disconnect(); await gone;
+    await expect.poll(async () => (await seatsOf(f.roomCode)).seats).toEqual([{ id: adaId, displayName: 'Ada' }]);
+    // Approval is off by default: the new phone gets the seat at once.
+    const requestId = randomUUID(); const taken = await reclaim(f.roomCode, adaId, requestId);
+    expect(taken.json()).toEqual({ ok: true, data: { status: 'approved', sessionId: f.sessionId } });
+    const newPhone = extractCookie(taken); expect(newPhone).not.toBe(ada.cookie);
+    // Repeating the same request returns the same access; a second takeover of the now-taken seat by another phone works only while it is disconnected.
+    expect(extractCookie(await reclaim(f.roomCode, adaId, requestId))).toBe(newPhone);
+    await expect(socketFor(f.sessionId, ada.cookie)).rejects.toThrow('Room access denied');
+    const continued = await socketFor(f.sessionId, newPhone);
+    const state = await sync(continued, f.sessionId);
+    expect(state.selfPlayerId).toBe(adaId);
+    expect(state.view.ownSubmission?.id).toBe(receipt.submissionId);
+    expect(await prisma.sessionPlayer.count({ where: { sessionId: f.sessionId } })).toBe(2);
+    expect(await prisma.playerCredential.count({ where: { sessionId: f.sessionId, playerId: adaId, revokedAt: null } })).toBe(1);
+    expect((await reclaim(f.roomCode, adaId, randomUUID())).json().error.code).toBe('SEAT_UNAVAILABLE');
+    // A player the host removed is never offered.
+    const benId = await seatOf(f, 'Ben');
+    await hostPost(f, 'revoke', { playerId: benId });
+    await expect.poll(async () => (await seatsOf(f.roomCode)).seats).toEqual([]);
+    expect((await reclaim(f.roomCode, benId, randomUUID())).json().error.code).toBe('SEAT_UNAVAILABLE');
+  });
+
+  it('waits for the host when approval is switched on, and lets only the host decide', async () => {
+    const f = await room(); const host = await socketFor(f.sessionId, f.cookie);
+    const ada = await player(f, 'Ada'); const adaId = await seatOf(f, 'Ada');
+    expect((await hostPost(f, 'settings', { reclaimApproval: true })).statusCode).toBe(200);
+    expect((await api(`/api/rooms/${f.sessionId}/settings`, { reclaimApproval: false }, ada.cookie)).statusCode).toBe(403);
+    expect((await seatsOf(f.roomCode)).approval).toBe(true);
+
+    const first = randomUUID(); const second = randomUUID();
+    expect((await reclaim(f.roomCode, adaId, first)).json()).toEqual({ ok: true, data: { status: 'pending', sessionId: null } });
+    expect(String((await reclaim(f.roomCode, adaId, first)).headers['set-cookie'] ?? '')).toBe('');
+    await reclaim(f.roomCode, adaId, second);
+    const pending = (await sync(host, f.sessionId)).seatRequests;
+    expect(pending.map(request => request.requestId).sort()).toEqual([first, second].sort());
+    expect((await sync(await socketFor(f.sessionId, ada.cookie), f.sessionId)).seatRequests).toEqual([]);
+    expect((await api(`/api/rooms/${f.sessionId}/seat-requests`, { requestId: first, approve: true }, ada.cookie)).statusCode).toBe(403);
+
+    expect((await hostPost(f, 'seat-requests', { requestId: second, approve: false })).statusCode).toBe(200);
+    expect((await reclaim(f.roomCode, adaId, second)).json().error.code).toBe('SEAT_DENIED');
+    // The host may approve even though the old phone is connected; that phone is then disconnected.
+    const oldPhone = await socketFor(f.sessionId, ada.cookie); const kicked = socketEvent(oldPhone, 'disconnect');
+    expect((await hostPost(f, 'seat-requests', { requestId: first, approve: true })).statusCode).toBe(200);
+    await kicked;
+    const approved = await reclaim(f.roomCode, adaId, first);
+    expect(approved.json().data.status).toBe('approved');
+    expect((await sync(await socketFor(f.sessionId, extractCookie(approved)), f.sessionId)).selfPlayerId).toBe(adaId);
+    await expect(socketFor(f.sessionId, ada.cookie)).rejects.toThrow('Room access denied');
+    expect((await sync(host, f.sessionId)).seatRequests).toEqual([]);
+    expect((await hostPost(f, 'seat-requests', { requestId: first, approve: true })).statusCode).toBe(403);
+  });
+});

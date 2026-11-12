@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply } from '@party/contracts';
+import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenVerifier } from '../auth.js';
@@ -10,7 +10,9 @@ import { GameError } from '../game/errors.js';
 import { createGameService } from '../game/service.js';
 import { readSessionView } from '../game/views.js';
 import { actorKey, authorize } from '../game/model.js';
+import { closeExpiredStages } from '../game/timing.js';
 import { createRoomGateway, lockRoom, type Principal } from './gateway.js';
+import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
@@ -31,19 +33,26 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
     roomAssert(limiter.allow(`http:${request.ip}`, 240), 'RATE_LIMITED');
   };
+  // Single-backend presence: which seats have a phone connected to this process right now.
+  const connectedPlayers = (id: string) => {
+    const connected = new Set<string>();
+    for (const socket of io.sockets.sockets.values()) {
+      const peer = socket.data['principal'] as Principal | undefined;
+      if (peer?.sessionId === id && peer.actor.role === 'player') connected.add(peer.actor.playerId);
+    }
+    return connected;
+  };
+  const seats = createSeatReclaim(client, config, connectedPlayers, (id, playerId) => { io.in(`player:${id}:${playerId}`).disconnectSockets(true); });
   const snapshot = async (principal: Principal) => {
     const [view, players, session] = await Promise.all([
       readSessionView(client, principal.actor, principal.sessionId),
       client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true }, orderBy: { joinedAt: 'asc' } }),
-      client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true } }),
+      client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true, state: true } }),
     ]);
-    const connected = new Set<string>();
-    for (const socket of io.sockets.sockets.values()) {
-      const peer = socket.data['principal'] as Principal | undefined;
-      if (peer?.sessionId === principal.sessionId && peer.actor.role === 'player') connected.add(peer.actor.playerId);
-    }
+    const connected = connectedPlayers(principal.sessionId); const state = readRoomState(session.state);
     return RoomSnapshotSchema.parse({ view, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
-      players: players.map(player => ({ ...player, connected: connected.has(player.id) })) });
+      players: players.map(player => ({ ...player, connected: connected.has(player.id) })), settings: { reclaimApproval: state.reclaimApproval },
+      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [] });
   };
 
   app.post('/api/rooms/join', async (request, reply) => {
@@ -53,6 +62,36 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       reply.header('set-cookie', roomCookie(config, joined.sessionId, joined.token, joined.expiresAt));
       return { ok: true, data: { sessionId: joined.sessionId } };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  app.get('/api/rooms/seats/:roomCode', async (request, reply) => {
+    try {
+      requireOrigin(request); roomAssert(limiter.allow(`seats:${request.ip}`, 60), 'RATE_LIMITED');
+      const code = RoomCodeSchema.safeParse((request.params as { roomCode?: string }).roomCode); roomAssert(code.success, 'INVALID_COMMAND');
+      return { ok: true, data: SeatListSchema.parse(await seats.seats(code.data)) };
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  app.post('/api/rooms/reclaim', async (request, reply) => {
+    try {
+      // Waiting phones repeat this every few seconds, so the limit allows minutes of polling.
+      requireOrigin(request); roomAssert(limiter.allow(`reclaim:${request.ip}`, 120), 'RATE_LIMITED');
+      const result = await seats.request(request.body);
+      if (result.status === 'approved') reply.header('set-cookie', roomCookie(config, result.sessionId, result.token, result.expiresAt));
+      return { ok: true, data: { status: result.status, sessionId: result.status === 'approved' ? result.sessionId : null } };
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  app.post('/api/rooms/:sessionId/seat-requests', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      const body = SeatDecisionSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await seats.decide(id, principal, body.data.requestId, body.data.approve); return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  app.post('/api/rooms/:sessionId/settings', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      const body = RoomSettingsSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await seats.setApproval(id, principal, body.data.reclaimApproval); return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
   });
   app.post('/api/rooms/:sessionId/claim', async (request, reply) => {
     try {
@@ -80,7 +119,8 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   app.post('/api/rooms/:sessionId/display', async (request, reply) => {
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request)); roomAssert(principal.role === 'host', 'FORBIDDEN');
-      const token = newToken(); const expiresAt = new Date(Math.min(Date.now() + 60 * 60 * 1000, principal.expiresAt.getTime()));
+      // The shared screen stays valid for as long as the host who created it.
+      const token = newToken(); const expiresAt = principal.expiresAt;
       await client.$transaction(async tx => {
         await lockRoom(tx, id);
         const session = await tx.gameSession.findUniqueOrThrow({ where: { id } }); await authorize(tx, session, principal.actor);
@@ -183,6 +223,16 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   };
   let publishTask: Promise<void> | undefined;
   const ticker = setInterval(() => { if (!publishing) publishTask = publish(); }, 250); ticker.unref();
+  // Deadlines are durable rows, so automatic closing needs no per-room timer
+  // and continues for rooms with nobody connected.
+  let closing = false; let closeTask: Promise<void> | undefined;
+  const closeDue = async () => {
+    if (closing || shuttingDown) return; closing = true;
+    try { const closed = await closeExpiredStages(client, service); if (closed) app.log.info({ event: 'stages_timed_out', count: closed }, 'Timed stages closed'); }
+    catch { app.log.warn({ event: 'stage_timeout_unavailable' }, 'Timed stage closing unavailable'); }
+    finally { closing = false; }
+  };
+  const timeoutTicker = setInterval(() => { if (!closing) closeTask = closeDue(); }, 250); timeoutTicker.unref();
   app.addHook('onReady', async () => {
     // Current deployment has one authoritative backend. Multiple instances need
     // room leases before enabling this startup recovery protocol.
@@ -191,6 +241,6 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     for (const session of running) await service.execute({ role: 'host', creatorId: session.hostId }, { formatVersion: 1, type: 'session.pause', sessionId: session.id, commandId: crypto.randomUUID(), expectedRevision: session.revision });
     if (running.length) app.log.info({ event: 'rooms_recovered', count: running.length }, 'Recovered rooms paused for host review');
   });
-  app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); await publishTask; await io.close(); });
+  app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); await publishTask; await closeTask; await io.close(); });
   return { io, gateway, snapshot };
 }

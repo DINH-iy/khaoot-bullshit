@@ -13,7 +13,7 @@ export const service = createGameService(prisma);
 export async function fixture(playerCount = 2, definition: GameDefinition = preparedGame) {
   const creator = await prisma.creator.create({ data: { issuer: 'https://identity.example/', subject: randomUUID() } });
   const game = await prisma.game.create({ data: { creatorId: creator.id, title: definition.title } });
-  const version = await prisma.gameVersion.create({ data: { gameId: game.id, number: 1, definition, contentHash: contentHash(definition), createdById: creator.id } });
+  const version = await prisma.gameVersion.create({ data: { gameId: game.id, number: 1, definitionFormat: definition.formatVersion, definition, contentHash: contentHash(definition), createdById: creator.id } });
   const sessionId = randomUUID();
   const host = { role: 'host' as const, creatorId: creator.id };
   const create = { formatVersion: 1, sessionId, commandId: randomUUID(), type: 'session.create', gameVersionId: version.id, mode: 'REHEARSAL', expectedRevision: 0 };

@@ -52,10 +52,10 @@ test('host and phone verify access, save privately, refresh and recover after a 
     expect(await db.client.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await host.getByRole('button', { name: 'Revoke Phone player\'s access' }).click();
+    await host.getByRole('button', { name: 'Revoke access for Phone player' }).click();
     await expect(page.getByRole('region', { name: 'Connection', exact: true }).getByRole('status', { name: 'Connection status' })).not.toHaveText('Connected');
     await page.reload();
-    await expect(page.getByText('Room access denied. Your access may have expired or been revoked.')).toBeVisible();
+    await expect(page.getByText('Room access denied. Your access may have expired, been revoked, or your seat was taken over on another phone.')).toBeVisible();
   } finally { await hostContext.close(); }
 });
 
