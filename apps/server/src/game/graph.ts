@@ -13,7 +13,7 @@ export interface Located { nodeKey: string; stage: StageDefinition; index: numbe
 
 const nodeOf = (definition: GameDefinition, key: string): Node | undefined => definition.nodes.find(node => node.key === key);
 export const outgoing = (definition: GameDefinition, nodeKey: string): Edge[] => definition.edges.filter(edge => edge.from === nodeKey);
-const playOf = (definition: GameDefinition, stage: StageDefinition) => stage.kind === 'route' ? null : stage.play ?? definition.play ?? { kind: 'solo' as const };
+const playOf = (definition: GameDefinition, stage: StageDefinition) => stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'minigame' ? null : stage.play ?? definition.play ?? { kind: 'solo' as const };
 
 /** Every stage of every node, in definition order (not a route). */
 export const allStages = (definition: GameDefinition) => definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ nodeKey: node.key, stage, index })));
@@ -76,48 +76,51 @@ export function maxPathStages(definition: GameDefinition): number {
  * must hold "earlier on the route" are checked on every possible path, using
  * forward passes in topological order instead of listing paths.
  */
-export function graphIssues(definition: GameDefinition): string[] {
-  const issues = new Set<string>(); const fail = (message: string) => issues.add(message);
+export interface GraphIssue { message: string; nodeKey?: string }
+export function graphIssues(definition: GameDefinition): GraphIssue[] {
+  const issues = new Map<string, GraphIssue>();
+  // `nodeKey` lets the builder show the message on the scene it concerns.
+  const fail = (message: string, nodeKey?: string) => { const issue = nodeKey ? { message, nodeKey } : { message }; issues.set(`${message}|${nodeKey ?? ''}`, issue); };
   const keys = new Set(definition.nodes.map(node => node.key));
   const v2 = definition.formatVersion === 2;
   const pairs = new Set<string>();
   for (const edge of definition.edges) {
-    if (edge.from === edge.to) fail('Self connection');
-    const pair = `${edge.from}->${edge.to}`; if (pairs.has(pair)) fail('Duplicate connection'); pairs.add(pair);
+    if (edge.from === edge.to) fail('Self connection', edge.from);
+    const pair = `${edge.from}->${edge.to}`; if (pairs.has(pair)) fail('Duplicate connection', edge.from); pairs.add(pair);
   }
   let routes = 0;
   for (const node of definition.nodes) {
     const edges = outgoing(definition, node.key); const route = node.stages.find(stage => stage.kind === 'route');
     if (!v2) {
-      if (route || edges.some(edge => edge.option !== undefined)) fail('Route choices require format 2');
-      if (edges.length > 1) fail('Branching requires a later definition format');
+      if (route || edges.some(edge => edge.option !== undefined)) fail('Route choices require format 2', node.key);
+      if (edges.length > 1) fail('Branching requires a later definition format', node.key);
       continue;
     }
     if (!route) {
-      if (edges.length > 1 || edges.some(edge => edge.option !== undefined)) fail('Only route choices branch');
+      if (edges.length > 1 || edges.some(edge => edge.option !== undefined)) fail('Only route choices branch', node.key);
       continue;
     }
     routes++;
-    if (node.stages.length !== 1 || route.kind !== 'route') { fail('Route choice must be its own node'); continue; }
+    if (node.stages.length !== 1 || route.kind !== 'route') { fail('Route choice must be its own node', node.key); continue; }
     const options = route.options.map(option => option.key);
-    if (edges.some(edge => edge.option === undefined)) fail('Unconnected route option');
+    if (edges.some(edge => edge.option === undefined)) fail('Unconnected route option', node.key);
     const connected = edges.map(edge => edge.option).filter(option => option !== undefined);
-    if (connected.some(option => !options.includes(option))) fail('Unknown route option');
-    if (new Set(connected).size !== connected.length) fail('Duplicate route option');
-    if (options.some(option => !connected.includes(option))) fail('Unconnected route option');
-    if (new Set(edges.map(edge => edge.to)).size !== edges.length) fail('Route options must lead to different scenes');
+    if (connected.some(option => !options.includes(option))) fail('Unknown route option', node.key);
+    if (new Set(connected).size !== connected.length) fail('Duplicate route option', node.key);
+    if (options.some(option => !connected.includes(option))) fail('Unconnected route option', node.key);
+    if (new Set(edges.map(edge => edge.to)).size !== edges.length) fail('Route options must lead to different scenes', node.key);
     const usesDefault = route.decide.method !== 'host' && (route.decide.tie === 'default' || route.decide.noVotes === 'default');
-    if (usesDefault !== (route.defaultOptionKey !== undefined) || (route.defaultOptionKey !== undefined && !options.includes(route.defaultOptionKey))) fail('Invalid default route');
-    if (route.decide.method === 'host' && route.durationMs !== null) fail('Host route choice has no timer');
+    if (usesDefault !== (route.defaultOptionKey !== undefined) || (route.defaultOptionKey !== undefined && !options.includes(route.defaultOptionKey))) fail('Invalid default route', node.key);
+    if (route.decide.method === 'host' && route.durationMs !== null) fail('Host route choice has no timer', node.key);
   }
   if (routes > 20) fail('Too many route choices');
   if (!v2 && definition.edges.length > 99) fail('Too many connections');
 
   const order = topologicalOrder(definition);
-  if (!order) { fail('Cycle or invalid route'); return [...issues]; }
+  if (!order) { fail('Cycle or invalid route'); return [...issues.values()]; }
   const reached = new Set<string>(); const queue = keys.has(definition.startNodeKey) ? [definition.startNodeKey] : [];
   while (queue.length) { const key = queue.shift()!; if (reached.has(key)) continue; reached.add(key); for (const edge of outgoing(definition, key)) queue.push(edge.to); }
-  if (reached.size !== keys.size) { fail('Unreachable node'); return [...issues]; }
+  if (reached.size !== keys.size) { for (const key of keys) if (!reached.has(key)) fail('Unreachable node', key); return [...issues.values()]; }
 
   const predecessors = (key: string) => definition.edges.filter(edge => edge.to === key && keys.has(edge.from)).map(edge => edge.from);
   const stagesById = new Map(allStages(definition).map(entry => [`${entry.nodeKey}/${entry.stage.key}`, entry.stage]));
@@ -131,14 +134,14 @@ export function graphIssues(definition: GameDefinition): string[] {
     for (const stage of nodeOf(definition, key)!.stages) {
       if (stage.kind === 'vote') {
         const id = `${stage.source.nodeKey}/${stage.source.stageKey}`; const source = stagesById.get(id);
-        if (!seen.has(id) || !source || source.kind !== 'collect' || !['text', 'media'].includes(source.input.kind) || source.scoring.kind !== 'none') fail('Invalid vote source');
+        if (!seen.has(id) || !source || source.kind !== 'collect' || !['text', 'media'].includes(source.input.kind) || source.scoring.kind !== 'none') fail('Invalid vote source', key);
       }
       const play = playOf(definition, stage);
       if (play?.kind === 'teams' && play.lineup.kind === 'reform') { teams = true; formed = true; }
-      if (play?.kind === 'teams' && play.lineup.kind === 'game') { if (!teams) fail('Game teams are used before they are defined'); formed = true; }
+      if (play?.kind === 'teams' && play.lineup.kind === 'game') { if (!teams) fail('Game teams are used before they are defined', key); formed = true; }
       if (stage.kind === 'route' && stage.decide.method === 'captains') {
-        if (!teams) fail('Game teams are used before they are defined');
-        if (!formed) fail('Captain vote needs teams earlier on every path');
+        if (!teams) fail('Game teams are used before they are defined', key);
+        if (!formed) fail('Captain vote needs teams earlier on every path', key);
       }
       seen.add(`${key}/${stage.key}`);
     }
@@ -156,7 +159,7 @@ export function graphIssues(definition: GameDefinition): string[] {
     }
     const index = nodeOf(definition, sourceNode)?.stages.findIndex(stage => stage.key === sourceStage) ?? -1;
     const next = outgoing(definition, sourceNode).map(edge => covered.get(edge.to) ?? false);
-    if (index >= 0 && !(votesIn(sourceNode, index + 1) || (next.length > 0 && next.every(Boolean)))) fail('Vote source may never be revealed');
+    if (index >= 0 && !(votesIn(sourceNode, index + 1) || (next.length > 0 && next.every(Boolean)))) fail('Vote source may never be revealed', sourceNode);
   }
-  return [...issues];
+  return [...issues.values()];
 }

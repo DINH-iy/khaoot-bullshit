@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { HostMenuSchema, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../network/api.js';
+import { MyGames } from './my-games.js';
+import { ImportGame } from './import-game.js';
 
 const initial = new URL(location.href);
 const ownerToken = new URLSearchParams(initial.hash.slice(1)).get('owner');
@@ -31,6 +33,7 @@ export function HostMenu() {
     window.addEventListener('pageshow', restored);
     return () => { mounted = false; window.removeEventListener('pageshow', restored); };
   }, []);
+  const reload = () => { void roomApi('/api/host').then(data => setMenu(HostMenuSchema.parse(data))).catch(cause => setError(explain(cause))); };
   const open = (work: Promise<{ sessionId: string }>) => {
     setBusy(true); setError('');
     work.then(result => location.assign(`/?room=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
@@ -45,12 +48,14 @@ export function HostMenu() {
         <form onSubmit={event => { event.preventDefault(); open(roomApi('/api/host/rooms', { gameKey, ...request })); }}>
           <fieldset><legend>Available games</legend>{menu.games.map(game => <label className="choice game-choice" key={game.key}>
             <input type="radio" name="game" value={game.key} checked={gameKey === game.key} onChange={() => setGameKey(game.key)} />
-            <span><strong>{game.title}</strong> · {game.stageCount} {game.stageCount === 1 ? 'round' : 'rounds'} · {game.timed ? 'timed' : 'no time limits'}<br />{game.description}</span>
+            <span><strong>{game.title}</strong> · {game.branches ? 'up to ' : ''}{game.stageCount} {game.stageCount === 1 ? 'round' : 'rounds'}{game.branches ? ' · the party picks a route' : ''} · {game.timed ? 'timed' : 'no time limits'}<br />{game.description}</span>
           </label>)}</fieldset>
           <button type="submit" disabled={busy || !gameKey}>{busy ? 'Opening…' : 'Open room'}</button>
         </form>
         <p>These are the built-in games. Making your own comes with the editors, which are not built yet.</p>
       </section>
+      <MyGames menu={menu} reload={reload} openRoom={gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() }))} />
+      <ImportGame />
       {menu.rooms.length > 0 && <section aria-labelledby="rooms-heading"><h2 id="rooms-heading">Your open rooms</h2>
         <ul>{menu.rooms.map(room => <li key={room.sessionId}>{room.title} · room {room.roomCode} · {room.status.toLowerCase()} · {room.playerCount} {room.playerCount === 1 ? 'player' : 'players'}
           <button className="small-button" disabled={busy} aria-label={`Return to room ${room.roomCode}`} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>Return to room</button></li>)}</ul>

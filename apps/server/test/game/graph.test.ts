@@ -78,7 +78,7 @@ describe('branching definitions', () => {
   it('runs the built-in branching game along both routes', () => {
     const game = builtInGames.find(entry => entry.key === 'friday-night-chaos')!.definition;
     expect(game.formatVersion).toBe(2);
-    expect(maxPathStages(game)).toBe(4);
+    expect(maxPathStages(game)).toBe(6);
   });
 
   // Oracle: enumerate every path from the start and check the "earlier on every path" rules directly.

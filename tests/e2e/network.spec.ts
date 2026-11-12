@@ -14,7 +14,7 @@ test('host and phone verify access, save privately, refresh and recover after a 
   const hostContext = await browser.newContext(); const host = await hostContext.newPage();
   try {
     await host.goto(`${baseURL}/?room=${f.sessionId}#access=${f.hostToken}`);
-    await expect(host.getByRole('button', { name: 'Start test round' })).toBeVisible();
+    await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
     await expect(host).not.toHaveURL(/access=/);
     const qr = host.getByRole('img', { name: `Scan to join room ${f.roomCode}` });
     await expect(qr).toBeVisible();
@@ -31,13 +31,13 @@ test('host and phone verify access, save privately, refresh and recover after a 
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect(page.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
     await expect(host.getByText('Phone player · connected', { exact: false })).toBeVisible();
-    await host.getByRole('button', { name: 'Start test round' }).click();
+    await host.getByRole('button', { name: 'Start the game' }).click();
     await page.getByRole('radio', { name: 'Canberra', exact: true }).check();
     await page.getByRole('button', { name: 'Save answer', exact: true }).click();
-    await expect(page.getByText('Your answer is saved on the server.')).toBeVisible();
+    await expect(page.getByText('Your answer is in!')).toBeVisible();
     const playerId = (await db.client.sessionPlayer.findFirstOrThrow({ where: { sessionId: f.sessionId } })).id;
     await page.reload();
-    await expect(page.getByText('Your answer is saved on the server.')).toBeVisible();
+    await expect(page.getByText('Your answer is in!')).toBeVisible();
     expect(await db.client.sessionPlayer.count({ where: { sessionId: f.sessionId } })).toBe(1);
     expect(await db.client.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(1);
     const cookies = await context.cookies(); expect(cookies.filter(cookie => cookie.name.startsWith('party_')).every(cookie => cookie.httpOnly)).toBe(true);
@@ -47,7 +47,7 @@ test('host and phone verify access, save privately, refresh and recover after a 
     await expect(page.getByRole('region', { name: 'Connection', exact: true }).getByRole('status', { name: 'Connection status' })).not.toHaveText('Connected');
     await context.setOffline(false);
     await expect(page.getByRole('region', { name: 'Connection', exact: true }).getByRole('status', { name: 'Connection status' })).toHaveText('Connected', { timeout: 20000 });
-    await expect(page.getByText('Your answer is saved on the server.')).toBeVisible();
+    await expect(page.getByText('Your answer is in!')).toBeVisible();
     expect((await db.client.sessionPlayer.findFirstOrThrow({ where: { sessionId: f.sessionId } })).id).toBe(playerId);
     expect(await db.client.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -67,8 +67,8 @@ test('display stays read-only without replacing host credentials in another tab'
     const href = await host.getByRole('link', { name: 'Open shared display' }).getAttribute('href'); expect(href).toBeTruthy();
     const display = await context.newPage(); await display.goto(href!);
     await expect(display.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
-    await expect(display.getByRole('button', { name: 'Start test round' })).toHaveCount(0);
+    await expect(display.getByRole('button', { name: 'Start the game' })).toHaveCount(0);
     await host.getByRole('button', { name: 'Reconnect and sync' }).click();
-    await expect(host.getByRole('button', { name: 'Start test round' })).toBeVisible();
+    await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
   } finally { await context.close(); }
 });

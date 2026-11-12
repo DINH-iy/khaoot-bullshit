@@ -11,7 +11,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await host.getByRole('radio', { name: /First reliable game/ }).check();
-    await host.getByRole('button', { name: 'Open room' }).click();
+    await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     const ask = host.getByRole('checkbox', { name: 'Ask me before a new phone takes over a seat' });
     await expect(ask).not.toBeChecked();
@@ -22,10 +22,10 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await oldPhone.goto(`${baseURL}/?code=${roomCode}`);
     await oldPhone.getByLabel('Your name').fill('Sam');
     await oldPhone.getByRole('button', { name: 'Join room', exact: true }).click();
-    await host.getByRole('button', { name: 'Start test round' }).click();
+    await host.getByRole('button', { name: 'Start the game' }).click();
     await oldPhone.getByRole('radio', { name: 'Canberra', exact: true }).check();
     await oldPhone.getByRole('button', { name: 'Save answer', exact: true }).click();
-    await expect(oldPhone.getByText('Your answer is saved on the server.')).toBeVisible();
+    await expect(oldPhone.getByText('Your answer is in!')).toBeVisible();
 
     // While the old phone is connected, its seat is not offered.
     await newPhone.goto(`${baseURL}/?code=${roomCode}`);
@@ -47,10 +47,10 @@ test('a player whose phone dies continues on a new phone, after the host approve
 
     await expect(newPhone.getByRole('heading', { name: `Room ${roomCode}` })).toBeVisible();
     await expect(newPhone.getByText('Sam (you) · connected')).toBeVisible();
-    await expect(newPhone.getByText('Your answer is saved on the server.')).toBeVisible();
+    await expect(newPhone.getByText('Your answer is in!')).toBeVisible();
     await expect(host.getByText('Sam · connected', { exact: false })).toBeVisible();
     await newPhone.reload();
-    await expect(newPhone.getByText('Your answer is saved on the server.')).toBeVisible();
+    await expect(newPhone.getByText('Your answer is in!')).toBeVisible();
     expect(await newPhone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   } finally { for (const context of [hostContext, newContext, oldContext]) await context.close().catch(() => undefined); }
 });

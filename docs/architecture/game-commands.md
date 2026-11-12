@@ -24,6 +24,8 @@ The first executable definition has `formatVersion`, `title`, `startNodeKey`, no
 | Order collection | The player arranges 2–8 items. Private `correct-order` scoring is all-or-nothing. Each viewer receives a stable per-viewer shuffle, never the authored order. Arranged with move buttons, not dragging. |
 | Media collection | Player uploads one picture, GIF or video; each round lists which of the three it accepts. See "Uploads" below. |
 | Vote | Players pick one answer from an earlier unscored text or upload round, never their own. Each vote gives its author a configured award. |
+| Info scene | Title and text shown on every screen (cutscene, rules, announcement), optional countdown. No answers or points; Next ends it directly, no close needed. A countdown only closes it; the host still continues. |
+| Scoreboard scene | Heading plus player standings, the game's team standings, or both. Same behaviour as an info scene. |
 | Text collection | Bounded prompt/text input. No voting/automatic judging yet. |
 | Drawing collection | Contract example only. Execution fails closed until asset validation exists. |
 | Host challenge | Prompt and maximum individual award; close first, then one judgment per eligible player. |
@@ -93,6 +95,32 @@ A definition may set game-wide `teams` (how the game's teams are made) and a def
 - **Team totals** are shown for the game's current teams. Lineups chain back while their rule is `keep`; the first other rule sets the start: `fresh` counts team points from that lineup on, `members` adds the current members' individual scores (derived, not new awards). A team is identified by its name in the room, so a round team called "Red" adds to the game team "Red" if it receives team points.
 
 Not built yet: the plan's "redistribute old team totals" and "manual starting totals" carryover rules, changing teams or captains after a round has started, team winners and tie-breaks.
+
+Reveals are never stamped before their close, even if the server clock steps back, because the database requires `revealedAt >= closedAt`. The timer sweep skips a room whose automatic close fails (retrying it after 30 seconds) instead of stopping for every room.
+
+### Drafts and publishing
+
+`apps/server/src/authoring/drafts.ts`, used by owner-only routes under `/api/host/games`. A game's draft (`game_drafts`) may be incomplete or invalid while it is edited; it is saved as is (up to 256 KB) and returned with every problem located on its scene (`nodeKey`), stage (`stageIndex`) and field path, so the editor can mark the right card. Saving takes the revision the editor last saw and fails with `REVISION_CONFLICT` if anyone saved since, so a second tab never silently overwrites work. Publishing requires the current revision and a fully valid, playable draft; it freezes it as the next immutable `game_versions` row with its real format number. Publishing an unchanged draft again returns the existing version. Rooms always play the latest published version, never the draft. Built-in games the owner plays are kept apart: authored games are those with a draft.
+
+Problems are written in plain language for authors (`authoring/messages.ts`); each also carries the validator's exact rule as `code`. Removing a game archives it: it disappears from the list, while its published versions and rooms keep working. The draft may carry an `editor` object with card positions; it is stripped before validation and never published. Not built yet: creator sign-in (these routes accept only the local owner) and restoring removed games.
+
+### Editors
+
+`editor-shell.tsx` holds both views over one draft (`use-draft.ts`: loading, automatic saving that never overwrites a newer save, undo/redo with quick typing merged into one step, publishing). The view is kept in the address (`&view=scene`).
+
+**Flow editor** (`flow-view.tsx`), additions in the second version: icons per scene type and a two-column add-scene palette; pick up an arrow by its handle (placed along each arrow, so arrows into the same scene are separately grabbable) or by a connected input, and drop it on another scene, or on empty canvas to remove it; multi-select with Shift-click, Shift-drag box and Ctrl/Cmd+A, moving the selection together (mouse or arrow keys) and deleting it with a confirm step; undo/redo buttons and Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z or Ctrl+Y.
+
+**Scene editor** (`scene-view.tsx`): scenes in play order on the left, each branch indented under its route and rejoins listed after their branches, with unconnected scenes separately; a rough preview of the shared screen and a phone in the middle (not the final game look); every field of the selected part on the right, the parts of a scene (add, reorder, remove), solo or team settings per part (the game default, everyone for themselves, the game's teams, teams for this round, or new teams with a score rule), where the game goes next, and game-wide settings (teams and default play). "Add after this" inserts a scene into the flow after the current one.
+
+**Rehearse** (`POST /api/host/games/:gameId/rehearse`): plays the current saved draft in a practice room without publishing, from the start or from a chosen scene. Scenes the rehearsal cannot reach are left out, so unconnected work in progress does not block it; anything else invalid does (for example starting at a vote without the round it votes on). The practice version lives in a separate game titled "Rehearsal · …" without a draft, so it never appears in Your games or as a published version; identical rehearsals reuse it.
+
+**Copying:** Duplicate (button or Ctrl/Cmd+D) and copy/paste (Ctrl/Cmd+C, V) take the selected scenes with the connections between them, under new names; a vote inside the copy points at the copied round. The copy is kept in the browser's local storage, so it can be pasted into another game. **Minimap:** an overview in the canvas corner; click or drag it to move the view.
+
+**Minigame scenes** are placeholders (`kind: 'minigame'`): they can be placed, connected and saved, are listed as a problem on their scene, and block publishing until minigames are built.
+
+### Flow editor (first version)
+
+`apps/web/src/editor/` (loaded only when opened, so phones never download it). `model.ts` holds the pure rules, tested offline: card geometry and ports, snapping (24-unit grid; level with the output port feeding a card so lines run straight; aligned with nearby card edges; dropped cards slide off overlaps), connection rules (one connection per output, no circles, no self-connections, two route options never to the same scene), scene defaults, automatic layout. `flow-editor.tsx` draws the canvas: drag cards; drag from an output port and release near a card to connect (the line snaps to the nearest valid input within reach and turns red with an explanation when not allowed); release on empty canvas to pick a new connected scene; a + on unconnected outputs; tap an output then a scene to connect without dragging; select a line to remove it; Tidy up, zoom and Fit; arrows show direction. The side panel edits the selected scene's main fields and offers "Next scene" lists as a non-drag alternative. Drafts save automatically after each change; a second tab gets a clear "changed elsewhere" message instead of overwriting. Inspiration beyond the owner's reference: Blender and n8n (drop a connection to add a node, + on outputs), Twine (arrows), canvas collision avoidance and accessible diagram guidance. Not built yet: undo, multi-select, a minimap, editing scenes with several parts (the Scene editor), and team settings in the panel.
 
 ### Route choices (format 2)
 

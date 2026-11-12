@@ -120,6 +120,27 @@ describe('timed stages', () => {
     expect(await prisma.scoreEntry.count({ where: { sessionId: w.f.sessionId } })).toBe(1);
   });
 
+  it('keeps closing other rooms when one room cannot be closed, and retries that room later', async () => {
+    const broken = await world(); const healthy = await world();
+    for (const w of [broken, healthy]) w.advance(DURATION + ACCEPTANCE_GRACE_MS + SETTLE_MS + 60_000);
+    const clock = () => new Date(Math.max(broken.at(), healthy.at()));
+    const flaky = { execute: async (actor: Parameters<typeof broken.service.execute>[0], input: unknown) => {
+      if ((input as { sessionId: string }).sessionId === broken.f.sessionId) throw new Error('database hiccup');
+      return broken.service.execute(actor, input);
+    } };
+    const backoff = new Map<string, number>();
+    const first = await closeExpiredStages(prisma, flaky, clock, backoff);
+    expect(first.failed).toBeGreaterThanOrEqual(1);
+    expect((await healthy.stage()).status).toBe('CLOSED');
+    expect((await broken.stage()).status).toBe('ACTIVE');
+    expect(backoff.has(broken.stageRunId)).toBe(true);
+    // During the pause the failing room is left alone; afterwards it is retried and closes.
+    expect((await closeExpiredStages(prisma, flaky, clock, backoff)).failed).toBe(0);
+    const later = () => new Date(clock().getTime() + 31_000);
+    await closeExpiredStages(prisma, broken.service, later, backoff);
+    expect((await broken.stage()).status).toBe('CLOSED');
+  });
+
   it('reopens a closed stage without duplicate answers or scores, but never a judged one', async () => {
     const w = await world();
     await w.submit(0);

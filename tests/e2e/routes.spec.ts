@@ -10,7 +10,7 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await host.getByRole('radio', { name: /Friday Night Chaos/ }).check();
-    await host.getByRole('button', { name: 'Open room' }).click();
+    await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     for (const [phone, name] of [[ada, 'Ada'], [ben, 'Ben'], [cleo, 'Cleo']] as const) {
       await phone.goto(`${baseURL}/?code=${roomCode}`);
@@ -18,9 +18,16 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
       await phone.getByRole('button', { name: 'Join room', exact: true }).click();
       await expect(host.getByText(`${name} · connected`, { exact: false })).toBeVisible();
     }
-    await host.getByRole('button', { name: 'Start test round' }).click();
-    await host.getByRole('button', { name: 'Close stage' }).click();
-    await host.getByRole('button', { name: 'Next stage' }).click();
+    await host.getByRole('button', { name: 'Start the game' }).click();
+    // Opening cutscene: shown everywhere, no answers; the host simply continues.
+    await expect(ada.getByRole('heading', { name: 'FRIDAY NIGHT.' })).toBeVisible();
+    await expect(ada.getByText('Welcome to Friday Night Chaos!', { exact: false })).toBeVisible();
+    await expect(ada.getByRole('button', { name: 'Save answer' })).toHaveCount(0);
+    await expect(host.getByRole('button', { name: 'Close answers' })).toHaveCount(0);
+    expect((await new AxeBuilder({ page: ada }).analyze()).violations).toEqual([]);
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
+    await host.getByRole('button', { name: 'Close answers' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
 
     // The vote: tiles on the phones; the host sees live counts, phones do not (this game shows counts at the announcement).
     await expect(ada.getByRole('heading', { name: 'Choose your challenge!' })).toBeVisible();
@@ -32,11 +39,11 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
     await expect(host.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
     for (const [phone, label] of [[ada, 'Physical'], [ben, 'Physical'], [cleo, 'Music']] as const) {
       await phone.getByRole('radio', { name: label, exact: true }).check();
-      await phone.getByRole('button', { name: 'Save answer', exact: true }).click();
-      await expect(phone.getByText('Your vote is saved on the server.')).toBeVisible();
+      await phone.getByRole('button', { name: 'Save vote', exact: true }).click();
+      await expect(phone.getByText('Your vote is in!')).toBeVisible();
     }
     await cleo.reload();
-    await expect(cleo.getByText('Your vote is saved on the server.')).toBeVisible();
+    await expect(cleo.getByText('Your vote is in!')).toBeVisible();
     const hostRoute = host.getByRole('region', { name: 'Route choice' });
     await expect(hostRoute).toContainText('3 of 3 voted');
     await expect(hostRoute).toContainText('Physical · 2 votes');
@@ -50,17 +57,25 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
 
     await expect(ada.getByText('answers are locked')).toHaveCount(0);
-    await host.getByRole('button', { name: 'Close stage' }).click();
+    await host.getByRole('button', { name: 'Close answers' }).click();
     await expect(hostRoute).toContainText('The party goes: Physical (by vote). Reveal to announce it.');
     await expect(ada.getByText('Voting has closed. The host announces the route.')).toBeVisible();
     await host.getByRole('button', { name: 'Announce the route' }).click();
     await expect(ada.getByRole('region', { name: 'Route choice' })).toContainText('The party goes: Physical (by vote).');
     await expect(ada.getByRole('region', { name: 'Route choice' })).toContainText('Physical · 2 votes');
-    await host.getByRole('button', { name: 'Next stage' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(ada.getByRole('heading', { name: /^Living Sculpture/ })).toBeVisible();
-    await host.getByRole('button', { name: 'Close stage' }).click();
-    await host.getByRole('button', { name: 'Next stage' }).click();
+    await host.getByRole('button', { name: 'Close answers' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(ben.getByRole('heading', { name: /^Shared finale/ })).toBeVisible();
+    await host.getByRole('button', { name: 'Close answers' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
+    // Results scene: the standings take centre stage with the scene's heading.
+    await expect(ben.getByRole('heading', { name: 'Results: both routes finish here' })).toBeVisible();
+    await expect(ben.getByRole('region', { name: 'Results: both routes finish here' })).toContainText('Ben (you)');
+    expect((await new AxeBuilder({ page: ben }).analyze()).violations).toEqual([]);
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(ben.getByRole('region', { name: 'Final scores' })).toBeVisible();
     expect(await ada.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   } finally { for (const context of contexts) await context.close().catch(() => undefined); }
 });

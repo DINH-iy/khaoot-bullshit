@@ -28,24 +28,30 @@ export function timerColumns(remaining: number | null, paused: boolean, now: Dat
 }
 
 interface TimeoutExecutor { execute(actor: TrustedActor, input: unknown): Promise<unknown> }
+const RETRY_AFTER_MS = 30_000;
 /**
  * Closes running stages whose deadline, grace and settle time have passed. The
  * deadline lives in PostgreSQL, so this survives restarts and needs no timer
  * per room. Bounded per pass; a room the host just changed is simply skipped.
+ * A room whose close fails is retried after a pause and never blocks the others.
  */
-export async function closeExpiredStages(client: PrismaClient, service: TimeoutExecutor, clock: Clock = () => new Date()): Promise<number> {
-  const cutoff = new Date(clock().getTime() - ACCEPTANCE_GRACE_MS - SETTLE_MS);
-  const due = await client.stageRun.findMany({ where: { status: 'ACTIVE', deadlineAt: { lte: cutoff }, session: { status: 'RUNNING' } },
+export async function closeExpiredStages(client: PrismaClient, service: TimeoutExecutor, clock: Clock = () => new Date(), backoff: Map<string, number> = new Map()): Promise<{ closed: number; failed: number }> {
+  const at = clock().getTime();
+  for (const [id, until] of backoff) if (until <= at) backoff.delete(id);
+  const cutoff = new Date(at - ACCEPTANCE_GRACE_MS - SETTLE_MS);
+  const due = await client.stageRun.findMany({ where: { status: 'ACTIVE', deadlineAt: { lte: cutoff }, session: { status: 'RUNNING' }, ...(backoff.size ? { id: { notIn: [...backoff.keys()] } } : {}) },
     select: { id: true, sessionId: true, session: { select: { hostId: true } } }, orderBy: { deadlineAt: 'asc' }, take: 50 });
-  let closed = 0;
+  let closed = 0; let failed = 0;
   for (const stage of due) {
     try {
       await service.execute({ role: 'host', creatorId: stage.session.hostId }, { formatVersion: 1, type: 'stage.timeout', sessionId: stage.sessionId, commandId: randomUUID(), stageRunId: stage.id });
       closed++;
     } catch (error) {
       // The host paused, extended or closed it first; the next pass re-reads.
-      if (!(error instanceof GameError) || error.code !== 'INVALID_STATE') throw error;
+      if (error instanceof GameError && error.code === 'INVALID_STATE') continue;
+      failed++;
+      if (backoff.size < 1000) backoff.set(stage.id, at + RETRY_AFTER_MS);
     }
   }
-  return closed;
+  return { closed, failed };
 }

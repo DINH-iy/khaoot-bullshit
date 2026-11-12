@@ -139,7 +139,7 @@ export const PublicRouteSchema = z.object({
 }).strict();
 export const PublicStageSchema = z.object({
   id: GameIdSchema, nodeKey: GameKeySchema, stageKey: GameKeySchema,
-  kind: z.enum(['collect', 'challenge', 'vote', 'route']), prompt: z.string().min(1).max(2000),
+  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard']), prompt: z.string().min(1).max(2000),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.
@@ -149,6 +149,9 @@ export const PublicStageSchema = z.object({
   challenge: z.object({ maxAwardMilli: AwardMilliSchema, judgedPlayerIds: z.array(GameIdSchema), judgedTeamIds: z.array(GameIdSchema) }).strict().nullable(),
   teams: StageTeamsSchema.nullable(),
   route: PublicRouteSchema.nullable(),
+  // Show-only scenes: an info scene's title, a scoreboard scene's standings selection.
+  info: z.object({ title: z.string().min(1).max(120) }).strict().nullable(),
+  scoreboard: z.object({ show: z.enum(['players', 'teams', 'both']) }).strict().nullable(),
   ballot: z.array(BallotEntrySchema).nullable(),
   // True when a later vote shows these answers without names; they are revealed by that vote.
   revealAfterVote: z.boolean(),

@@ -29,15 +29,20 @@ export const SeatDecisionSchema = z.object({ requestId: GameIdSchema, approve: z
 export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean() }).strict();
 export type RoomSnapshot = z.infer<typeof RoomSnapshotSchema>;
 import { MediaKindSchema } from './game.js';
+import { GameSummarySchema } from './authoring.js';
 export const UploadedAssetSchema = z.object({ assetId: GameIdSchema, mediaKind: MediaKindSchema }).strict();
 export const HeartbeatSchema = z.object({ nonce: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) }).strict();
 export const HeartbeatReplySchema = z.object({ nonce: z.string(), serverTime: z.string().datetime() }).strict();
 
 // Browser hosting menu. Lists only titles and shape, never prompts or answers.
-export const HostGameSchema = z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(1).max(160), description: z.string().max(240), stageCount: z.number().int().min(1), timed: z.boolean() }).strict();
+export const HostGameSchema = z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(1).max(160), description: z.string().max(240), stageCount: z.number().int().min(1), timed: z.boolean(), branches: z.boolean() }).strict();
 export const HostMenuSchema = z.object({
   games: z.array(HostGameSchema),
+  // The owner's own games, with their draft and publishing state.
+  myGames: z.array(GameSummarySchema),
   rooms: z.array(z.object({ sessionId: GameIdSchema, roomCode: RoomCodeSchema, title: z.string().min(1).max(160), status: SessionViewSchema.shape.status, playerCount: z.number().int().min(0) }).strict()),
 }).strict();
 export type HostMenu = z.infer<typeof HostMenuSchema>;
-export const HostRoomSchema = z.object({ gameKey: HostGameSchema.shape.key, sessionId: GameIdSchema, commandId: GameIdSchema }).strict();
+// Open a room for a built-in game (`gameKey`) or for the latest published version of one of your games (`gameId`).
+export const HostRoomSchema = z.object({ gameKey: HostGameSchema.shape.key.optional(), gameId: GameIdSchema.optional(), sessionId: GameIdSchema, commandId: GameIdSchema }).strict()
+  .refine(input => (input.gameKey === undefined) !== (input.gameId === undefined), 'Choose a built-in game or one of your games');

@@ -13,10 +13,10 @@ export function draftValue(input: Input, draft: Draft): SubmissionValue | null {
 }
 
 /** The answer control for one round. Which one appears is set per round in the game. */
-export function AnswerInput({ sessionId, input, draft, onChange }: { sessionId: string; input: Input; draft: Draft; onChange: (draft: Draft) => void }) {
+export function AnswerInput({ sessionId, input, draft, onChange, legend = 'Your private answer' }: { sessionId: string; input: Input; draft: Draft; onChange: (draft: Draft) => void; legend?: string }) {
   if (input.kind === 'choice') {
     const tiles = input.layout === 'tiles';
-    return <fieldset className={tiles ? 'tiles' : undefined}><legend>Your private answer</legend>{input.options.map((option, index) => <label className={tiles ? 'tile' : 'choice'} key={option.key}>
+    return <fieldset className={tiles ? 'tiles' : undefined}><legend>{legend}</legend>{input.options.map((option, index) => <label className={tiles ? 'tile' : 'choice'} key={option.key}>
       <input type="radio" name="answer" value={option.key} checked={draft.text === option.key} onChange={() => onChange({ ...draft, text: option.key })} />
       {tiles && <span className="tile-mark" aria-hidden="true">{String.fromCharCode(65 + index)}</span>}{option.label}</label>)}</fieldset>;
   }

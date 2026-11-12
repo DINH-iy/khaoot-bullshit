@@ -67,6 +67,12 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 .route-choice { margin: 12px 0; }
 .route-decision { font-size: 1.15rem; }
 .route-pending { font-weight: 600; }
+.info-text { font-size: clamp(1.15rem, 3.5vw, 1.6rem); line-height: 1.5; white-space: pre-wrap; }
+.scoreboard-scene { border-width: 2px; }
+.button-link { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border-radius: 9px; border: 1px solid light-dark(#555, #bbb); background: light-dark(#222, #eee); color: light-dark(#fff, #161616); text-decoration: none; }
+.steps { padding-left: 1.4rem; } .steps li { margin-bottom: 6px; }
+.import-text { min-height: 180px; font-family: ui-monospace, Menlo, monospace; font-size: .9rem; }
+.guide pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; padding: 12px; border-radius: 10px; background: light-dark(#f4f4f6, #1b1c21); font-size: .85rem; }
 .join-qr { margin: 20px 0; }
 .join-qr img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
 @media (max-width: 480px) { main { margin: 12px auto; padding: 12px; } section { padding: 16px; } .actions button { flex: 1 1 140px; } }

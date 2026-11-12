@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PLAYER_COMMANDS, type GameCommand, type MediaKind, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
-import { effectivePlay, isVoteSource, type GameDefinition, type StageDefinition } from './definition.js';
+import { effectivePlay, isShowOnly, isVoteSource, type GameDefinition, type StageDefinition } from './definition.js';
 import { firstStage, locateStage, nextStage, type Located } from './graph.js';
 import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes.js';
 import { GameError, requireGame } from './errors.js';
@@ -31,7 +31,9 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
     const opened = await openRoute(tx, sessionId, entry.stage, ids);
     presentation = opened.presentation; eligible = opened.eligibility; lineupId = opened.lineupId;
   }
-  const play = entry.stage.kind === 'route' ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
+  // Show-only scenes have nobody answering.
+  if (isShowOnly(entry.stage)) eligible = [];
+  const play = entry.stage.kind === 'route' || isShowOnly(entry.stage) ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
   if (play.kind === 'teams') {
     const teamPlay = { answers: play.answers, points: play.points };
     const existing = play.lineup.kind === 'game' ? await gameLineupForRound(tx, sessionId, ids) : null;
@@ -53,10 +55,15 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
 }
 
 /** Reveals a stage; revealing a vote also puts names on the answers that were voted on. */
+// Never stamped before the close, even if the server clock stepped back since.
+const notBefore = (closedAt: Date | null, now: Date) => closedAt && closedAt > now ? closedAt : now;
 async function reveal(tx: Transaction, stage: StageRun, now: Date): Promise<void> {
-  await tx.stageRun.update({ where: { id: stage.id }, data: { revealedAt: now } });
+  const current = await tx.stageRun.findUniqueOrThrow({ where: { id: stage.id }, select: { closedAt: true } });
+  await tx.stageRun.update({ where: { id: stage.id }, data: { revealedAt: notBefore(current.closedAt, now) } });
   const vote = VotePresentationSchema.safeParse(stage.presentation);
-  if (vote.success) await tx.stageRun.updateMany({ where: { id: vote.data.sourceStageRunId, sessionId: stage.sessionId, status: 'CLOSED', revealedAt: null }, data: { revealedAt: now } });
+  if (!vote.success) return;
+  const source = await tx.stageRun.findFirst({ where: { id: vote.data.sourceStageRunId, sessionId: stage.sessionId, status: 'CLOSED', revealedAt: null }, select: { id: true, closedAt: true } });
+  if (source) await tx.stageRun.update({ where: { id: source.id }, data: { revealedAt: notBefore(source.closedAt, now) } });
 }
 
 async function present(tx: Transaction, sessionId: string) {
@@ -138,12 +145,14 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       { voterCount, counts, leaders: leadersOf(counts), resolution: 'host', random: null, closedBy: 'decide' }) };
   }
   if (command.type === 'stage.advance') {
-    requireGame(stage.status === 'CLOSED' && latest?.id === stage.id, 'INVALID_STATE');
+    // A show-only scene ends when the host moves on; other stages are closed first.
+    requireGame((stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && isShowOnly(entry.stage))) && latest?.id === stage.id, 'INVALID_STATE');
     // Moving on makes the finished stage's results public, except answers that a
     // later vote still needs to show without names; the vote's reveal uncovers those.
     // A route goes where its recorded decision says, even after a restart; never a fresh vote.
     const next = nextStage(definition, { nodeKey: stage.nodeKey, stageKey: stage.stageKey }, decided ? { selectedEdgeKey: decided.selectedEdgeKey, destinationNodeKey: decided.destinationNodeKey } : null);
     requireGame(next !== 'DECISION_PENDING', 'DECISION_PENDING');
+    if (stage.status === 'ACTIVE') await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
     if (!stage.revealedAt && !isVoteSource(definition, entry.nodeKey, entry.stage.key)) await reveal(tx, stage, now);
     if (next === 'END') {
       await tx.gameSession.update({ where: { id: session.id }, data: { status: 'FINISHED', endedAt: now, currentNodeKey: null } });

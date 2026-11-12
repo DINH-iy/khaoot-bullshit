@@ -225,10 +225,10 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const ticker = setInterval(() => { if (!publishing) publishTask = publish(); }, 250); ticker.unref();
   // Deadlines are durable rows, so automatic closing needs no per-room timer
   // and continues for rooms with nobody connected.
-  let closing = false; let closeTask: Promise<void> | undefined;
+  let closing = false; let closeTask: Promise<void> | undefined; const timeoutBackoff = new Map<string, number>();
   const closeDue = async () => {
     if (closing || shuttingDown) return; closing = true;
-    try { const closed = await closeExpiredStages(client, service); if (closed) app.log.info({ event: 'stages_timed_out', count: closed }, 'Timed stages closed'); }
+    try { const { closed, failed } = await closeExpiredStages(client, service, undefined, timeoutBackoff); if (closed) app.log.info({ event: 'stages_timed_out', count: closed }, 'Timed stages closed'); if (failed) app.log.warn({ event: 'stage_timeout_failed', count: failed }, 'Some timed stages could not be closed; retrying later'); }
     catch { app.log.warn({ event: 'stage_timeout_unavailable' }, 'Timed stage closing unavailable'); }
     finally { closing = false; }
   };

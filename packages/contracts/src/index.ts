@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export * from './game.js';
 export * from './rooms.js';
+export * from './authoring.js';
 
 export const ProblemSchema = z.object({
   error: z.object({

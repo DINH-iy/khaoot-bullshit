@@ -5,7 +5,7 @@ import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnap
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
   const [message, setMessage] = useState(''); const [samples, setSamples] = useState<number[]>([]); const [reconnects, setReconnects] = useState(0);
-  const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false); const [clockOffset, setClockOffset] = useState(0);
+  const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false); const [clockOffset, setClockOffset] = useState(0); const [confirmMs, setConfirmMs] = useState<number | null>(null);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
   // What the host was looking at when acting: used to decide whether a conflicting action is still meant.
   const latestRef = useRef<RoomSnapshot | undefined>(undefined); const basisRef = useRef('');
@@ -36,7 +36,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
         const receipt = CommandReceiptSchema.parse(data);
         if (!mounted || receipt.commandId !== pendingRef.current?.commandId) return;
         // Buttons stay disabled until the screen shows the result, so a quick next press is based on the new state.
-        remember(); setMessage(`Saved · ${Math.round(performance.now() - start)} ms confirmation`); return sync();
+        // A confirmed action needs no message; its timing goes to the connection details.
+        remember(); setMessage(''); setConfirmMs(Math.round(performance.now() - start)); return sync();
       }).catch(error => {
         if (!mounted) return;
         // Every saved answer advances the room revision, so a host action often
@@ -100,7 +101,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
     return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
   }, [sessionId, display, remember, storageKey]);
-  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset,
+  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs,
     send(command: GameCommand) { if (pendingRef.current) return; basisRef.current = basisOf(latestRef.current); remember(command); sendRef.current(command); }, retry() { if (pendingRef.current) sendRef.current(pendingRef.current); },
     discard() { remember(); setMessage('Pending action discarded locally. Already saved actions remain on the server.'); }, reconnect() { socketRef.current?.disconnect().connect(); },
   };

@@ -57,7 +57,7 @@ const teamParty = parseDefinition({
 const fridayNightChaos = parseDefinition({
   formatVersion: 2, title: 'Friday Night Chaos', startNodeKey: 'opening',
   nodes: [
-    { key: 'opening', stages: [{ key: 'warmup', kind: 'collect', prompt: 'Warm-up: what day is it?', durationMs: 20_000,
+    { key: 'opening', stages: [{ key: 'cutscene', kind: 'info', title: 'FRIDAY NIGHT.', prompt: 'Welcome to Friday Night Chaos! Grab your phone: one warm-up question, then you choose tonight’s challenge.', durationMs: 30_000 }, { key: 'warmup', kind: 'collect', prompt: 'Warm-up: what day is it?', durationMs: 20_000,
       input: { kind: 'choice', layout: 'tiles', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday', label: 'Monday' }] },
       scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } }] },
     { key: 'choose', stages: [{ key: 'route', kind: 'route', prompt: 'Choose your challenge!', durationMs: 20_000,
@@ -69,7 +69,8 @@ const fridayNightChaos = parseDefinition({
     { key: 'physical', stages: [{ key: 'sculpture', kind: 'challenge', prompt: 'Living Sculpture: together, build the Eiffel Tower out of people. The host judges each player.', durationMs: 120_000, maxAwardMilli: '10000' }] },
     { key: 'finale', stages: [{ key: 'last', kind: 'collect', prompt: 'Shared finale: how many sides does a hexagon have?', durationMs: 20_000,
       input: { kind: 'choice', layout: 'tiles', options: [{ key: 'five', label: '5' }, { key: 'six', label: '6' }, { key: 'eight', label: '8' }] },
-      scoring: { kind: 'correct-choice', correctChoiceKey: 'six', awardMilli: '10000' } }] },
+      scoring: { kind: 'correct-choice', correctChoiceKey: 'six', awardMilli: '10000' } },
+      { key: 'results', kind: 'scoreboard', prompt: 'Results: both routes finish here', show: 'players', durationMs: null }] },
   ],
   edges: [
     { key: 'opening-to-choose', from: 'opening', to: 'choose' },

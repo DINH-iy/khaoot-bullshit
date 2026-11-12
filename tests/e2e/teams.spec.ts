@@ -10,7 +10,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await host.getByRole('radio', { name: /Team party/ }).check();
-    await host.getByRole('button', { name: 'Open room' }).click();
+    await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     for (const [phone, name] of [[ada, 'Ada'], [ben, 'Ben'], [cleo, 'Cleo']] as const) {
       await phone.goto(`${baseURL}/?code=${roomCode}`);
@@ -18,7 +18,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
       await phone.getByRole('button', { name: 'Join room', exact: true }).click();
       await expect(host.getByText(`${name} · connected`, { exact: false })).toBeVisible();
     }
-    await host.getByRole('button', { name: 'Start test round' }).click();
+    await host.getByRole('button', { name: 'Start the game' }).click();
 
     // A random proposal appears everywhere; nobody can answer yet.
     await expect(ada.getByRole('region', { name: 'Team forming' })).toContainText('Teams were drawn at random');
@@ -40,10 +40,10 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await expect(ada.getByRole('timer', { name: 'Time left' })).toHaveText(/left$/);
     await ada.getByRole('radio', { name: 'Nile', exact: true }).check();
     await ada.getByRole('button', { name: 'Save answer', exact: true }).click();
-    await expect(ben.getByText('Your team’s answer is saved on the server.')).toBeVisible();
+    await expect(ben.getByText('Your team’s answer is in!')).toBeVisible();
     await cleo.getByRole('radio', { name: 'Amazon', exact: true }).check();
     await cleo.getByRole('button', { name: 'Save answer', exact: true }).click();
-    await host.getByRole('button', { name: 'Close stage' }).click();
+    await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
     await expect(ben.getByRole('region', { name: 'Round results' })).toContainText('Red · 10');
     // "both": Red gets 10 and so do Ada and Ben.
@@ -53,18 +53,18 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     expect((await new AxeBuilder({ page: ben }).analyze()).violations).toEqual([]);
 
     // Solo override: no teams, everybody answers for themselves.
-    await host.getByRole('button', { name: 'Next stage' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(ben.getByRole('radio', { name: '8', exact: true })).toBeVisible();
     await expect(ben.getByText('You are in', { exact: false })).toHaveCount(0);
-    await host.getByRole('button', { name: 'Close stage' }).click();
+    await host.getByRole('button', { name: 'Close answers' }).click();
 
     // One against the rest, for this round only, judged per side.
-    await host.getByRole('button', { name: 'Next stage' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
     const oneVsRest = host.getByRole('region', { name: 'Team forming' });
     await expect(oneVsRest).toContainText('Teams for this round');
     await expect(oneVsRest).toContainText('Soloist · 1 of 1');
     await oneVsRest.getByRole('button', { name: 'Start round with these teams' }).click();
-    await host.getByRole('button', { name: 'Close stage' }).click();
+    await host.getByRole('button', { name: 'Close answers' }).click();
     const judging = host.getByRole('group', { name: 'Judge teams' });
     await judging.getByLabel('Points for Soloist').fill('30');
     await judging.getByRole('button', { name: 'Award' }).first().click();
@@ -72,7 +72,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await host.getByRole('button', { name: 'Reveal results' }).click();
 
     // Players pick new teams themselves.
-    await host.getByRole('button', { name: 'Next stage' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(cleo.getByRole('region', { name: 'Team forming' })).toContainText('Pick your team.');
     await cleo.getByRole('button', { name: 'Join Red' }).click();
     await expect(cleo.getByRole('button', { name: 'You are in Red' })).toBeVisible();

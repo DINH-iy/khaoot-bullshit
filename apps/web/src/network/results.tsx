@@ -75,21 +75,26 @@ export function JudgePanel({ state, stage, disabled, send }: { state: RoomSnapsh
 }
 
 export function Scoreboard({ state, disabled, send }: { state: RoomSnapshot; disabled: boolean; send: Send }) {
-  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [edit, setEdit] = useState<Record<string, string>>({}); const [correcting, setCorrecting] = useState(false);
   const totals = new Map(state.view.standings.map(row => [row.playerId, row.amountMilli]));
   const rows = [...new Set([...state.players.map(player => player.id), ...totals.keys()])].map(id => ({ id, name: nameOf(state, id), milli: totals.get(id) ?? '0' }))
     .sort((a, b) => { const difference = BigInt(b.milli) - BigInt(a.milli); return difference > 0n ? 1 : difference < 0n ? -1 : a.name.localeCompare(b.name); });
   const finished = state.view.status === 'FINISHED';
+  // A scoreboard scene puts the standings centre stage, with its own heading and selection.
+  const scene = state.view.stage?.status === 'ACTIVE' ? state.view.stage.scoreboard : null;
+  const players = !scene || scene.show !== 'teams'; const teams = !scene || scene.show !== 'players';
   if (state.view.status === 'LOBBY' || (!rows.length && !state.view.teamStandings.length)) return null;
-  return <section aria-labelledby="scores-heading"><h2 id="scores-heading">{finished ? 'Final scores' : 'Scoreboard'}</h2>
-    <ol className="scoreboard">{rows.map(row => {
+  return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : undefined}><h2 id="scores-heading">{scene ? state.view.stage!.prompt : finished ? 'Final scores' : 'Scoreboard'}</h2>
+    {scene && teams && !state.view.teamStandings.length && scene.show === 'teams' && <p>No teams have been made yet.</p>}
+    {players && <ol className="scoreboard">{rows.map(row => {
       const milli = pointsToMilli(edit[row.id] ?? '', true); const valid = milli !== null && milli !== '0';
       return <li key={row.id}><span className="score-name">{row.name}{row.id === state.selfPlayerId ? ' (you)' : ''}</span><span className="score-points">{formatPoints(row.milli)}</span>
-        {state.role === 'host' && <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) { send('score.adjust', { playerId: row.id, amountMilli: milli, reason: 'Host correction' }); setEdit({ ...edit, [row.id]: '' }); } }}>
+        {state.role === 'host' && correcting && <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) { send('score.adjust', { playerId: row.id, amountMilli: milli, reason: 'Host correction' }); setEdit({ ...edit, [row.id]: '' }); } }}>
           <label>Correct score for {row.name} (+ or −)<input type="number" inputMode="numeric" step={1} value={edit[row.id] ?? ''} onChange={event => setEdit({ ...edit, [row.id]: event.target.value })} /></label>
           <button disabled={disabled || !valid}>Correct score</button></form>}</li>;
-    })}</ol>
-    <TeamStandings state={state} />
+    })}</ol>}
+    {teams && <TeamStandings state={state} />}
+    {state.role === 'host' && players && <button className="small-button ghost" aria-expanded={correcting} onClick={() => setCorrecting(!correcting)}>{correcting ? 'Done correcting' : 'Correct scores'}</button>}
     {!finished && <p>Scores include revealed rounds only.</p>}
   </section>;
 }

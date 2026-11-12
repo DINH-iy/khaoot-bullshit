@@ -47,3 +47,17 @@ describe('server-only game definitions', () => {
     }));
   });
 });
+
+describe('show-only scenes', () => {
+  const base = { formatVersion: 1, title: 'Show', startNodeKey: 'n', edges: [] };
+  const info = { key: 'intro', kind: 'info', title: 'FRIDAY NIGHT.', prompt: 'Welcome', durationMs: 30_000 };
+  const board = { key: 'board', kind: 'scoreboard', prompt: 'Standings', show: 'both', durationMs: null };
+  it('accepts info and scoreboard scenes, and refuses answers, scoring or play settings on them', () => {
+    expect(() => parseDefinition({ ...base, nodes: [{ key: 'n', stages: [info, board] }] })).not.toThrow();
+    for (const extra of [{ play: { kind: 'solo' } }, { input: { kind: 'text', maxLength: 5 } }, { scoring: { kind: 'none' } }]) {
+      expect(() => parseDefinition({ ...base, nodes: [{ key: 'n', stages: [{ ...info, ...extra }] }] })).toThrow('INVALID_DEFINITION');
+    }
+    expect(() => parseDefinition({ ...base, nodes: [{ key: 'n', stages: [{ ...board, show: 'everyone' }] }] })).toThrow('INVALID_DEFINITION');
+    expect(() => parseDefinition({ ...base, nodes: [{ key: 'n', stages: [{ ...info, title: '' }] }] })).toThrow('INVALID_DEFINITION');
+  });
+});

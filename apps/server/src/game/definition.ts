@@ -48,6 +48,15 @@ const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('challenge'), maxAwardMilli: AwardMilliSchema }).strict(),
   // Players vote for one answer from an earlier text or upload round. Each vote gives its author points.
   z.object({ ...common, kind: z.literal('vote'), source: z.object({ nodeKey: GameKeySchema, stageKey: GameKeySchema }).strict(), awardPerVoteMilli: AwardMilliSchema }).strict(),
+  // Show-only scenes: no answers, no points, no team play. The host continues
+  // whenever they like; an optional countdown only informs the room.
+  // An info scene (cutscene, rules, announcement): a title and text on every screen.
+  z.object({ key: GameKeySchema, kind: z.literal('info'), title: z.string().trim().min(1).max(120), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable() }).strict(),
+  // A scoreboard scene: the standings of players, the game's teams, or both.
+  z.object({ key: GameKeySchema, kind: z.literal('scoreboard'), prompt: z.string().trim().min(1).max(2000), show: z.enum(['players', 'teams', 'both']), durationMs: StageDurationSchema.nullable() }).strict(),
+  // A minigame placeholder: authors can place and connect it now; it cannot be
+  // published until minigames exist. `game` will name one from a future catalog.
+  z.object({ key: GameKeySchema, kind: z.literal('minigame'), prompt: z.string().trim().min(1).max(2000), game: z.string().trim().min(1).max(64), durationMs: StageDurationSchema.nullable() }).strict(),
   // Format 2: the party picks one route. It is the only stage of its node, each
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.
@@ -98,7 +107,10 @@ export const GameDefinitionSchema = z.object({
   }
   if (count > 200) fail('Too many stages');
   if (!keys.has(definition.startNodeKey) || definition.edges.some(edge => !keys.has(edge.from) || !keys.has(edge.to))) return;
-  for (const issue of graphIssues(definition)) fail(issue);
+  for (const issue of graphIssues(definition)) {
+    const index = issue.nodeKey ? definition.nodes.findIndex(node => node.key === issue.nodeKey) : -1;
+    ctx.addIssue({ code: 'custom', message: issue.message, ...(index >= 0 ? { path: ['nodes', index] } : {}) });
+  }
 });
 export type GameDefinition = z.infer<typeof GameDefinitionSchema>;
 export type StageDefinition = GameDefinition['nodes'][number]['stages'][number];
@@ -111,7 +123,7 @@ export function parseDefinition(value: unknown): GameDefinition {
 
 export function assertExecutable(definition: GameDefinition): void {
   // Asset validation for drawings is a separate planned slice.
-  if (allStages(definition).some(({ stage }) => stage.kind === 'collect' && stage.input.kind === 'drawing')) throw new GameError('UNSUPPORTED_FEATURE');
+  if (unplayable(definition).length) throw new GameError('UNSUPPORTED_FEATURE');
 }
 
 export function canonicalJson(value: unknown): string {
@@ -127,7 +139,11 @@ export function isVoteSource(definition: GameDefinition, nodeKey: string, stageK
 }
 
 /** The round's play: its own setting, else the game default, else solo. */
+/** Scenes that only show something: no answers, no play settings, the host moves on. */
+export const isShowOnly = (stage: StageDefinition) => stage.kind === 'info' || stage.kind === 'scoreboard';
+/** Stages that can be authored but not played yet, with where they are. */
+export const unplayable = (definition: GameDefinition) => allStages(definition).filter(({ stage }) => stage.kind === 'minigame' || (stage.kind === 'collect' && stage.input.kind === 'drawing'));
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {
-  if (stage.kind === 'route') throw new GameError('INVALID_STATE');
+  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'minigame') throw new GameError('INVALID_STATE');
   return stage.play ?? definition.play ?? { kind: 'solo' };
 }
