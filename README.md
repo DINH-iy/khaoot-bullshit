@@ -1,6 +1,6 @@
 # Party game builder
 
-Browser frontend and authoritative TypeScript/Node.js backend. This checkout contains scaffolding plus the PostgreSQL/Prisma database foundation, not a playable game. Product decisions live in [APP_PLAN.md](APP_PLAN.md).
+Browser frontend and authoritative TypeScript/Node.js backend. The current checkpoint has PostgreSQL/Prisma, durable game commands, verified room credentials, Socket.IO, and minimal host/phone connection-test screens. It is not the complete party-game builder. Product decisions live in [APP_PLAN.md](APP_PLAN.md).
 
 ## Requirements and local commands
 
@@ -30,7 +30,7 @@ Build contracts before standalone package development/tests; the root commands h
 - `apps/server`: Fastify API, authentication enforcement, logs and instrumentation.
 - `packages/contracts`: public runtime schemas/types; no secrets or privileged engine code.
 
-The UI is deliberately a foundation status page. Do not treat it as the game's visual design.
+The UI is a minimal networking checkpoint, not the final game/builder design. Editors and the admin dashboard remain unbuilt.
 
 Detailed deployment notes live in [docs/deployment/raspberry-pi.md](docs/deployment/raspberry-pi.md). The target is a home-hosted Raspberry Pi 4 (8 GB) or NUC, with PostgreSQL and SSD-backed persistent storage. A local Docker PostgreSQL setup and migrations are available; nothing has been deployed to the home server. Folder and contributor conventions are in [AGENTS.md](AGENTS.md).
 
@@ -44,7 +44,7 @@ The backend can verify API access tokens from a configured OIDC provider using H
 
 With no provider in development, protected endpoints return 503 and readiness is 503. Production startup refuses missing authentication configuration. Liveness stays 200 so a deployment does not endlessly restart just because sign-in is unconfigured.
 
-This is the verification boundary, **not complete authentication**. Provider selection, browser sign-in/PKCE or backend session flow, revocation, guest player credentials, roles, rate limits, and WebSocket connection admission must be implemented before public use.
+Room networking now separately verifies expiring/revocable opaque host/display/player credentials in HttpOnly cookies, checks roles/origins and bounds admission/messages. Normal room creation requires verified OIDC identity and ownership. The owner-run rehearsal CLI explicitly provisions a short-lived host grant for one test room; production rejects those local rehearsal grants. Full creator browser sign-in/provider integration and host-approved cross-device player reclaim remain future work.
 
 ## Logs, timing, and health
 
@@ -61,9 +61,15 @@ Never commit `.env`, credentials, answers, or recovery codes in logs. Centralize
 
 CI runs type checking, offline tests and builds. Tests cover signed tokens and invalid claims, permission boundaries, configuration failures, error containment, log redaction, request limits, timings and health behavior. No tests depend on a live identity provider.
 
-PostgreSQL schema, code-first migrations, typed client, and integration tests are now present. Next: choose creator authentication and implement durable command handlers, then guest sessions and real-time rooms. The first persistence milestone is a saved submission that survives a server kill/restart without duplicate effects. Integration tests prove database constraints and transaction behavior, not the full server-kill/reconnect recovery milestone.
+Game contracts and the first internal durable command service now support prepared untimed individual choice/text stages, host-judged challenges, exact score effects, receipts/retries, safe views, and transactional audit/outbox persistence. See [contracts and command services](docs/architecture/game-commands.md) for trust boundaries and limitations. A new migration records zero-point judgments as immutable decisions.
 
-The [next-phase sequence](APP_PLAN.md#26-next-phase-build-order-and-quality-gates) puts a small playable loop and basic creative mechanics before the editors. [Creative minigame research](docs/architecture/creative-minigames.md) covers avatars, drawing, jokes, team creation/animation and a customizable show-host character. The [testing/accessibility strategy](docs/architecture/testing-and-accessibility.md) defines planned E2E/regression coverage, responsive devices and accessibility gates. Those features and browser test suites are planned, not implemented.
+Real process-kill tests verify rollback/retry without duplicate scoring. The room gateway, real WebSocket/polling tests, bounded outbox publication, startup pausing, and browser host/phone refresh/offline/recovery tests are now implemented. Trusted actor IDs are derived from verified credentials, never accepted as authentication from a request. Timed admission/closing, teams, drawing, voting and the editors remain later slices.
+
+**Current gate: actual Android Chrome phone testing over public HTTPS, including 5G and Wi-Fi switching. Do not continue product features until this networking review passes.** See [network checkpoint and test steps](docs/testing/network-checkpoint.md). Temporary public rehearsal uses the built app through a Cloudflare tunnel; database ports remain private. Run `npm run network:prepare`, `npm run network:public`, and separately `npm run network:host` after the documented build/database setup. No cloud account/domain or permanent production deployment is created.
+
+Browser regressions: start `npm run db:test:up`, install Chromium with `npx playwright install chromium`, then `npm run test:e2e` after building. These use a dedicated `_test` database; phone rehearsal uses local `_dev`. Automated emulation does not replace real-phone/5G evidence.
+
+The [next-phase sequence](APP_PLAN.md#26-next-phase-build-order-and-quality-gates) puts the reliable loop and basic creative mechanics before the editors. [Creative minigame research](docs/architecture/creative-minigames.md) covers still-planned avatars, drawing, jokes, team animation and show-host characters. The [testing/accessibility strategy](docs/architecture/testing-and-accessibility.md) extends the implemented initial networking browser suite to later features, devices and accessibility gates.
 
 ## Editor design reference
 

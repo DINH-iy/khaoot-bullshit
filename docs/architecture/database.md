@@ -1,6 +1,6 @@
 # Database architecture and migrations
 
-Implemented foundation, 11 November 2026. Editors, room APIs, command handlers, voting/scoring engines, and production recovery are not implemented by these tables.
+Implemented foundation, 11 November 2026. Durable commands, individual scoring and the verified room/network gateway now use these tables; see [command-service scope](game-commands.md) and [network checkpoint](../testing/network-checkpoint.md). Editors, voting/team engines and final production operations remain future work.
 
 ## One database per environment
 
@@ -27,7 +27,7 @@ Publishing creates a numbered snapshot. A GameSession references that version; l
 
 The database forbids updates/deletes to published versions and key history tables. This prevents accidental mutation by application code; a database owner/superuser can still change database protections. A future intentional retention/purge procedure needs explicit design because ordinary cascading deletion is restricted.
 
-## Initial schema: 17 models
+## Schema: 19 models
 
 Authoritative definitions: [schema.prisma](../../apps/server/database/schema.prisma).
 
@@ -38,8 +38,9 @@ Authoritative definitions: [schema.prisma](../../apps/server/database/schema.pri
 | Authoring | GameDraft / game_drafts | One per game; revision; format version; JSONB definition; updated timestamp |
 | Authoring | GameVersion / game_versions | Unique game+version number; definition snapshot, format, content hash, publishing creator |
 | Runtime | GameSession / game_sessions | Published version, host, live/rehearsal mode, status, room code, state revision, current node, private state snapshot |
-| Runtime | SessionPlayer / session_players | Session-scoped identity, nickname, join/departure timestamps |
+| Runtime | SessionPlayer / session_players | Session-scoped identity, nickname, join/departure timestamps, optional unique opaque join-key hash |
 | Runtime | PlayerCredential / player_credentials | Player/session reference, unique token hash, expiry and revocation; no raw tokens |
+| Runtime | RoomCredential / room_credentials | Expiring/revocable host/display token hash, session role and OIDC/local-rehearsal source |
 | Runtime | SessionTeam / session_teams | Named team within a session |
 | Runtime | TeamLineup / team_lineups | Numbered membership snapshot and carryover metadata |
 | Runtime | TeamMember / team_members | Player+team+lineup; one team per player per lineup; at most one captain per team/lineup |
@@ -47,6 +48,7 @@ Authoritative definitions: [schema.prisma](../../apps/server/database/schema.pri
 | Runtime | Submission / submissions | Stage, player or team actor, response slot, revision, private JSONB value, server receipt time |
 | Runtime | RouteDecision / route_decisions | One resolution per choice stage; selected edge/destination, reason, vote snapshot and command reference |
 | Reliability | GameCommand / game_commands | Unique session+actor+command key, request hash, committed result |
+| Runtime history | StageJudgment / stage_judgments | One immutable judgment per stage+player, including zero awards; same-session stage/player/command references |
 | Reliability | ScoreEntry / score_entries | Recipient player or team, exact signed amount, source command/stage/lineup, award key, correction/transfer references |
 | Reliability | AuditEvent / audit_events | Session revision+event index, command reference, event kind, private structured details |
 | Reliability | OutboxEvent / outbox_events | Ordered session events, intended audience/key, payload, attempts, next availability and publish timestamp |
@@ -79,6 +81,10 @@ Pinned **Prisma 7.10.1** CLI/client/adapter, PostgreSQL 18.6 container. At setup
 - `infra/database/compose.yaml`: local-only development/test services.
 
 The second migration owns CHECK constraints, partial unique indexes, and immutability triggers that Prisma's schema language cannot represent. Keep them in reviewed migration history. Prisma's schema diff cannot verify all such custom objects; integration tests are required alongside drift/status checks.
+
+The third migration adds StageJudgment, its nonnegative-amount check and immutable-history trigger. It is a new additive migration; the first two applied migrations are unchanged. Zero-point judgments need their own durable record because the score ledger intentionally rejects zero-value entries.
+
+The fourth migration adds room credentials and a nullable unique player join-key hash. Existing players remain intact with null join hashes. Tokens and join keys are never stored raw in PostgreSQL. Reviewed lifetime/hash checks supplement the Prisma schema. This migration is additive; earlier applied migrations remain unchanged.
 
 ## Local setup
 
@@ -122,7 +128,7 @@ The test wrapper requires an explicitly configured local `TEST_DATABASE_URL` end
 
 Coverage: draft/version isolation and immutability, duplicate commands/submissions/awards, cross-session references, actor consistency, one active stage, team captain constraints, exact scores and corrections, atomic rollback across command/submission/audit/outbox, record persistence across client recreation, immutable branch resolution, and populated-schema upgrade preservation.
 
-Not yet implemented: authenticated authoring endpoints, runtime command processors, idempotent retry result handling, deadline enforcement, replay/snapshot recovery after server termination, outbox publication, score/carryover logic, purge/retention tooling, or a production database migration role. Table availability does not establish those guarantees.
+The command service now has a [verified room/network gateway](../testing/network-checkpoint.md): guest/host/display credentials, HTTP admission, Socket.IO snapshots/receipts, bounded outbox publication and single-backend startup pausing. Tests exercise real transports, 20 clients and browser recovery. Real-phone acceptance is pending. Still unimplemented: full creator sign-in/authoring, cross-device reclaim, timed admission/close policy, team/carryover/correction services, purge/retention and a production migration role. Table availability alone does not establish those guarantees.
 
 ## Health and administration
 
@@ -132,4 +138,4 @@ Game history stays in PostgreSQL. High-frequency performance metrics/logs should
 
 ## Planned creative-content extensions
 
-Player avatars, upload metadata, drawing checkpoints, creation lineage and frame/turn ownership are not present in the initial 17-model schema. The [creative-content plan](creative-minigames.md#storage-and-database-evolution) describes proposed additions and a staged file/database lifecycle. Add reviewed new migrations only when implementing those slices; do not rewrite the existing applied migrations. Use the same environment database and separate managed file storage, with authorized access and coordinated backups. Design retention/tombstones around immutable history rather than embedding personal images in append-only records.
+Player avatars, upload metadata, drawing checkpoints, creation lineage and frame/turn ownership are not present in the schema. The [creative-content plan](creative-minigames.md#storage-and-database-evolution) describes proposed additions and a staged file/database lifecycle. Add reviewed new migrations only when implementing those slices; do not rewrite the existing applied migrations. Use the same environment database and separate managed file storage, with authorized access and coordinated backups. Design retention/tombstones around immutable history rather than embedding personal images in append-only records.

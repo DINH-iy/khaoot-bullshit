@@ -1,6 +1,6 @@
 # Testing, accessibility, and device support
 
-Planning/research, 11 November 2026. Unit/API and PostgreSQL integration tests exist; Playwright, browser accessibility checks, visual baselines, load suites, and the screens described here are planned. This document adds no dependencies or test implementation. See [APP_PLAN.md](../../APP_PLAN.md#26-next-phase-build-order-and-quality-gates).
+Strategy, 11 November 2026. Unit/API/PostgreSQL tests, Socket.IO protocol tests and initial Playwright desktop/Android-emulated browser flows with axe checks now exist. Broad visual baselines, soak/load suites and later product screens remain planned. See [current networking evidence and real-phone gate](../testing/network-checkpoint.md) and [APP_PLAN.md](../../APP_PLAN.md#26-next-phase-build-order-and-quality-gates).
 
 ## Quality starts with each feature
 

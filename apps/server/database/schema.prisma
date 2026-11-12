@@ -47,6 +47,16 @@ enum EventAudience {
   PLAYER
 }
 
+enum RoomRole {
+  HOST
+  DISPLAY
+}
+
+enum CredentialSource {
+  OIDC
+  LOCAL_REHEARSAL
+}
+
 // Authoring: mutable drafts and immutable published versions share one database.
 model Creator {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -54,9 +64,9 @@ model Creator {
   subject   String   @db.VarChar(255)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  games     Game[]
-  versions  GameVersion[]
-  sessions  GameSession[]
+  games    Game[]
+  versions GameVersion[]
+  sessions GameSession[]
 
   @@unique([issuer, subject])
   @@map("creators")
@@ -123,8 +133,8 @@ model GameSession {
   updatedAt      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
   endedAt        DateTime?     @db.Timestamptz(3)
 
-  gameVersion GameVersion  @relation(fields: [gameVersionId], references: [id], onDelete: Restrict)
-  host        Creator      @relation(fields: [hostId], references: [id], onDelete: Restrict)
+  gameVersion GameVersion     @relation(fields: [gameVersionId], references: [id], onDelete: Restrict)
+  host        Creator         @relation(fields: [hostId], references: [id], onDelete: Restrict)
   players     SessionPlayer[]
   teams       SessionTeam[]
   lineups     TeamLineup[]
@@ -132,6 +142,7 @@ model GameSession {
   commands    GameCommand[]
   auditEvents AuditEvent[]
   outbox      OutboxEvent[]
+  roomCredentials RoomCredential[]
 
   @@index([hostId, status])
   @@index([gameVersionId])
@@ -144,15 +155,33 @@ model SessionPlayer {
   displayName String    @db.VarChar(40)
   joinedAt    DateTime  @default(now()) @db.Timestamptz(3)
   leftAt      DateTime? @db.Timestamptz(3)
+  joinKeyHash String?   @unique @db.Char(64)
 
   session     GameSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   credentials PlayerCredential[]
   memberships TeamMember[]
   submissions Submission[]
   scores      ScoreEntry[]
+  judgments   StageJudgment[]
 
   @@unique([sessionId, id])
   @@map("session_players")
+}
+
+model RoomCredential {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String @db.Uuid
+  role      RoomRole
+  source    CredentialSource @default(OIDC)
+  tokenHash String @unique @db.Char(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, role])
+  @@map("room_credentials")
 }
 
 model PlayerCredential {
@@ -193,7 +222,7 @@ model TeamLineup {
   carryover Json     @default("{}") @db.JsonB
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  session GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   members TeamMember[]
   stages  StageRun[]
   scores  ScoreEntry[]
@@ -221,25 +250,26 @@ model TeamMember {
 }
 
 model StageRun {
-  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId        String      @db.Uuid
-  number           Int
-  nodeKey          String      @db.VarChar(128)
-  stageKey         String      @db.VarChar(128)
-  status           StageStatus @default(ACTIVE)
-  lineupId         String?     @db.Uuid
-  eligibility      Json        @default("{}") @db.JsonB
-  presentation     Json        @default("{}") @db.JsonB
-  openedAt         DateTime    @default(now()) @db.Timestamptz(3)
-  deadlineAt       DateTime?   @db.Timestamptz(3)
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId         String      @db.Uuid
+  number            Int
+  nodeKey           String      @db.VarChar(128)
+  stageKey          String      @db.VarChar(128)
+  status            StageStatus @default(ACTIVE)
+  lineupId          String?     @db.Uuid
+  eligibility       Json        @default("{}") @db.JsonB
+  presentation      Json        @default("{}") @db.JsonB
+  openedAt          DateTime    @default(now()) @db.Timestamptz(3)
+  deadlineAt        DateTime?   @db.Timestamptz(3)
   pausedRemainingMs Int?
-  closedAt         DateTime?   @db.Timestamptz(3)
+  closedAt          DateTime?   @db.Timestamptz(3)
 
-  session     GameSession   @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  lineup      TeamLineup?   @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
+  session     GameSession     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  lineup      TeamLineup?     @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
   submissions Submission[]
   decision    RouteDecision?
   scores      ScoreEntry[]
+  judgments   StageJudgment[]
 
   @@unique([sessionId, id])
   @@unique([sessionId, number])
@@ -296,14 +326,35 @@ model GameCommand {
   result      Json     @db.JsonB
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
-  session   GameSession    @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  session   GameSession     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   scores    ScoreEntry[]
   decisions RouteDecision[]
   audit     AuditEvent[]
+  judgments StageJudgment[]
 
   @@unique([sessionId, id])
   @@unique([sessionId, actorKey, commandKey])
   @@map("game_commands")
+}
+
+// A zero-point decision is still a durable judgment. Corrections are a later
+// append-only operation, not an update of this historical decision.
+model StageJudgment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String   @db.Uuid
+  stageRunId  String   @db.Uuid
+  playerId    String   @db.Uuid
+  commandId   String   @db.Uuid
+  amountMilli BigInt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  stage   StageRun      @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  player  SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  command GameCommand   @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
+
+  @@unique([stageRunId, playerId])
+  @@index([sessionId, commandId])
+  @@map("stage_judgments")
 }
 
 // Signed fixed-point integers: 1,000 milli-points = 1 point. Never JS floats.
@@ -323,13 +374,13 @@ model ScoreEntry {
   transferGroupId   String?   @db.Uuid
   createdAt         DateTime  @default(now()) @db.Timestamptz(3)
 
-  command    GameCommand    @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
-  stage      StageRun?      @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
-  lineup     TeamLineup?    @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
-  player     SessionPlayer? @relation(fields: [sessionId, recipientPlayerId], references: [sessionId, id], onDelete: Restrict)
-  team       SessionTeam?   @relation(fields: [sessionId, recipientTeamId], references: [sessionId, id], onDelete: Restrict)
-  reverses   ScoreEntry?    @relation("ScoreCorrection", fields: [sessionId, reversesEntryId], references: [sessionId, id], onDelete: Restrict)
-  corrections ScoreEntry[] @relation("ScoreCorrection")
+  command     GameCommand    @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
+  stage       StageRun?      @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  lineup      TeamLineup?    @relation(fields: [sessionId, lineupId], references: [sessionId, id], onDelete: Restrict)
+  player      SessionPlayer? @relation(fields: [sessionId, recipientPlayerId], references: [sessionId, id], onDelete: Restrict)
+  team        SessionTeam?   @relation(fields: [sessionId, recipientTeamId], references: [sessionId, id], onDelete: Restrict)
+  reverses    ScoreEntry?    @relation("ScoreCorrection", fields: [sessionId, reversesEntryId], references: [sessionId, id], onDelete: Restrict)
+  corrections ScoreEntry[]   @relation("ScoreCorrection")
 
   @@unique([sessionId, id])
   @@unique([sessionId, awardKey])
@@ -340,14 +391,14 @@ model ScoreEntry {
 }
 
 model AuditEvent {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId String   @db.Uuid
-  commandId String?  @db.Uuid
-  revision  Int
-  eventIndex Int     @default(0)
-  kind      String   @db.VarChar(100)
-  details   Json     @db.JsonB
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId  String   @db.Uuid
+  commandId  String?  @db.Uuid
+  revision   Int
+  eventIndex Int      @default(0)
+  kind       String   @db.VarChar(100)
+  details    Json     @db.JsonB
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
 
   session GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   command GameCommand? @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)

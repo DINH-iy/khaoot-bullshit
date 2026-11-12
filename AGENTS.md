@@ -21,3 +21,8 @@
 - For documentation-only changes, check links/consistency and git diff --check; do not run unrelated full test suites.
 - Keep production sign-in fail-closed. No implicit development bypass in production paths.
 - Distinguish local checks from actual-device load tests, provider integration tests, and deployments. Report remaining verification limits clearly.
+
+## Dependency discipline
+
+- Prefer browser/Node APIs and existing dependencies for straightforward work. Avoid unnecessary wrappers, large convenience packages and duplicative libraries. Review the purpose, maintenance, transitive dependencies and security advisories before adding a runtime package.
+- Keep tests/tooling in development dependencies; keep the lockfile and CI audit current. Prefer small dependency-free packages for isolated algorithms where sensible. Do not replace vetted authentication/cryptography, database or networking foundations with improvised security-sensitive implementations merely to reduce package counts.

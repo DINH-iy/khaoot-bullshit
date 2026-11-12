@@ -6,6 +6,9 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+.local/
+test-results/
+playwright-report/
 
 # Generated server-only Prisma client
 apps/server/src/generated/

@@ -1,0 +1,12 @@
+import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { projectRoot } from '../database/environment.mjs';
+const access = JSON.parse(await readFile(new URL('../../.local/network-rehearsal.json', import.meta.url), 'utf8'));
+const origin = JSON.parse(await readFile(new URL('../../.local/network-origin.json', import.meta.url), 'utf8')).origin;
+if (new Date(access.expiresAt).getTime() <= Date.now()) throw new Error('Host access expired. Prepare a new rehearsal room.');
+const url = `${origin}/?room=${access.sessionId}#access=${access.hostToken}`;
+const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+const child = spawn(command, [url], { cwd: projectRoot, stdio: 'ignore' });
+child.on('error', () => { console.error('Could not open the host browser. Host access remains in the ignored local rehearsal file.'); process.exitCode = 1; });
+child.on('exit', code => { if (code) process.exitCode = 1; });
+console.log('Opening the private host link. Share only the player link shown inside the room.');

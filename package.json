@@ -28,13 +28,22 @@
     "db:status": "node scripts/database/prisma.mjs migrate status",
     "db:test": "node scripts/database/test.mjs",
     "db:drift": "node scripts/database/prisma.mjs migrate diff --from-config-datasource --to-schema database/schema.prisma --exit-code",
-    "db:test:stop": "node scripts/database/compose.mjs stop postgres-test"
+    "db:test:stop": "node scripts/database/compose.mjs stop postgres-test",
+    "network:prepare": "node --import tsx scripts/network/prepare.mjs",
+    "network:public": "node scripts/network/public.mjs",
+    "network:host": "node scripts/network/host.mjs",
+    "test:e2e": "node scripts/network/e2e.mjs",
+    "network:restart": "node scripts/network/restart.mjs",
+    "network:smoke": "node scripts/network/smoke.mjs"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
-    "vitest": "^4.0.0",
-    "fast-check": "^4.3.0",
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^24.0.0",
     "concurrently": "^9.2.0",
-    "@types/node": "^24.0.0"
+    "fast-check": "^4.3.0",
+    "jsqr": "1.4.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.0"
   }
 }

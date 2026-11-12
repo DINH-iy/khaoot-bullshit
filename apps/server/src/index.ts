@@ -28,7 +28,7 @@ process.once('SIGINT', () => { void shutdown('SIGINT'); });
 process.on('uncaughtExceptionMonitor', error => { app.log.fatal({ err: error, event: 'process_crashed' }, 'Fatal process failure'); });
 try {
   await app.listen({ host: config.HOST, port: config.PORT });
-  if (!config.AUTH_ISSUER) app.log.warn({ event: 'authentication_unconfigured' }, 'Protected routes are disabled until sign-in is configured');
+  if (!config.AUTH_ISSUER) app.log.warn({ event: 'authentication_unconfigured' }, 'Creator sign-in is not configured; room credentials are verified separately');
 } catch (error) {
   app.log.fatal({ err: error, event: 'startup_failed' }, 'Startup failed');
   await shutdown('startup_failure');

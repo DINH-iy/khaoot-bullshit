@@ -7,8 +7,12 @@ import type { Config } from './config.js';
 import type { DatabaseHealth } from './database/client.js';
 import { AuthenticationUnavailable, createTokenVerifier, type TokenVerifier } from './auth.js';
 import { RequestMetrics, now } from './observability.js';
+import type { PrismaClient } from './generated/prisma/client.js';
+import { registerRoomNetworking } from './rooms/network.js';
+import staticFiles from '@fastify/static';
+import { fileURLToPath } from 'node:url';
 
-export function buildApp(config: Config, options: { verifyToken?: TokenVerifier; logStream?: NodeJS.WritableStream; database?: DatabaseHealth } = {}) {
+export function buildApp(config: Config, options: { verifyToken?: TokenVerifier; logStream?: NodeJS.WritableStream; database?: DatabaseHealth & { client?: PrismaClient } } = {}) {
   const app = Fastify({
     bodyLimit: 16 * 1024,
     requestTimeout: 10000,
@@ -28,7 +32,10 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   const metrics = new RequestMetrics();
   const requests = new WeakMap<FastifyRequest, { start: number; span: Span }>();
   const identities = new WeakMap<FastifyRequest, Identity>();
-  void app.register(helmet);
+  void app.register(helmet, { contentSecurityPolicy: { directives: {
+    'upgrade-insecure-requests': config.PUBLIC_ORIGIN.startsWith('https:') ? [] : null,
+    'connect-src': ["'self'", config.PUBLIC_ORIGIN.replace(/^http/, 'ws')],
+  } } });
 
   app.addHook('onRequest', async (request, reply) => {
     const span = trace.getTracer('party-server').startSpan('http.request', { attributes: { 'http.request.method': request.method } });
@@ -94,5 +101,10 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     if (!identities.get(request)?.scopes.includes('ops:read')) return problem(request, reply, 403, 'FORBIDDEN', 'Operational access is required.');
     return { ...metrics.snapshot(), database: options.database?.snapshot() ?? null };
   });
+  if (options.database?.client && config.ROOM_TOKEN_SECRET) registerRoomNetworking(app, options.database.client, config, verifier);
+  if (config.SERVE_WEB) {
+    void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: false, index: false, cacheControl: false });
+    app.get('/', async (_request, reply) => reply.sendFile('index.html'));
+  }
   return app;
 }

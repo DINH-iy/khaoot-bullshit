@@ -4,7 +4,7 @@ Date: 9 November 2026
 
 Last updated: 11 November 2026 — creative minigames, player customization, researched browser constraints, build order, testing, and accessibility.
 
-Status: Browser/server/shared-contract scaffolding, tests, diagnostic logging, timing, token verification, PostgreSQL/Prisma models, migrations, and database integration tests are present. Live sign-in, gameplay command/persistence services, multiplayer rooms, editors, and the admin dashboard remain unimplemented. See README.md for implemented scope and verification. Build phases below describe intended outcomes, not completed features. This planning update does not start implementation.
+Status: Contracts, durable commands, PostgreSQL/Prisma, verified room credentials, Socket.IO/outbox publication, single-backend startup pausing, and minimal host/phone networking screens are present. Automated protocol/browser tests cover admission, privacy, retries and reconnects. The active gate is the user's actual Android Chrome test over public HTTPS/5G/Wi-Fi; no further product features proceed until reviewed. Full creator sign-in/provider setup, richer gameplay, editors and admin dashboard remain unbuilt. See README.md and [network checkpoint](docs/testing/network-checkpoint.md). Build phases describe intended outcomes, not completed features.
 
 ## 1. Product overview
 
@@ -364,7 +364,7 @@ Keep schema definitions, migration history, and database configuration together 
 - Use expand/backfill/contract steps where compatibility or existing data requires them. Backups and verified recovery procedures precede destructive changes; application rollback does not imply an automatic lossless database downgrade.
 - Keep development, test, and production database targets separate. CI verifies schema validity and migration application against disposable PostgreSQL.
 
-Database foundation implemented locally: PostgreSQL 18.6 and matching stable Prisma 7.10.1 CLI/client/adapter, version-controlled schema/migrations, a bounded client pool, connectivity diagnostics, and migration/integrity integration tests. [Database architecture and exact commands](docs/architecture/database.md) describe the 17 initial models and the limits of this foundation. Production deployment and gameplay command/recovery services remain unimplemented.
+Database foundation implemented locally: PostgreSQL 18.6 and matching stable Prisma 7.10.1 CLI/client/adapter, version-controlled schema/migrations, a bounded client pool, connectivity diagnostics, and migration/integrity integration tests. [Database architecture](docs/architecture/database.md) describes 19 models, including judgments and room credentials. The room gateway/networking checkpoint now uses these services; actual-phone review and final production deployment remain outstanding.
 
 Versioned references for the pinned Prisma 7 tooling: [development/deploy migrations](https://www.prisma.io/docs/orm/v7/prisma-migrate/workflows/development-and-production), [migration customization](https://www.prisma.io/docs/orm/v7/prisma-migrate/workflows/customizing-migrations). The unversioned documentation currently describes a different Prisma major; do not mix CLI workflows.
 
@@ -388,7 +388,7 @@ Use a small bounded PostgreSQL connection pool and tune shared memory, per-query
 
 Build release assets on the development machine/CI where practical. Avoid server-side video transcoding and heavy processing during games. The host laptop/TV browser plays media; the home server serves files and game state. Plan for media bandwidth as well as API latency.
 
-Local-network versus internet access remains to be confirmed. Remote play requires a deliberate HTTPS/domain/reachability setup, potentially through a suitable tunnel or reverse proxy. Authentication/JWKS and YouTube may still require internet even when clients access the game over the LAN; fully offline operation is not promised by home hosting alone.
+Internet access is required: players may use Wi-Fi or 5G/mobile data, independently of the host network. All devices use one public HTTPS/WSS origin, through deliberate home-server ingress/tunnel/reverse proxy. A temporary Cloudflare Quick Tunnel is used for the phone checkpoint; production needs a stable hostname and supported ingress. PostgreSQL remains private. Authentication/JWKS and YouTube can require internet; fully offline operation is not promised.
 
 See [Raspberry Pi deployment notes](docs/deployment/raspberry-pi.md) for hardware assumptions, database rationale, and readiness checks. No home network, firewall, or deployment settings are changed by this plan.
 
@@ -1094,7 +1094,17 @@ Trigger cues at introductions, stage changes, reveals, results and finale. Dedup
 
 ## 26. Next-phase build order and quality gates
 
+Current work status: the user parked the manual networking checkpoint on 11 November 2026 to choose another task. Existing code/data and confirmed test results are retained; QR scanning, connection switching, sleep and live restart checks remain pending. Resume them with a fresh temporary link/key. Networking acceptance remains incomplete; do not interpret parking as a passed gate or authorization to start the editors/admin dashboard.
+
 The existing scaffold/database is the starting point, not a completed multiplayer engine. Build a small playable game from prepared versioned definitions before either editor. This sequence refines phases 1–3B; no implementation is started by this document update.
+
+Implementation progress (11 November 2026): steps 1–2 have an executable untimed individual subset. Step 3 and the minimal step-4 test UI now include host/player/display credentials, guest admission, safe Socket.IO snapshots/receipts, bounded notification publication and single-backend restart pausing. Automated real-client and browser regressions exist. Creator provider sign-in, cross-device reclaim, icons and full gameplay/phone usability remain incomplete. See [command boundaries](docs/architecture/game-commands.md) and [network gate](docs/testing/network-checkpoint.md).
+
+**Required hold before more product features:** the user prioritizes networking as vital and requires testing on their Android Chrome phone, including joining over 5G, Wi-Fi/mobile-data switching, saved-answer refresh, sleep/foreground and backend restart recovery. No shared LAN is required. Automated tests complement this review; they cannot mark real-phone acceptance complete. Editors and admin dashboard remain out of scope. Track results in [network checkpoint](docs/testing/network-checkpoint.md).
+
+Actual-phone progress: Android Chrome admission over 5G with Wi-Fi off and saved-answer/identity restoration after refresh were confirmed by the user on 11 November 2026. Connection-switch, sleep and live restart checks remain pending; do not advance features yet.
+
+The host screen includes a scannable public player-join QR code, with room-code/link fallbacks and no host/display credentials in its payload. QR generation is local and tested by decoding its rendered image. Keep dependencies lean: prefer platform APIs/existing code, review transitive dependencies and advisories, and keep test tools outside runtime dependencies. The QR generator has no runtime dependencies; its independent decoding test tool is development-only.
 
 | Order | Slice | Evidence required before moving on |
 | --- | --- | --- |
@@ -1113,7 +1123,7 @@ The existing scaffold/database is the starting point, not a completed multiplaye
 
 Steps are dependency order rather than deadlines. Backend APIs and minimal UI may advance together within a slice; durability and authorization must exist before real accepted submissions. Start browser E2E with the first interactive slice, not after the editors. Incremental diagnostics ship throughout; a full admin interface follows real signals.
 
-The [testing, accessibility and device strategy](docs/architecture/testing-and-accessibility.md) specifies unit/property, API/database/migration, component, Playwright E2E, selected visual regressions, protocol/load/failure tests and manual accessibility checks. Proposed tools are not installed by this update. Regression cases accompany bug fixes at the cheapest realistic layer.
+The [testing, accessibility and device strategy](docs/architecture/testing-and-accessibility.md) specifies unit/property, API/database/migration, component, Playwright E2E, selected visual regressions, protocol/load/failure tests and manual accessibility checks. Vitest, Playwright, axe and initial real-protocol tests are now installed/implemented; broad visual/load/soak coverage remains future work. Regression cases accompany bug fixes at the cheapest realistic layer.
 
 Controllers are mobile first; host controls work on laptop and phone/tablet; shared display is readable on a TV; editors are desktop first. Target WCAG 2.2 AA for ordinary application UI, with keyboard/screen-reader support, visible focus, adequate contrast/targets, zoom/reflow, reduced motion, timing accommodations and non-drag editing alternatives. Spatial/drawing mechanics need documented alternative roles/rounds and real-user evaluation; no conformance claim follows from an automated scan alone.
 

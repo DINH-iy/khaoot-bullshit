@@ -40,7 +40,7 @@ Start with a small bounded pool (for example, 5 connections as a candidate to me
 
 Caddy is one reverse-proxy candidate. Select the final service/container setup when deployment begins; neither Docker nor a specific proxy is required yet. When using Docker, verify ARM64 image support, pin supported versions, and persist data in explicit volumes. Proxy trust must be configured narrowly to match the chosen topology.
 
-LAN-only versus remote access is not decided. Internet access needs a suitable domain/TLS/reachability arrangement; opening ports or configuring a tunnel is separate deployment work. Do not expose PostgreSQL. A local frontend address does not make external sign-in or YouTube work without internet. Fully offline play requires additional design.
+Internet access is required: players may connect over Wi-Fi or 5G independently of the host network. Use one public HTTPS/WSS origin with a deliberate tunnel/reverse proxy and stable hostname for production. The [phone checkpoint](../testing/network-checkpoint.md) uses an ephemeral Cloudflare tunnel to the development machine; it is not a Pi deployment. PostgreSQL remains private. External sign-in and YouTube require their own internet availability; fully offline play requires additional design.
 
 ## Target-device acceptance checks
 
