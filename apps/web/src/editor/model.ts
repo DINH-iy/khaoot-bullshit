@@ -265,3 +265,18 @@ export function pasteScenes(target: Definition, targetPositions: Positions, sour
 }
 /** Copies scenes within the same game, a little lower and to the right. */
 export const duplicateScenes = (definition: Definition, positions: Positions, keys: string[], offset: Point = { x: GRID * 2, y: GRID * 2 }) => pasteScenes(definition, positions, definition, positions, keys, offset);
+
+/**
+ * About how long the game takes: the rounds on the longest route, each with
+ * its timer (a minute when it has none) and some time for results and talk.
+ */
+export function estimateMinutes(definition: Definition): number {
+  const cost = (node: Node) => node.stages.reduce((sum, stage) => sum + (typeof stage.durationMs === 'number' ? stage.durationMs : 60_000) + 20_000, 0);
+  const byKey = new Map(definition.nodes.map(node => [node.key, node])); const memo = new Map<string, number>(); const visiting = new Set<string>();
+  const longest = (key: string): number => {
+    const node = byKey.get(key); if (!node || visiting.has(key)) return 0; const known = memo.get(key); if (known !== undefined) return known;
+    visiting.add(key); const next = Math.max(0, ...definition.edges.filter(edge => edge.from === key).map(edge => longest(edge.to))); visiting.delete(key);
+    const total = cost(node) + next; memo.set(key, total); return total;
+  };
+  return Math.max(1, Math.round(longest(definition.startNodeKey) / 60_000));
+}

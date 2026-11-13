@@ -6,7 +6,7 @@ import { readRoute } from './routes.js';
 import { readForming, teamContext } from './teams.js';
 import { ACCEPTANCE_GRACE_MS, remainingMs, SETTLE_MS, timerColumns } from './timing.js';
 
-/** How long after the last answer the round closes, so everyone sees "all in" before the result. */
+/** How long after the last answer the round closes unless the room sets another delay, so everyone sees "all in" before the result. */
 export const ALL_IN_CLOSE_MS = 3000;
 
 /**
@@ -17,7 +17,9 @@ export const ALL_IN_CLOSE_MS = 3000;
  * (`autoClose`, on by default) turns it off.
  */
 export async function closeSoonWhenAllIn(tx: Transaction, session: GameSession, definition: GameDefinition, stageRunId: string, now: Date): Promise<void> {
-  if ((session.state as { autoClose?: unknown } | null)?.autoClose === false) return;
+  const settings = session.state as { autoClose?: unknown; autoCloseSeconds?: unknown } | null;
+  if (settings?.autoClose === false) return;
+  const seconds = settings?.autoCloseSeconds; const delay = typeof seconds === 'number' && Number.isInteger(seconds) && seconds >= 1 && seconds <= 30 ? seconds * 1000 : ALL_IN_CLOSE_MS;
   const stage = await tx.stageRun.findUnique({ where: { id: stageRunId } });
   if (!stage || stage.status !== 'ACTIVE' || readForming(stage.presentation)) return;
   const entry = locateStage(definition, stage.nodeKey, stage.stageKey);
@@ -31,7 +33,7 @@ export async function closeSoonWhenAllIn(tx: Transaction, session: GameSession, 
   const answered = await tx.submission.count({ where: { stageRunId: stage.id, slotKey: 'answer' } });
   if (needed === 0 || answered < needed) return;
   // A deadline that closes the round ALL_IN_CLOSE_MS from now, after the usual grace for answers in flight.
-  const wanted = ALL_IN_CLOSE_MS - ACCEPTANCE_GRACE_MS - SETTLE_MS;
+  const wanted = Math.max(1, delay - ACCEPTANCE_GRACE_MS - SETTLE_MS);
   const current = remainingMs(stage, now);
   if (current !== null && current <= wanted) return;
   await tx.stageRun.update({ where: { id: stage.id }, data: timerColumns(wanted, false, now) });

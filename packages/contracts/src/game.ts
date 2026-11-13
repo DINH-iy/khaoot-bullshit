@@ -90,6 +90,8 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('player.look'), look: PlayerLookSchema }).strict(),
   // The host takes away a player's photo or drawn picture (the character stays).
   z.object({ ...hostEnvelope, type: z.literal('player.removePicture'), playerId: GameIdSchema }).strict(),
+  // The host spins the wheel of fortune set on this scene (again, if they like); the server picks the entry.
+  z.object({ ...hostEnvelope, type: z.literal('wheel.spin'), stageRunId: GameIdSchema }).strict(),
   // One turn of a relay drawing (Pass the pencil): the strokes this player added in turn `turn`.
   z.object({ ...envelope, type: z.literal('minigame.part'), stageRunId: GameIdSchema, turn: z.number().int().min(0).max(63), assetId: GameIdSchema }).strict(),
 ]);
@@ -174,6 +176,17 @@ export const PublicStageSchema = z.object({
   revealAfterVote: z.boolean(),
   revealed: z.boolean(), reveal: StageRevealSchema.nullable(),
 }).strict();
+/** Statistics for the end-of-game show; the author picks which ones appear and in which order. */
+export const FINALE_STATS = ['winner', 'mostCorrect', 'mostWrong', 'fastest', 'slowest', 'mostVotes', 'minigameChamp', 'luckiest', 'mostReactions'] as const;
+export type FinaleStat = typeof FINALE_STATS[number];
+export const FinaleSlideSchema = z.object({ stat: z.enum(FINALE_STATS), playerIds: z.array(GameIdSchema), value: z.string().max(60) }).strict();
+// The wheel of fortune as screens see it: a spin on the current scene (with every entry, to draw the wheel),
+// and the last result, which stays in a corner until the next spin or until a scene clears it.
+export const WheelViewSchema = z.object({
+  canSpin: z.boolean(),
+  spin: z.object({ title: z.string(), entries: z.array(z.string()), index: z.number().int().min(0), label: z.string(), spunAt: z.string().datetime(), seconds: z.number().int() }).strict().nullable(),
+  current: z.object({ title: z.string(), label: z.string() }).strict().nullable(),
+}).strict();
 export const SessionViewSchema = z.object({
   formatVersion: z.literal(1), sessionId: GameIdSchema, revision: RevisionSchema,
   status: z.enum(['LOBBY', 'RUNNING', 'PAUSED', 'RECOVERING', 'FINISHED']),
@@ -185,6 +198,9 @@ export const SessionViewSchema = z.object({
   standings: z.array(z.object({ playerId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
   // The look and texts for this moment: the game's, with the current scene's changes on top.
   presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
+  wheel: WheelViewSchema,
+  // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
+  finale: z.array(FinaleSlideSchema).nullable(),
   // Totals of the game's current teams, following that lineup's carryover rule.
   teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema }).strict()),
 }).strict();

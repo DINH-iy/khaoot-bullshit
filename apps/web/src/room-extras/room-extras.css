@@ -6,9 +6,9 @@
 .room-player { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .phone-dock { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 15; display: flex; gap: 6px; padding: 6px;
   border-radius: 22px; background: color-mix(in srgb, var(--r-surface) 92%, black); border: 1px solid var(--r-line); box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
-.room .phone-dock button { display: grid; justify-items: center; gap: 2px; min-width: 64px; min-height: 56px; padding: 6px 10px; border-radius: 16px; background: transparent; border: 0; }
+.room .phone-dock button { display: grid; justify-items: center; gap: 2px; min-width: 72px; min-height: 56px; padding: 6px 8px; border-radius: 16px; background: transparent; border: 0; }
 .room .phone-dock button:active { background: var(--r-card-strong); }
-.phone-dock span { font-size: 1.4rem; line-height: 1; } .phone-dock small { font-size: .72rem; font-weight: 700; color: var(--r-muted); }
+.phone-dock span { font-size: 1.4rem; line-height: 1; } .phone-dock small { font-size: .7rem; font-weight: 700; color: var(--r-muted); white-space: nowrap; }
 
 .sheet-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; align-items: end; justify-items: center; background: rgb(0 0 0 / .5); padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 .room .bottom-sheet { width: min(560px, 100%); max-height: min(80dvh, 720px); display: grid; grid-template-rows: auto 1fr; border-radius: var(--r-radius) var(--r-radius) 18px 18px; background: var(--r-surface); border: 1px solid var(--r-line); overflow: hidden; }
@@ -27,7 +27,7 @@
 .room .reaction-grid button:active { transform: scale(.94); }
 
 /* Shared screen: reactions float up in the bottom right, then fade. */
-.reactions-overlay { position: fixed; right: 18px; bottom: 18px; z-index: 25; width: min(320px, 40vw); height: 60vh; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; gap: 6px; overflow: hidden; }
+.reactions-overlay { position: fixed; right: 24px; bottom: 18px; z-index: 25; width: min(320px, 40vw); height: 60vh; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; gap: 6px; overflow: hidden; }
 .reaction { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: color-mix(in srgb, var(--r-surface) 85%, transparent); border: 1px solid var(--r-line); animation: reaction-float 4.2s ease-out forwards; translate: var(--drift) 0; }
 .reaction-value { font-size: 2rem; line-height: 1; } .reaction.sticker .reaction-value { font-size: 1.1rem; font-weight: 900; padding: 4px 10px; border-radius: 10px; background: var(--r-accent); color: var(--r-accent-ink); }
 .reaction-name { font-size: .8rem; font-weight: 700; color: var(--r-muted); max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -53,3 +53,45 @@
 .room .reaction-picks button { min-height: 40px; min-width: 44px; padding: 4px 8px; font-size: 1.2rem; border-radius: 10px; opacity: .45; }
 .room .reaction-picks button[aria-pressed=true] { opacity: 1; outline: 2px solid var(--r-accent); outline-offset: -2px; }
 .room .reaction-settings .field-title { margin: 4px 0 0; font-weight: 600; }
+.room .room-settings .inline-setting { display: grid; grid-template-columns: 1fr 5.5rem; gap: 10px; align-items: center; font-weight: 600; }
+
+/* Break: a calm full-screen pause for everyone. */
+.break-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; text-align: center;
+  background: color-mix(in srgb, var(--r-bg2) 94%, transparent); backdrop-filter: blur(8px); color: var(--r-text); }
+.break-icon { margin: 0; font-size: clamp(5rem, 22vw, 11rem); line-height: 1; animation: break-sway 4s ease-in-out infinite; }
+.break-overlay h2 { margin: 0; font-size: clamp(2.2rem, 8vw, 5rem); } .break-overlay p { margin: 0; font-size: 1.2rem; }
+.break-time { color: var(--r-muted); } .room .break-overlay button.big { width: auto; padding: 12px 32px; margin-top: 12px; }
+@keyframes break-sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+
+/* Wheel of fortune. */
+.wheel-overlay { position: fixed; inset: 0; z-index: 45; display: grid; place-content: center; justify-items: center; gap: 16px; padding: 20px; background: color-mix(in srgb, var(--r-bg2) 90%, transparent); backdrop-filter: blur(6px); }
+.wheel-title { margin: 0; font-family: var(--r-heading-font); font-size: clamp(1.4rem, 4vw, 2.4rem); font-weight: 900; }
+.wheel-frame { position: relative; width: min(78vw, 62vh, 560px); aspect-ratio: 1; }
+.wheel-pointer { position: absolute; top: -10px; left: 50%; translate: -50% 0; z-index: 2; width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 30px solid var(--r-accent); filter: drop-shadow(0 3px 4px rgb(0 0 0 / .4)); }
+.wheel-disc { position: absolute; inset: 0; border-radius: 50%; border: 8px solid var(--r-text); box-shadow: 0 20px 60px rgb(0 0 0 / .45); animation: wheel-turn var(--spin-time) cubic-bezier(.12, .7, .1, 1) forwards; }
+@keyframes wheel-turn { from { transform: rotate(0deg); } to { transform: rotate(var(--turn)); } }
+.wheel-label { position: absolute; inset: 0; display: grid; justify-items: center; align-items: start; padding-top: 50%; pointer-events: none; }
+.wheel-label i { font-style: normal; font-weight: 800; font-size: clamp(.6rem, 1.6vw, 1rem); color: var(--a-text); writing-mode: vertical-rl; text-shadow: 0 1px 2px rgb(0 0 0 / .5); max-height: 40%; overflow: hidden; }
+.wheel-result { margin: 0; min-height: 1.4em; padding: 8px 26px; border-radius: 999px; font-family: var(--r-heading-font); font-size: clamp(1.6rem, 5vw, 3rem); font-weight: 900; }
+.wheel-result.shown { background: var(--r-accent); color: var(--r-accent-ink); animation: points-pop 3.4s ease-out both; animation-name: wheel-pop; }
+@keyframes wheel-pop { 0% { transform: scale(.4); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.room .wheel-badge { margin: 0; display: inline-grid; gap: 2px; padding: 8px 16px; border-radius: 16px; background: var(--r-card-strong); border: 1px solid var(--r-line); }
+.wheel-badge span { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); font-weight: 700; } .wheel-badge strong { font-size: 1.05rem; }
+.room-display .wheel-badge, .room-host .wheel-badge.corner { position: fixed; right: 24px; bottom: 18px; z-index: 24; box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
+.room-display:has(.wheel-badge) .reactions-overlay { bottom: 92px; }
+
+/* End-of-game awards. */
+.room .finale { display: grid; gap: 14px; justify-items: center; text-align: center; padding: 28px 24px !important; border-radius: var(--r-radius) !important; background: var(--r-card) !important; border: 1px solid var(--r-line) !important; }
+.finale h2 { margin: 0; color: var(--r-muted); font-size: 1rem; text-transform: uppercase; letter-spacing: .12em; }
+.finale-slide { display: grid; gap: 12px; justify-items: center; animation: finale-in .6s ease-out; }
+@keyframes finale-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.finale-stat { margin: 0; font-family: var(--r-heading-font); font-size: clamp(1.8rem, 6vw, 3.4rem); font-weight: 900; color: var(--r-accent); }
+.finale-people { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; } .finale-people span { display: grid; justify-items: center; gap: 6px; font-size: 1.3rem; }
+.finale-value { margin: 0; font-size: 1.3rem; font-weight: 700; }
+.finale-dots { display: flex; gap: 8px; }
+.room .finale-dots button { min-height: 0; width: 14px; height: 14px; padding: 0; border-radius: 50%; background: var(--r-line); border: 0; } .room .finale-dots button[aria-pressed=true] { background: var(--r-accent); }
+
+/* The shared screen stays minimal: the round, nothing else. Connection tools appear only when something is wrong. */
+.room-display .room-connection .ghost, .room-display .conn-details, .room-display .conn.conn-ok { display: none; }
+.room-display .room-bar { padding-block: 10px; }
+@media (prefers-reduced-motion: reduce) { .break-icon, .wheel-disc, .finale-slide, .wheel-result.shown { animation: none; } .wheel-disc { transform: rotate(var(--turn)); } }

@@ -2,8 +2,10 @@ import { expect, type Page } from '@playwright/test';
 
 /** For tests about closing rounds by hand: rounds no longer end 3 seconds after everyone answered. */
 export async function closeRoundsByHand(host: Page) {
-  const setting = host.getByLabel('End a round 3 seconds after everyone answered');
+  const setting = host.getByLabel('End a round soon after everyone answered');
   await setting.uncheck(); await expect(setting).not.toBeChecked();
+  // Saved on the server too (the room update confirms it).
+  await host.waitForTimeout(400);
 }
 /** Phones keep the scoreboard behind the bottom bar: open it, check what it lists, close it again. */
 export async function expectPhoneScores(page: Page, expected: string[] | string) {

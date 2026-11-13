@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { FlowView } from './flow-view.js';
 import { SceneView } from './scene-view.js';
 import { LookView } from './look/look-view.js';
-import { isRoute } from './model.js';
+import { estimateMinutes, isRoute } from './model.js';
 import { useDraft, type SaveState } from './use-draft.js';
 import './editor.css';
 
@@ -54,7 +54,7 @@ export function EditorShell({ gameId }: { gameId: string }) {
       <div className="editor-bar">
         <div className="tabs" role="tablist" aria-label="Editor view">
           {(Object.keys(VIEW_NAMES) as View[]).map(key => <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}>{VIEW_NAMES[key]}</button>)}</div>
-        <p>Game overview · {nodes.length} {nodes.length === 1 ? 'scene' : 'scenes'}{routes ? `, ${routes} ${routes === 1 ? 'party choice' : 'party choices'}` : ''} · {d.issues.length ? `${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'}` : 'no problems'}</p>
+        <p>Game overview · about {estimateMinutes(definition)} min · {nodes.length} {nodes.length === 1 ? 'scene' : 'scenes'}{routes ? `, ${routes} ${routes === 1 ? 'party choice' : 'party choices'}` : ''} · {d.issues.length ? `${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'}` : 'no problems'}</p>
       </div>
       {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} /> : view === 'scene' ? <SceneView d={d} selected={selected} setSelected={setSelected} /> : <LookView d={d} selected={selected} />}
       {d.issues.some(issue => !issue.nodeKey) && <div className="general-problems" role="region" aria-label="Problems in the whole game"><h2>Problems in the whole game</h2><ul>{d.issues.filter(issue => !issue.nodeKey).map((issue, index) => <li key={index}>{issue.message}</li>)}</ul></div>}

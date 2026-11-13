@@ -52,7 +52,7 @@ describe('public game contracts', () => {
   });
   it('rejects ambiguous choices and secret fields in public views', () => {
     expect(InputSchema.safeParse({ kind: 'choice', options: [{ key: 'a', label: 'A' }, { key: 'a', label: 'B' }] }).success).toBe(false);
-    const view = { formatVersion: 1, sessionId: ids.sessionId, revision: 0, status: 'LOBBY', title: 'Party', stage: null, serverTime: '2026-11-12T10:00:00.000Z', teamStandings: [], ownSubmission: null, standings: [], presentation: { texts: {}, animations: {}, themes: [] } };
+    const view = { formatVersion: 1, sessionId: ids.sessionId, revision: 0, status: 'LOBBY', title: 'Party', stage: null, serverTime: '2026-11-12T10:00:00.000Z', teamStandings: [], ownSubmission: null, standings: [], presentation: { texts: {}, animations: {}, themes: [] }, wheel: { canSpin: false, spin: null, current: null }, finale: null };
     expect(SessionViewSchema.safeParse(view).success).toBe(true);
     expect(SessionViewSchema.safeParse({ ...view, correctChoiceKey: 'a' }).success).toBe(false);
   });

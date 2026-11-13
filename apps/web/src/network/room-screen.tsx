@@ -16,6 +16,7 @@ import { PhoneDock } from '../room-extras/phone-dock.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
 import { RoomSettings } from '../room-extras/room-settings.js';
 import { PointsCelebration } from '../room-extras/celebrate.js';
+import { BreakOverlay, FinaleShow, WheelBadge, WheelOverlay } from '../room-extras/show-extras.js';
 import { formatPoints } from './results.js';
 import { Avatar, RoomSessionContext } from '../players/avatar.js';
 import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js';
@@ -174,6 +175,7 @@ export function RoomScreen() {
           {/* While teams are picked, the round's question waits: one thing at a time. */}
           <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? 'Scoreboard' : stage.prompt)}</h2>
           {stage.info && <p className="info-text">{stage.prompt}</p>}
+          {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
           <TeamSummary state={state} stage={stage} />
           {!stage.teams?.forming && <div ref={timerRef}><StageTimer stage={stage} remaining={remaining} /></div>}
@@ -201,15 +203,19 @@ export function RoomScreen() {
               <button className="primary" disabled={disabled || !draftValue(stage.input, draft) || timeUp}>{timeUp ? t('timer.up') : stage.kind === 'route' ? t('vote.submit') : t('answer.submit')}</button></form>
             : role === 'player' ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly ? '' : t('wait.screen')}</p> : null}</div></>}
         </section>}
-        {/* Phones keep the scores one tap away (the dock); screens show them inline when allowed. */}
-        {(role !== 'player' || scoreMoment) && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command} /></div>}
+        {role !== 'display' && <WheelBadge wheel={state.view.wheel} />}
+        {state.view.status === 'FINISHED' && <FinaleShow state={state} />}
+        {/* Phones keep the scores one tap away (the dock). The shared screen shows them with the results of a round, at scoreboard scenes and at the end: nothing it does not need. */}
+        {(role === 'host' || scoreMoment || (role === 'display' && stage?.revealed)) && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command} /></div>}
       </div>
 
       {host && <aside className="room-controls" aria-label="Host controls">
         {primary && <button className="primary big" disabled={disabled} onClick={primary.run}>{primary.label}</button>}
         {nextAlso && <button disabled={disabled} onClick={() => command('stage.advance', { stageRunId: stage!.id })}>{t('host.next')}</button>}
+        {running && stage && state.view.wheel.canSpin && <button disabled={disabled} onClick={() => command('wheel.spin', { stageRunId: stage.id })}>{state.view.wheel.spin ? t('wheel.again') : t('wheel.spin')}</button>}
         <div className="actions">
           {running && <button className="ghost" disabled={disabled} onClick={() => command('session.pause')}>{t('host.pause')}</button>}
+          {running && <button className="ghost" disabled={disabled} onClick={() => { void roomApi(`/api/rooms/${sessionId}/break`, {}).catch(() => setError('The break could not be started.')); }}>{t('break.icon')} {t('break.vote')}</button>}
           {running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.route?.decision && stage.route?.method !== 'host' && <>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: 30_000 })}>Reopen for 30 seconds</button>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>Reopen without time limit</button></>}
@@ -235,11 +241,15 @@ export function RoomScreen() {
     </div>}
     {state && me && editingLook && <div className="look-sheet" role="dialog" aria-modal="true" aria-labelledby="look-builder-heading" onKeyDown={event => { if (event.key === 'Escape') setEditingLook(false); }}><LookBuilder initial={me.look} name={me.displayName} busy={disabled} sessionId={state.view.sessionId}
       onCancel={() => setEditingLook(false)} onSave={next => { rememberLook(next); command('player.look', { look: next }); setEditingLook(false); }} /></div>}
+    {state && <WheelOverlay wheel={state.view.wheel} offset={room.clockOffset} />}
+    {state && role === 'display' && <WheelBadge wheel={state.view.wheel} />}
+    {state && <BreakOverlay state={state} host={host} disabled={disabled} onContinue={() => command('session.resume')} />}
     {state && role === 'player' && <PhoneDock state={state} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
+      onBreak={vote => { void roomApi(`/api/rooms/${sessionId}/break`, { vote }).catch(() => setError('Your vote did not go through. Try again.')); }}
       scores={<Scoreboard state={state} disabled={disabled} send={command} />} />}
     {state && role === 'player' && <PointsCelebration roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
     {state && role !== 'player' && state.settings.reactions && <ReactionsOverlay state={state} store={room.reactions} />}
-    {state && role !== 'player' && <section className="players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
+    {state && role === 'host' && <section className="players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
       {me && state.view.status !== 'LOBBY' && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
       <ul ref={playersRef}>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}<span className="visually-hidden"> · </span><span className="player-state">{player.connected ? 'connected' : 'disconnected'}</span>
         {host && player.look.picture && <button className="small-button ghost" aria-label={`Remove the picture of ${player.displayName}`} onClick={() => command('player.removePicture', { playerId: player.id })}>Remove picture</button>}

@@ -28,9 +28,16 @@ export function registerReactions(io: Server, client: PrismaClient) {
   // Each player's recent reactions (all their phones and tabs together), for the "per 10 seconds" limit.
   const sent = new Map<string, number[]>();
   let next = 0;
+  // How many reactions each player sent, per room, for the end-of-game show. In memory: a restart starts counting again.
+  const totals = new Map<string, Map<string, number>>();
   return {
     /** Forget a room's cached setting after the host changed it. */
     settingsChanged(sessionId: string) { cached.delete(sessionId); },
+    /** The players who reacted most in this room, and how often; null when nobody did. */
+    most(sessionId: string): { playerIds: string[]; count: number } | null {
+      const room = totals.get(sessionId); if (!room?.size) return null; const count = Math.max(...room.values());
+      return { playerIds: [...room.entries()].filter(([, value]) => value === count).map(([id]) => id), count };
+    },
     connect(socket: Socket, principal: Principal) {
       if (principal.actor.role !== 'player') return;
       const playerId = principal.actor.playerId; const sessionId = principal.sessionId;
@@ -43,6 +50,7 @@ export function registerReactions(io: Server, client: PrismaClient) {
           const second = Math.floor(now / 1000); const rate = roomRate.get(sessionId);
           if (rate?.second === second && rate.count >= ROOM_PER_SECOND) return;
           roomRate.set(sessionId, { second, count: rate?.second === second ? rate.count + 1 : 1 }); if (roomRate.size > 1024) roomRate.delete(roomRate.keys().next().value!);
+          const room_ = totals.get(sessionId) ?? new Map<string, number>(); room_.set(playerId, (room_.get(playerId) ?? 0) + 1); totals.set(sessionId, room_); if (totals.size > 512) totals.delete(totals.keys().next().value!);
           const message = { id: ++next, playerId, reaction: parsed.data.reaction };
           io.to(`display:${sessionId}`).to(`host:${sessionId}`).emit('room.reaction', message);
         }).catch(() => undefined);

@@ -75,3 +75,11 @@
 .look-devices > figure { min-width: 0; }
 .look-preview .segmented { flex-wrap: wrap; }
 .look-panel input[type=range] { min-width: 0; width: 100%; }
+/* A grid's single column must be allowed to be narrower than its widest child, or the panel scrolls sideways. */
+.look-controls, .look-panel, .look-panel fieldset, .anim-builder, .frame-list, .frame-block, .frame-props, .look-preview { grid-template-columns: minmax(0, 1fr); }
+.look-controls > *, .look-panel > *, .anim-builder > *, .frame-block > * { min-width: 0; }
+.frame-prop { grid-template-columns: minmax(0, 9rem) minmax(0, 1fr); }
+.moment-row > * { min-width: 0; } .moment-row select { flex: 1 1 140px; max-width: 100%; }
+.anim-timing { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
+.color-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
+.look-controls select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; } .look-controls > label { min-width: 0; }

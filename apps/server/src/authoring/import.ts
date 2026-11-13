@@ -51,7 +51,10 @@ function stageFrom(raw: Json, key: string): Json {
   const play = isObject(raw['play']) ? { play: raw['play'] } : {};
   const stage = stageOfType(raw, key, type, prompt, durationMs, play);
   // A scene can have its own look (texts, style, animations); the definition check validates it.
-  return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, presentation: raw['look'] ?? raw['presentation'] } : stage;
+  // `spin`: the name of a wheel of fortune the host spins on this scene.
+  const spun = typeof raw['spin'] === 'string' && raw['spin'].trim() ? { spin: { wheel: slug(raw['spin'], 'wheel') } } : isObject(raw['spin']) ? { spin: raw['spin'] } : {};
+  const extras = { ...spun, ...(raw['wheelClear'] === true ? { wheelClear: true } : {}) };
+  return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
 }
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
   switch (type) {
@@ -154,6 +157,10 @@ export function importDefinition(input: string): Json | null {
     title: text(raw['title'], 'Imported game').slice(0, 160) || 'Imported game',
     startNodeKey: keyFor(raw['startNodeKey'] ?? raw['start']) ?? nodes[0]?.key ?? 'start',
     ...(isObject(raw['teams']) ? { teams: raw['teams'] } : {}), ...(isObject(raw['play']) ? { play: raw['play'] } : {}), ...(isObject(raw['look'] ?? raw['presentation']) ? { presentation: raw['look'] ?? raw['presentation'] } : {}),
+    // Wheels of fortune: `{ "title": "Forfeits", "entries": ["Sing", "Dance"], "removePicked": true, "spinSeconds": 5 }`; awards: `"awards": ["winner", "mostWrong"]`.
+    ...(Array.isArray(raw['wheels']) ? { wheels: raw['wheels'].filter(isObject).slice(0, 10).map((wheel, index) => ({ key: slug(text(wheel['title'] ?? wheel['key']), `wheel-${index + 1}`), title: text(wheel['title'], `Wheel ${index + 1}`).slice(0, 80),
+      entries: options(wheel['entries'], 'entry'), removePicked: wheel['removePicked'] !== false, spinSeconds: Math.max(2, Math.min(15, Math.round(Number(wheel['spinSeconds']) || 5))) })) } : {}),
+    ...(Array.isArray(raw['awards']) ? { finale: { stats: raw['awards'].map(entry => text(entry)) } } : isObject(raw['finale']) ? { finale: raw['finale'] } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;

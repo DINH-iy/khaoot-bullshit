@@ -216,3 +216,4 @@
 .minigame-fields .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .minigame-fields .door-list, .minigame-fields .placement-list { display: grid; gap: 6px; }
 .drawing-fields .doodle-preview .drawing-view { width: 160px; } .drawing-fields .doodle-editor .drawing-pad { width: 100%; }
+.wheel-fields { display: grid; gap: 8px; }

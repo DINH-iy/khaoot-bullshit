@@ -48,7 +48,10 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await expect(requests).toHaveCount(0);
 
     await expect(newPhone.getByRole('heading', { name: `Room ${roomCode}` })).toBeVisible();
-    await expect(newPhone.getByText('Sam (you) · connected')).toBeVisible();
+    // The player list is behind the phone's bottom bar now.
+    await newPhone.getByRole('navigation', { name: 'More' }).getByRole('button', { name: /^Players/ }).click();
+    await expect(newPhone.getByRole('dialog', { name: /^Players/ })).toContainText('Sam (you)');
+    await newPhone.keyboard.press('Escape');
     await expect(newPhone.getByText('Your answer is in!')).toBeVisible();
     await expect(host.getByText('Sam · connected', { exact: false })).toBeVisible();
     await newPhone.reload();

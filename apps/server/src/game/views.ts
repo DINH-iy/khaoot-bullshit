@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { isVoteSource, minigameRules, parseDefinition, type StageDefinition } from './definition.js';
 import { readMinigameRun } from '../minigames/rules.js';
 import { relayPlan } from '../minigames/relay.js';
+import { wheelView } from './wheel.js';
+import { finaleSlides } from './finale.js';
 import { minigameOutcome } from '../minigames/outcome.js';
 import { locateStage } from './graph.js';
 import { routeView } from './route-views.js';
@@ -113,6 +115,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         standings: totals.filter(row => row.recipientPlayerId !== null).map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
         teamStandings: await teamStandings(tx, session.id, playerTotals),
         presentation: viewPresentation(definition.presentation, entry?.stage.presentation),
+        wheel: await wheelView(tx, session.id, definition, current, actor.data.role === 'host'),
+        finale: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
       });
     }, { isolationLevel: 'RepeatableRead', maxWait: 2000, timeout: 5000 });
   } catch (error) { throw error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE'); }

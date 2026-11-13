@@ -24,8 +24,8 @@ function BottomSheet({ title, onClose, children }: { title: string; onClose: () 
  * scoreboard (when the host allows it), the players, reactions to the big
  * screen, and sound on or off. Nothing to scroll for.
  */
-export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact }: {
-  state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void;
+export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak }: {
+  state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void; onBreak: (vote: boolean) => void;
 }) {
   const t = useText(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
   // Sound needs a first tap on phones; any tap in the dock (or an answer) prepares it.
@@ -36,6 +36,8 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact }
       {canSeeScores && <button type="button" onClick={() => setSheet('scores')}><span aria-hidden="true">🏆</span><small>{t('scores.title')}</small></button>}
       <button type="button" onClick={() => setSheet('players')}><span aria-hidden="true">👥</span><small>{t('players.title', { count: state.players.length })}</small></button>
       {state.settings.reactions && state.view.status !== 'FINISHED' && <button type="button" onClick={() => setSheet('react')}><span aria-hidden="true">😀</span><small>React</small></button>}
+      {state.settings.breakVotes && state.view.status === 'RUNNING' && <button type="button" aria-pressed={state.break.voted} onClick={() => onBreak(!state.break.voted)}>
+        <span aria-hidden="true">{t('break.icon')}</span><small>{t('break.vote')} {state.break.votes}/{state.break.needed}</small></button>}
       <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>Sound</small></button>
     </nav>
     {sheet === 'scores' && <BottomSheet title={t('scores.title')} onClose={close}>{scores}</BottomSheet>}

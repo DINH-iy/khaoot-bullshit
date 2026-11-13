@@ -17,6 +17,7 @@ import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js'
 import { createLiveSignals } from '../minigames/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
 import { registerReactions } from './reactions.js';
+import { breakVotesNeeded, createBreaks } from './breaks.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
@@ -28,7 +29,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const live = createLiveSignals();
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'), undefined, live.signals);
   const minigames = registerMinigameEvents(io, client, live, app.log);
-  const reactions = registerReactions(io, client);
+  const reactions = registerReactions(io, client); const breaks = createBreaks(client, service);
   const failure = (error: unknown): RoomReply<never> => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
     app.log.warn({ event: 'room_request_rejected', code }, 'Room request rejected');
@@ -59,10 +60,15 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const connected = connectedPlayers(principal.sessionId); const state = readRoomState(session.state);
     // Secret scores: phones and the shared screen get no standings during the game, only at a scoreboard scene and at the end. The host always sees them.
     const scoresOpen = state.showScores || principal.role === 'host' || view.status === 'FINISHED' || (view.stage?.kind === 'scoreboard' && view.stage.status === 'ACTIVE');
-    const shown = scoresOpen ? view : { ...view, standings: [], teamStandings: [] };
+    // "Most reactions" comes from the room's own count; without one, the slide is left out.
+    const reacted = view.finale?.some(slide => slide.stat === 'mostReactions') ? reactions.most(principal.sessionId) : null;
+    const finale = view.finale?.flatMap(slide => slide.stat !== 'mostReactions' ? [slide] : reacted ? [{ ...slide, playerIds: reacted.playerIds, value: `${reacted.count} ${reacted.count === 1 ? 'reaction' : 'reactions'}` }] : []) ?? null;
+    const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), finale };
+    const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices },
+      break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [] });
   };
 
@@ -113,6 +119,15 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
       const body = RoomSettingsSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       reactions.settingsChanged(id); await seats.setSettings(id, principal, Object.fromEntries(Object.entries(body.data).filter(([, value]) => value !== undefined))); return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  // A break: a player votes for (or withdraws from) one, the host calls one. The host ends it by continuing the game.
+  app.post('/api/rooms/:sessionId/break', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      const body = z.object({ vote: z.boolean().optional() }).strict().safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      if (principal.role === 'host') await breaks.call(id, principal); else await breaks.vote(id, principal, body.data.vote ?? true);
+      return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error)); }
   });
   app.post('/api/rooms/:sessionId/claim', async (request, reply) => {

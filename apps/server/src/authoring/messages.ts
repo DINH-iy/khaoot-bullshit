@@ -35,6 +35,8 @@ const RULES: Record<string, string> = {
   'Item keys must be unique': 'Two items have the same name.',
   'At most one team takes the rest': 'Only one team can take “the rest” of the players.',
   'Choose a minigame': 'Choose which minigame is played here. The game can be published once every minigame scene has one.',
+  'This scene spins a wheel that does not exist': 'This scene spins a wheel that was removed. Choose another wheel or switch the wheel off for this scene.',
+  'Duplicate wheel': 'Two wheels have the same name. Rename one.', 'Wheel entries must be unique': 'A wheel has the same entry twice.',
   'This minigame needs teams': 'Pass the pencil is played in teams. Set this round (or the game) to play in teams.',
   'Minigame settings are not valid': 'The minigame settings do not fit together. Check the times and points.',
 };

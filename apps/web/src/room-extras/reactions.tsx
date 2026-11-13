@@ -29,7 +29,7 @@ export function ReactionsOverlay({ state, store }: { state: RoomSnapshot; store:
   if (!items.length) return null;
   return <div className="reactions-overlay" aria-hidden="true">{items.map(item => {
     const player = state.players.find(entry => entry.id === item.playerId); const value = REACTIONS[item.reaction]!; const sticker = /^[A-Z!]+$/.test(value);
-    return <div key={item.id} className={`reaction${sticker ? ' sticker' : ''}`} style={{ '--drift': `${(item.id % 5) * 9 - 18}px` } as React.CSSProperties}>
+    return <div key={item.id} className={`reaction${sticker ? ' sticker' : ''}`} style={{ '--drift': `${-(item.id % 5) * 10}px` } as React.CSSProperties}>
       {player && <Avatar look={player.look} size={34} />}<span className="reaction-value">{value}</span>{player && <span className="reaction-name">{player.displayName}</span>}</div>;
   })}</div>;
 }

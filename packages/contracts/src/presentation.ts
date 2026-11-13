@@ -26,6 +26,10 @@ export const TEXT_DEFAULTS = {
   'players.title': 'Players · {count}', 'players.changeLook': 'Change my look',
   'phase.teams': 'Picking teams', 'phase.answer': 'Answer now', 'phase.vote': 'Vote now', 'phase.route': 'Choose the route', 'phase.minigame': 'Minigame', 'phase.challenge': 'Challenge',
   'phase.locked': 'Answers are in', 'phase.results': 'Results', 'phase.paused': 'Paused', 'phase.allIn': 'Everyone has answered',
+  'break.title': 'Smoke break!', 'break.icon': '🚬', 'break.text': 'The game is paused. Back in a moment.', 'break.vote': 'Break', 'break.voted': 'You voted for a break', 'break.host': 'Continue the game',
+  'wheel.spin': 'Spin the wheel', 'wheel.again': 'Spin again', 'wheel.current': 'Now: {result}',
+  'stat.title': 'The awards', 'stat.winner': 'Winner', 'stat.mostCorrect': 'Most correct answers', 'stat.mostWrong': 'Most wrong answers', 'stat.fastest': 'Fastest fingers', 'stat.slowest': 'Took their time',
+  'stat.mostVotes': 'Crowd favourite', 'stat.minigameChamp': 'Minigame champion', 'stat.luckiest': 'Luckiest', 'stat.mostReactions': 'Most reactions',
   'scores.open': 'Show the scoreboard', 'scores.close': 'Close', 'react.open': 'Send a reaction', 'react.title': 'React on the big screen',
   'minigame.getReady': 'Get ready…', 'minigame.wait': 'Wait for it…', 'minigame.go': 'GO!', 'minigame.tooSoon': 'Too soon!', 'minigame.tap': 'TAP!',
   'minigame.stop': 'Stop', 'minigame.pickDoor': 'Pick a door', 'minigame.door': 'Door {number}', 'minigame.result': 'Your result: {result}', 'minigame.played': 'Done! Waiting for the others…', 'minigame.paused': 'Paused. When the host continues, you get a new countdown.',
@@ -40,7 +44,7 @@ export const TEXT_KEYS = Object.keys(TEXT_DEFAULTS) as TextKey[];
 export const TEXT_GROUPS: { title: string; prefix: string }[] = [
   { title: 'Joining', prefix: 'join.' }, { title: 'Room status', prefix: 'status.' }, { title: 'Lobby', prefix: 'lobby.' }, { title: 'Answering', prefix: 'answer.' },
   { title: 'Voting', prefix: 'vote.' }, { title: 'Timer', prefix: 'timer.' }, { title: 'Waiting', prefix: 'wait.' }, { title: 'Progress', prefix: 'progress.' },
-  { title: 'Results', prefix: 'results.' }, { title: 'Scores', prefix: 'scores.' }, { title: 'Party choice', prefix: 'route.' }, { title: 'Players', prefix: 'players.' }, { title: 'Round phases', prefix: 'phase.' }, { title: 'Reactions', prefix: 'react.' }, { title: 'Minigames', prefix: 'minigame.' }, { title: 'Drawing', prefix: 'drawing.' }, { title: 'Host buttons', prefix: 'host.' },
+  { title: 'Results', prefix: 'results.' }, { title: 'Scores', prefix: 'scores.' }, { title: 'Party choice', prefix: 'route.' }, { title: 'Players', prefix: 'players.' }, { title: 'Round phases', prefix: 'phase.' }, { title: 'Break', prefix: 'break.' }, { title: 'Wheel of fortune', prefix: 'wheel.' }, { title: 'End-of-game awards', prefix: 'stat.' }, { title: 'Reactions', prefix: 'react.' }, { title: 'Minigames', prefix: 'minigame.' }, { title: 'Drawing', prefix: 'drawing.' }, { title: 'Host buttons', prefix: 'host.' },
 ];
 export function fillText(template: string, values: Record<string, string | number> = {}): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => name in values ? String(values[name]) : match);

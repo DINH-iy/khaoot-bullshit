@@ -13,6 +13,7 @@ import './look.css';
 
 type Section = 'theme' | 'texts' | 'animations';
 const SECTIONS: Record<Section, string> = { theme: 'Colours & style', texts: 'Texts', animations: 'Animations' };
+const short = (text: string) => text.length > 48 ? `${text.slice(0, 46)}…` : text;
 const scopeValue = (scope: Scope) => scope.kind === 'game' ? 'game' : `${scope.nodeKey}|${scope.stageIndex}`;
 
 /** The look of the game: style, every text and every animation, for the whole game or for a single scene. */
@@ -33,7 +34,7 @@ export function LookView({ d, selected }: { d: DraftState; selected: string[] })
       <label>Change the look of<select value={scopeValue(live)} onChange={event => { const value = event.target.value; if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}>
         <option value="game">The whole game</option>
         <optgroup label="Only this scene">{definition.nodes.flatMap(node => node.stages.map((stage, index) => <option key={`${node.key}|${index}`} value={`${node.key}|${index}`}>
-          {cardText(definition, node).title || node.key}{node.stages.length > 1 ? ` · part ${index + 1}` : ''}{stage['presentation'] ? ' ✎' : ''}</option>))}</optgroup>
+          {short(cardText(definition, node).title || node.key)}{node.stages.length > 1 ? ` · part ${index + 1}` : ''}{stage['presentation'] ? ' ✎' : ''}</option>))}</optgroup>
       </select></label>
       <p className="hint">{live.kind === 'game' ? 'Changes here apply to every scene, unless a scene has its own.' : 'Changes here apply only to this scene; everything else follows the whole game.'}</p>
       {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{changedScenes.length} {changedScenes.length === 1 ? 'scene has' : 'scenes have'} its own look (marked ✎).</p>}

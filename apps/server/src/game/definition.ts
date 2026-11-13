@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { AwardMilliSchema, ChoiceOptionSchema, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -43,7 +43,16 @@ export type Play = z.infer<typeof PlaySchema>;
 const RoutePolicySchema = z.enum(['host', 'default', 'random']);
 const RouteCountsSchema = z.enum(['live', 'reveal', 'never']);
 // `presentation`: this scene's own texts, look and animations on top of the game's.
-const look = { presentation: PresentationSchema.optional() };
+// A wheel of fortune: its entries, whether a picked entry leaves the wheel, and how long it spins.
+export const WheelSchema = z.object({
+  key: GameKeySchema, title: z.string().trim().min(1).max(80),
+  entries: z.array(z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(80) }).strict()).min(2).max(40)
+    .refine(entries => new Set(entries.map(entry => entry.key)).size === entries.length, 'Wheel entries must be unique'),
+  removePicked: z.boolean(), spinSeconds: z.number().int().min(2).max(15),
+}).strict();
+// Every scene may carry its own look, a wheel to spin there (`spin`), or hide the last wheel result from here on (`wheelClear`).
+// All optional, so earlier definitions keep their hash.
+const look = { presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional() };
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
@@ -89,6 +98,8 @@ export const GameDefinitionSchema = z.object({
   teams: FormationSchema.optional(), play: PlaySchema.optional(),
   // The game's texts, look and animations; defaults fill in anything left out.
   presentation: PresentationSchema.optional(),
+  // Wheels of fortune that scenes can spin, and the statistics of the end-of-game show (left out: the standard set; empty: no show).
+  wheels: z.array(WheelSchema).max(10).optional(), finale: z.object({ stats: z.array(z.enum(FINALE_STATS)).max(FINALE_STATS.length) }).strict().optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),
   // `option` names the route option an edge belongs to (format 2 choice nodes only).
   edges: z.array(z.object({ key: GameKeySchema, from: GameKeySchema, to: GameKeySchema, option: GameKeySchema.optional() }).strict()).max(300),
@@ -98,6 +109,8 @@ export const GameDefinitionSchema = z.object({
   if (keys.size !== definition.nodes.length) fail('Duplicate node key');
   if (!keys.has(definition.startNodeKey)) fail('Missing start node');
   if (new Set(definition.edges.map(edge => edge.key)).size !== definition.edges.length) fail('Duplicate edge key');
+  const wheels = new Set((definition.wheels ?? []).map(wheel => wheel.key));
+  if (wheels.size !== (definition.wheels ?? []).length) fail('Duplicate wheel');
   for (const edge of definition.edges) if (!keys.has(edge.from) || !keys.has(edge.to)) fail('Missing edge endpoint');
   let count = 0;
   for (const node of definition.nodes) {
@@ -108,6 +121,7 @@ export const GameDefinitionSchema = z.object({
         const rule = stage.scoring;
         if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) fail('Invalid correct choice');
       }
+      if (stage.spin && !wheels.has(stage.spin.wheel)) ctx.addIssue({ code: 'custom', message: 'This scene spins a wheel that does not exist', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       // Pass the pencil is drawn by teams: it needs team play, from the round or the game.
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });

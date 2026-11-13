@@ -3,6 +3,7 @@ import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from './icons.js';
 import { FormFields, NextFields, StageFields } from './inspector.js';
 import { ScenePalette } from './flow-view.js';
+import { FinaleSettings, SpinFields, WheelSettings } from './show-settings.js';
 import { addScene, autoLayout, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from './model.js';
 import type { DraftState } from './use-draft.js';
 
@@ -111,7 +112,10 @@ export function SceneView({ d, selected, setSelected }: { d: DraftState; selecte
       <h3>Part {index + 1}</h3>
       <StageFields definition={definition} node={current} index={index} onChange={onChange} />
       <NextFields definition={definition} node={current} onChange={onChange} />
+      <SpinFields definition={definition} node={current} index={index} onChange={onChange} />
       <GameSettings definition={definition} onChange={onChange} />
+      <WheelSettings definition={definition} onChange={onChange} />
+      <FinaleSettings definition={definition} onChange={onChange} />
       {confirming ? <div className="actions"><button className="danger" onClick={() => { const kept = { ...positions }; delete kept[current.key]; change(deleteScene(definition, current.key), kept); setSelected([]); }}>Yes, delete this scene</button><button onClick={() => setConfirming(false)}>Keep it</button></div>
         : <button className="danger-outline" onClick={() => setConfirming(true)}>Delete scene</button>}
     </aside>

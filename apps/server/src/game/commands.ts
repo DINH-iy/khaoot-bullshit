@@ -5,6 +5,7 @@ import { effectivePlay, isShowOnly, isVoteSource, minigameRules, type GameDefini
 import { CLOCK_SLACK_MS, judgeResult, NO_FAIRNESS, readMinigameRun, startMinigame } from '../minigames/rules.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay.js';
 import type { LiveSignals } from '../minigames/live.js';
+import { spinWheel } from './wheel.js';
 import { minigameOutcome } from '../minigames/outcome.js';
 import { firstStage, locateStage, nextStage, type Located } from './graph.js';
 import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes.js';
@@ -141,7 +142,9 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type === 'session.pause' || command.type === 'session.resume') {
     requireGame(session.status === (command.type === 'session.pause' ? 'RUNNING' : 'PAUSED'), 'INVALID_STATE');
     const pausing = command.type === 'session.pause';
-    await tx.gameSession.update({ where: { id: session.id }, data: { status: pausing ? 'PAUSED' : 'RUNNING' } });
+    // Continuing also ends a break (the room remembers a break in its state) and clears any votes for one.
+    const state = session.state && typeof session.state === 'object' && !Array.isArray(session.state) ? session.state as Record<string, unknown> : {};
+    await tx.gameSession.update({ where: { id: session.id }, data: { status: pausing ? 'PAUSED' : 'RUNNING', ...(pausing ? {} : { state: { ...state, breakStartedAt: null, breakVoters: [] } as object }) } });
     // A pause freezes the clock; resuming restarts it with the same remainder.
     const active = await tx.stageRun.findFirst({ where: { sessionId: session.id, status: 'ACTIVE' } });
     if (active) {
@@ -183,6 +186,11 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   requireGame(entry, 'INVALID_STATE');
   const choice = entry.stage.kind === 'route' ? entry.stage : null;
   const decided = choice ? await tx.routeDecision.findUnique({ where: { stageRunId: stage.id } }) : null;
+  if (command.type === 'wheel.spin') {
+    // The host spins the wheel set on this scene, as often as they like while the scene is on.
+    await spinWheel(tx, session.id, definition, stage, entry.stage, now);
+    return { ...empty, stageRunId: stage.id };
+  }
   if (command.type === 'route.decide') {
     // The host may pick any option, at any time until a route is recorded.
     requireGame(choice, 'INVALID_STATE');
