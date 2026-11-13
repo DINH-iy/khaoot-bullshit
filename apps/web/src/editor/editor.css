@@ -18,7 +18,7 @@
 .editor-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .editor .editor-actions button, .flow-tools button, .inspector button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
 .editor button.accent { background: var(--e-accent); color: light-dark(#fff, #1d1730); border-color: var(--e-accent); }
-.save-state { margin: 0; font-size: .9rem; color: var(--e-muted); } .save-conflict, .save-error { color: var(--e-danger); }
+.save-state { margin: 0; font-size: .9rem; color: var(--e-muted); } .save-error { color: var(--e-danger); }
 .editor-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--e-border); }
 .editor-bar p { margin: 0; color: var(--e-muted); }
 .tabs { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; background: light-dark(#e8e8ee, #16171b); }

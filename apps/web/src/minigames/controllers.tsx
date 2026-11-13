@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { emptyDrawing, MINIGAME_COUNTDOWN_MS, type MinigameSettings } from '@party/contracts';
 import { DrawingPad } from '../drawing/drawing-pad.js';
 import { useText } from '../presentation/look.js';
@@ -20,11 +20,14 @@ export function Countdown({ startsAt, offset, children }: { startsAt: string; of
  */
 export function ReactionPad({ startsAt, goAt, offset, disabled, onResult }: Props<MinigameSettings<'reaction'>>) {
   const t = useText(); const go = goAt !== null; const shownAt = useRef<number | null>(null); const done = useRef(false);
-  useEffect(() => { if (go) requestAnimationFrame(() => { shownAt.current = performance.now(); }); }, [go]);
+  // The moment GO is put on screen (before any tap can be handled), not a frame later.
+  useLayoutEffect(() => { if (go && shownAt.current === null) shownAt.current = performance.now(); }, [go]);
   const tap = () => {
     if (done.current || disabled) return; done.current = true;
-    if (!go || shownAt.current === null) onResult({ value: 0, early: true });
-    else onResult({ value: Math.max(1, Math.round(performance.now() - shownAt.current)) });
+    const reacted = go && shownAt.current !== null ? Math.round(performance.now() - shownAt.current) : null;
+    // Faster than a person can react means the tap was already on its way: a false start, as in a sprint.
+    if (reacted === null || reacted < 80) onResult({ value: 0, early: true });
+    else onResult({ value: reacted });
   };
   return <Countdown startsAt={startsAt} offset={offset}>
     <button type="button" className={`mg-pad ${go ? 'go' : 'wait'}`} onPointerDown={tap} onKeyDown={event => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) { event.preventDefault(); tap(); } }}>

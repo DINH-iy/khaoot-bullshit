@@ -1,0 +1,17 @@
+/* Editing together: who else is here, what they have selected, and their pointers. */
+.peer-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.peer-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.peer-chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px 3px 3px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-bg); font-size: .9rem; }
+.peer-dot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--peer); color: #fff; font-weight: 700; font-size: .8rem; }
+.peer-me { display: inline-flex; gap: 6px; align-items: center; margin: 0; font-size: .9rem; color: var(--e-muted); }
+.editor .peer-me input { width: 8.5rem; min-height: 0; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--e-border); border-left: 4px solid var(--peer, var(--e-border)); background: var(--e-bg); color: var(--e-text); font: inherit; }
+
+.scene-card.peer-selected { outline: 3px solid var(--peer); outline-offset: 4px; }
+.peer-tags { position: absolute; right: 8px; top: -14px; display: flex; gap: 4px; pointer-events: none; }
+.peer-tag { padding: 1px 8px; border-radius: 999px; background: var(--peer); color: #fff; font-size: .75rem; font-weight: 600; white-space: nowrap; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+.row-peers { display: flex; gap: 4px; flex: none; margin-left: auto; }
+
+.peer-cursor { position: absolute; z-index: 5; display: flex; align-items: flex-start; gap: 2px; transform-origin: 0 0; pointer-events: none; transition: left .08s linear, top .08s linear; }
+.peer-cursor svg { flex: none; fill: var(--peer); stroke: #fff; stroke-width: 1.5; }
+.peer-cursor span { margin-top: 14px; padding: 1px 8px; border-radius: 999px; background: var(--peer); color: #fff; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .peer-cursor { transition: none; } }

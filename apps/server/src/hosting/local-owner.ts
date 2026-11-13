@@ -10,6 +10,7 @@ import { GameError } from '../game/errors.js';
 import { createGameService } from '../game/service.js';
 import { builtInGames } from '../game/templates.js';
 import { createAuthoring } from '../authoring/drafts.js';
+import type { EditorLive } from '../authoring/live.js';
 import { lockRoom, makeRoomCode } from '../rooms/gateway.js';
 import { allowedOrigin, joinToken, namedCookie, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
 
@@ -22,7 +23,7 @@ const OWNER = { issuer: 'urn:local-owner', subject: 'owner' };
 const HOST_ACCESS_MS = 8 * 60 * 60 * 1000;
 const digest = (value: string) => createHash('sha256').update(value).digest();
 
-export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config) {
+export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, live?: EditorLive) {
   const limiter = new RateLimiter(1024);
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
   const authoring = createAuthoring(client);
@@ -35,15 +36,16 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   };
   // Each limit has its own counter: a strict key-guessing limit on signing in
   // must not be used up by the owner's ordinary menu and room requests.
-  const guard = (request: FastifyRequest, bucket: 'menu' | 'claim' = 'menu') => {
+  // Editing saves every few keystrokes, and people editing together can share one address.
+  const guard = (request: FastifyRequest, bucket: 'menu' | 'claim' | 'edit' = 'menu') => {
     roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
-    roomAssert(limiter.allow(`host-${bucket}:${request.ip}`, bucket === 'claim' ? 20 : 120), 'RATE_LIMITED');
+    roomAssert(limiter.allow(`host-${bucket}:${request.ip}`, bucket === 'claim' ? 20 : bucket === 'edit' ? 600 : 120), 'RATE_LIMITED');
     roomAssert(config.NODE_ENV !== 'production' && config.LOCAL_OWNER_TOKEN && config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE');
     return { ownerToken: config.LOCAL_OWNER_TOKEN, roomSecret: config.ROOM_TOKEN_SECRET };
   };
   const isOwner = (expected: string, candidate: string | undefined) => candidate !== undefined && timingSafeEqual(digest(candidate), digest(expected));
-  const requireOwner = (request: FastifyRequest) => {
-    const settings = guard(request);
+  const requireOwner = (request: FastifyRequest, bucket: 'menu' | 'edit' = 'menu') => {
+    const settings = guard(request, bucket);
     roomAssert(isOwner(settings.ownerToken, namedCookie(request.headers.cookie, OWNER_COOKIE)), 'UNAUTHORIZED');
     return settings;
   };
@@ -141,11 +143,19 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     try { requireOwner(request); return { ok: true, data: await authoring.create((await ownerCreator()).id, request.body) }; } catch (error) { return fail(reply, error); }
   });
   app.get('/api/host/games/:gameId', async (request, reply) => {
-    try { requireOwner(request); return { ok: true, data: await authoring.get((await ownerCreator()).id, gameParam(request)) }; } catch (error) { return fail(reply, error); }
+    try { requireOwner(request, 'edit'); return { ok: true, data: await authoring.get((await ownerCreator()).id, gameParam(request)) }; } catch (error) { return fail(reply, error); }
+  });
+  // A short-lived ticket for the live channel of one game: who else is editing, and their saves as they happen.
+  app.post('/api/host/games/:gameId/live', async (request, reply) => {
+    try {
+      requireOwner(request, 'edit'); roomAssert(live, 'AUTH_UNAVAILABLE');
+      const creator = await ownerCreator(); const { gameId } = await authoring.get(creator.id, gameParam(request));
+      return { ok: true, data: { ticket: await live.ticket(creator.id, gameId) } };
+    } catch (error) { return fail(reply, error); }
   });
   // A whole game is larger than ordinary requests, so this route alone accepts up to the draft limit.
   app.put('/api/host/games/:gameId/draft', { bodyLimit: MAX_DRAFT_BYTES + 16 * 1024 }, async (request, reply) => {
-    try { requireOwner(request); return { ok: true, data: await authoring.save((await ownerCreator()).id, gameParam(request), request.body) }; } catch (error) { return fail(reply, error); }
+    try { requireOwner(request, 'edit'); const draft = await authoring.save((await ownerCreator()).id, gameParam(request), request.body); live?.saved(draft); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
   });
   // Pasted games can be as large as a draft, so this route alone accepts up to the draft limit.
   app.post('/api/host/games/import', { bodyLimit: MAX_DRAFT_BYTES + 16 * 1024 }, async (request, reply) => {
@@ -166,6 +176,6 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/publish', async (request, reply) => {
-    try { requireOwner(request); return { ok: true, data: await authoring.publish((await ownerCreator()).id, gameParam(request), request.body) }; } catch (error) { return fail(reply, error); }
+    try { requireOwner(request); const draft = await authoring.publish((await ownerCreator()).id, gameParam(request), request.body); live?.saved(draft); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
   });
 }

@@ -200,7 +200,7 @@ export const SessionViewSchema = z.object({
   presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
   wheel: WheelViewSchema,
   // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
-  finale: z.array(FinaleSlideSchema).nullable(),
+  awards: z.array(FinaleSlideSchema).nullable(),
   // Totals of the game's current teams, following that lineup's carryover rule.
   teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema }).strict()),
 }).strict();

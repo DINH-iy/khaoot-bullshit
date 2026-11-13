@@ -103,27 +103,6 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   expect(await card(page, /Shared finale/).evaluate(element => (element as HTMLElement).style.cssText)).toBe(before);
 });
 
-test('a second tab cannot silently overwrite newer work', async ({ browser, baseURL }) => {
-  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const first = await context.newPage();
-  await first.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  const name = `Two tabs ${Date.now()}`;
-  await first.getByLabel('Name of your new game').fill(name);
-  await first.getByRole('button', { name: 'Create game' }).click();
-  const href = await first.getByRole('link', { name: `Edit ${name}` }).getAttribute('href');
-  await first.goto(`${baseURL}${href}`);
-  const second = await context.newPage(); await second.goto(`${baseURL}${href}`);
-  await expect(second.locator('.scene-card')).toHaveCount(1);
-  await first.getByLabel('Game name').fill(`${name} (first tab)`);
-  await saved(first);
-  await second.getByLabel('Game name').fill(`${name} (second tab)`);
-  await expect(second.getByText('Not saved: this game was changed in another tab or window.')).toBeVisible({ timeout: 10_000 });
-  await second.getByRole('button', { name: 'Load the latest version' }).click();
-  await expect(second.getByLabel('Game name')).toHaveValue(`${name} (first tab)`);
-  await context.close();
-});
-
 async function openCopy(page: Page, baseURL: string, name: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);

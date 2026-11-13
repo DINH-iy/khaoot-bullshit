@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DefinitionIssue } from '@party/contracts';
+import type { DefinitionIssue, EditorPeer } from '@party/contracts';
+import { peersOn, PeerTags } from './live/presence.js';
 import { Icon, sceneIcon } from './icons.js';
 import { FormFields, NextFields, StageFields } from './inspector.js';
 import { ScenePalette } from './flow-view.js';
@@ -38,7 +39,7 @@ export function sceneOrder(definition: Definition): { rows: Row[]; loose: Node[]
   return { rows, loose: definition.nodes.filter(node => !placed.has(node.key)) };
 }
 
-export function SceneView({ d, selected, setSelected }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void }) {
+export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; peers: EditorPeer[] }) {
   const definition = d.definition!; const { change, positions } = d;
   const { rows, loose } = useMemo(() => sceneOrder(definition), [definition]);
   const current = definition.nodes.find(node => node.key === selected[0]) ?? rows[0]?.node ?? definition.nodes[0]!;
@@ -78,6 +79,7 @@ export function SceneView({ d, selected, setSelected }: { d: DraftState; selecte
     return <li key={node.key}><button className={`scene-row${node.key === current.key ? ' current' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={node.key === current.key ? 'true' : undefined} onClick={() => setSelected([node.key])}>
       <span className={`row-icon thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`}><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
       <span className="row-text"><small>{definition.startNodeKey === node.key ? 'Start · ' : ''}{text.label}</small><span>{text.banner || text.title}</span></span>
+      <PeerTags peers={peersOn(peers, node.key)} className="row-peers" />
       {count > 0 && <span className="row-problems" aria-label={`${count} problems`}>{count}</span>}
     </button></li>;
   };

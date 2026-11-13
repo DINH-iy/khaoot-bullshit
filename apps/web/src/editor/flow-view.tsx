@@ -8,6 +8,8 @@ import {
   isRoute, optionsOf, outputPort, pointOnCurve, SCENE_TYPES, snap, snapCard, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions, type SceneType,
 } from './model.js';
 import type { DraftState } from './use-draft.js';
+import type { LiveState } from './live/use-live.js';
+import { PeerCursors, peerOutline, peersOn, PeerTags } from './live/presence.js';
 
 interface Connecting { from: string; option: string | undefined; pointer: Point; target: string | null; blocked: string | null; rewire: string | null }
 interface Box { from: Point; to: Point }
@@ -28,7 +30,7 @@ export function ScenePalette({ label, onPick, onCancel }: { label: string; onPic
   </div>;
 }
 
-export function FlowView({ d, selected, setSelected }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void }) {
+export function FlowView({ d, selected, setSelected, live }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState }) {
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [view, setView] = useState({ x: 48, y: 48, zoom: 1 }); const [guides, setGuides] = useState<Guides>({ x: null, y: null });
@@ -258,7 +260,7 @@ export function FlowView({ d, selected, setSelected }: { d: DraftState; selected
       <span className="flow-hint">Drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several</span>
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
-    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
+    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
         <svg className="flow-lines" width="1" height="1" overflow="visible" aria-hidden="true">
           <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="arrow-head" /></marker>
@@ -288,11 +290,12 @@ export function FlowView({ d, selected, setSelected }: { d: DraftState; selected
         {nodes.map(node => {
           const position = positions[node.key]; if (!position) return null;
           const text = cardText(definition, node); const problems = problemsBy.get(node.key) ?? []; const isTarget = connecting?.target === node.key; const on = selected.includes(node.key);
-          const incoming = definition.edges.some(edge => edge.to === node.key);
-          return <div key={node.key} className={`scene-card kind-${text.kind}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
-            style={{ left: position.x, top: position.y, width: CARD_WIDTH, height: cardHeight(node) }} tabIndex={0} role="group" aria-roledescription="scene card"
-            aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? ' Start scene.' : ''}${on ? ' Selected.' : ''}${problems.length ? ` ${problems.length} problems.` : ''}`}
+          const incoming = definition.edges.some(edge => edge.to === node.key); const others = peersOn(live.peers, node.key);
+          return <div key={node.key} className={`scene-card kind-${text.kind}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
+            style={{ ...peerOutline(others), left: position.x, top: position.y, width: CARD_WIDTH, height: cardHeight(node) }} tabIndex={0} role="group" aria-roledescription="scene card"
+            aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? ' Start scene.' : ''}${on ? ' Selected.' : ''}${others.length ? ` ${others.map(peer => peer.name).join(', ')} working here.` : ''}${problems.length ? ` ${problems.length} problems.` : ''}`}
             onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)}>
+            <PeerTags peers={others} />
             <p className="card-label">{definition.startNodeKey === node.key && <span className="start-flag">Start · </span>}{text.label}</p>
             <div className={`card-thumb thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true">{text.banner ?? <Icon name={sceneIcon(text.kind, text.input)} size={26} />}</div>
             <p className="card-title">{text.title}</p><p className="card-line">{text.line}</p>
@@ -307,6 +310,7 @@ export function FlowView({ d, selected, setSelected }: { d: DraftState; selected
                 {!definition.edges.some(edge => edge.from === node.key) && <button className="port-plus" style={{ top: outputPort(node, position).y - position.y }} onPointerDown={event => event.stopPropagation()} onClick={() => setAdding({ from: node.key, option: undefined, at: { x: position.x + CARD_WIDTH + GRID * 4, y: outputPort(node, position).y } })}>+<span className="visually-hidden"> Add a scene after {text.title}</span></button>}</>}
           </div>;
         })}
+        <PeerCursors live={live} zoom={view.zoom} />
         {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onCancel={() => setAdding(null)} /></div>}
       </div>
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}

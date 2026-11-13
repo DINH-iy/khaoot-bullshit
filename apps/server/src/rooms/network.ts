@@ -61,9 +61,9 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     // Secret scores: phones and the shared screen get no standings during the game, only at a scoreboard scene and at the end. The host always sees them.
     const scoresOpen = state.showScores || principal.role === 'host' || view.status === 'FINISHED' || (view.stage?.kind === 'scoreboard' && view.stage.status === 'ACTIVE');
     // "Most reactions" comes from the room's own count; without one, the slide is left out.
-    const reacted = view.finale?.some(slide => slide.stat === 'mostReactions') ? reactions.most(principal.sessionId) : null;
-    const finale = view.finale?.flatMap(slide => slide.stat !== 'mostReactions' ? [slide] : reacted ? [{ ...slide, playerIds: reacted.playerIds, value: `${reacted.count} ${reacted.count === 1 ? 'reaction' : 'reactions'}` }] : []) ?? null;
-    const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), finale };
+    const reacted = view.awards?.some(slide => slide.stat === 'mostReactions') ? reactions.most(principal.sessionId) : null;
+    const awards = view.awards?.flatMap(slide => slide.stat !== 'mostReactions' ? [slide] : reacted ? [{ ...slide, playerIds: reacted.playerIds, value: `${reacted.count} ${reacted.count === 1 ? 'reaction' : 'reactions'}` }] : []) ?? null;
+    const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), awards };
     const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.

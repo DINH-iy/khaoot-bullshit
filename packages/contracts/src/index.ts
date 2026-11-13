@@ -2,6 +2,7 @@ import { z } from 'zod';
 export * from './game.js';
 export * from './rooms.js';
 export * from './authoring.js';
+export * from './live-editing.js';
 export * from './presentation.js';
 export * from './minigames.js';
 export * from './players.js';

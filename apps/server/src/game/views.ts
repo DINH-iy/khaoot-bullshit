@@ -116,7 +116,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         teamStandings: await teamStandings(tx, session.id, playerTotals),
         presentation: viewPresentation(definition.presentation, entry?.stage.presentation),
         wheel: await wheelView(tx, session.id, definition, current, actor.data.role === 'host'),
-        finale: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
+        awards: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
       });
     }, { isolationLevel: 'RepeatableRead', maxWait: 2000, timeout: 5000 });
   } catch (error) { throw error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE'); }

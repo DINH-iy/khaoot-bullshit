@@ -10,6 +10,7 @@ import { RequestMetrics, now } from './observability.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 import { registerRoomNetworking } from './rooms/network.js';
 import { registerLocalHosting } from './hosting/local-owner.js';
+import { createEditorLive } from './authoring/live.js';
 import { registerAssetRoutes } from './assets/routes.js';
 import staticFiles from '@fastify/static';
 import { fileURLToPath } from 'node:url';
@@ -104,9 +105,11 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     if (!identities.get(request)?.scopes.includes('ops:read')) return problem(request, reply, 403, 'FORBIDDEN', 'Operational access is required.');
     return { ...metrics.snapshot(), database: options.database?.snapshot() ?? null };
   });
-  if (options.database?.client && config.ROOM_TOKEN_SECRET) registerRoomNetworking(app, options.database.client, config, verifier);
+  const rooms = options.database?.client && config.ROOM_TOKEN_SECRET ? registerRoomNetworking(app, options.database.client, config, verifier) : undefined;
   if (options.database?.client && config.ROOM_TOKEN_SECRET) registerAssetRoutes(app, options.database.client, config);
-  if (options.database?.client) registerLocalHosting(app, options.database.client, config);
+  // Editing together shares the rooms' socket server, under its own namespace and its own tickets.
+  const live = rooms && config.ROOM_TOKEN_SECRET ? createEditorLive(rooms.io, config.ROOM_TOKEN_SECRET, app.log) : undefined;
+  if (options.database?.client) registerLocalHosting(app, options.database.client, config, live);
   if (config.SERVE_WEB) {
     void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: false, index: false, cacheControl: false });
     app.get('/', async (_request, reply) => reply.sendFile('index.html'));

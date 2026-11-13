@@ -43,12 +43,12 @@ describe('wheel of fortune, awards, breaks and auto-close', () => {
   it('ends with awards worked out from the saved answers, in the author’s order', async () => {
     const game = parseDefinition({ formatVersion: 2, title: 'Awards', startNodeKey: 'a', finale: { stats: ['mostWrong', 'winner', 'mostCorrect', 'mostVotes'] }, nodes: [quiz('a')], edges: [] });
     const f = await fixture(2, game); const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
-    expect((await readSessionView(prisma, f.host, f.sessionId)).finale).toBeNull();
+    expect((await readSessionView(prisma, f.host, f.sessionId)).awards).toBeNull();
     await service.execute(as(f.players[0]!.id), answer(f.sessionId, stageRunId, 'canberra'));
     await service.execute(as(f.players[1]!.id), answer(f.sessionId, stageRunId, 'sydney'));
     await hostCommand(f, 'stage.close', { stageRunId }); await hostCommand(f, 'stage.advance', { stageRunId });
     // "Most votes" has nothing to show in this game and is skipped.
-    expect((await readSessionView(prisma, as(f.players[1]!.id), f.sessionId)).finale).toEqual([
+    expect((await readSessionView(prisma, as(f.players[1]!.id), f.sessionId)).awards).toEqual([
       { stat: 'mostWrong', playerIds: [f.players[1]!.id], value: '1 wrong answer' },
       { stat: 'winner', playerIds: [f.players[0]!.id], value: '10 points' },
       { stat: 'mostCorrect', playerIds: [f.players[0]!.id], value: '1 correct answer' }]);

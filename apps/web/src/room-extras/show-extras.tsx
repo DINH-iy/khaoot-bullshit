@@ -56,7 +56,7 @@ export function WheelBadge({ wheel }: { wheel: View['wheel'] }) {
 
 /** The end-of-game show: one award per slide, moving on by itself; anyone can also step through it. */
 export function FinaleShow({ state }: { state: RoomSnapshot }) {
-  const t = useText(); const slides = state.view.finale ?? []; const [at, setAt] = useState(0);
+  const t = useText(); const slides = state.view.awards ?? []; const [at, setAt] = useState(0);
   useEffect(() => { if (slides.length < 2) return; const timer = setInterval(() => setAt(value => (value + 1) % slides.length), 6000); return () => clearInterval(timer); }, [slides.length]);
   if (!slides.length) return null;
   const slide = slides[Math.min(at, slides.length - 1)]!;

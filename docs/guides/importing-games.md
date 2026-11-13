@@ -42,6 +42,8 @@ Top level:
 | `teams` | Optional game teams, see "Teams". |
 | `play` | Optional default for all rounds, see "Teams". |
 | `look` | Optional texts, style and animations, see "Look & feel". |
+| `wheels` | Optional wheels of fortune: `[{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke"], "removePicked": true, "spinSeconds": 5 }]`. A scene with `"spin": "Forfeits"` lets the host spin it there; `"wheelClear": true` stops showing the last result. |
+| `awards` | The end-of-game awards in order, from `winner`, `mostCorrect`, `mostWrong`, `fastest`, `slowest`, `mostVotes`, `minigameChamp`, `luckiest`, `mostReactions`. Leave out for all of them; `[]` for none. |
 
 Every scene can have:
 

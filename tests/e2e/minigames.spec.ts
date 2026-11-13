@@ -40,7 +40,8 @@ test('a player builds their own look and plays minigames on the phone; the scree
     await expect(host.getByText('Reaction duel', { exact: true }).first()).toBeVisible();
     const pad = page.getByRole('button', { name: 'GO!' });
     await expect(pad).toBeVisible({ timeout: 15_000 });
-    await pad.click();
+    // A person needs a moment to react; faster than 80 ms counts as a false start.
+    await page.waitForTimeout(200); await pad.click();
     await expect(page.getByRole('status').filter({ hasText: /\d+ ms/ })).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await host.getByRole('button', { name: 'Close answers' }).click();

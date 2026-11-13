@@ -35,7 +35,10 @@
     "network:host": "node scripts/network/host.mjs",
     "test:e2e": "node scripts/network/e2e.mjs",
     "network:restart": "node scripts/network/restart.mjs",
-    "network:smoke": "node scripts/network/smoke.mjs"
+    "network:smoke": "node scripts/network/smoke.mjs",
+    "status": "node scripts/ops/status.mjs",
+    "stop": "node scripts/ops/stop.mjs",
+    "host:link": "node scripts/ops/host-link.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
