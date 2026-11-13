@@ -26,8 +26,8 @@ export function inspectDefinition(draft: unknown): { issues: DefinitionIssue[]; 
     // Valid, but some parts cannot be played yet: listed on their scene, and not publishable.
     const blocked = unplayable(parsed.data);
     if (!blocked.length) return { issues: [], definition: parsed.data };
-    return { definition: null, issues: blocked.map(({ nodeKey, index, stage }) => {
-      const code = stage.kind === 'minigame' ? 'Minigames cannot be played yet' : 'Drawing rounds cannot be played yet';
+    return { definition: null, issues: blocked.map(({ nodeKey, index }) => {
+      const code = 'Choose a minigame';
       const nodeIndex = parsed.data.nodes.findIndex(node => node.key === nodeKey);
       return { message: friendlyMessage(code, []), code, nodeKey, stageIndex: index, path: `nodes.${nodeIndex}.stages.${index}` };
     }) };

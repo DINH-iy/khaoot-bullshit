@@ -75,7 +75,8 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
           roomAssert(credential.expiresAt.getTime() > Date.now(), 'CREDENTIAL_EXPIRED');
           return { sessionId: room.id, token, expiresAt: credential.expiresAt };
         }
-        const player = await tx.sessionPlayer.create({ data: { sessionId: room.id, displayName: data.displayName, joinKeyHash } });
+        const player = await tx.sessionPlayer.create({ data: { sessionId: room.id, displayName: data.displayName, joinKeyHash, // A picture is never taken over at joining: it would belong to another room (or someone else). Only the character parts.
+          ...(data.look ? { look: (({ picture: _picture, ...parts }) => parts)(data.look) } : {}) } });
         const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
         await tx.playerCredential.create({ data: { sessionId: room.id, playerId: player.id, tokenHash: tokenHash(token), expiresAt } });
         await recordRoomChange(tx, room.id, 'player.joined');

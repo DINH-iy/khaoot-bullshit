@@ -2,6 +2,10 @@ import { z } from 'zod';
 export * from './game.js';
 export * from './rooms.js';
 export * from './authoring.js';
+export * from './presentation.js';
+export * from './minigames.js';
+export * from './players.js';
+export * from './drawing.js';
 
 export const ProblemSchema = z.object({
   error: z.object({

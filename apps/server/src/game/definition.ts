@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { AwardMilliSchema, ChoiceOptionSchema, GameKeySchema, InputSchema, StageDurationSchema } from '@party/contracts';
+import { AwardMilliSchema, ChoiceOptionSchema, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -42,7 +42,9 @@ export const PlaySchema = z.discriminatedUnion('kind', [
 export type Play = z.infer<typeof PlaySchema>;
 const RoutePolicySchema = z.enum(['host', 'default', 'random']);
 const RouteCountsSchema = z.enum(['live', 'reveal', 'never']);
-const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional() };
+// `presentation`: this scene's own texts, look and animations on top of the game's.
+const look = { presentation: PresentationSchema.optional() };
+const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
   z.object({ ...common, kind: z.literal('challenge'), maxAwardMilli: AwardMilliSchema }).strict(),
@@ -51,16 +53,21 @@ const stageSchema = z.discriminatedUnion('kind', [
   // Show-only scenes: no answers, no points, no team play. The host continues
   // whenever they like; an optional countdown only informs the room.
   // An info scene (cutscene, rules, announcement): a title and text on every screen.
-  z.object({ key: GameKeySchema, kind: z.literal('info'), title: z.string().trim().min(1).max(120), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable() }).strict(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('info'), title: z.string().trim().min(1).max(120), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable() }).strict(),
   // A scoreboard scene: the standings of players, the game's teams, or both.
-  z.object({ key: GameKeySchema, kind: z.literal('scoreboard'), prompt: z.string().trim().min(1).max(2000), show: z.enum(['players', 'teams', 'both']), durationMs: StageDurationSchema.nullable() }).strict(),
-  // A minigame placeholder: authors can place and connect it now; it cannot be
-  // published until minigames exist. `game` will name one from a future catalog.
-  z.object({ key: GameKeySchema, kind: z.literal('minigame'), prompt: z.string().trim().min(1).max(2000), game: z.string().trim().min(1).max(64), durationMs: StageDurationSchema.nullable() }).strict(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('scoreboard'), prompt: z.string().trim().min(1).max(2000), show: z.enum(['players', 'teams', 'both']), durationMs: StageDurationSchema.nullable() }).strict(),
+  // A minigame from the catalog. `game` may still be a placeholder name, which
+  // keeps the game a draft until a minigame is chosen. `settings` must fit the
+  // minigame (checked below); left out, the minigame's defaults apply.
+  // `placementMilli`: points for 1st, 2nd, 3rd… (shared on a tie). `teamResult`:
+  // how members' results make a team's result. All optional, so placeholder
+  // scenes saved earlier keep their hash.
+  z.object({ ...common, kind: z.literal('minigame'), game: z.string().trim().min(1).max(64), settings: z.record(z.string(), z.json()).optional(),
+    placementMilli: z.array(AwardMilliSchema).min(1).max(12).optional(), teamResult: z.enum(['best', 'average', 'total']).optional() }).strict(),
   // Format 2: the party picks one route. It is the only stage of its node, each
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.
-  z.object({ key: GameKeySchema, kind: z.literal('route'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('route'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
     options: z.array(ChoiceOptionSchema).min(2).max(6)
       .refine(options => new Set(options.map(option => option.key)).size === options.length && new Set(options.map(option => option.label.trim().toLowerCase())).size === options.length, 'Route options must be unique'),
     decide: z.discriminatedUnion('method', [
@@ -80,6 +87,8 @@ export const GameDefinitionSchema = z.object({
   formatVersion: z.union([z.literal(1), z.literal(2)]), title: z.string().trim().min(1).max(160), startNodeKey: GameKeySchema,
   // Game-wide defaults; a stage's own `play` overrides `play` for that round.
   teams: FormationSchema.optional(), play: PlaySchema.optional(),
+  // The game's texts, look and animations; defaults fill in anything left out.
+  presentation: PresentationSchema.optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),
   // `option` names the route option an edge belongs to (format 2 choice nodes only).
   edges: z.array(z.object({ key: GameKeySchema, from: GameKeySchema, to: GameKeySchema, option: GameKeySchema.optional() }).strict()).max(300),
@@ -99,6 +108,9 @@ export const GameDefinitionSchema = z.object({
         const rule = stage.scoring;
         if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) fail('Invalid correct choice');
       }
+      // Pass the pencil is drawn by teams: it needs team play, from the round or the game.
+      if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-order') {
         const rule = stage.scoring; const keys = stage.input.kind === 'order' ? stage.input.items.map(item => item.key) : [];
         if (keys.length !== rule.correctOrder.length || new Set(rule.correctOrder).size !== keys.length || !keys.every(key => rule.correctOrder.includes(key))) fail('Invalid correct order');
@@ -142,8 +154,17 @@ export function isVoteSource(definition: GameDefinition, nodeKey: string, stageK
 /** Scenes that only show something: no answers, no play settings, the host moves on. */
 export const isShowOnly = (stage: StageDefinition) => stage.kind === 'info' || stage.kind === 'scoreboard';
 /** Stages that can be authored but not played yet, with where they are. */
-export const unplayable = (definition: GameDefinition) => allStages(definition).filter(({ stage }) => stage.kind === 'minigame' || (stage.kind === 'collect' && stage.input.kind === 'drawing'));
+export const unplayable = (definition: GameDefinition) => allStages(definition).filter(({ stage }) => stage.kind === 'minigame' && !isMinigameKey(stage.game));
+export type MinigameStage = Extract<StageDefinition, { kind: 'minigame' }>;
+/** A playable minigame scene's rules, with defaults filled in. */
+export function minigameRules(stage: MinigameStage): { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total' } {
+  if (!isMinigameKey(stage.game)) throw new GameError('UNSUPPORTED_FEATURE');
+  const settings = parseMinigameSettings(stage.game, stage.settings);
+  if (!settings) throw new GameError('INVALID_DEFINITION');
+  return { game: stage.game, settings, placementMilli: stage.placementMilli ?? ['10000', '6000', '3000'], teamResult: stage.teamResult ?? 'average' };
+}
+export { MINIGAMES };
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {
-  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'minigame') throw new GameError('INVALID_STATE');
+  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard') throw new GameError('INVALID_STATE');
   return stage.play ?? definition.play ?? { kind: 'solo' };
 }

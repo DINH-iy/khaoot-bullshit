@@ -41,6 +41,7 @@ Top level:
 | `start` | `id` of the first scene. Default: the first scene. |
 | `teams` | Optional game teams, see "Teams". |
 | `play` | Optional default for all rounds, see "Teams". |
+| `look` | Optional texts, style and animations, see "Look & feel". |
 
 Every scene can have:
 
@@ -50,6 +51,7 @@ Every scene can have:
 | `type` | One of the types below. |
 | `seconds` | Timer. Leave it out for no timer (the host continues). |
 | `next` | `id` of the scene that follows, or `"end"` to end the game there. Default: the next scene in the list. |
+| `look` | Optional look for this scene only, see "Look & feel". |
 | `parts` | Instead of one scene, several parts that play one after another, each written like a scene (for example a question followed by a scoreboard). |
 
 Scene types:
@@ -66,7 +68,8 @@ Scene types:
 | `challenge` | `question`, `maxPoints` | Something the group does in the room; the host gives points. |
 | `party-choice` | `question`, `options` (each `{ "label": "Music", "to": "music-round" }`), `decidedBy` (`"players"`, `"captains"`, `"host"`), `onTie` (`"random"` or `"host"`), `showCounts` (`"reveal"`, `"live"`, `"never"`) | The party picks a route. Routes may come back together at a later scene. |
 | `scoreboard` | `title`, `show` (`"players"`, `"teams"`, `"both"`) | Shows the standings. |
-| `minigame` | `question`, `game` | A placeholder: the game can be edited, but not published until minigames exist. |
+| `drawing` | `question`, optional `blind` (`true`: players cannot see what they draw) | Players draw on their phone. Can be voted on. |
+| `minigame` | `question` (title on the screens), `game` (`reaction`, `tap-race`, `stop-clock`, `lucky-doors`, `perfect-circle` or `relay-drawing`, which needs team play), optional `settings`, `points` (list: 1st, 2nd, 3rd place…), `teamResult` (`average`, `best`, `total`) | Played on the phones. Default points 10, 6, 3. Settings: reaction `{ "minWaitMs": 2000, "maxWaitMs": 6000 }`, tap race `{ "seconds": 10 }`, stop the clock `{ "targetMs": 10000, "visibleMs": 3000 }`, lucky doors `{ "doorsMilli": ["0", "5000", "10000"] }` (points × 1000). Works solo or with `play` for teams, including one against the rest. An unknown `game` stays a scene to choose in the editor. |
 
 Rules the game must follow (the editor explains any break):
 
@@ -89,6 +92,24 @@ Leave teams out for everyone-for-themselves. For a team game, add game teams and
 - `answers`: `"everyone"` or `"captain"`. `points`: `"team"`, `"members"` or `"both"`.
 - One scene can differ from the game: add `"play": { "kind": "solo" }` for everyone-for-themselves. For teams in this round only, add `"play": { "kind": "teams", "lineup": { "kind": "round", "form": { "split": { "kind": "sizes", "sizes": [1, "rest"] }, "formation": "random" } }, "answers": "everyone", "points": "members" }`.
 
+### Look & feel
+
+Leave `look` out for the standard look. Everything in it is optional, and a scene's `look` changes only that scene:
+
+```json
+"look": {
+  "theme": { "preset": "neon", "colors": { "accent": "#ff2bd6" }, "font": "condensed", "radius": 8, "background": "grid", "tiles": "outline" },
+  "texts": { "answer.saved": "Locked in!", "timer.left": "{time} to go", "lobby.playerTitle": "Welcome, quizzer!" },
+  "animations": { "sceneEnter": { "preset": "drop" }, "answerSaved": { "preset": "pop" } }
+}
+```
+
+- `theme.preset`: `party`, `neon`, `pub`, `clean`, `retro`, `kids`, `elegant` or `ocean`; then any of `colors` (`background`, `background2`, `surface`, `text`, `muted`, `accent`, `accentText`, `success`, `danger`, `answerText` as `#rrggbb`, and `answers` as a list of 2–8 colours), `font` and `headingFont` (`system`, `rounded`, `serif`, `slab`, `mono`, `condensed`, `playful`, `elegant`), `radius` (0–40), `textScale` (0.8–1.6), `background` (`gradient`, `solid`, `dots`, `stripes`, `glow`, `grid`), `tiles` (`filled`, `outline`, `glass`, `flat`) and `uppercaseHeadings`.
+- `texts`: the names of the texts are listed in the editor's Look & feel tab and in `packages/contracts/src/presentation.ts`; words in curly brackets such as `{time}` are filled in during the game.
+- `animations`: for the moments `sceneEnter`, `answersEnter`, `answerSaved`, `timerEnding`, `reveal`, `scoreboard`, `cutscene` and `lobbyJoin`, a ready-made `preset` (`none`, `fade`, `rise`, `drop`, `zoom`, `pop`, `slideLeft`, `slideRight`, `flip`, `spin`, `blur`, `bounce`, `wobble`, `shake`, `pulse`, `cascade`), or your own `custom` animation built in the editor.
+
+Unknown names, wrong colours and anything that looks like code are listed as problems, never used.
+
 <!-- ai-instructions:start -->
 ## Instructions for the AI
 
@@ -107,8 +128,11 @@ You are writing a party game for a web app where people play on their phones whi
   - `"challenge"`: `"question"` (something people do in the room), `"maxPoints"`. The host judges.
   - `"party-choice"`: `"question"`, `"options"`: 2–6 objects `{ "label": "Music", "to": "id-of-first-scene-of-that-route" }`, optional `"decidedBy"`: `"players"`, `"captains"` or `"host"`. Each option must go to a DIFFERENT scene. Give the last scene of each route `"next"` set to the scene where the routes come back together.
   - `"scoreboard"`: `"title"`, `"show"`: `"players"`, `"teams"` or `"both"`.
+  - `"drawing"`: `"question"` (what to draw), optional `"blind": true`. Can be voted on with a `"vote"` scene.
+  - `"minigame"`: `"question"` (a short title), `"game"`: `"reaction"` (tap at GO), `"tap-race"` (tap fast), `"stop-clock"` (stop a vanishing clock at a target), `"lucky-doors"` (pick a door with hidden points), `"perfect-circle"` (draw the roundest circle) or `"relay-drawing"` (teams take turns drawing one picture, then vote; add team `"play"`); optional `"points"`: list of points for 1st, 2nd, 3rd place. Use `"seconds"` of 20–30.
 - Rules: no loops (never lead back to an earlier scene); every scene must be reachable; a `"vote"` must come after the scene it votes on, on every route, and every route through that scene must reach the vote; only a party-choice may lead to more than one scene.
 - Optional teams: add at top level `"teams": { "split": { "kind": "count", "teams": 2 }, "formation": "random" }` and `"play": { "kind": "teams", "lineup": { "kind": "game" }, "answers": "captain", "points": "both" }`. A single scene can use `"play": { "kind": "solo" }` to be everyone-for-themselves.
+- Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Presets: `party`, `neon`, `pub`, `clean`, `retro`, `kids`, `elegant`, `ocean`. Animation presets: `fade`, `rise`, `drop`, `zoom`, `pop`, `flip`, `spin`, `bounce`, `shake`, `pulse`. Only add a look if the user asks for a style.
 - Use timers on quiz questions (15–30 seconds), writing (45–90 seconds) and votes (30–45 seconds). Keep phone texts short; answers fit on a small screen.
 
 Example:

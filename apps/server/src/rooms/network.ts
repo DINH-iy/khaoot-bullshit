@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply } from '@party/contracts';
+import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenVerifier } from '../auth.js';
@@ -11,8 +11,12 @@ import { createGameService } from '../game/service.js';
 import { readSessionView } from '../game/views.js';
 import { actorKey, authorize } from '../game/model.js';
 import { closeExpiredStages } from '../game/timing.js';
+import { parseDefinition } from '../game/definition.js';
 import { createRoomGateway, lockRoom, type Principal } from './gateway.js';
 import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js';
+import { createLiveSignals } from '../minigames/live.js';
+import { registerMinigameEvents } from './minigame-events.js';
+import { registerReactions } from './reactions.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
@@ -21,7 +25,10 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const io = new Server(app.server, { serveClient: false, connectTimeout: 5000, maxHttpBufferSize: 16 * 1024, pingInterval: 10000, pingTimeout: 10000,
     perMessageDeflate: false, allowRequest: (request, callback) => callback(null, !shuttingDown && io.engine.clientsCount < 512 && allowedOrigin(request.headers, config)),
   });
-  const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
+  const live = createLiveSignals();
+  const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'), undefined, live.signals);
+  const minigames = registerMinigameEvents(io, client, live, app.log);
+  const reactions = registerReactions(io, client);
   const failure = (error: unknown): RoomReply<never> => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
     app.log.warn({ event: 'room_request_rejected', code }, 'Room request rejected');
@@ -46,12 +53,16 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const snapshot = async (principal: Principal) => {
     const [view, players, session] = await Promise.all([
       readSessionView(client, principal.actor, principal.sessionId),
-      client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true }, orderBy: { joinedAt: 'asc' } }),
+      client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true, look: true }, orderBy: { joinedAt: 'asc' } }),
       client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true, state: true } }),
     ]);
     const connected = connectedPlayers(principal.sessionId); const state = readRoomState(session.state);
-    return RoomSnapshotSchema.parse({ view, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
-      players: players.map(player => ({ ...player, connected: connected.has(player.id) })), settings: { reclaimApproval: state.reclaimApproval },
+    // Secret scores: phones and the shared screen get no standings during the game, only at a scoreboard scene and at the end. The host always sees them.
+    const scoresOpen = state.showScores || principal.role === 'host' || view.status === 'FINISHED' || (view.stage?.kind === 'scoreboard' && view.stage.status === 'ACTIVE');
+    const shown = scoresOpen ? view : { ...view, standings: [], teamStandings: [] };
+    return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
+      // A stored look that no longer fits the parts list falls back to the default.
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [] });
   };
 
@@ -62,6 +73,17 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       reply.header('set-cookie', roomCookie(config, joined.sessionId, joined.token, joined.expiresAt));
       return { ok: true, data: { sessionId: joined.sessionId } };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  app.get('/api/rooms/look/:roomCode', async (request, reply) => {
+    try {
+      requireOrigin(request); roomAssert(limiter.allow(`look:${request.ip}`, 120), 'RATE_LIMITED');
+      const code = RoomCodeSchema.safeParse((request.params as { roomCode?: string }).roomCode); roomAssert(code.success, 'INVALID_COMMAND');
+      const room = await client.gameSession.findUnique({ where: { roomCode: code.data }, select: { status: true, gameVersion: { select: { definition: true } } } });
+      roomAssert(room && room.status !== 'FINISHED', 'ROOM_NOT_AVAILABLE');
+      const definition = parseDefinition(room.gameVersion.definition);
+      const look = definition.presentation;
+      return { ok: true, data: RoomLookSchema.parse({ title: definition.title, presentation: { texts: look?.texts ?? {}, animations: look?.animations ?? {}, themes: look?.theme ? [look.theme] : [] } }) };
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 404).send(failure(error)); }
   });
   app.get('/api/rooms/seats/:roomCode', async (request, reply) => {
     try {
@@ -90,7 +112,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
       const body = RoomSettingsSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
-      await seats.setApproval(id, principal, body.data.reclaimApproval); return { ok: true, data: {} };
+      reactions.settingsChanged(id); await seats.setSettings(id, principal, Object.fromEntries(Object.entries(body.data).filter(([, value]) => value !== undefined))); return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error)); }
   });
   app.post('/api/rooms/:sessionId/claim', async (request, reply) => {
@@ -159,6 +181,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const original = socket.data['principal'] as Principal; const id = original.sessionId;
     void socket.join([`session:${id}`, `${original.role}:${id}`, `credential:${original.id}`]);
     if (original.actor.role === 'player') void socket.join(`player:${id}:${original.actor.playerId}`);
+    const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original);
     const expiry = setTimeout(() => { socket.emit('room.error', { code: 'CREDENTIAL_EXPIRED' }); socket.disconnect(true); }, Math.max(1, original.expiresAt.getTime() - Date.now())); expiry.unref();
     let syncing = false; let commanding = false; let heartbeating = false; let receipting = false;
     const current = async () => {
@@ -196,7 +219,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         .then(data => ack({ ok: true, data })).catch(error => { ack(failure(error)); if (error instanceof RoomError && ['UNAUTHORIZED', 'CREDENTIAL_EXPIRED'].includes(error.code)) socket.disconnect(true); }).finally(() => { heartbeating = false; });
     });
     io.to(`session:${id}`).emit('presence.changed'); app.log.info({ event: 'room_connected', role: original.role }, 'Room connected');
-    socket.on('disconnect', reason => { clearTimeout(expiry); io.to(`session:${id}`).emit('presence.changed'); app.log.info({ event: 'room_disconnected', reason }, 'Room disconnected'); });
+    socket.on('disconnect', reason => { clearTimeout(expiry); stopMinigames(); io.to(`session:${id}`).emit('presence.changed'); app.log.info({ event: 'room_disconnected', reason }, 'Room disconnected'); });
   });
 
   const publish = async () => {
@@ -211,6 +234,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
             const data = SessionChangedSchema.parse(event.payload); roomAssert(data.sessionId === event.sessionId, 'INVALID_STATE');
             const audience = event.audience === 'HOST' ? 'host' : event.audience === 'DISPLAY' ? 'display' : 'player';
             io.to(`${audience}:${event.sessionId}`).emit('room.changed', data);
+            if (audience === 'host') minigames.roomChanged(event.sessionId);
           } else if (event.type === 'submission.saved' && event.audience === 'PLAYER' && /^player:[0-9a-f-]{36}$/.test(event.audienceKey)) {
             const data = CommandReceiptSchema.parse(event.payload); roomAssert(data.sessionId === event.sessionId, 'INVALID_STATE');
             io.to(`player:${event.sessionId}:${event.audienceKey.slice(7)}`).emit('submission.saved', data);
@@ -241,6 +265,6 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     for (const session of running) await service.execute({ role: 'host', creatorId: session.hostId }, { formatVersion: 1, type: 'session.pause', sessionId: session.id, commandId: crypto.randomUUID(), expectedRevision: session.revision });
     if (running.length) app.log.info({ event: 'rooms_recovered', count: running.length }, 'Recovered rooms paused for host review');
   });
-  app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); await publishTask; await closeTask; await io.close(); });
+  app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); minigames.close(); await publishTask; await closeTask; await io.close(); });
   return { io, gateway, snapshot };
 }

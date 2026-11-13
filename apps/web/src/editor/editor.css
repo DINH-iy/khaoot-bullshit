@@ -213,3 +213,6 @@
 .export-panel h2 { margin: 0; font-size: 1.05rem; }
 .export-panel textarea { min-height: 320px; font-family: ui-monospace, Menlo, monospace; font-size: .8rem; background: var(--e-bg); color: inherit; border-color: var(--e-border); }
 .editor .export-panel button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
+.minigame-fields .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.minigame-fields .door-list, .minigame-fields .placement-list { display: grid; gap: 6px; }
+.drawing-fields .doodle-preview .drawing-view { width: 160px; } .drawing-fields .doodle-editor .drawing-pad { width: 100%; }

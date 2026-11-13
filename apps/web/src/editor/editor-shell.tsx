@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { FlowView } from './flow-view.js';
 import { SceneView } from './scene-view.js';
+import { LookView } from './look/look-view.js';
 import { isRoute } from './model.js';
 import { useDraft, type SaveState } from './use-draft.js';
 import './editor.css';
 
 const saveText: Record<SaveState, string> = { saved: 'All changes saved', pending: 'Saving soon…', saving: 'Saving…', conflict: 'Not saved: this game was changed in another tab or window.', error: 'Not saved: the server could not be reached. Retrying…' };
-type View = 'flow' | 'scene';
+type View = 'flow' | 'scene' | 'look';
+const VIEW_NAMES: Record<View, string> = { flow: 'Flow editor', scene: 'Scene editor', look: 'Look & feel' };
 
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
 export function EditorShell({ gameId }: { gameId: string }) {
   const d = useDraft(gameId);
-  const [view, setViewState] = useState<View>(() => new URLSearchParams(location.search).get('view') === 'scene' ? 'scene' : 'flow');
+  const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'scene' || wanted === 'look' ? wanted : 'flow'; });
   const [selected, setSelected] = useState<string[]>([]); const [rehearsing, setRehearsing] = useState(false); const [exporting, setExporting] = useState(false);
   const setView = (next: View) => { setViewState(next); const url = new URL(location.href); url.searchParams.set('view', next); history.replaceState(null, '', url); };
   useEffect(() => {
@@ -27,7 +29,7 @@ export function EditorShell({ gameId }: { gameId: string }) {
   const ready = d.issues.length === 0 && d.save === 'saved';
   return <div className="editor">
     <header className="editor-header">
-      <h1 className="visually-hidden">{view === 'flow' ? 'Flow editor' : 'Scene editor'}: {definition.title}</h1>
+      <h1 className="visually-hidden">{VIEW_NAMES[view]}: {definition.title}</h1>
       <div className="editor-title"><span className="editor-logo" aria-hidden="true">p.</span>
         <div><label className="visually-hidden" htmlFor="game-title">Game name</label>
           <input id="game-title" className="title-input" value={definition.title} maxLength={160} onChange={event => d.change({ ...definition, title: event.target.value }, undefined, 'title')} />
@@ -51,11 +53,10 @@ export function EditorShell({ gameId }: { gameId: string }) {
     <main className="editor-main">
       <div className="editor-bar">
         <div className="tabs" role="tablist" aria-label="Editor view">
-          <button role="tab" aria-selected={view === 'flow'} onClick={() => setView('flow')}>Flow editor</button>
-          <button role="tab" aria-selected={view === 'scene'} onClick={() => setView('scene')}>Scene editor</button></div>
+          {(Object.keys(VIEW_NAMES) as View[]).map(key => <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}>{VIEW_NAMES[key]}</button>)}</div>
         <p>Game overview · {nodes.length} {nodes.length === 1 ? 'scene' : 'scenes'}{routes ? `, ${routes} ${routes === 1 ? 'party choice' : 'party choices'}` : ''} · {d.issues.length ? `${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'}` : 'no problems'}</p>
       </div>
-      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} /> : <SceneView d={d} selected={selected} setSelected={setSelected} />}
+      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} /> : view === 'scene' ? <SceneView d={d} selected={selected} setSelected={setSelected} /> : <LookView d={d} selected={selected} />}
       {d.issues.some(issue => !issue.nodeKey) && <div className="general-problems" role="region" aria-label="Problems in the whole game"><h2>Problems in the whole game</h2><ul>{d.issues.filter(issue => !issue.nodeKey).map((issue, index) => <li key={index}>{issue.message}</li>)}</ul></div>}
     </main>
   </div>;

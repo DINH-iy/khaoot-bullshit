@@ -12,6 +12,13 @@ const run = (args, label) => {
   const result = spawnSync(process.execPath, args, { cwd: projectRoot, stdio: ['ignore', 'ignore', 'inherit'] });
   if (result.status !== 0) { console.error(label); process.exit(1); }
 };
+// Already running (for example the public launcher): rebuilding now would change the files under the running
+// server and leave its pages blank, so stop here with a clear message instead.
+const running = await fetch(`http://127.0.0.1:${process.env.PORT || '3001'}/api/health/live`, { signal: AbortSignal.timeout(1500) }).then(response => response.ok, () => false);
+if (running) {
+  console.error('The app is already running on this computer (maybe "npm run network:public" in another window). Use that one; its host menu link is in that window.');
+  process.exit(1);
+}
 if (!process.argv.includes('--no-build')) {
   console.log('Building the app…');
   const built = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'], { cwd: projectRoot, stdio: ['ignore', 'ignore', 'inherit'] });

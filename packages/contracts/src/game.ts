@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { PresentationSchema, ThemeSchema, AnimationChoiceSchema } from './presentation.js';
+import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames.js';
+import { PlayerLookSchema } from './players.js';
+import { DrawingSchema } from './drawing.js';
 
 export const GameKeySchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/);
 export const GameIdSchema = z.string().uuid().transform(value => value.toLowerCase());
@@ -25,8 +29,9 @@ export const InputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), maxLength: z.number().int().min(1).max(2000) }).strict(),
   // The player uploads one picture, GIF or video; each round lists what it accepts.
   z.object({ kind: z.literal('media'), accept: z.array(MediaKindSchema).min(1).max(3) }).strict().refine(input => new Set(input.accept).size === input.accept.length, 'Accepted media kinds must be unique'),
-  // Reserved contracts; asset validation/creation services must exist before execution.
-  z.object({ kind: z.literal('drawing'), maxStrokes: z.number().int().min(1).max(2000) }).strict(),
+  // The player draws (strokes, see drawing.ts). `blind`: the player cannot see their own drawing until it is sent.
+  // `start`: a doodle everyone gets to finish. Both optional, so earlier definitions keep their hash.
+  z.object({ kind: z.literal('drawing'), maxStrokes: z.number().int().min(1).max(600), blind: z.boolean().optional(), start: DrawingSchema.optional() }).strict(),
 ]);
 export const SubmissionValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('choice'), choiceKey: GameKeySchema }).strict(),
@@ -36,6 +41,8 @@ export const SubmissionValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('media'), assetId: GameIdSchema }).strict(),
   // A vote names one entry of the ballot shown for this stage.
   z.object({ kind: z.literal('vote'), submissionId: GameIdSchema }).strict(),
+  // A minigame result, measured on the phone and checked by the server.
+  MinigameValueSchema,
 ]);
 export type SubmissionValue = z.infer<typeof SubmissionValueSchema>;
 
@@ -79,10 +86,16 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   // Concurrent players do not depend on a global session revision. The stage ID
   // binds the answer to its original stage, including after a reconnect.
   z.object({ ...envelope, type: z.literal('submission.submit'), stageRunId: GameIdSchema, value: SubmissionValueSchema }).strict(),
+  // A player changes their own look (character parts only), at any time.
+  z.object({ ...envelope, type: z.literal('player.look'), look: PlayerLookSchema }).strict(),
+  // The host takes away a player's photo or drawn picture (the character stays).
+  z.object({ ...hostEnvelope, type: z.literal('player.removePicture'), playerId: GameIdSchema }).strict(),
+  // One turn of a relay drawing (Pass the pencil): the strokes this player added in turn `turn`.
+  z.object({ ...envelope, type: z.literal('minigame.part'), stageRunId: GameIdSchema, turn: z.number().int().min(0).max(63), assetId: GameIdSchema }).strict(),
 ]);
 export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Commands a player may send; every other command is the host's. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'player.look', 'minigame.part'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),
@@ -106,6 +119,8 @@ export const StageRevealSchema = z.object({
     // Uploaded answers are shown to everyone once revealed.
     z.object({ kind: z.literal('vote'), entries: z.array(z.object({ submissionId: GameIdSchema, playerId: GameIdSchema.nullable(), teamId: GameIdSchema.nullable(), votes: z.number().int().min(0) }).strict()) }).strict(),
     z.object({ kind: z.literal('media'), entries: z.array(z.object({ playerId: GameIdSchema, assetId: GameIdSchema, mediaKind: MediaKindSchema }).strict()) }).strict(),
+    MinigameRevealSchema,
+    z.object({ kind: z.literal('drawing'), entries: z.array(z.object({ playerId: GameIdSchema.nullable(), teamId: GameIdSchema.nullable(), assetId: GameIdSchema }).strict()) }).strict(),
   ]).nullable(),
   awards: z.array(z.object({ playerId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
   teamAwards: z.array(z.object({ teamId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
@@ -117,6 +132,7 @@ export const BallotEntrySchema = z.object({
   content: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('text'), text: z.string().max(2000) }).strict(),
     z.object({ kind: z.literal('media'), assetId: GameIdSchema, mediaKind: MediaKindSchema }).strict(),
+    z.object({ kind: z.literal('drawing'), assetId: GameIdSchema }).strict(),
   ]),
 }).strict();
 // The teams of a team round. While `forming`, teams are a proposal (no team IDs
@@ -139,7 +155,7 @@ export const PublicRouteSchema = z.object({
 }).strict();
 export const PublicStageSchema = z.object({
   id: GameIdSchema, nodeKey: GameKeySchema, stageKey: GameKeySchema,
-  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard']), prompt: z.string().min(1).max(2000),
+  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame']), prompt: z.string().min(1).max(2000),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.
@@ -153,6 +169,7 @@ export const PublicStageSchema = z.object({
   info: z.object({ title: z.string().min(1).max(120) }).strict().nullable(),
   scoreboard: z.object({ show: z.enum(['players', 'teams', 'both']) }).strict().nullable(),
   ballot: z.array(BallotEntrySchema).nullable(),
+  minigame: PublicMinigameSchema.nullable(),
   // True when a later vote shows these answers without names; they are revealed by that vote.
   revealAfterVote: z.boolean(),
   revealed: z.boolean(), reveal: StageRevealSchema.nullable(),
@@ -166,6 +183,8 @@ export const SessionViewSchema = z.object({
   ownSubmission: z.object({ id: GameIdSchema, value: SubmissionValueSchema }).strict().nullable(),
   // Only revealed-stage scores and host corrections are visible; awards on an open or unrevealed stage are private.
   standings: z.array(z.object({ playerId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
+  // The look and texts for this moment: the game's, with the current scene's changes on top.
+  presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
   // Totals of the game's current teams, following that lineup's carryover rule.
   teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema }).strict()),
 }).strict();
@@ -174,3 +193,5 @@ export type SessionView = z.infer<typeof SessionViewSchema>;
 export const SessionChangedSchema = z.object({
   formatVersion: z.literal(1), type: z.literal('session.changed'), sessionId: GameIdSchema, revision: RevisionSchema,
 }).strict();
+
+export { PresentationSchema };

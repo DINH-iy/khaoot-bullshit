@@ -1,8 +1,13 @@
+import { useText } from '../presentation/look.js';
 import { useState } from 'react';
 import type { RoomSnapshot } from '@party/contracts';
 import { MediaView } from './media-upload.js';
 import { BallotContent } from './vote.js';
 import { TeamStandings, teamName } from './teams.js';
+import { MinigameResults } from '../minigames/minigame-stage.js';
+import { StoredDrawing } from '../drawing/drawing-view.js';
+import { Avatar } from '../players/avatar.js';
+import { defaultLook } from '@party/contracts';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
@@ -23,26 +28,32 @@ export function pointsToMilli(text: string, allowNegative: boolean): string | nu
 const nameOf = (state: RoomSnapshot, playerId: string) => state.players.find(player => player.id === playerId)?.displayName ?? 'Former player';
 
 export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Stage }) {
+  const t = useText();
   const reveal = stage.reveal; if (!reveal) return null;
   const answer = reveal.answer; const input = stage.input;
   const label = (key: string) => input?.kind === 'choice' ? input.options.find(option => option.key === key)?.label ?? key : input?.kind === 'order' ? input.items.find(item => item.key === key)?.label ?? key : key;
   const own = state.selfPlayerId ? reveal.awards.find(award => award.playerId === state.selfPlayerId) : undefined;
   return <div className="results" role="region" aria-label="Round results">
-    <h3>Results</h3>
+    <h3>{t('results.title')}</h3>
     {answer?.kind === 'choice' && <>
-      {answer.correctChoiceKey && <p>Correct answer: <strong>{label(answer.correctChoiceKey)}</strong></p>}
-      <ul className="plain-list">{answer.counts.map(row => <li key={row.choiceKey}>{label(row.choiceKey)}{row.choiceKey === answer.correctChoiceKey ? ' ✓' : ''} · {row.count} {row.count === 1 ? 'answer' : 'answers'}</li>)}</ul>
+      {answer.correctChoiceKey && <p>{t('results.correct', { answer: label(answer.correctChoiceKey) })}</p>}
+      <ul className="plain-list answer-bars">{answer.counts.map(row => { const total = answer.counts.reduce((sum, entry) => sum + entry.count, 0);
+        return <li key={row.choiceKey} className={row.choiceKey === answer.correctChoiceKey ? 'correct' : answer.correctChoiceKey ? 'wrong' : undefined} style={{ '--share': `${total ? Math.round(row.count / total * 100) : 0}%` } as React.CSSProperties}>
+          <span className="bar" aria-hidden="true" />{label(row.choiceKey)}{row.choiceKey === answer.correctChoiceKey ? ' ✓' : ''} · {row.count} {row.count === 1 ? 'answer' : 'answers'}</li>; })}</ul>
     </>}
+    {answer?.kind === 'minigame' && <MinigameResults state={state} answer={answer} />}
+    {answer?.kind === 'drawing' && (answer.entries.length ? <ul className="drawing-gallery">{answer.entries.map(entry => { const author = entry.teamId ? teamName(state, entry.teamId) : nameOf(state, entry.playerId ?? '');
+      return <li key={entry.assetId}><StoredDrawing sessionId={state.view.sessionId} assetIds={[entry.assetId]} label={`Drawing by ${author}`} /><span>{author}</span></li>; })}</ul> : <p>Nobody drew anything.</p>)}
     {answer?.kind === 'order' && answer.correctOrder && <><p>Correct order:</p><ol>{answer.correctOrder.map(key => <li key={key}>{label(key)}</li>)}</ol></>}
     {answer?.kind === 'vote' && (answer.entries.length ? <ol className="ballot">{answer.entries.map(row => {
       const entry = stage.ballot?.find(candidate => candidate.submissionId === row.submissionId); const author = row.teamId ? teamName(state, row.teamId) : row.playerId ? nameOf(state, row.playerId) : 'Former player';
       return <li key={row.submissionId} className="ballot-entry"><strong>{author} · {row.votes} {row.votes === 1 ? 'vote' : 'votes'}</strong>{entry && <BallotContent sessionId={state.view.sessionId} entry={entry} label={`Entry from ${author}`} />}</li>;
     })}</ol> : <p>There was nothing to vote on.</p>)}
     {answer?.kind === 'media' && (answer.entries.length ? <ul className="gallery">{answer.entries.map(entry => <li key={entry.assetId}><MediaView sessionId={state.view.sessionId} media={entry} label={`Upload from ${nameOf(state, entry.playerId)}`} /><span>{nameOf(state, entry.playerId)}</span></li>)}</ul> : <p>Nobody uploaded anything.</p>)}
-    {reveal.teamAwards.length > 0 && <><h4>Team points this round</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
-    {state.role === 'player' && stage.input?.kind !== 'media' && <p role="status">{own ? `You earned ${formatPoints(own.amountMilli)} points this round.` : 'No points for you this round.'}</p>}
-    {stage.input?.kind !== 'media' && <h4>Points this round</h4>}
-    {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list">{reveal.awards.map(award => <li key={award.playerId}>{nameOf(state, award.playerId)} · {formatPoints(award.amountMilli)}</li>)}</ul> : <p>Nobody scored this round.</p>}
+    {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
+    {state.role === 'player' && stage.input?.kind !== 'media' && <p role="status">{own ? t('results.earned', { points: formatPoints(own.amountMilli) }) : t('results.nothing')}</p>}
+    {stage.input?.kind !== 'media' && <h4>{t('results.points')}</h4>}
+    {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list">{[...reveal.awards].sort((a, b) => { const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli); return difference > 0n ? 1 : difference < 0n ? -1 : 0; }).map(award => <li key={award.playerId}>{nameOf(state, award.playerId)} · {formatPoints(award.amountMilli)}</li>)}</ul> : <p>{t('results.nobody')}</p>}
   </div>;
 }
 
@@ -75,6 +86,7 @@ export function JudgePanel({ state, stage, disabled, send }: { state: RoomSnapsh
 }
 
 export function Scoreboard({ state, disabled, send }: { state: RoomSnapshot; disabled: boolean; send: Send }) {
+  const t = useText();
   const [edit, setEdit] = useState<Record<string, string>>({}); const [correcting, setCorrecting] = useState(false);
   const totals = new Map(state.view.standings.map(row => [row.playerId, row.amountMilli]));
   const rows = [...new Set([...state.players.map(player => player.id), ...totals.keys()])].map(id => ({ id, name: nameOf(state, id), milli: totals.get(id) ?? '0' }))
@@ -84,17 +96,17 @@ export function Scoreboard({ state, disabled, send }: { state: RoomSnapshot; dis
   const scene = state.view.stage?.status === 'ACTIVE' ? state.view.stage.scoreboard : null;
   const players = !scene || scene.show !== 'teams'; const teams = !scene || scene.show !== 'players';
   if (state.view.status === 'LOBBY' || (!rows.length && !state.view.teamStandings.length)) return null;
-  return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : undefined}><h2 id="scores-heading">{scene ? state.view.stage!.prompt : finished ? 'Final scores' : 'Scoreboard'}</h2>
+  return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : undefined}><h2 id="scores-heading">{scene ? state.view.stage!.prompt : finished ? t('scores.final') : t('scores.title')}</h2>
     {scene && teams && !state.view.teamStandings.length && scene.show === 'teams' && <p>No teams have been made yet.</p>}
     {players && <ol className="scoreboard">{rows.map(row => {
       const milli = pointsToMilli(edit[row.id] ?? '', true); const valid = milli !== null && milli !== '0';
-      return <li key={row.id}><span className="score-name">{row.name}{row.id === state.selfPlayerId ? ' (you)' : ''}</span><span className="score-points">{formatPoints(row.milli)}</span>
+      return <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? ' (you)' : ''}</span><span className="score-points">{formatPoints(row.milli)}</span>
         {state.role === 'host' && correcting && <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) { send('score.adjust', { playerId: row.id, amountMilli: milli, reason: 'Host correction' }); setEdit({ ...edit, [row.id]: '' }); } }}>
           <label>Correct score for {row.name} (+ or −)<input type="number" inputMode="numeric" step={1} value={edit[row.id] ?? ''} onChange={event => setEdit({ ...edit, [row.id]: event.target.value })} /></label>
           <button disabled={disabled || !valid}>Correct score</button></form>}</li>;
     })}</ol>}
     {teams && <TeamStandings state={state} />}
     {state.role === 'host' && players && <button className="small-button ghost" aria-expanded={correcting} onClick={() => setCorrecting(!correcting)}>{correcting ? 'Done correcting' : 'Correct scores'}</button>}
-    {!finished && <p>Scores include revealed rounds only.</p>}
+    {!finished && <p>{t('scores.note')}</p>}
   </section>;
 }

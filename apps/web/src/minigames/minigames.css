@@ -1,0 +1,39 @@
+/* Minigames: big, thumb-sized controls; colours follow the game's look. */
+.mg-play, .mg-screen, .mg-done { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.mg-how { margin: 0; color: var(--r-muted); max-width: 36rem; }
+.mg-name { margin: 0; font-family: var(--r-heading-font); font-size: 1.6rem; font-weight: 900; color: var(--r-accent); }
+.mg-big { margin: 0; font-family: var(--r-heading-font); font-size: clamp(3rem, 14vw, 6rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.mg-big.go { color: var(--r-ok); } .mg-big.wait { color: var(--r-bad); }
+.mg-sub { margin: 0; font-size: 1.15rem; }
+.mg-countdown { display: grid; gap: 6px; justify-items: center; }
+.mg-countdown strong { font-size: clamp(4rem, 20vw, 8rem); line-height: 1; font-family: var(--r-heading-font); color: var(--r-accent); }
+/* The pad: as big as the phone allows, no double-tap zoom, no text selection while hammering it. */
+.room .mg-pad { width: min(100%, 26rem); min-height: min(52vh, 22rem); border-radius: calc(var(--r-radius) * 1.2); font-size: clamp(2rem, 10vw, 3.4rem); font-weight: 900;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; border: 0; }
+.room .mg-pad.wait { background: var(--r-bad); color: #1a0505; }
+.room .mg-pad.go { background: var(--r-ok); color: #04170e; }
+.room .mg-pad.stop { background: var(--r-accent); color: var(--r-accent-ink); min-height: 10rem; }
+.room .mg-pad:active { transform: scale(.98); }
+.mg-clock { letter-spacing: .02em; }
+.mg-doors { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 12px; width: 100%; }
+.room .mg-door { min-height: 9rem; border-radius: calc(var(--r-radius) * .6) calc(var(--r-radius) * .6) 6px 6px; font-size: 1.2rem; font-weight: 800; color: var(--a-text);
+  background: linear-gradient(180deg, var(--a2), color-mix(in srgb, var(--a2) 70%, black)); border: 3px solid color-mix(in srgb, var(--a2) 60%, black); display: grid; place-items: center; gap: 4px; padding: 10px; }
+.mg-doors.revealed .mg-door strong { font-size: 1.8rem; }
+.mg-results { display: grid; gap: 8px; }
+.mg-podium { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mg-podium li { display: flex; gap: 10px; align-items: center; margin: 0; padding: 8px 12px; border-radius: 14px; background: var(--r-card-strong); }
+.mg-podium li.first { outline: 3px solid var(--r-accent); }
+.mg-podium li span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+.mg-place { min-width: 1.6em; font-weight: 900; font-size: 1.3rem; color: var(--r-accent); }
+@media (prefers-reduced-motion: reduce) { .room .mg-pad:active { transform: none; } }
+.mg-race { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 8px; }
+.mg-race li { display: grid; grid-template-columns: auto minmax(5rem, 10rem) 1fr 3rem; gap: 10px; align-items: center; margin: 0; }
+.mg-race-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.mg-race-track { height: 22px; border-radius: 999px; background: var(--r-card-strong); overflow: hidden; }
+.mg-race-track span { display: block; height: 100%; border-radius: inherit; background: var(--r-accent); transition: width .25s ease-out; }
+.mg-race-count { font-variant-numeric: tabular-nums; font-weight: 800; text-align: right; }
+@media (prefers-reduced-motion: reduce) { .mg-race-track span { transition: none; } }
+.mg-circle { width: 56px; flex: none; }
+.mg-relay, .mg-turn, .mg-relay-screen { display: grid; gap: 12px; width: 100%; justify-items: center; }
+.mg-relay .drawing-view, .mg-turn .drawing-pad { width: min(100%, 30rem); }
+.mg-relay-screen .drawing-gallery { width: 100%; }

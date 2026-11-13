@@ -1,3 +1,4 @@
+import { useText } from '../presentation/look.js';
 import { useEffect, useState } from 'react';
 import type { RoomSnapshot } from '@party/contracts';
 
@@ -26,9 +27,10 @@ export function useRemaining(stage: Stage | null | undefined, clockOffset: numbe
   return remaining;
 }
 export function StageTimer({ stage, remaining }: { stage: Stage; remaining: number | null }) {
+  const t = useText();
   if (stage.status !== 'ACTIVE') return null;
   const paused = stage.pausedRemainingMs !== null;
-  const text = remaining === null ? 'No time limit' : paused ? `Paused · ${formatRemaining(remaining)} left` : remaining > 0 ? `${formatRemaining(remaining)} left` : 'Time is up';
+  const text = remaining === null ? t('timer.none') : paused ? t('timer.paused', { time: formatRemaining(remaining) }) : remaining > 0 ? t('timer.left', { time: formatRemaining(remaining) }) : t('timer.up');
   // role=timer is not announced on every tick; the ending is announced separately.
   return <p className={`timer${remaining !== null && remaining <= 5000 && !paused ? ' timer-ending' : ''}`}>
     <span role="timer" aria-label="Time left">{text}</span>

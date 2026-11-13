@@ -1,0 +1,68 @@
+/* Look & feel editor. The preview itself uses the real room styles (room.css). */
+.look-editor { display: grid; grid-template-columns: minmax(340px, 440px) 1fr; gap: 0; min-height: 0; flex: 1; }
+.look-controls { overflow: auto; padding: 16px 20px 40px; border-right: 1px solid var(--line, #dcd6ee); display: grid; gap: 14px; align-content: start; }
+.look-controls h2 { margin: 0; }
+.look-controls > label, .look-panel label { display: grid; gap: 4px; font-weight: 600; }
+.look-controls select, .look-controls input:not([type=checkbox]):not([type=range]):not([type=color]) { min-height: 38px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--line, #c9c2e0); font: inherit; font-weight: 400; background: #fff; }
+.look-panel { display: grid; gap: 14px; }
+.look-panel fieldset { display: grid; gap: 10px; border: 1px solid var(--line, #dcd6ee); border-radius: 12px; padding: 12px 14px; margin: 0; }
+.look-panel legend { font-weight: 800; padding: 0 4px; }
+.look-panel .hint.warn { color: #9a3412; }
+.field-title { margin: 4px 0 0; font-weight: 600; }
+
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.preset-card { display: grid; gap: 8px; text-align: left; padding: 12px; min-height: 76px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; }
+.preset-card.on { border-color: #6d3fd6; outline: 2px solid #fff; outline-offset: -4px; }
+.swatches { display: flex; gap: 4px; } .swatches i { width: 16px; height: 16px; border-radius: 50%; display: block; box-shadow: 0 0 0 1px rgb(255 255 255 / .4); }
+
+.color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.look-panel .color-field { display: flex; gap: 8px; align-items: center; font-weight: 500; }
+.color-field input[type=color], .answer-color input[type=color] { width: 40px; height: 32px; padding: 0; border: 1px solid var(--line, #dcd6ee); border-radius: 8px; background: none; flex: none; }
+.answer-colors { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.answer-color { display: inline-flex; gap: 2px; align-items: center; }
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented button { min-height: 36px; padding: 4px 12px; border-radius: 999px; }
+.segmented button[aria-pressed=true] { background: #2a1d5c; color: #fff; border-color: #2a1d5c; }
+.look-warnings { background: #fff4e5; color: #6b3a00; border-radius: 12px; padding: 10px 14px; }
+.look-warnings h3 { margin: 0 0 4px; font-size: 1rem; } .look-warnings ul { margin: 0; padding-left: 1.2em; }
+.text-field { display: grid; gap: 2px; } .text-field .hint { margin: 0; }
+
+.moment { gap: 8px; }
+.moment-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.moment-row select { flex: 1 1 180px; }
+.anim-sample { display: inline-flex; gap: 8px; align-items: center; }
+.anim-stage { display: flex; gap: 4px; padding: 6px; border-radius: 10px; background: #241a4d; min-width: 56px; justify-content: center; overflow: hidden; }
+.anim-box, .anim-stage .tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: #ffcf4a; color: #2a1d00; font-weight: 800; }
+.anim-stage.list .tile:nth-child(2) { background: #5ee6a8; } .anim-stage.list .tile:nth-child(3) { background: #7cb3ff; } .anim-stage.list .tile:nth-child(4) { background: #ff8ab8; }
+.anim-builder { display: grid; gap: 10px; background: #f6f3ff; border-radius: 12px; padding: 10px; }
+.frame-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.frame-block { background: #fff; border: 1px solid var(--line, #dcd6ee); border-left: 6px solid #6d3fd6; border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; }
+.frame-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .frame-head label { display: flex; gap: 6px; align-items: center; font-weight: 500; }
+.frame-props { display: grid; gap: 4px; }
+.frame-prop { display: grid; grid-template-columns: minmax(130px, auto) 1fr; gap: 8px; align-items: center; min-height: 32px; } .frame-prop.unused { opacity: .7; }
+.look-panel .frame-prop .choice { display: flex; gap: 6px; align-items: center; font-weight: 500; }
+.visually-hidden-label { display: flex !important; gap: 6px; align-items: center; } .visually-hidden-label input { flex: 1; min-width: 0; } .visually-hidden-label output { min-width: 3.5em; font-variant-numeric: tabular-nums; font-size: .85rem; }
+.anim-timing { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 12px; }
+
+.look-preview-area { overflow: auto; padding: 16px 20px 40px; background: #ece8f6; }
+.look-preview { display: grid; gap: 12px; }
+.look-devices { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 16px; align-items: start; }
+.look-devices figure { margin: 0; display: grid; gap: 6px; } .look-devices figcaption { font-weight: 700; color: #4a4466; }
+.room.room-preview { min-height: 0; padding: 16px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgb(30 20 70 / .2); }
+.look-tv .room-preview { min-height: 340px; } .look-phone .room-preview { min-height: 560px; border: 8px solid #15121f; border-radius: 28px; padding: 12px; }
+/* The preview is a small copy of the room: same proportions, smaller type. */
+.room.room-preview { font-size: calc(13px * var(--r-scale)); }
+.room-preview h2 { font-size: 1.7em; margin: 0; overflow-wrap: anywhere; } .room-preview .timer { font-size: 1.3em; }
+.room-preview .options-board li { font-size: 1.1em; padding: 10px 12px; } .look-phone .room-preview h2 { font-size: 1.35em; }
+.room-preview .preview-body { display: grid; gap: 12px; }
+.room-preview .lobby, .room-preview .stage-card, .room-preview .join-card { padding: 16px !important; display: grid; gap: 10px; }
+.room-preview .preview-players { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.room-preview .tiles { display: grid; grid-template-columns: 1fr 1fr; }
+.room-preview .tile { min-height: 64px; display: flex; gap: 8px; align-items: center; padding: 8px 10px; }
+.room-preview .big-code { font-size: 2.4rem; margin: 0; }
+@media (max-width: 900px) { .look-editor { grid-template-columns: 1fr; } .look-devices { grid-template-columns: 1fr; } .look-controls { border-right: 0; } }
+.room.room-preview .stage-card h2, .room.room-preview .lobby h2 { font-size: 1.7em; }
+.look-phone .room.room-preview .stage-card h2 { font-size: 1.3em; }
+.room.room-preview .stage-card, .room.room-preview .tiles { min-width: 0; }
+.room.room-preview .tile { font-size: 1em; min-width: 0; overflow-wrap: anywhere; }
+.look-panel .frame-prop label { min-height: 0; }

@@ -15,6 +15,8 @@ const PLAYER_ACCESS_MS = 4 * 60 * 60 * 1000;
 const RequestSchema = z.object({ id: GameIdSchema, playerId: GameIdSchema, status: z.enum(['PENDING', 'APPROVED', 'DENIED']), requestedAt: z.string().datetime() }).strict();
 export const RoomStateSchema = z.object({
   reclaimApproval: z.boolean().default(false),
+  // Host settings (see RoomSettingsSchema). Rooms saved before they existed get these defaults.
+  showScores: z.boolean().default(true), reactions: z.boolean().default(true), autoClose: z.boolean().default(true),
   seatRequests: z.array(RequestSchema).max(50).default([]),
 }).strict();
 export type RoomState = z.infer<typeof RoomStateSchema>;
@@ -23,7 +25,7 @@ const live = (state: RoomState, now: number) => state.seatRequests.filter(reques
 export const pendingRequests = (state: RoomState, now = Date.now()) => live(state, now).filter(request => request.status === 'PENDING');
 
 export function createSeatReclaim(client: PrismaClient, config: Config, connected: (sessionId: string) => Set<string>, kick: (sessionId: string, playerId: string) => void) {
-  const save = (tx: Transaction, sessionId: string, state: RoomState) => tx.gameSession.update({ where: { id: sessionId }, data: { state: { reclaimApproval: state.reclaimApproval, seatRequests: state.seatRequests } } });
+  const save = (tx: Transaction, sessionId: string, state: RoomState) => tx.gameSession.update({ where: { id: sessionId }, data: { state: { ...state } } });
   async function grant(tx: Transaction, sessionId: string, playerId: string, token: string) {
     await tx.playerCredential.updateMany({ where: { sessionId, playerId, revokedAt: null }, data: { revokedAt: new Date() } });
     await tx.playerCredential.create({ data: { sessionId, playerId, tokenHash: tokenHash(token), expiresAt: new Date(Date.now() + PLAYER_ACCESS_MS) } });
@@ -96,14 +98,14 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setApproval(sessionId: string, principal: Principal, reclaimApproval: boolean) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose'>>) {
       roomAssert(principal.role === 'host', 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);
         const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId } }); await authorize(tx, session, principal.actor);
         const state = readRoomState(session.state);
         // Turning approval off does not silently grant waiting requests; the host still answers those.
-        await save(tx, sessionId, { ...state, reclaimApproval });
+        await save(tx, sessionId, { ...state, ...settings });
         await recordRoomChange(tx, sessionId, 'room.settings');
       });
     },

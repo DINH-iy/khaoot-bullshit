@@ -13,7 +13,7 @@ export interface Located { nodeKey: string; stage: StageDefinition; index: numbe
 
 const nodeOf = (definition: GameDefinition, key: string): Node | undefined => definition.nodes.find(node => node.key === key);
 export const outgoing = (definition: GameDefinition, nodeKey: string): Edge[] => definition.edges.filter(edge => edge.from === nodeKey);
-const playOf = (definition: GameDefinition, stage: StageDefinition) => stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'minigame' ? null : stage.play ?? definition.play ?? { kind: 'solo' as const };
+const playOf = (definition: GameDefinition, stage: StageDefinition) => stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' ? null : stage.play ?? definition.play ?? { kind: 'solo' as const };
 
 /** Every stage of every node, in definition order (not a route). */
 export const allStages = (definition: GameDefinition) => definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ nodeKey: node.key, stage, index })));
@@ -134,7 +134,7 @@ export function graphIssues(definition: GameDefinition): GraphIssue[] {
     for (const stage of nodeOf(definition, key)!.stages) {
       if (stage.kind === 'vote') {
         const id = `${stage.source.nodeKey}/${stage.source.stageKey}`; const source = stagesById.get(id);
-        if (!seen.has(id) || !source || source.kind !== 'collect' || !['text', 'media'].includes(source.input.kind) || source.scoring.kind !== 'none') fail('Invalid vote source', key);
+        if (!seen.has(id) || !source || source.kind !== 'collect' || !['text', 'media', 'drawing'].includes(source.input.kind) || source.scoring.kind !== 'none') fail('Invalid vote source', key);
       }
       const play = playOf(definition, stage);
       if (play?.kind === 'teams' && play.lineup.kind === 'reform') { teams = true; formed = true; }

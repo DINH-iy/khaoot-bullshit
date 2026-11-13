@@ -1,0 +1,23 @@
+/* Drawings: always on white paper, so palette colours look the same in every game style. */
+.drawing-view { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: calc(var(--r-radius, 16px) * .5); box-shadow: 0 0 0 1px rgb(0 0 0 / .12); background: #fff; }
+.drawing-pad { display: grid; gap: 10px; width: min(100%, 34rem); margin-inline: auto; }
+/* No scrolling, zooming or text selection while drawing. */
+.drawing-surface { display: block; width: 100%; height: auto; aspect-ratio: 1; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 14px; box-shadow: 0 0 0 2px var(--r-line, #ccc); cursor: crosshair; background: #fff; }
+.drawing-pad.disabled .drawing-surface { cursor: not-allowed; opacity: .75; }
+.drawing-pad.blind .drawing-surface { background: repeating-linear-gradient(45deg, #f1eef9 0 12px, #fff 12px 24px); }
+.drawing-note { margin: 0; text-align: center; color: var(--r-muted, #555); }
+.drawing-tools { display: grid; gap: 8px; }
+.drawing-colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.room .drawing-colors button, .drawing-colors button { min-height: 34px; padding: 0; border-radius: 50%; aspect-ratio: 1; border: 2px solid rgb(0 0 0 / .25); }
+.room .drawing-colors button[aria-checked=true], .drawing-colors button[aria-checked=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: 2px; }
+.drawing-widths { display: flex; gap: 6px; }
+.room .drawing-widths button, .drawing-widths button { flex: 1; min-height: 40px; display: grid; place-items: center; padding: 0; }
+.drawing-widths button span { display: block; border-radius: 50%; box-shadow: 0 0 0 1px rgb(255 255 255 / .6); }
+.room .drawing-widths button[aria-checked=true], .drawing-widths button[aria-checked=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: -1px; }
+.drawing-actions { display: flex; gap: 8px; justify-content: center; }
+.drawing-gallery { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 12px; }
+.drawing-gallery li { display: grid; gap: 6px; margin: 0; font-weight: 700; text-align: center; }
+.drawing-surface:focus-visible { outline: 4px solid var(--r-accent, #6d3fd6); outline-offset: 3px; }
+.drawing-keys { margin: 0; font-size: .8rem; color: var(--r-muted, #555); text-align: center; }
+/* The keyboard help is read by screen readers always, and shown when the pad is used with a keyboard. */
+.drawing-keys { display: none; } .drawing-pad:has(.drawing-surface:focus-visible) .drawing-keys { display: block; }

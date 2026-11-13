@@ -1,6 +1,6 @@
 # Creative minigames: research and technical direction
 
-Planning/research, 11 November 2026. No drawing tools, uploads, minigames, avatar services, animation system, or show-host character are implemented by this document. See [APP_PLAN.md](../../APP_PLAN.md#25-player-customization-and-creative-minigames) for product scope and [testing/accessibility](testing-and-accessibility.md) for release gates.
+Planning/research, 11 November 2026. Since then (12–13 November) uploads, an animation system, four phone minigames and character looks built from parts have been implemented (see the README); drawing tools, photo or drawn avatars and the show-host character are not. See [APP_PLAN.md](../../APP_PLAN.md#25-player-customization-and-creative-minigames) for product scope and [testing/accessibility](testing-and-accessibility.md) for release gates.
 
 ## Inspiration and what it does not prove
 
@@ -126,3 +126,19 @@ Use the same asset validation/retention rules as other media. Test repeated cues
 | Browser emulation mistaken for real-device evidence | Real phones, actual Wi-Fi and Pi/NUC measurements before capacity/support claims |
 
 Open decisions: upload/drawing limits, local draft lifetime, retention/purge policy, supported browser versions, score normalization for unequal teams, strict live-drawing deadline behavior, precise reaction fairness, and simultaneous-canvas conflict strategy. Only the last two require advanced real-time work; they do not block the first drawing/voting game.
+
+## Drawing minigame ideas (13 November 2026)
+
+Built: drawing rounds (also blind, or finishing a doodle), Perfect circle and Pass the pencil (team relay with a vote). Ideas for later, roughly from simplest to most demanding; each reuses the stroke format, the drawing pad and the vote:
+
+| Idea | How it plays | Scoring | What it needs |
+| --- | --- | --- | --- |
+| Speed sketch | Draw the prompt in 15 seconds, then vote | Votes, plus a bonus for the first to finish | Nothing new: a drawing round with a short timer and a vote (can be a built-in template) |
+| One line | Draw the prompt without lifting your finger | Votes | A one-stroke option on drawing rounds (the pad already supports it) |
+| Trace it | A shape is shown for 3 seconds, then players redraw it from memory | Automatic: distance between the strokes and the shape | A shape library and a server-side comparison like the circle score |
+| Copy cat | One player draws, the others copy it as closely as possible | Automatic similarity | The same comparison, between two drawings |
+| Draw and guess | One player draws a secret word, the others type guesses | Points for fast correct guesses and for the drawer | Strokes streamed live to screens (not per turn), turn rotation, guess checking |
+| Telephone | Write a sentence, the next player draws it, the next describes the drawing, and so on | Votes for the funniest chain; replay of every chain at the end | Creation chains passed between players |
+| Exquisite corpse | Each team member draws one part (head, body, legs) without seeing the rest; revealed together | Votes | Hidden parts per turn and a stacked reveal |
+| Team canvas race | Teams draw on one shared canvas at the same time to finish a picture first | First complete picture as judged by the host, or votes | Live shared canvas with simultaneous strokes (needs a load test on the Pi) |
+| Draw with constraints | Left hand only, eyes closed, phone held upside down | Votes | Honour rules shown on the phone; the blind mode covers eyes closed |

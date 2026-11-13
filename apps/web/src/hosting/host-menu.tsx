@@ -3,6 +3,8 @@ import { HostMenuSchema, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../network/api.js';
 import { MyGames } from './my-games.js';
 import { ImportGame } from './import-game.js';
+import { GamePicker } from './game-picker.js';
+import './host-menu.css';
 
 const initial = new URL(location.href);
 const ownerToken = new URLSearchParams(initial.hash.slice(1)).get('owner');
@@ -38,21 +40,15 @@ export function HostMenu() {
     setBusy(true); setError('');
     work.then(result => location.assign(`/?room=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
   };
-  return <main>
-    <p className="eyebrow">PARTY GAME · HOST</p><h1>Host a game</h1>
-    <p>Pick a game and open a room. Players join on their phones with the room code or the QR code on the next screen.</p>
+  return <main className="host-page">
+    <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Host</p><h1>Host a game</h1>
+      <p>Pick a game and open a room. Players join on their phones with the room code or the QR code on the next screen.</p></header>
     {error && <p role="alert" className="error">{error}</p>}
     {busy && !menu && <p role="status">Loading your games…</p>}
     {menu && <>
-      <section aria-labelledby="games-heading"><h2 id="games-heading">Choose a game</h2>
-        <form onSubmit={event => { event.preventDefault(); open(roomApi('/api/host/rooms', { gameKey, ...request })); }}>
-          <fieldset><legend>Available games</legend>{menu.games.map(game => <label className="choice game-choice" key={game.key}>
-            <input type="radio" name="game" value={game.key} checked={gameKey === game.key} onChange={() => setGameKey(game.key)} />
-            <span><strong>{game.title}</strong> · {game.branches ? 'up to ' : ''}{game.stageCount} {game.stageCount === 1 ? 'round' : 'rounds'}{game.branches ? ' · the party picks a route' : ''} · {game.timed ? 'timed' : 'no time limits'}<br />{game.description}</span>
-          </label>)}</fieldset>
-          <button type="submit" disabled={busy || !gameKey}>{busy ? 'Opening…' : 'Open room'}</button>
-        </form>
-        <p>These are the built-in games. Making your own comes with the editors, which are not built yet.</p>
+      <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">Choose a game</h2>
+        <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))} />
+        <p className="hint">These are the built-in games. Make your own under Your games, or import one from text.</p>
       </section>
       <MyGames menu={menu} reload={reload} openRoom={gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() }))} />
       <ImportGame />

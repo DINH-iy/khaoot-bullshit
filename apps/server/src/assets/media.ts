@@ -6,11 +6,12 @@ import { Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import type { AssetKind } from '../generated/prisma/client.js';
+import { MAX_DRAWING_BYTES } from '@party/contracts';
 
 export interface MediaType { kind: AssetKind; contentType: string }
 // Per-kind size limits. Nothing is transcoded: the Pi stores and serves the
 // verified original, so limits are what keeps memory, disk and mobile data bounded.
-export const MEDIA_LIMITS: Record<AssetKind, number> = { IMAGE: 8 * 1024 * 1024, GIF: 12 * 1024 * 1024, VIDEO: 40 * 1024 * 1024 };
+export const MEDIA_LIMITS: Record<AssetKind, number> = { IMAGE: 8 * 1024 * 1024, GIF: 12 * 1024 * 1024, VIDEO: 40 * 1024 * 1024, DRAWING: MAX_DRAWING_BYTES };
 export const MAX_UPLOAD_BYTES = Math.max(...Object.values(MEDIA_LIMITS));
 export const SESSION_MEDIA_BYTES = 1024 * 1024 * 1024;
 export const UPLOAD_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];
@@ -67,3 +68,45 @@ export async function storeUpload(source: Readable, directory: string, sessionId
   } catch (error) { await rm(partial, { force: true }); throw error; }
 }
 export const removeStored = (directory: string, sessionId: string, assetId: string) => rm(assetPath(directory, sessionId, assetId), { force: true });
+
+/** Writes server-made bytes (a validated drawing, a cleaned picture) to the store, the same way as uploads. */
+export async function storeBytes(bytes: Buffer, directory: string, sessionId: string, assetId: string): Promise<{ byteSize: number; sha256: string }> {
+  const folder = join(directory, sessionId); const target = join(folder, assetId); const partial = `${target}.part`;
+  await mkdir(folder, { recursive: true, mode: 0o700 });
+  try {
+    const file = await open(partial, 'wx', 0o600); try { await file.writeFile(bytes); } finally { await file.close(); }
+    await rename(partial, target);
+    return { byteSize: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+  } catch (error) { await rm(partial, { force: true }); throw error; }
+}
+
+export const MAX_PICTURE_BYTES = 512 * 1024; export const MAX_PICTURE_SIDE = 512;
+/**
+ * A player's photo, as made by the phone (cropped and re-drawn on a canvas,
+ * which already drops the camera's metadata). Accepted only as a PNG of at
+ * most 512 × 512, and rebuilt from its image chunks alone, so no text, location
+ * or other metadata chunk survives even from a modified phone.
+ * Returns null when it is not such a PNG.
+ */
+export function cleanPicture(bytes: Buffer): Buffer | null {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (bytes.length < 33 || bytes.length > MAX_PICTURE_BYTES || !bytes.subarray(0, 8).equals(signature)) return null;
+  const kept: Buffer[] = [signature]; let offset = 8; let header = false; let end = false; let data = false;
+  while (offset + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset); const type = bytes.toString('latin1', offset + 4, offset + 8);
+    if (offset + 12 + length > bytes.length) return null;
+    const chunk = bytes.subarray(offset, offset + 12 + length);
+    if (type === 'IHDR') {
+      if (header || length !== 13) return null;
+      const width = bytes.readUInt32BE(offset + 8); const height = bytes.readUInt32BE(offset + 12);
+      if (width < 16 || height < 16 || width > MAX_PICTURE_SIDE || height > MAX_PICTURE_SIDE) return null;
+      header = true;
+    }
+    // Only what the image needs: header, palette, transparency, pixels, end.
+    if (['IHDR', 'PLTE', 'tRNS', 'IDAT', 'IEND'].includes(type)) { if (!header) return null; kept.push(chunk); }
+    if (type === 'IDAT') data = true;
+    offset += 12 + length;
+    if (type === 'IEND') { end = true; break; }
+  }
+  return header && data && end ? Buffer.concat(kept) : null;
+}

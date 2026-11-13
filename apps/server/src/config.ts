@@ -13,6 +13,8 @@ const EnvironmentSchema = z.object({
   LOCAL_OWNER_TOKEN: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Use a generated 32-byte base64url owner token').optional(),
   // Where uploaded pictures and videos are stored. Defaults to the ignored .local/media folder.
   MEDIA_DIR: z.string().min(1).max(1024).refine(value => value.startsWith('/'), 'Use an absolute path').optional(),
+  // Days after a room ends (or is last used) before its pictures, videos and drawings are deleted.
+  MEDIA_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   SERVE_WEB: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   DATABASE_URL: z.url().refine(value => ['postgresql:', 'postgres:'].includes(new URL(value).protocol), 'PostgreSQL URL is required').optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),

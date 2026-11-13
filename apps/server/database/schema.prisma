@@ -31,6 +31,14 @@ enum AssetKind {
   IMAGE
   GIF
   VIDEO
+  // Strokes as validated JSON (see the drawing contract), never an image.
+  DRAWING
+}
+
+// What a stored file is for: an answer in a round (or a part of a relay drawing), or a player's picture.
+enum AssetPurpose {
+  ANSWER
+  AVATAR
 }
 
 enum ScoreKind {
@@ -162,6 +170,8 @@ model SessionPlayer {
   joinedAt    DateTime  @default(now()) @db.Timestamptz(3)
   leftAt      DateTime? @db.Timestamptz(3)
   joinKeyHash String?   @unique @db.Char(64)
+  // The player's own look: built-in character parts, validated by PlayerLookSchema. Null means the default made from the ID.
+  look        Json?     @db.JsonB
 
   session     GameSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   credentials PlayerCredential[]
@@ -314,21 +324,26 @@ model Submission {
 model Asset {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sessionId    String    @db.Uuid
-  stageRunId   String    @db.Uuid
+  // Null for a player's picture, which belongs to no round.
+  stageRunId   String?   @db.Uuid
   playerId     String    @db.Uuid
   kind         AssetKind
+  purpose      AssetPurpose @default(ANSWER)
   contentType  String    @db.VarChar(64)
   byteSize     Int
   sha256       String    @db.Char(64)
   submissionId String?   @unique @db.Uuid
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  // Set when the file was deleted by the clean-up; the row stays for history and audit.
+  removedAt    DateTime? @db.Timestamptz(3)
 
-  stage      StageRun      @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  stage      StageRun?     @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
   player     SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
   submission Submission?   @relation(fields: [submissionId], references: [id], onDelete: Restrict)
 
   @@unique([sessionId, id])
   @@index([stageRunId, playerId])
+  @@index([sessionId, removedAt])
   @@map("assets")
 }
 

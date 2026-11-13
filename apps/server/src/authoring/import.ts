@@ -1,3 +1,4 @@
+import { isMinigameKey, MINIGAME_KEYS, MINIGAMES } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -39,7 +40,7 @@ const findKey = (list: { key: string; label: string }[], wanted: unknown) => {
 
 const TYPES: Record<string, string> = { cutscene: 'info', info: 'info', text: 'info', quiz: 'quiz', question: 'quiz', choice: 'quiz', poll: 'poll', writing: 'writing', write: 'writing', joke: 'writing', caption: 'writing',
   upload: 'upload', picture: 'upload', photo: 'upload', video: 'upload', order: 'order', ordering: 'order', challenge: 'challenge', vote: 'vote', voting: 'vote',
-  route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame' };
+  route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame', drawing: 'drawing', draw: 'drawing', sketch: 'drawing' };
 
 /** One stage in the simple format (with `type`) becomes an exact stage. Exact stages (with `kind`) pass through. */
 function stageFrom(raw: Json, key: string): Json {
@@ -48,11 +49,26 @@ function stageFrom(raw: Json, key: string): Json {
   const prompt = text(raw['prompt'] ?? raw['question'] ?? raw['text'] ?? raw['title'], 'Untitled');
   const durationMs = seconds(raw);
   const play = isObject(raw['play']) ? { play: raw['play'] } : {};
+  const stage = stageOfType(raw, key, type, prompt, durationMs, play);
+  // A scene can have its own look (texts, style, animations); the definition check validates it.
+  return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, presentation: raw['look'] ?? raw['presentation'] } : stage;
+}
+function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
   switch (type) {
     case 'info': return { key, kind: 'info', title: text(raw['title'], prompt).slice(0, 120), prompt: text(raw['text'] ?? raw['prompt'], prompt), durationMs };
     case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
-    case 'minigame': return { key, kind: 'minigame', prompt, game: text(raw['game'], 'to-be-chosen'), durationMs };
+    case 'minigame': {
+      // `game` by key or by name ("Tap race"); unknown names stay a placeholder to choose in the editor.
+      const wanted = text(raw['game']).toLowerCase().trim().replace(/\s+/g, '-');
+      const game = MINIGAME_KEYS.find(entry => entry === wanted || MINIGAMES[entry].name.toLowerCase().replace(/\s+/g, '-') === wanted) ?? (wanted || 'to-be-chosen');
+      const known = isMinigameKey(game);
+      const points = Array.isArray(raw['points']) ? raw['points'].map(entry => milli(entry)).filter(entry => entry !== undefined).slice(0, 12) : [];
+      const teamResult = ['best', 'average', 'total'].includes(text(raw['teamResult'])) ? { teamResult: text(raw['teamResult']) } : {};
+      return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...(points.length ? { placementMilli: points } : {}), ...teamResult, ...play };
+    }
     case 'challenge': return { key, kind: 'challenge', prompt, durationMs, maxAwardMilli: milli(raw['maxPoints'] ?? raw['points'] ?? 10) ?? '10000', ...play };
+    case 'drawing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'drawing', maxStrokes: 400, ...(raw['blind'] === true ? { blind: true } : {}) }, scoring: { kind: 'none' }, ...play };
     case 'writing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'text', maxLength: Math.max(1, Math.min(2000, Number(raw['maxLength']) || 240)) }, scoring: { kind: 'none' }, ...play };
     case 'upload': {
       const accept = (Array.isArray(raw['accept']) ? raw['accept'] : ['image', 'gif']).map(entry => text(entry).toLowerCase().replace(/s$/, '').replace('picture', 'image').replace('photo', 'image')).filter(entry => ['image', 'gif', 'video'].includes(entry));
@@ -137,7 +153,7 @@ export function importDefinition(input: string): Json | null {
     formatVersion: raw['formatVersion'] === 1 && !usesRoutes ? 1 : 2,
     title: text(raw['title'], 'Imported game').slice(0, 160) || 'Imported game',
     startNodeKey: keyFor(raw['startNodeKey'] ?? raw['start']) ?? nodes[0]?.key ?? 'start',
-    ...(isObject(raw['teams']) ? { teams: raw['teams'] } : {}), ...(isObject(raw['play']) ? { play: raw['play'] } : {}),
+    ...(isObject(raw['teams']) ? { teams: raw['teams'] } : {}), ...(isObject(raw['play']) ? { play: raw['play'] } : {}), ...(isObject(raw['look'] ?? raw['presentation']) ? { presentation: raw['look'] ?? raw['presentation'] } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;

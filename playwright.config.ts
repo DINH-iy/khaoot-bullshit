@@ -2,7 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e', fullyParallel: false, workers: 1, retries: 0,
   timeout: 45000, expect: { timeout: 10000 }, reporter: 'list',
-  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },
+  // Rooms animate; tests check a settled page, so motion is reduced (the look test turns it back on).
+  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure', contextOptions: { reducedMotion: 'reduce' } },
   projects: [
     { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
     { name: 'android-chrome', use: { ...devices['Pixel 5'] } },

@@ -81,10 +81,44 @@ const fridayNightChaos = parseDefinition({
   ],
 });
 
+// All four minigames, the last one as one player against everyone else.
+const minigameMadness = parseDefinition({
+  formatVersion: 2, title: 'Minigame madness', startNodeKey: 'intro',
+  nodes: [
+    { key: 'intro', stages: [{ key: 'cutscene', kind: 'info', title: 'MINIGAME MADNESS', prompt: 'Four quick games on your phone. Fastest fingers win.', durationMs: null }] },
+    { key: 'reaction', stages: [{ key: 'play', kind: 'minigame', prompt: 'Reaction duel', game: 'reaction', durationMs: 20_000 }] },
+    { key: 'taps', stages: [{ key: 'play', kind: 'minigame', prompt: 'Tap race', game: 'tap-race', settings: { seconds: 10 }, durationMs: 20_000 }] },
+    { key: 'clock', stages: [{ key: 'play', kind: 'minigame', prompt: 'Stop the clock at 10 seconds', game: 'stop-clock', durationMs: 30_000 }] },
+    { key: 'doors', stages: [{ key: 'play', kind: 'minigame', prompt: 'Lucky doors', game: 'lucky-doors', settings: { doorsMilli: ['0', '3000', '5000', '15000'] }, durationMs: 20_000 }] },
+    { key: 'showdown', stages: [{ key: 'play', kind: 'minigame', prompt: 'Showdown: one against everyone', game: 'tap-race', settings: { seconds: 8 }, durationMs: 20_000, teamResult: 'average',
+      play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'sizes', sizes: [1, 'rest'] }, formation: 'random', names: ['The Lone Hero', 'The Crowd'] } }, answers: 'everyone', points: 'members' } },
+      { key: 'scores', kind: 'scoreboard', prompt: 'Final standings', show: 'players', durationMs: null }] },
+  ],
+  edges: [{ key: 'a', from: 'intro', to: 'reaction' }, { key: 'b', from: 'reaction', to: 'taps' }, { key: 'c', from: 'taps', to: 'clock' }, { key: 'd', from: 'clock', to: 'doors' }, { key: 'e', from: 'doors', to: 'showdown' }],
+});
+
+// Drawing: a blind drawing and its vote, a doodle to finish, the roundest circle, and teams passing the pencil.
+const squiggle = { v: 1 as const, strokes: [{ c: 0, w: 10, p: [300, 600, 360, 520, 440, 500, 500, 560, 560, 620, 640, 600, 700, 520] }] };
+const drawParty = parseDefinition({
+  formatVersion: 2, title: 'Draw party', startNodeKey: 'blind',
+  nodes: [
+    { key: 'blind', stages: [{ key: 'draw', kind: 'collect', prompt: 'Draw the host, without looking!', durationMs: 45_000, input: { kind: 'drawing', maxStrokes: 200, blind: true }, scoring: { kind: 'none' } },
+      { key: 'vote', kind: 'vote', prompt: 'Vote for the best portrait. Not your own.', durationMs: 40_000, source: { nodeKey: 'blind', stageKey: 'draw' }, awardPerVoteMilli: '5000' }] },
+    { key: 'doodle', stages: [{ key: 'draw', kind: 'collect', prompt: 'Finish this doodle. What could it be?', durationMs: 60_000, input: { kind: 'drawing', maxStrokes: 300, start: squiggle }, scoring: { kind: 'none' } }] },
+    { key: 'circle', stages: [{ key: 'play', kind: 'minigame', prompt: 'Perfect circle', game: 'perfect-circle', durationMs: 25_000 }] },
+    { key: 'relay', stages: [{ key: 'play', kind: 'minigame', prompt: 'Pass the pencil: draw a castle with a dragon', game: 'relay-drawing', settings: { secondsPerTurn: 15, voteSeconds: 30 }, durationMs: 180_000,
+      play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }, answers: 'everyone', points: 'members' } },
+      { key: 'scores', kind: 'scoreboard', prompt: 'Final standings', show: 'players', durationMs: null }] },
+  ],
+  edges: [{ key: 'a', from: 'blind', to: 'doodle' }, { key: 'b', from: 'doodle', to: 'circle' }, { key: 'c', from: 'circle', to: 'relay' }],
+});
+
 export const builtInGames: readonly { key: string; description: string; definition: GameDefinition }[] = [
   { key: 'timed-quiz', description: 'Timed questions with tiles and a list, an ordering round and a writing round. The host can add time, change it or close early.', definition: timedQuiz },
   { key: 'friday-night-chaos', description: 'The party votes on a route: Music Mayhem or Living Sculpture. Both routes end in the same finale.', definition: fridayNightChaos },
   { key: 'team-party', description: 'Two random teams with captains, a solo round, one player against the rest, then players pick new teams and vote.', definition: teamParty },
+  { key: 'minigame-madness', description: 'Reaction duel, tap race, stop the clock and lucky doors, then one player against everyone in a final tap race.', definition: minigameMadness },
+  { key: 'draw-party', description: 'A blind portrait of the host and a vote, a doodle to finish, the roundest circle, then teams pass the pencil and vote for the best drawing.', definition: drawParty },
   { key: 'picture-party', description: 'Players answer by uploading pictures, GIFs or short videos, shown to everyone at the reveal.', definition: pictureParty },
   { key: 'first-reliable-game', description: 'Untimed quiz question, a host-judged challenge and a writing round. The host closes each stage.', definition: preparedGame },
 ];

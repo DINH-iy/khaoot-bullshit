@@ -1,3 +1,4 @@
+import { isMinigameKey, MINIGAMES } from '@party/contracts';
 // Flow editor model: pure functions over a game draft. The server validates
 // every save; this only keeps edits well formed and the canvas snappy.
 
@@ -41,18 +42,19 @@ export function pointOnCurve(from: Point, to: Point, t: number): Point {
 }
 
 // ---------- scene types ----------
-export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'order' | 'challenge' | 'vote' | 'route' | 'scoreboard' | 'minigame';
+export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'scoreboard' | 'minigame';
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
   { type: 'info', name: 'Cutscene or info', icon: 'info', hint: 'Text on every screen' },
   { type: 'quiz', name: 'Quiz question', icon: 'quiz', hint: 'Tiles or a list, one correct answer' },
   { type: 'writing', name: 'Writing round', icon: 'writing', hint: 'Jokes, captions, excuses' },
   { type: 'upload', name: 'Picture or video round', icon: 'upload', hint: 'Photos, GIFs, short videos' },
+  { type: 'drawing', name: 'Drawing round', icon: 'drawing', hint: 'Draw on the phone, then vote' },
   { type: 'order', name: 'Put in order', icon: 'order', hint: 'Arrange items correctly' },
   { type: 'challenge', name: 'Host-judged challenge', icon: 'challenge', hint: 'The host gives points' },
   { type: 'vote', name: 'Vote on answers', icon: 'vote', hint: 'Vote for a writing or upload round' },
   { type: 'route', name: 'Party choice', icon: 'route', hint: 'Branch into routes' },
   { type: 'scoreboard', name: 'Scoreboard', icon: 'scoreboard', hint: 'Show the standings' },
-  { type: 'minigame', name: 'Minigame', icon: 'minigame', hint: 'Placeholder until minigames exist' },
+  { type: 'minigame', name: 'Minigame', icon: 'minigame', hint: 'Reaction, tap race, circles, Pass the pencil…' },
 ];
 export function newStage(type: SceneType, definition: Definition): Stage {
   switch (type) {
@@ -61,6 +63,7 @@ export function newStage(type: SceneType, definition: Definition): Stage {
       input: { kind: 'choice', layout: 'tiles', options: [{ key: 'a', label: 'Answer A' }, { key: 'b', label: 'Answer B' }] },
       scoring: { kind: 'correct-choice', correctChoiceKey: 'a', awardMilli: '10000' } };
     case 'writing': return { key: 'main', kind: 'collect', prompt: 'Write your answer.', durationMs: 60_000, input: { kind: 'text', maxLength: 240 }, scoring: { kind: 'none' } };
+    case 'drawing': return { key: 'main', kind: 'collect', prompt: 'Draw a cat on a skateboard.', durationMs: 60_000, input: { kind: 'drawing', maxStrokes: 400 }, scoring: { kind: 'none' } };
     case 'upload': return { key: 'main', kind: 'collect', prompt: 'Upload a picture or GIF.', durationMs: 90_000, input: { kind: 'media', accept: ['image', 'gif'] }, scoring: { kind: 'none' } };
     case 'challenge': return { key: 'main', kind: 'challenge', prompt: 'Describe the challenge. The host judges.', durationMs: null, maxAwardMilli: '10000' };
     case 'vote': {
@@ -73,10 +76,10 @@ export function newStage(type: SceneType, definition: Definition): Stage {
     case 'order': return { key: 'main', kind: 'collect', prompt: 'Put these in the right order.', durationMs: 30_000,
       input: { kind: 'order', items: [{ key: 'first', label: 'First' }, { key: 'second', label: 'Second' }, { key: 'third', label: 'Third' }] },
       scoring: { kind: 'correct-order', correctOrder: ['first', 'second', 'third'], awardMilli: '10000' } };
-    case 'minigame': return { key: 'main', kind: 'minigame', prompt: 'Describe the minigame you have in mind.', game: 'to-be-chosen', durationMs: 60_000 };
+    case 'minigame': return { key: 'main', kind: 'minigame', prompt: 'Tap race!', game: 'tap-race', durationMs: MINIGAMES['tap-race'].defaultSeconds * 1000 };
   }
 }
-export const isVotable = (stage: Stage) => stage.kind === 'collect' && ['text', 'media'].includes((stage['input'] as { kind?: string } | undefined)?.kind ?? '') && (stage['scoring'] as { kind?: string } | undefined)?.kind === 'none';
+export const isVotable = (stage: Stage) => stage.kind === 'collect' && ['text', 'media', 'drawing'].includes((stage['input'] as { kind?: string } | undefined)?.kind ?? '') && (stage['scoring'] as { kind?: string } | undefined)?.kind === 'none';
 export function uniqueKey(prefix: string, taken: Iterable<string>): string {
   const used = new Set(taken); let index = 1;
   while (used.has(`${prefix}-${index}`)) index++;
@@ -88,7 +91,7 @@ const KIND_LABEL: Record<string, string> = { info: 'Cutscene', route: 'Party cho
 function stageLabel(stage: Stage): string {
   if (stage.kind !== 'collect') return KIND_LABEL[stage.kind] ?? stage.kind;
   const input = (stage['input'] as { kind?: string } | undefined)?.kind;
-  return input === 'choice' ? 'Quiz' : input === 'order' ? 'Ordering' : input === 'media' ? 'Upload' : input === 'text' ? 'Writing' : 'Question';
+  return input === 'choice' ? 'Quiz' : input === 'order' ? 'Ordering' : input === 'media' ? 'Upload' : input === 'text' ? 'Writing' : input === 'drawing' ? 'Drawing' : 'Question';
 }
 const seconds = (stage: Stage) => typeof stage.durationMs === 'number' ? `${Math.round(stage.durationMs / 1000)} seconds` : null;
 function stageLine(stage: Stage): string {
@@ -100,7 +103,7 @@ function stageLine(stage: Stage): string {
   }
   if (stage.kind === 'challenge') return 'Challenge · Host judges';
   if (stage.kind === 'scoreboard') return 'Scoreboard';
-  if (stage.kind === 'minigame') return ['Placeholder', timer].filter(Boolean).join(' · ');
+  if (stage.kind === 'minigame') { const game = String(stage['game']); return [isMinigameKey(game) ? MINIGAMES[game].name : 'Choose a minigame', timer].filter(Boolean).join(' · '); }
   if (stage.kind === 'vote') return ['Vote on answers', timer].filter(Boolean).join(' · ');
   const input = stage['input'] as { kind?: string; options?: unknown[] } | undefined;
   return [stageLabel(stage), input?.kind === 'choice' ? `${input.options?.length ?? 0} options` : null, timer].filter(Boolean).join(' · ');

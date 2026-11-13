@@ -8,7 +8,7 @@ import type { DraftState } from './use-draft.js';
 
 // What a part is, without the scene's own route or rejoin label.
 const partLabel = (definition: Definition, stage: Node['stages'][number]) => cardText(definition, { key: '\u0000part', stages: [stage] }).label;
-const PART_TYPES: SceneType[] = ['info', 'quiz', 'writing', 'upload', 'order', 'challenge', 'vote', 'scoreboard', 'minigame'];
+const PART_TYPES: SceneType[] = ['info', 'quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote', 'scoreboard', 'minigame'];
 interface Row { node: Node; depth: number; via: string | null }
 
 /** The scenes in play order: depth-first along the routes, each branch indented under its route, rejoins listed once after them. */
@@ -120,7 +120,7 @@ export function SceneView({ d, selected, setSelected }: { d: DraftState; selecte
 
 function PartPalette({ onPick, onCancel }: { onPick: (type: SceneType) => void; onCancel: () => void }) {
   return <div className="add-menu inline" role="menu" aria-label="Add a part">
-    {PART_TYPES.map(type => <button key={type} role="menuitem" onClick={() => onPick(type)}><Icon name={type === 'quiz' ? 'quiz' : type} /><span><strong>{{ info: 'Cutscene or info', quiz: 'Quiz question', writing: 'Writing round', upload: 'Picture or video round', order: 'Put in order', challenge: 'Host-judged challenge', vote: 'Vote on answers', scoreboard: 'Scoreboard', minigame: 'Minigame', route: '' }[type]}</strong></span></button>)}
+    {PART_TYPES.map(type => <button key={type} role="menuitem" onClick={() => onPick(type)}><Icon name={type === 'quiz' ? 'quiz' : type} /><span><strong>{{ info: 'Cutscene or info', quiz: 'Quiz question', writing: 'Writing round', upload: 'Picture or video round', drawing: 'Drawing round', order: 'Put in order', challenge: 'Host-judged challenge', vote: 'Vote on answers', scoreboard: 'Scoreboard', minigame: 'Minigame', route: '' }[type]}</strong></span></button>)}
     <button role="menuitem" className="add-cancel" onClick={onCancel}>Cancel</button></div>;
 }
 function Problems({ problems, parts }: { problems: DefinitionIssue[]; parts: number }) {
@@ -151,8 +151,8 @@ function Preview({ node, index }: { node: Node; index: number }) {
   const timer = typeof stage.durationMs === 'number' ? `${Math.round(stage.durationMs / 1000)} s` : null;
   const options = stage.kind === 'route' ? optionsOf(node) : input?.options ?? input?.items ?? [];
   const phone = stage.kind === 'info' || stage.kind === 'scoreboard' ? 'Watching the shared screen'
-    : stage.kind === 'challenge' ? 'Follow the host' : stage.kind === 'minigame' ? 'Minigame controls will appear here'
-    : stage.kind === 'vote' ? 'Vote for an answer' : input?.kind === 'text' ? 'Type an answer' : input?.kind === 'media' ? 'Upload a picture or video' : input?.kind === 'order' ? 'Put the items in order' : 'Choose an answer';
+    : stage.kind === 'challenge' ? 'Follow the host' : stage.kind === 'minigame' ? 'Minigame controls: big buttons to play'
+    : stage.kind === 'vote' ? 'Vote for an answer' : input?.kind === 'text' ? 'Type an answer' : input?.kind === 'media' ? 'Upload a picture or video' : input?.kind === 'drawing' ? 'Draw on the phone' : input?.kind === 'order' ? 'Put the items in order' : 'Choose an answer';
   return <div className="preview">
     <figure className="tv"><figcaption>Shared screen</figcaption>
       <div className={`tv-screen tv-${stage.kind}`}>

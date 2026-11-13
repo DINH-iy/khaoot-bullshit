@@ -17,7 +17,7 @@ describe('server-only game definitions', () => {
     }
     expect(() => parseDefinition({ ...preparedGame, nodes: [...preparedGame.nodes, preparedGame.nodes[0]] })).toThrow('INVALID_DEFINITION');
   });
-  it('validates secret scoring and runs timed stages while failing closed on not-yet-supported drawing', () => {
+  it('validates secret scoring, runs timed stages and drawing rounds, and fails closed on an unchosen minigame', () => {
     const game = structuredClone(preparedGame);
     const stage = game.nodes[0]!.stages[0]!;
     if (stage.kind !== 'collect') throw new Error('Fixture');
@@ -27,7 +27,9 @@ describe('server-only game definitions', () => {
     for (const durationMs of [999, 3_600_001, 1500.5]) { stage.durationMs = durationMs; expect(() => parseDefinition(game)).toThrow('INVALID_DEFINITION'); }
     stage.durationMs = 1000;
     expect(() => assertExecutable(parseDefinition(game))).not.toThrow();
-    stage.input = { kind: 'drawing', maxStrokes: 100 };
+    stage.input = { kind: 'drawing', maxStrokes: 100, blind: true };
+    expect(() => assertExecutable(parseDefinition(game))).not.toThrow();
+    game.nodes[0]!.stages[0] = { key: stage.key, kind: 'minigame', prompt: 'Later', game: 'to-be-chosen', durationMs: null };
     expect(() => assertExecutable(parseDefinition(game))).toThrow('UNSUPPORTED_FEATURE');
   });
   it('validates ordering rounds and keeps old definitions without a layout hashing the same', () => {

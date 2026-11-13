@@ -80,4 +80,16 @@ describe('importing a game from text', () => {
       expect(imported['nodes']).toEqual(definition.nodes);
     }
   });
+  it('imports minigames by key or name, with settings, place points and team play', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Minis', scenes: [
+      { id: 'race', type: 'minigame', question: 'Tap race!', game: 'Tap race', settings: { seconds: 5 }, points: [20, 10] },
+      { id: 'duel', type: 'minigame', question: 'Duel', game: 'reaction', teamResult: 'best', play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'sizes', sizes: [1, 'rest'] }, formation: 'random' } }, answers: 'everyone', points: 'team' } },
+      { id: 'later', type: 'minigame', question: 'Something else', game: 'hot potato' },
+    ] }));
+    const stages = (definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes.map(node => node.stages[0]!);
+    expect(stages[0]).toMatchObject({ kind: 'minigame', game: 'tap-race', settings: { seconds: 5 }, placementMilli: ['20000', '10000'], durationMs: 20000 });
+    expect(stages[1]).toMatchObject({ game: 'reaction', teamResult: 'best', play: { kind: 'teams' } });
+    // An unknown minigame stays a scene to choose in the editor.
+    expect(issues).toEqual([expect.objectContaining({ code: 'Choose a minigame', nodeKey: 'later' })]);
+  });
 });

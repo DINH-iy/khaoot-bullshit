@@ -1,3 +1,4 @@
+import { gameFacts } from './game-facts.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ClaimRoomSchema, GameIdSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, type RoomReply } from '@party/contracts';
@@ -93,7 +94,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
         orderBy: { createdAt: 'desc' }, take: 10,
       });
       return { ok: true, data: HostMenuSchema.parse({
-        games: builtInGames.map(game => ({ key: game.key, title: game.definition.title, description: game.description, stageCount: maxPathStages(game.definition), branches: allStages(game.definition).some(entry => entry.stage.kind === 'route'), timed: allStages(game.definition).some(entry => entry.stage.durationMs !== null) })),
+        games: builtInGames.map(game => ({ key: game.key, title: game.definition.title, description: game.description, stageCount: maxPathStages(game.definition), branches: allStages(game.definition).some(entry => entry.stage.kind === 'route'), timed: allStages(game.definition).some(entry => entry.stage.durationMs !== null), ...gameFacts(game.definition) })),
         myGames: await authoring.list(creator.id),
         rooms: rooms.map(room => ({ sessionId: room.id, roomCode: room.roomCode, title: room.gameVersion.game.title, status: room.status, playerCount: room._count.players })),
       }) };

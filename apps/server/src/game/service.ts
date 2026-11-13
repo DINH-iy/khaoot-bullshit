@@ -2,6 +2,8 @@ import { performance } from 'node:perf_hooks';
 import { CommandReceiptSchema, GameCommandSchema, PLAYER_COMMANDS, SessionChangedSchema, type CommandReceipt, type GameErrorCode } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { applyCommand } from './commands.js';
+import { closeSoonWhenAllIn } from './auto-close.js';
+import type { LiveSignals } from '../minigames/live.js';
 import { assertExecutable, contentHash, parseDefinition } from './definition.js';
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
@@ -9,7 +11,8 @@ import { actorKey, authorize, checkRevision, requireHost, TrustedActorSchema, ty
 
 export interface CommandObservation { type: string; outcome: 'COMMITTED' | 'REPLAYED' | GameErrorCode; durationMs: number }
 
-export function createGameService(client: PrismaClient, observe?: (event: CommandObservation) => void, clock: Clock = () => new Date()) {
+/** `live`: optional signals from connected phones that help judge minigame results (see minigames/live.ts). */
+export function createGameService(client: PrismaClient, observe?: (event: CommandObservation) => void, clock: Clock = () => new Date(), live?: LiveSignals) {
   return {
     async execute(trustedActor: TrustedActor, input: unknown): Promise<CommandReceipt> {
       const start = performance.now();
@@ -57,7 +60,8 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
           const definition = parseDefinition(session.gameVersion.definition);
           requireGame(session.gameVersion.definitionFormat === definition.formatVersion && contentHash(definition) === session.gameVersion.contentHash, 'INVALID_DEFINITION');
           assertExecutable(definition);
-          const effect = await applyCommand(tx, session, definition, actor.data, command, receivedAt);
+          const effect = await applyCommand(tx, session, definition, actor.data, command, receivedAt, live);
+          if (command.type === 'submission.submit' && effect.stageRunId) await closeSoonWhenAllIn(tx, session, definition, effect.stageRunId, receivedAt);
           const revision = session.revision + 1;
           const result = CommandReceiptSchema.parse({ formatVersion: 1, commandId: command.commandId, sessionId: session.id, revision, type: command.type, stageRunId: effect.stageRunId, submissionId: effect.submissionId });
           const saved = await tx.gameCommand.create({ data: { sessionId: session.id, commandKey: command.commandId, actorKey: key, type, requestHash, result } });

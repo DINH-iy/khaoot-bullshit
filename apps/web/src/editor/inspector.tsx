@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DefinitionIssue } from '@party/contracts';
+import { MinigameFields } from './minigame-fields.js';
+import { DrawingFields } from './drawing-fields.js';
 import { cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, setRouteOptions, uniqueKey, updateStage, type Definition, type Node, type Option, type Stage } from './model.js';
 
 type Change = (next: Definition, group?: string) => void;
@@ -18,7 +20,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
   const id = (field: string) => `${node.key}-${index}-${field}`;
   return <div className="stage-fields">
     {stage.kind === 'info' && <label>Title<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
-    <label>{stage.kind === 'info' ? 'Text on every screen' : stage.kind === 'scoreboard' ? 'Heading' : stage.kind === 'route' ? 'Question to the party' : stage.kind === 'minigame' ? 'What happens in this minigame' : 'Question or instruction'}
+    <label>{stage.kind === 'info' ? 'Text on every screen' : stage.kind === 'scoreboard' ? 'Heading' : stage.kind === 'route' ? 'Question to the party' : stage.kind === 'minigame' ? 'Title on the screens' : 'Question or instruction'}
       <textarea value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
     {!(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' &&
       <label>Timer in seconds (empty: no timer)<input type="number" inputMode="numeric" min={1} max={3600} value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} /></label>}
@@ -51,6 +53,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
     {stage.kind === 'collect' && input?.kind === 'media' && <fieldset><legend>Players may upload</legend>{(['image', 'gif', 'video'] as const).map(kind => <label key={kind} className="choice"><input type="checkbox" checked={(input.accept ?? []).includes(kind)}
       disabled={(input.accept ?? []).length === 1 && (input.accept ?? []).includes(kind)}
       onChange={event => edit(current => ({ ...current, input: { ...input, accept: event.target.checked ? [...(input.accept ?? []), kind] : (input.accept ?? []).filter(entry => entry !== kind) } }))} />{{ image: 'Pictures', gif: 'GIFs', video: 'Short videos' }[kind]}</label>)}</fieldset>}
+    {stage.kind === 'collect' && input?.kind === 'drawing' && <DrawingFields stage={stage} onChange={(next, field) => edit(() => next, field)} />}
     {stage.kind === 'challenge' && <label>Most points the host can give<input type="number" min={0} value={points(stage['maxAwardMilli'])} onChange={event => edit(current => ({ ...current, maxAwardMilli: milli(event.target.value) }), 'points')} /></label>}
     {stage.kind === 'vote' && <>
       <label>Answers to vote on<select value={`${(stage['source'] as { nodeKey: string }).nodeKey}/${(stage['source'] as { stageKey: string }).stageKey}`}
@@ -60,9 +63,9 @@ export function StageFields({ definition, node, index, onChange }: { definition:
       <label>Points per vote received<input type="number" min={0} value={points(stage['awardPerVoteMilli'])} onChange={event => edit(current => ({ ...current, awardPerVoteMilli: milli(event.target.value) }), 'points')} /></label>
     </>}
     {stage.kind === 'scoreboard' && <label>Show<select value={String(stage['show'])} onChange={event => edit(current => ({ ...current, show: event.target.value }))}><option value="players">Player scores</option><option value="teams">Team scores</option><option value="both">Both</option></select></label>}
-    {stage.kind === 'minigame' && <p className="hint">Minigames are placeholders for now: you can place and connect them, but the game can only be published once minigames are built.</p>}
+    {stage.kind === 'minigame' && <MinigameFields definition={definition} node={node} index={index} onChange={onChange} />}
     {stage.kind === 'route' && <RouteFields definition={definition} node={node} stage={stage} onChange={onChange} />}
-    {['collect', 'challenge', 'vote'].includes(stage.kind) && <PlayFields definition={definition} node={node} index={index} onChange={onChange} />}
+    {['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind) && <PlayFields definition={definition} node={node} index={index} onChange={onChange} />}
   </div>;
 }
 

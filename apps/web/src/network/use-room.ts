@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import { createLiveStrokes } from '../drawing/live-strokes.js';
+import { createReactionStore } from '../room-extras/reactions.js';
 import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, type GameCommand, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
   const [message, setMessage] = useState(''); const [samples, setSamples] = useState<number[]>([]); const [reconnects, setReconnects] = useState(0);
   const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false); const [clockOffset, setClockOffset] = useState(0); const [confirmMs, setConfirmMs] = useState<number | null>(null);
+  // Live minigame signals: GO the moment it happens, and the running tap counts of a race.
+  const [go, setGo] = useState<{ stageRunId: string; goAt: string; receivedAt: number } | null>(null); const [progress, setProgress] = useState<{ stageRunId: string; counts: { playerId: string; count: number }[] } | null>(null);
+  const [liveStrokes] = useState(createLiveStrokes); const [reactions] = useState(createReactionStore);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
   // What the host was looking at when acting: used to decide whether a conflicting action is still meant.
   const latestRef = useRef<RoomSnapshot | undefined>(undefined); const basisRef = useRef('');
@@ -95,13 +100,27 @@ export function useRoom(sessionId: string | undefined, display = false) {
       }
     });
     socket.on('room.changed', requestSync); socket.on('presence.changed', requestSync);
+    // The server measures its round trip to this phone; answering at once keeps minigame results fair.
+    socket.on('room.ping', (_input: unknown, ack: unknown) => { if (typeof ack === 'function') ack(); });
+    socket.on('minigame.go', (data: { stageRunId?: unknown; goAt?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && typeof data.goAt === 'string') { setGo({ stageRunId: data.stageRunId, goAt: data.goAt, receivedAt: performance.now() }); requestSync(); } });
+    socket.on('drawing.live', (data: unknown) => { if (mounted) liveStrokes.apply(data); });
+    socket.on('room.reaction', (data: unknown) => { if (mounted) reactions.add(data); });
+    socket.on('minigame.progress', (data: { stageRunId?: unknown; counts?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && Array.isArray(data.counts)) setProgress({ stageRunId: data.stageRunId, counts: (data.counts as { playerId: string; count: number }[]).filter(entry => typeof entry?.playerId === 'string' && Number.isInteger(entry.count)).slice(0, 512) }); });
     socket.on('room.error', (error: { code: string }) => { if (mounted) setMessage(error.code); });
     const interval = setInterval(() => { void heartbeat(); requestSync(); }, 10000);
     const foreground = () => { if (!document.hidden) { if (!socket.connected) socket.connect(); reconciled = false; requestSync(); void heartbeat(); } };
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
     return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
-  }, [sessionId, display, remember, storageKey]);
-  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs,
+  }, [sessionId, display, remember, storageKey, liveStrokes, reactions]);
+  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress,
+    /** A tap race's running count; fire-and-forget, the final result is the saved one. */
+    // Not volatile: a report waits for a busy connection instead of being dropped, so the server sees every tap it can.
+    sendTaps(stageRunId: string, count: number) { socketRef.current?.emit('minigame.taps', { stageRunId, count }); },
+    liveStrokes, reactions,
+    /** An emoji or sticker for the shared screen; fire-and-forget (the server limits the pace). */
+    sendReaction(reaction: number) { socketRef.current?.volatile.emit('room.react', { reaction }); },
+    /** A stroke of a Pass the pencil turn while it is drawn (others see it grow); `stroke: null` with a smaller `count` is an undo. */
+    sendStroke(message: { stageRunId: string; turn: number; strokeId: number; stroke: unknown; count: number }) { socketRef.current?.volatile.emit('drawing.stroke', message); },
     send(command: GameCommand) { if (pendingRef.current) return; basisRef.current = basisOf(latestRef.current); remember(command); sendRef.current(command); }, retry() { if (pendingRef.current) sendRef.current(pendingRef.current); },
     discard() { remember(); setMessage('Pending action discarded locally. Already saved actions remain on the server.'); }, reconnect() { socketRef.current?.disconnect().connect(); },
   };

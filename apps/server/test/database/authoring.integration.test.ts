@@ -89,13 +89,13 @@ describe('authoring drafts and publishing', () => {
     await expect(prisma.gameVersion.update({ where: { id: versions[0]!.id }, data: { contentHash: 'f'.repeat(64) } })).rejects.toThrow();
   });
 
-  it('accepts minigame placeholders in drafts, marks them on their scene, and refuses to publish them', async () => {
+  it('accepts minigame scenes without a chosen minigame in drafts, marks them on their scene, and refuses to publish them', async () => {
     const author = await creator(); const draft = await authoring.create(author.id, { gameId: randomUUID(), title: 'Mini', startFrom: null });
     const definition = draft.definition as { nodes: { key: string; stages: object[] }[]; edges: object[] };
     const withMinigame = { ...definition, nodes: [...definition.nodes, { key: 'mini', stages: [{ key: 'main', kind: 'minigame', prompt: 'Musical chairs', game: 'to-be-chosen', durationMs: 60000 }] }],
       edges: [{ key: 'w-m', from: 'welcome', to: 'mini' }] };
     const saved = await authoring.save(author.id, draft.gameId, { expectedRevision: 0, definition: withMinigame });
-    expect(saved.issues).toEqual([expect.objectContaining({ code: 'Minigames cannot be played yet', nodeKey: 'mini', stageIndex: 0, message: expect.stringContaining('placeholders') })]);
+    expect(saved.issues).toEqual([expect.objectContaining({ code: 'Choose a minigame', nodeKey: 'mini', stageIndex: 0, message: expect.stringContaining('Choose which minigame') })]);
     await expect(authoring.publish(author.id, draft.gameId, { expectedRevision: 1 })).rejects.toMatchObject({ code: 'INVALID_DEFINITION' });
   });
   it('rehearses the current draft without publishing, from the start or from a scene, in a hidden game', async () => {

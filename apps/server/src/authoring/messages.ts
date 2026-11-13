@@ -34,8 +34,9 @@ const RULES: Record<string, string> = {
   'Choice keys must be unique': 'Two answer options have the same name.',
   'Item keys must be unique': 'Two items have the same name.',
   'At most one team takes the rest': 'Only one team can take “the rest” of the players.',
-  'Drawing rounds cannot be played yet': 'Drawing rounds cannot be played yet.',
-  'Minigames cannot be played yet': 'Minigames are placeholders for now. The game can be published once minigames are built, or when this scene is removed.',
+  'Choose a minigame': 'Choose which minigame is played here. The game can be published once every minigame scene has one.',
+  'This minigame needs teams': 'Pass the pencil is played in teams. Set this round (or the game) to play in teams.',
+  'Minigame settings are not valid': 'The minigame settings do not fit together. Check the times and points.',
 };
 const FIELDS: Record<string, string> = {
   prompt: 'The text is empty or too long.', title: 'The title is empty or too long.', label: 'An option name is empty or too long.',
