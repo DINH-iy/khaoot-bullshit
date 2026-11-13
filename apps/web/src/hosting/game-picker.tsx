@@ -17,7 +17,7 @@ export function GameCover({ game, size }: { game: Game; size: 'small' | 'large' 
   const icons = (game.features.length ? game.features : ['quiz' as Feature]).slice(0, size === 'large' ? 4 : 2);
   return <div className={`game-cover ${size}`} aria-hidden="true" style={{ background: `linear-gradient(${angle}deg, ${game.colors.from}, hsl(${hue} 70% 42%) 60%, ${game.colors.to})` }}>
     <svg className="cover-pattern" viewBox="0 0 200 120" preserveAspectRatio="none">{Array.from({ length: 9 }, (_, index) =>
-      <circle key={index} cx={(value >> index) % 200} cy={(value >> (index + 3)) % 120} r={8 + ((value >> index) % 30)} fill="#fff" opacity={0.06 + (index % 3) * 0.03} />)}</svg>
+      <circle key={index} cx={(value >>> index) % 200} cy={(value >>> (index + 3)) % 120} r={8 + ((value >>> index) % 30)} fill="#fff" opacity={0.06 + (index % 3) * 0.03} />)}</svg>
     <div className="cover-icons">{icons.map(feature => <span key={feature}><Icon name={FEATURES[feature].icon} size={size === 'large' ? 40 : 22} /></span>)}</div>
     {size === 'large' && <p className="cover-title">{game.title}</p>}
   </div>;

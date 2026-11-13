@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { closeRoundsByHand, expectPhoneScores } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -21,6 +22,7 @@ test('owner opens a room from the host menu and stays in control of a timed stag
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await closeRoundsByHand(host);
 
     await page.goto(`/?code=${roomCode}`);
     await page.getByLabel('Your name').fill('Phone player');
@@ -68,8 +70,7 @@ test('owner opens a room from the host menu and stays in control of a timed stag
     await expect(page.getByRole('radio', { name: 'Pacific', exact: true })).toBeVisible();
     await expect(page.locator('fieldset.tiles')).toHaveCount(0);
     // Moving on revealed round one: the scoreboard now counts the correct Saturn answer.
-    const playerScores = page.getByRole('region', { name: 'Scoreboard' });
-    await expect(playerScores.getByRole('listitem')).toContainText(['Phone player (you)10']);
+    await expectPhoneScores(page, ['Phone player (you)10']);
     await page.getByRole('radio', { name: 'Pacific', exact: true }).check();
     await page.getByRole('button', { name: 'Save answer', exact: true }).click();
     await expect(page.getByText('1 of 1 answered')).toBeVisible();
@@ -77,18 +78,18 @@ test('owner opens a room from the host menu and stays in control of a timed stag
     // Locked but not revealed: no answer, no new points yet.
     await expect(page.getByText('answers are locked')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Round results' })).toHaveCount(0);
-    await expect(playerScores.getByRole('listitem')).toContainText(['Phone player (you)10']);
+    await expectPhoneScores(page, ['Phone player (you)10']);
     await host.getByRole('button', { name: 'Reveal results' }).click();
     const results = page.getByRole('region', { name: 'Round results' });
     await expect(results).toContainText('Correct answer: Pacific');
     await expect(results).toContainText('You earned 10 points this round.');
-    await expect(playerScores.getByRole('listitem')).toContainText(['Phone player (you)20']);
+    await expectPhoneScores(page, ['Phone player (you)20']);
     await expect(host.getByRole('button', { name: 'Reopen for 30 seconds' })).toHaveCount(0);
     // The host fixes a score; the player sees it without any earlier entry being edited.
     await host.getByRole('button', { name: 'Correct scores' }).click();
     await host.getByLabel('Correct score for Phone player (+ or −)').fill('-3');
     await host.getByRole('button', { name: 'Correct score', exact: true }).click();
-    await expect(playerScores.getByRole('listitem')).toContainText(['Phone player (you)17']);
+    await expectPhoneScores(page, ['Phone player (you)17']);
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await host.getByRole('button', { name: 'Next', exact: true }).click();

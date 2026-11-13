@@ -35,11 +35,17 @@ export function ReactionsOverlay({ state, store }: { state: RoomSnapshot; store:
 }
 
 /** The phone's reaction tray: tap as often as you like (the server limits the pace). */
-export function ReactionTray({ onSend }: { onSend: (reaction: number) => void }) {
+export function ReactionTray({ onSend, choices, limit }: { onSend: (reaction: number) => void; choices: readonly number[]; limit: number }) {
   const t = useText(); const [sent, setSent] = useState<number | null>(null);
+  // The same limit as the server (per 10 seconds), so the phone can say "slow down" instead of silently dropping.
+  const [recent, setRecent] = useState<number[]>([]); const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(timer); }, []);
+  const live = recent.filter(at => now - at < 10_000); const waiting = live.length >= limit;
+  const send = (index: number) => { const at = Date.now(); const kept = recent.filter(time => at - time < 10_000); if (kept.length >= limit) return; setRecent([...kept, at]); setNow(at); onSend(index); setSent(index); };
   return <div className="reaction-tray">
-    <p className="sheet-title">{t('react.title')}</p>    <div className="reaction-grid">{REACTIONS.map((value, index) => <button key={value} type="button" className={/^[A-Z!]+$/.test(value) ? 'sticker' : undefined}
-      aria-label={`Send ${value}`} onClick={() => { onSend(index); setSent(index); }}>{value}</button>)}</div>
+    <p className="sheet-title">{t('react.title')}</p>    <div className="reaction-grid">{REACTIONS.map((value, index) => choices.includes(index) && <button key={value} type="button" className={/^[A-Z!]+$/.test(value) ? 'sticker' : undefined}
+      aria-label={`Send ${value}`} disabled={waiting} onClick={() => send(index)}>{value}</button>)}</div>
+    <p className="hint" role="status">{waiting ? `Slow down: ${limit} per 10 seconds. Ready in ${Math.ceil((10_000 - (now - live[0]!)) / 1000)} s.` : `${limit - live.length} of ${limit} left for now.`}</p>
     {sent !== null && <p role="status" className="visually-hidden">Sent {REACTIONS[sent]}</p>}
   </div>;
 }

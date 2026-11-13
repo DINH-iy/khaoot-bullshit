@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { closeRoundsByHand, expectPhoneScores } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -14,6 +15,7 @@ test('a player answers with a picture, the room votes on it without names, then 
     await host.getByRole('radio', { name: /Picture party/ }).check();
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await closeRoundsByHand(host);
     for (const [device, name] of [[page, 'Uploader'], [other, 'Watcher']] as const) {
       await device.goto(`${baseURL}/?code=${roomCode}`);
       await device.getByLabel('Your name').fill(name);
@@ -64,7 +66,7 @@ test('a player answers with a picture, the room votes on it without names, then 
     const shown = results.getByRole('img', { name: 'Entry from Uploader' });
     await expect(shown).toBeVisible();
     await expect.poll(() => shown.evaluate(loaded)).toBe(true);
-    await expect(page.getByRole('region', { name: 'Scoreboard' }).getByRole('listitem')).toContainText(['Uploader (you)5']);
+    await expectPhoneScores(page, ['Uploader (you)5']);
     expect((await new AxeBuilder({ page: other }).analyze()).violations).toEqual([]);
     expect(await other.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   } finally { await hostContext.close(); await otherContext.close(); }

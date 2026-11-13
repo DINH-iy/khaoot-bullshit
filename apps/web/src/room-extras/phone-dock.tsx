@@ -33,10 +33,10 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact }
   const close = () => setSheet(null);
   return <>
     <nav className="phone-dock" aria-label="More">
-      {canSeeScores && <button type="button" aria-label={t('scores.open')} onClick={() => setSheet('scores')}><span aria-hidden="true">🏆</span><small>Scores</small></button>}
-      <button type="button" aria-label={t('players.title', { count: state.players.length })} onClick={() => setSheet('players')}><span aria-hidden="true">👥</span><small>{state.players.length}</small></button>
-      {state.settings.reactions && state.view.status !== 'FINISHED' && <button type="button" aria-label={t('react.open')} onClick={() => setSheet('react')}><span aria-hidden="true">😀</span><small>React</small></button>}
-      <button type="button" aria-pressed={sound} aria-label="Sound" onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>{sound ? 'On' : 'Off'}</small></button>
+      {canSeeScores && <button type="button" onClick={() => setSheet('scores')}><span aria-hidden="true">🏆</span><small>{t('scores.title')}</small></button>}
+      <button type="button" onClick={() => setSheet('players')}><span aria-hidden="true">👥</span><small>{t('players.title', { count: state.players.length })}</small></button>
+      {state.settings.reactions && state.view.status !== 'FINISHED' && <button type="button" onClick={() => setSheet('react')}><span aria-hidden="true">😀</span><small>React</small></button>}
+      <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>Sound</small></button>
     </nav>
     {sheet === 'scores' && <BottomSheet title={t('scores.title')} onClose={close}>{scores}</BottomSheet>}
     {sheet === 'players' && <BottomSheet title={t('players.title', { count: state.players.length })} onClose={close}>
@@ -44,6 +44,6 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact }
         <span className={`dot ${player.connected ? 'on' : 'off'}`} aria-label={player.connected ? 'connected' : 'disconnected'} /></li>)}</ul>
       <button type="button" className="primary" onClick={() => { close(); onChangeLook(); }}>{t('players.changeLook')}</button>
     </BottomSheet>}
-    {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} /></BottomSheet>}
+    {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} choices={state.settings.reactionChoices} limit={state.settings.reactionLimit} /></BottomSheet>}
   </>;
 }

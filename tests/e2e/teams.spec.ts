@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { closeRoundsByHand, expectPhoneScores } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -12,6 +13,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await host.getByRole('radio', { name: /Team party/ }).check();
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await closeRoundsByHand(host);
     for (const [phone, name] of [[ada, 'Ada'], [ben, 'Ben'], [cleo, 'Cleo']] as const) {
       await phone.goto(`${baseURL}/?code=${roomCode}`);
       await phone.getByLabel('Your name').fill(name);
@@ -47,9 +49,8 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await host.getByRole('button', { name: 'Reveal results' }).click();
     await expect(ben.getByRole('region', { name: 'Round results' })).toContainText('Red · 10');
     // "both": Red gets 10 and so do Ada and Ben.
-    const scores = ben.getByRole('region', { name: 'Scoreboard' });
-    await expect(scores).toContainText('Red · Ada, Ben10');
-    await expect(scores).toContainText('Ben (you)10');
+    await expectPhoneScores(ben, 'Red · Ada, Ben10');
+    await expectPhoneScores(ben, 'Ben (you)10');
     expect((await new AxeBuilder({ page: ben }).analyze()).violations).toEqual([]);
 
     // Solo override: no teams, everybody answers for themselves.

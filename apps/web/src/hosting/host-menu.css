@@ -15,7 +15,7 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
   border: 2px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); transition: border-color .15s, transform .15s; }
 .game-card:hover { transform: translateY(-1px); border-color: light-dark(#bfb3e8, #5b5280); }
 .game-card.chosen { border-color: #6d3fd6; box-shadow: 0 0 0 3px rgb(109 63 214 / .25); }
-.game-card input { position: absolute; opacity: 0; pointer-events: none; }
+.game-card input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
 .game-card:has(input:focus-visible) { outline: 3px solid #6d3fd6; outline-offset: 3px; }
 .game-card-text { display: grid; gap: 4px; min-width: 0; } .game-card-text strong { font-size: 1.05rem; } .game-card-text small { opacity: .75; }
 

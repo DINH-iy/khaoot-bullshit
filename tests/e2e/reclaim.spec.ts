@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { closeRoundsByHand } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -13,6 +14,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await host.getByRole('radio', { name: /First reliable game/ }).check();
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await closeRoundsByHand(host);
     const ask = host.getByRole('checkbox', { name: 'Ask me before a new phone takes over a seat' });
     await expect(ask).not.toBeChecked();
     // The box reflects the saved room setting, so it ticks once the server has stored it.

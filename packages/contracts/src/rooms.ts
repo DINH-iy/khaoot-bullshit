@@ -20,7 +20,7 @@ export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()) }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
   seatRequests: z.array(z.object({ requestId: GameIdSchema, playerId: GameIdSchema, requestedAt: z.string().datetime() }).strict()),
 }).strict();
@@ -29,13 +29,15 @@ export const RoomSnapshotSchema = z.object({
 export const ReclaimSeatSchema = z.object({ roomCode: RoomCodeSchema, playerId: GameIdSchema, requestId: GameIdSchema }).strict();
 export const SeatListSchema = z.object({ approval: z.boolean(), seats: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40) }).strict()) }).strict();
 export const SeatDecisionSchema = z.object({ requestId: GameIdSchema, approve: z.boolean() }).strict();
+/** Emoji and stickers players can send to the shared screen. A reaction is its position in this list. */
+export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤️', '🎉', '🤔', '💀', '🙈', '🍻', 'GG', 'LOL', 'NOOO', 'YES!', 'WOW', 'BOO'] as const;
 // Host settings for the room; send only what changes.
 // `showScores`: players and the shared screen see the scoreboard during the game (else only at scoreboard scenes and the end).
 // `reactions`: players may send emoji and stickers to the shared screen. `autoClose`: a round closes 3 seconds after everyone answered.
-export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean() }).partial().strict()
+// `reactionLimit`: reactions each player may send per 10 seconds. `reactionChoices`: which of REACTIONS are allowed (positions in the list).
+export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(),
+  reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
-/** Emoji and stickers players can send to the shared screen. A reaction is its position in this list. */
-export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤️', '🎉', '🤔', '💀', '🙈', '🍻', 'GG', 'LOL', 'NOOO', 'YES!', 'WOW', 'BOO'] as const;
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();
 export type RoomSnapshot = z.infer<typeof RoomSnapshotSchema>;
 import { MediaKindSchema } from './game.js';

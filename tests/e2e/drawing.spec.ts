@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { closeRoundsByHand } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -24,6 +25,7 @@ test('players draw blind and vote, draw the roundest circle, and pass the pencil
   await host.getByRole('radio', { name: /Draw party/ }).check();
   await host.getByRole('button', { name: 'Open room', exact: true }).click();
   const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+  await closeRoundsByHand(host);
   const phones: Page[] = [];
   for (const name of ['Ada', 'Bo']) {
     const phone = await open({ width: 390, height: 844 }); await phone.goto(`${baseURL}/?code=${code}`);

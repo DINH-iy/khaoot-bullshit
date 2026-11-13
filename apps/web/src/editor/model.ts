@@ -21,7 +21,7 @@ export const SNAP_RADIUS = 56;
 const ALIGN = 12;
 export const isRoute = (node: Node | undefined) => node?.stages.length === 1 && node.stages[0]!.kind === 'route';
 export const optionsOf = (node: Node | undefined): Option[] => isRoute(node) ? (node!.stages[0]!['options'] as Option[] | undefined) ?? [] : [];
-export const cardHeight = (node: Node) => isRoute(node) ? ROUTE_FIRST + Math.max(0, optionsOf(node).length - 1) * OPTION_GAP + 32 : 168;
+export const cardHeight = (node: Node) => isRoute(node) ? ROUTE_FIRST + Math.max(0, optionsOf(node).length - 1) * OPTION_GAP + 32 : 192;
 export const inputPort = (position: Point): Point => ({ x: position.x, y: position.y + PORT_Y });
 export function outputPort(node: Node, position: Point, option?: string): Point {
   if (!isRoute(node)) return { x: position.x + CARD_WIDTH, y: position.y + PORT_Y };

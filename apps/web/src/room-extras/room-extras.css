@@ -47,3 +47,9 @@
   .reaction, .celebration-points { animation-duration: 4.2s; animation-name: fade-only; } .confetti { display: none; }
   @keyframes fade-only { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 }
+.reaction-settings { display: grid; gap: 8px; }
+.reaction-settings label { display: grid; gap: 6px; font-weight: 600; }
+.reaction-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.room .reaction-picks button { min-height: 40px; min-width: 44px; padding: 4px 8px; font-size: 1.2rem; border-radius: 10px; opacity: .45; }
+.room .reaction-picks button[aria-pressed=true] { opacity: 1; outline: 2px solid var(--r-accent); outline-offset: -2px; }
+.room .reaction-settings .field-title { margin: 4px 0 0; font-weight: 600; }

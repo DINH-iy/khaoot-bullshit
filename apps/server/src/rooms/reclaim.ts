@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GameIdSchema, ReclaimSeatSchema } from '@party/contracts';
+import { GameIdSchema, ReclaimSeatSchema, REACTIONS } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { authorize, type Transaction } from '../game/model.js';
@@ -17,6 +17,7 @@ export const RoomStateSchema = z.object({
   reclaimApproval: z.boolean().default(false),
   // Host settings (see RoomSettingsSchema). Rooms saved before they existed get these defaults.
   showScores: z.boolean().default(true), reactions: z.boolean().default(true), autoClose: z.boolean().default(true),
+  reactionLimit: z.number().int().min(1).max(30).default(10), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).default(REACTIONS.map((_, index) => index)),
   seatRequests: z.array(RequestSchema).max(50).default([]),
 }).strict();
 export type RoomState = z.infer<typeof RoomStateSchema>;
@@ -98,7 +99,7 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose'>>) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'reactionLimit' | 'reactionChoices'>>) {
       roomAssert(principal.role === 'host', 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);

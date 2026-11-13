@@ -91,10 +91,10 @@
 .players { margin: 0 20px !important; max-width: 1240px; } @media (min-width: 1300px) { .players { margin: 0 auto !important; } }
 .players h2 { margin: 0 0 12px; font-size: 1rem; color: var(--r-muted); }
 .players ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.players li { display: inline-flex; gap: 8px; align-items: center; margin: 0; padding: 6px 12px; border-radius: 999px; background: var(--r-card-strong); }
+.players li { display: inline-flex; gap: 10px; align-items: center; margin: 0; padding: 8px 14px; border-radius: 999px; background: var(--r-card-strong); }
 .players .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--r-ok); } .players .offline .dot { background: var(--r-bad); }
 .players .player-state { color: var(--r-muted); font-size: .8rem; }
-.players .small-button { min-height: 32px; margin: 0; font-size: .75rem; padding: 2px 8px; }
+.players .small-button { min-height: 34px; margin: 0; font-size: .78rem; padding: 4px 12px; }
 
 /* Shared display: big type, no controls */
 .room-display .room-grid { max-width: 1600px; }
