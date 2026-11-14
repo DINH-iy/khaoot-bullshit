@@ -4,6 +4,7 @@ import type { Server, Socket } from 'socket.io';
 import type { FastifyBaseLogger } from 'fastify';
 import { EDITOR_NAMESPACE, EditorJoinSchema, EditorPointSchema, EditorPresenceSchema, GameIdSchema, MAX_EDITORS, type Draft, type EditorPeer, type EditorPresence } from '@party/contracts';
 import { RateLimiter } from '../rooms/security.js';
+import { clientAddress } from '../client-address.js';
 
 // Editing a game together. Saving stays what it was: whole drafts over HTTP,
 // each checked against the revision it was based on. This channel only tells
@@ -18,7 +19,7 @@ const TICKET_SECONDS = 120;
 const MAX_CONNECTED_MS = 12 * 60 * 60 * 1000;
 interface Seat { gameId: string; color: number; presence: EditorPresence }
 
-export function createEditorLive(io: Server, roomSecret: string, log: FastifyBaseLogger) {
+export function createEditorLive(io: Server, roomSecret: string, log: FastifyBaseLogger, trustCloudflareLocal = false) {
   // Its own key, so a ticket can never stand in for another kind of room credential.
   const key = createHash('sha256').update(`editor-live:${roomSecret}`).digest();
   const editors = io.of(EDITOR_NAMESPACE); const limiter = new RateLimiter(2048);
@@ -32,7 +33,7 @@ export function createEditorLive(io: Server, roomSecret: string, log: FastifyBas
 
   editors.use((socket, next) => {
     void (async () => {
-      if (!limiter.allow(`connect:${socket.handshake.address}`, 120)) throw new Error('Too many connections');
+      if (!limiter.allow(`connect:${clientAddress(socket.handshake.address, socket.handshake.headers, trustCloudflareLocal)}`, 120)) throw new Error('Too many connections');
       const join = EditorJoinSchema.parse(socket.handshake.auth);
       const { payload } = await jwtVerify(join.ticket, key, { audience: AUDIENCE, algorithms: ['HS256'], requiredClaims: ['sub', 'exp', 'game'] });
       const gameId = GameIdSchema.parse(payload['game']);

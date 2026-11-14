@@ -20,6 +20,7 @@ import { registerReactions } from './reactions.js';
 import { breakVotesNeeded, createBreaks } from './breaks.js';
 import { personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
+import { clientAddress } from '../client-address.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
   const gateway = createRoomGateway(client, config); const limiter = new RateLimiter();
@@ -188,7 +189,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   io.use((socket, next) => {
     void (async () => {
       const parsed = ConnectRoomSchema.safeParse(socket.handshake.auth); roomAssert(parsed.success, 'UNAUTHORIZED');
-      roomAssert(limiter.allow(`connect:${socket.handshake.address}`, 240), 'RATE_LIMITED');
+      roomAssert(limiter.allow(`connect:${clientAddress(socket.handshake.address, socket.handshake.headers, config.TRUST_CLOUDFLARE_LOCAL)}`, 240), 'RATE_LIMITED');
       const principal = await gateway.authenticate(parsed.data.sessionId, socket.handshake.headers.cookie, parsed.data.display);
       const peers = [...io.sockets.sockets.values()].filter(peer => (peer.data['principal'] as Principal | undefined)?.id === principal.id).length;
       roomAssert(peers < 3, 'RATE_LIMITED'); socket.data['principal'] = principal;

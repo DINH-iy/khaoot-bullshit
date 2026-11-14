@@ -42,6 +42,10 @@ Caddy is one reverse-proxy candidate. Select the final service/container setup w
 
 Internet access is required: players may connect over Wi-Fi or 5G independently of the host network. Use one public HTTPS/WSS origin with a deliberate tunnel/reverse proxy and stable hostname for production. The [phone checkpoint](../testing/network-checkpoint.md) uses an ephemeral Cloudflare tunnel to the development machine; it is not a Pi deployment. PostgreSQL remains private. External sign-in and YouTube require their own internet availability; fully offline play requires additional design.
 
+## Cloudflare tunnel and visitor addresses
+
+With cloudflared running on the same machine as the backend, every visitor reaches the backend from `127.0.0.1`, so per-address rate limits are shared by everyone. Set `TRUST_CLOUDFLARE_LOCAL=true` in that machine's `.env` and restart: for connections from `127.0.0.1`/`::1` only, the backend then uses Cloudflare's `CF-Connecting-IP` header as the visitor's address. Keep `HOST=127.0.0.1` so only the tunnel (and the machine itself) can connect; anything running on the machine could send that header. Leave the setting off without such a tunnel. Details: [owner bar and client IP change notes](../changes/2026-11-14-owner-nav-and-client-ip.md).
+
 ## Target-device acceptance checks
 
 - 20 players plus host/display, simultaneous deadline submissions and reconnects.

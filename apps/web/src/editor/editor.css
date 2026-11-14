@@ -217,3 +217,7 @@
 .minigame-fields .door-list, .minigame-fields .placement-list { display: grid; gap: 6px; }
 .drawing-fields .doodle-preview .drawing-view { width: 160px; } .drawing-fields .doodle-editor .drawing-pad { width: 100%; }
 .wheel-fields { display: grid; gap: 8px; }
+/* The page around the editor: the owner bar on top, the editor filling the rest of the screen. */
+.editor-page { display: flex; flex-direction: column; height: 100dvh; }
+.editor-page > .editor { flex: 1; min-height: 0; height: auto; }
+.editor-page > .editor-message { width: 100%; box-sizing: border-box; }

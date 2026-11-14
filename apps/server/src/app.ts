@@ -16,6 +16,7 @@ import { registerPeopleRoutes } from './people/routes.js';
 import { registerSideGames } from './side-games/routes.js';
 import { createEditorLive } from './authoring/live.js';
 import { registerAssetRoutes } from './assets/routes.js';
+import { registerClientAddress } from './client-address.js';
 import staticFiles from '@fastify/static';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +37,8 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
       base: { service: 'party-server', version: config.APP_VERSION },
     },
   });
+  // First, so every limit below sees the visitor's address (only changes anything when TRUST_CLOUDFLARE_LOCAL is on).
+  registerClientAddress(app, config.TRUST_CLOUDFLARE_LOCAL);
   const verifier = options.verifyToken ?? createTokenVerifier(config);
   const metrics = new RequestMetrics();
   const requests = new WeakMap<FastifyRequest, { start: number; span: Span }>();
@@ -112,7 +115,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   const rooms = options.database?.client && config.ROOM_TOKEN_SECRET ? registerRoomNetworking(app, options.database.client, config, verifier) : undefined;
   if (options.database?.client && config.ROOM_TOKEN_SECRET) registerAssetRoutes(app, options.database.client, config);
   // Editing together shares the rooms' socket server, under its own namespace and its own tickets.
-  const live = rooms && config.ROOM_TOKEN_SECRET ? createEditorLive(rooms.io, config.ROOM_TOKEN_SECRET, app.log) : undefined;
+  const live = rooms && config.ROOM_TOKEN_SECRET ? createEditorLive(rooms.io, config.ROOM_TOKEN_SECRET, app.log, config.TRUST_CLOUDFLARE_LOCAL) : undefined;
   if (options.database?.client) {
     const owner = createOwnerAccess(app, config);
     registerLocalHosting(app, options.database.client, config, owner, live);
