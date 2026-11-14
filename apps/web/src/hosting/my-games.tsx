@@ -20,7 +20,7 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
   const run = (work: Promise<unknown>) => { setBusy(true); setError(''); void work.then(reload).catch(cause => { setError(explain(cause)); reload(); }).finally(() => setBusy(false)); };
   const showProblems = (gameId: string) => { void roomApi(`/api/host/games/${gameId}`).then(data => setProblems(current => ({ ...current, [gameId]: DraftSchema.parse(data).issues }))).catch(cause => setError(explain(cause))); };
-  return <section aria-labelledby="my-games-heading"><h2 id="my-games-heading">Your games</h2>
+  return <section id="my-games" aria-labelledby="my-games-heading"><h2 id="my-games-heading">Your games</h2>
     {error && <p role="alert" className="error">{error}</p>}
     {menu.myGames.length === 0 ? <p>You have not made a game yet.</p> : <ul className="plain-list my-games">{menu.myGames.map(game => <li key={game.gameId} className="team-card">
       <strong>{game.title}</strong><p>{status(game)}</p>

@@ -1,0 +1,9 @@
+/* The owner's top bar on the host menu, the editor and the admin pages. */
+.owner-nav { background: light-dark(#1d1a2b, #121019); color: #fff; border-bottom: 1px solid light-dark(#2f2a45, #2c2840); }
+.owner-nav ul { display: flex; gap: 4px; margin: 0 auto; padding: 6px 16px; list-style: none; max-width: 1180px; overflow-x: auto; scrollbar-width: none; }
+.owner-nav li { margin: 0; flex: none; }
+.owner-nav a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; color: inherit; text-decoration: none; font-weight: 600; font-size: .95rem; opacity: .8; }
+.owner-nav a:hover { opacity: 1; background: rgb(255 255 255 / .1); }
+.owner-nav a:focus-visible { opacity: 1; outline: 3px solid #ffcf4a; outline-offset: 0; }
+.owner-nav a[aria-current=page] { opacity: 1; background: #ffcf4a; color: #2a1d00; font-weight: 800; }
+@media (max-width: 480px) { .owner-nav ul { gap: 2px; padding: 6px 12px; } .owner-nav a { padding: 0 10px; font-size: .9rem; } }

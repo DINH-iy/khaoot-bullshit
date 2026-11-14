@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { PeopleListSchema, PersonLinkSchema, type PersonLink, type PersonRow } from '@party/contracts';
 import { roomApi } from '../network/api.js';
+import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 
 const problems: Record<string, string> = {
-  UNAUTHORIZED: 'This browser is not signed in as the owner. Start the app with “npm run host”: the host menu it opens signs this browser in, then come back here.',
+  UNAUTHORIZED: SIGNED_OUT_TEXT,
   AUTH_UNAVAILABLE: 'Owner access is not set up on this server.',
   NAME_TAKEN: 'Someone already has that name. Pick another.',
   INVALID_COMMAND: 'Give a name of 1 to 40 characters.',

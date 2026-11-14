@@ -21,6 +21,7 @@ import { formatPoints } from './results.js';
 import { Avatar, RoomSessionContext } from '../players/avatar.js';
 import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js';
 import { useMe, type Person } from '../people/use-me.js';
+import { wasOwner } from '../owner/owner-session.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 
@@ -34,7 +35,7 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
   style: React.CSSProperties; className: string; title: string | null;
   person: Person | null | undefined; linked: { name: string | null } | null; onForget: () => void;
 }) {
-  const t = useText();
+  const t = useText(); const [ownerBrowser] = useState(wasOwner);
   return <main className={`room room-join ${className}`} style={style}>
     <section className="join-card" aria-labelledby="join-heading">
       <p className="brand">party<span>.</span></p>
@@ -48,7 +49,8 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
         <button className="primary" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
       <p className="join-links">{t('join.reclaim')} <button type="button" className="link-button" onClick={onReclaim}>{t('join.reclaimButton')}</button></p>
-      <p className="join-links"><a href="/?host=1">Host a game instead</a></p>
+      {/* Only for a browser that signed in as the owner before: players never see it, and nothing asks the server. */}
+      {ownerBrowser && <p className="join-links"><a href="/?host=1">Host a game instead</a></p>}
     </section>
   </main>;
 }

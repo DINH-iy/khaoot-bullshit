@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HostMenuSchema, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../network/api.js';
 import { MyGames } from './my-games.js';
 import { ImportGame } from './import-game.js';
 import { GamePicker } from './game-picker.js';
+import { OwnerNav } from '../owner/owner-nav.js';
+import { rememberOwner, SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import './host-menu.css';
 
 const initial = new URL(location.href);
@@ -12,7 +14,7 @@ const ownerToken = new URLSearchParams(initial.hash.slice(1)).get('owner');
 if (ownerToken) history.replaceState(null, '', `${initial.pathname}${initial.search}`);
 
 const problems: Record<string, string> = {
-  UNAUTHORIZED: 'This browser is not signed in as the owner. Start the app with “npm run host” on the computer that runs it; that opens this page already signed in.',
+  UNAUTHORIZED: SIGNED_OUT_TEXT,
   AUTH_UNAVAILABLE: 'Hosting from the browser is not set up on this server yet.',
   RATE_LIMITED: 'Too many attempts. Wait a minute and try again.',
 };
@@ -28,19 +30,28 @@ export function HostMenu() {
     void (async () => {
       if (ownerToken) await roomApi('/api/host/claim', { token: ownerToken });
       const loaded = HostMenuSchema.parse(await roomApi('/api/host'));
+      rememberOwner(true);
       if (mounted) { setMenu(loaded); setGameKey(loaded.games[0]?.key ?? ''); }
-    })().catch(cause => { if (mounted) setError(explain(cause)); }).finally(() => { if (mounted) setBusy(false); });
+    })().catch(cause => {
+      if (cause instanceof Error && cause.message === 'UNAUTHORIZED') rememberOwner(false);
+      if (mounted) setError(explain(cause));
+    }).finally(() => { if (mounted) setBusy(false); });
     // A page restored from the back/forward cache would reuse the previous room request.
     const restored = (event: PageTransitionEvent) => { if (event.persisted) location.reload(); };
     window.addEventListener('pageshow', restored);
     return () => { mounted = false; window.removeEventListener('pageshow', restored); };
   }, []);
+  // "Editor" in the owner bar points at Your games (#my-games). The list appears after loading, so scroll there once it is shown.
+  const [hash, setHash] = useState(location.hash);
+  const scrolled = useRef(false);
+  useEffect(() => { const changed = () => setHash(location.hash); window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed); }, []);
+  useEffect(() => { if (menu && hash === '#my-games' && !scrolled.current) { scrolled.current = true; document.getElementById('my-games')?.scrollIntoView(); } }, [menu, hash]);
   const reload = () => { void roomApi('/api/host').then(data => setMenu(HostMenuSchema.parse(data))).catch(cause => setError(explain(cause))); };
   const open = (work: Promise<{ sessionId: string }>) => {
     setBusy(true); setError('');
     work.then(result => location.assign(`/?room=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
   };
-  return <main className="host-page">
+  return <><OwnerNav current={hash === '#my-games' ? 'editor' : 'host'} signedIn={Boolean(menu)} /><main className="host-page">
     <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Host</p><h1>Host a game</h1>
       <p>Pick a game and open a room. Players join on their phones with the room code or the QR code on the next screen.</p></header>
     {error && <p role="alert" className="error">{error}</p>}
@@ -58,5 +69,5 @@ export function HostMenu() {
       </section>}
     </>}
     <p className="host-links"><a href="/">Join a game as a player instead</a>{menu && <><a href="/?admin">Admin: feedback from testers</a><a href="/?admin=people">Admin: people (accounts)</a></>}</p>
-  </main>;
+  </main></>;
 }
