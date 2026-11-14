@@ -5,8 +5,11 @@ import { Inspector } from './inspector.js';
 import { Minimap } from './minimap.js';
 import {
   addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, curve, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  isRoute, optionsOf, outputPort, pointOnCurve, SCENE_TYPES, snap, snapCard, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions, type SceneType,
+  insertPrefab, isRoute, prefabFrom, optionsOf, outputPort, pointOnCurve, snap, snapCard, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from './model.js';
+import { ScenePalette, type SceneChoice } from './scene-palette.js';
+import { SavePrefab } from './save-prefab.js';
+import type { PrefabContent } from '@party/contracts';
 import type { DraftState } from './use-draft.js';
 import type { LiveState } from './live/use-live.js';
 import { PeerCursors, peerOutline, peersOn, PeerTags } from './live/presence.js';
@@ -20,15 +23,6 @@ const CLIP = 'party-editor-clipboard';
 function writeClip(clip: Clip) { try { localStorage.setItem(CLIP, JSON.stringify(clip)); return true; } catch { return false; } }
 function readClip(): Clip | null { try { const value = JSON.parse(localStorage.getItem(CLIP) ?? 'null') as Clip | null; return value && Array.isArray(value.keys) && value.from && Array.isArray(value.from.nodes) ? value : null; } catch { return null; } }
 const blockedText: Record<string, string> = { self: 'A scene cannot lead to itself.', circle: 'That would make the game go round in a circle.', 'same-scene': 'Another option of this choice already leads there.' };
-
-/** Add-a-scene menu with icons, used for the toolbar, the + buttons and dropped connections. */
-export function ScenePalette({ label, onPick, onCancel }: { label: string; onPick: (type: SceneType) => void; onCancel: () => void }) {
-  return <div className="add-menu" role="menu" aria-label={label} onPointerDown={event => event.stopPropagation()}>
-    <p>{label}</p>
-    {SCENE_TYPES.map(type => <button key={type.type} role="menuitem" onClick={() => onPick(type.type)}><Icon name={type.icon} /><span><strong>{type.name}</strong><small>{type.hint}</small></span></button>)}
-    <button role="menuitem" className="add-cancel" onClick={onCancel}>Cancel</button>
-  </div>;
-}
 
 export function FlowView({ d, selected, setSelected, live }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState }) {
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
@@ -198,9 +192,18 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   });
 
   // ---------- adding scenes ----------
-  const addFromMenu = (type: SceneType) => {
+  // A prefab lands with its top-left card where a single scene would, connected after `from` when there is one.
+  const addPrefab = (content: PrefabContent) => {
     if (!adding) return;
-    const result = adding.from ? addConnectedScene(definition, type, adding.from, adding.option) : addScene(definition, type);
+    const target = adding.place ?? { x: adding.at.x, y: adding.at.y - 72 };
+    const result = insertPrefab(definition, positions, content, { x: snap(target.x), y: snap(target.y) }, adding.from ? { key: adding.from, option: adding.option } : undefined);
+    change(result.definition, result.positions); setAdding(null); select(result.keys);
+    const first = result.positions[result.keys[0]!]; if (first) requestAnimationFrame(() => reveal(first));
+    setNotice(`Inserted ${result.keys.length === 1 ? 'a scene' : `${result.keys.length} scenes`} from the prefab.`);
+  };
+  const addFromMenu = ({ type, variant }: SceneChoice) => {
+    if (!adding) return;
+    const result = adding.from ? addConnectedScene(definition, type, adding.from, adding.option, variant) : addScene(definition, type, variant);
     const target = adding.place ?? { x: adding.at.x, y: adding.at.y - 72 };
     const raw = { ...positions, [result.key]: { x: snap(target.x), y: snap(target.y) } };
     const spot = freeSpot(result.definition, raw, result.key, raw[result.key]!);
@@ -325,23 +328,26 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onCancel={() => setAdding(null)} /></div>}
+        {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={addPrefab} onCancel={() => setAdding(null)} /></div>}
       </div>
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
     </div>
     {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)}
-      onDelete={next => { const kept = { ...positions }; delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])} />}
-    {selected.length > 1 && <MultiPanel count={selected.length} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)} />}
+      onDelete={next => { const kept = { ...positions }; delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
+      extra={<SavePrefab key={single.key} content={() => prefabFrom(definition, positions, [single.key])} defaultName={cardText(definition, single).banner || cardText(definition, single).title} />} />}
+    {selected.length > 1 && <MultiPanel count={selected.length} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)}
+      savePrefab={<SavePrefab key={selected.join()} content={() => prefabFrom(definition, positions, selected)} defaultName={`${selected.length} scenes`} />} />}
   </div>;
 }
 
-function MultiPanel({ count, onDelete, onClear, onDuplicate }: { count: number; onDelete: () => void; onClear: () => void; onDuplicate: () => void }) {
+function MultiPanel({ count, onDelete, onClear, onDuplicate, savePrefab }: { count: number; onDelete: () => void; onClear: () => void; onDuplicate: () => void; savePrefab: React.ReactNode }) {
   const [confirming, setConfirming] = useState(false);
   return <aside className="inspector" aria-labelledby="multi-heading">
     <div className="inspector-head"><h2 id="multi-heading">{count} scenes selected</h2><button className="small-button" onClick={onClear}>Clear selection</button></div>
     <p className="hint">Drag any of them to move them together, or use the arrow keys. Shift-click a scene to add or remove it.</p>
     <button onClick={onDuplicate}>Duplicate {count} scenes</button>
+    {savePrefab}
     <p className="hint">Copy and paste also work: Ctrl/Cmd+C, then Ctrl/Cmd+V, even in another game.</p>
     {confirming ? <div className="actions"><button className="danger" onClick={onDelete}>Yes, delete {count} scenes</button><button onClick={() => setConfirming(false)}>Keep them</button></div>
       : <button className="danger-outline" onClick={() => setConfirming(true)}>Delete {count} scenes</button>}

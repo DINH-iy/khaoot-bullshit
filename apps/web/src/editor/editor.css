@@ -221,3 +221,20 @@
 .editor-page { display: flex; flex-direction: column; height: 100dvh; }
 .editor-page > .editor { flex: 1; min-height: 0; height: auto; }
 .editor-page > .editor-message { width: 100%; box-sizing: border-box; }
+/* Add menu: a "›" on types that open a second menu, the saved prefabs, and a footer
+   (Back, Cancel) that sits apart under the list instead of looking like another item. */
+.add-menu .add-more { margin-left: auto; align-self: center; font-size: 1.3rem; line-height: 1; color: var(--e-muted); }
+.add-menu .add-note { grid-column: 1 / -1; margin: 4px 6px 8px; font-size: .9rem; text-transform: none; letter-spacing: normal; color: var(--e-text); line-height: 1.5; }
+.add-menu .add-note.error { color: var(--e-danger); }
+.add-menu-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--e-border); }
+.add-menu .add-menu-foot button { min-height: 40px; padding: 8px 16px; align-items: center; justify-content: center; border-radius: 10px; font-weight: 600; }
+.add-menu .add-menu-foot .add-cancel { margin-left: auto; }
+.prefab-row { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 4px; min-width: 0; }
+.prefab-row > button:first-child { flex: 1; min-width: 0; }
+.add-menu .prefab-row .prefab-delete { flex: none; width: 40px; min-height: 40px; padding: 0; justify-content: center; align-items: center; font-size: 1.2rem; color: var(--e-muted) !important; }
+.add-menu .prefab-row .prefab-delete:hover, .add-menu .prefab-row .prefab-delete:focus-visible { color: var(--e-danger) !important; }
+.save-prefab { display: grid; gap: 8px; }
+.save-prefab form { display: grid; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--e-border); }
+.save-prefab .hint { margin: 0; }
+/* Points by place: what each place gets when a total is split. */
+.places-fields .places-preview { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--e-accent-soft); font-weight: 600; font-variant-numeric: tabular-nums; }

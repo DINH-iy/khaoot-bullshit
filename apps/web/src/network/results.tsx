@@ -61,25 +61,30 @@ export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Sta
 export function JudgePanel({ state, stage, disabled, send }: { state: RoomSnapshot; stage: Stage; disabled: boolean; send: Send }) {
   const [points, setPoints] = useState<Record<string, string>>({});
   const challenge = stage.challenge; if (!challenge) return null;
-  const max = formatPoints(challenge.maxAwardMilli);
+  // With points by place the host gives each a place in one tap (any place, ties allowed); typing points stays possible.
+  const placesMilli = challenge.placesMilli;
+  const limit = placesMilli?.[0] && BigInt(placesMilli[0]) > BigInt(challenge.maxAwardMilli) ? placesMilli[0] : challenge.maxAwardMilli;
+  const max = formatPoints(limit);
+  const placeButtons = (name: string, give: (amountMilli: string) => void) => placesMilli && <div className="place-buttons" role="group" aria-label={`Place for ${name}`}>
+    {placesMilli.map((amount, index) => <button key={index} type="button" className="small-button" disabled={disabled} onClick={() => give(amount)}>{['1st', '2nd', '3rd'][index] ?? `${index + 1}th`} · {formatPoints(amount)}</button>)}</div>;
   const teams = stage.teams && !stage.teams.forming ? stage.teams.teams.filter(team => team.teamId) : null;
   if (teams) return <div role="group" aria-label="Judge teams"><h3>Judge each team (0 to {max} points)</h3>
     <ul className="plain-list">{teams.map(team => {
       const judged = challenge.judgedTeamIds.includes(team.teamId!); const text = points[team.teamId!] ?? '0';
-      const milli = pointsToMilli(text, false); const valid = milli !== null && BigInt(milli) <= BigInt(challenge.maxAwardMilli);
-      return <li key={team.teamId}>{judged ? `${team.name} · judged` : <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) send('stage.judgeTeam', { stageRunId: stage.id, teamId: team.teamId, amountMilli: milli }); }}>
+      const milli = pointsToMilli(text, false); const valid = milli !== null && BigInt(milli) <= BigInt(limit);
+      return <li key={team.teamId}>{judged ? `${team.name} · judged` : <>{placeButtons(team.name, amountMilli => send('stage.judgeTeam', { stageRunId: stage.id, teamId: team.teamId, amountMilli }))}<form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) send('stage.judgeTeam', { stageRunId: stage.id, teamId: team.teamId, amountMilli: milli }); }}>
         <label>Points for {team.name}<input type="number" inputMode="numeric" min={0} max={Number(max)} step={1} value={text} onChange={event => setPoints({ ...points, [team.teamId!]: event.target.value })} /></label>
-        <button disabled={disabled || !valid}>Award</button></form>}</li>;
+        <button disabled={disabled || !valid}>Award</button></form></>}</li>;
     })}</ul>
     <p>A judgment is final once given. Use “Correct score” on the scoreboard to fix a mistake.</p>
   </div>;
   return <div role="group" aria-label="Judge players"><h3>Judge each player (0 to {max} points)</h3>
     <ul className="plain-list">{state.players.map(player => {
       const judged = challenge.judgedPlayerIds.includes(player.id); const text = points[player.id] ?? '0';
-      const milli = pointsToMilli(text, false); const valid = milli !== null && BigInt(milli) <= BigInt(challenge.maxAwardMilli);
-      return <li key={player.id}>{judged ? `${player.displayName} · judged` : <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) send('stage.judge', { stageRunId: stage.id, playerId: player.id, amountMilli: milli }); }}>
+      const milli = pointsToMilli(text, false); const valid = milli !== null && BigInt(milli) <= BigInt(limit);
+      return <li key={player.id}>{judged ? `${player.displayName} · judged` : <>{placeButtons(player.displayName, amountMilli => send('stage.judge', { stageRunId: stage.id, playerId: player.id, amountMilli }))}<form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) send('stage.judge', { stageRunId: stage.id, playerId: player.id, amountMilli: milli }); }}>
         <label>Points for {player.displayName}<input type="number" inputMode="numeric" min={0} max={Number(max)} step={1} value={text} onChange={event => setPoints({ ...points, [player.id]: event.target.value })} /></label>
-        <button disabled={disabled || !valid}>Award</button></form>}</li>;
+        <button disabled={disabled || !valid}>Award</button></form></>}</li>;
     })}</ul>
     <p>A judgment is final once given. Use “Correct score” on the scoreboard to fix a mistake.</p>
   </div>;

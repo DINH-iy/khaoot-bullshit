@@ -1,0 +1,29 @@
+/* Head-to-head games (duels and challenges): readable on a phone, big touch targets. */
+.h2h { display: grid; gap: 10px; }
+.h2h p { margin: 0; }
+.h2h-title { font-size: .95rem; opacity: .85; }
+.h2h-turn { font-weight: 700; }
+.h2h-result { font-size: 1.3rem; font-weight: 800; }
+.h2h-check { color: #ff8a8a; font-weight: 800; }
+.h2h-score { font-size: 1.1rem; }
+.h2h-last { opacity: .85; }
+.h2h-rps-picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.h2h-rps-picks button { display: grid; gap: 4px; justify-items: center; min-height: 88px; font-size: .85rem; text-transform: capitalize; }
+.h2h-rps-picks button span { font-size: 2.2rem; line-height: 1; }
+.h2h-rps-picks button[aria-pressed=true] { outline: 3px solid #ffcf4a; }
+.h2h-ttt { display: grid; gap: 6px; width: min(100%, 300px); }
+.h2h-ttt-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.h2h-ttt button { aspect-ratio: 1; min-height: 0; padding: 0; font-size: 2.4rem; font-weight: 800; border-radius: 12px; }
+.h2h-ttt button.line { background: #ffcf4a; color: #2a1d00; }
+.h2h-chess-board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(100%, 400px); aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 2px solid #3a3550; }
+.h2h-chess-board .sq { min-height: 0; padding: 0; border: 0; border-radius: 0; display: grid; place-items: center; font-size: clamp(1.2rem, 7vw, 2.1rem); line-height: 1; cursor: pointer; }
+.h2h-chess-board .sq.light { background: #ede6d6; } .h2h-chess-board .sq.dark { background: #7b6aa8; }
+.h2h-chess-board .sq.last { box-shadow: inset 0 0 0 100px rgb(255 207 74 / .45); }
+.h2h-chess-board .sq.from { box-shadow: inset 0 0 0 3px #ffcf4a, inset 0 0 0 100px rgb(255 207 74 / .35); }
+.h2h-chess-board .sq.target::after { content: ''; width: 28%; height: 28%; border-radius: 50%; background: rgb(30 30 30 / .45); position: absolute; }
+.h2h-chess-board .sq { position: relative; }
+.h2h-chess-board .sq:focus-visible { outline: 3px solid #ffcf4a; outline-offset: -3px; }
+.h2h-chess-board .white { color: #fff; text-shadow: 0 0 2px #000, 0 0 1px #000; } .h2h-chess-board .black { color: #111; text-shadow: 0 0 1px #fff; }
+.h2h-promote { display: flex; flex-wrap: wrap; gap: 6px; } .h2h-promote button { min-width: 52px; font-size: 1.6rem; }
+.h2h-replay { display: grid; gap: 8px; justify-items: start; }
+.h2h-replay canvas { width: min(100%, 320px); height: auto; border-radius: 12px; }

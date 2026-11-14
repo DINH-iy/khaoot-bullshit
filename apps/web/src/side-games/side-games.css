@@ -56,3 +56,11 @@
 /* A short note on the phone when a round takes over from a side game. */
 .side-paused-note { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 16; margin: 0; padding: 8px 14px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 800; box-shadow: 0 8px 20px rgb(0 0 0 / .3); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .reels.spinning .reel, .pack-reveal li { animation: none; } }
+/* Challenges between players. */
+.challenges { display: grid; gap: 14px; }
+.challenge-group h3 { margin: 0 0 8px; font-size: 1rem; }
+.challenge-card { margin: 0 0 8px; padding: 12px; border-radius: 14px; background: rgb(255 255 255 / .06); display: grid; gap: 8px; }
+.challenge-card p { margin: 0; }
+.challenge-form { display: grid; gap: 12px; }
+.challenge-form select { min-height: 44px; border-radius: 8px; padding: 8px 10px; font: inherit; }
+.dock-dot { display: inline-block; width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; background: #ff3d7f; vertical-align: top; }

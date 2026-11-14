@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
-import { effectivePlay, isShowOnly, isVoteSource, minigameRules, type GameDefinition, type StageDefinition } from './definition.js';
+import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
+import { earned, revealAwards } from './place-awards.js';
+import { checkBet, decideDuel, duelPlay, openDuel, pickDuelists } from './duel.js';
 import { CLOCK_SLACK_MS, judgeResult, NO_FAIRNESS, readMinigameRun, startMinigame } from '../minigames/rules.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay.js';
 import type { LiveSignals } from '../minigames/live.js';
 import { spinWheel } from './wheel.js';
-import { minigameOutcome } from '../minigames/outcome.js';
 import { firstStage, locateStage, nextStage, type Located } from './graph.js';
 import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes.js';
 import { GameError, requireGame } from './errors.js';
@@ -38,7 +39,9 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   }
   // Show-only scenes have nobody answering.
   if (isShowOnly(entry.stage)) eligible = [];
-  const play = entry.stage.kind === 'route' || isShowOnly(entry.stage) ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
+  // A duel: everyone but the two duelists bets; when the host picks the pair, betting waits (untimed) until then.
+  if (entry.stage.kind === 'duel') { const opened = openDuel(entry.stage, ids); presentation = { duel: opened.duel }; eligible = opened.eligible; timed = opened.timed; }
+  const play = entry.stage.kind === 'route' || entry.stage.kind === 'duel' || isShowOnly(entry.stage) ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
   if (play.kind === 'teams') {
     const teamPlay = { answers: play.answers, points: play.points };
     const existing = play.lineup.kind === 'game' ? await gameLineupForRound(tx, sessionId, ids) : null;
@@ -62,13 +65,6 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
 }
 
 const startOf = (stage: StageDefinition, now: Date) => { const rules = minigameRules(stage as Extract<StageDefinition, { kind: 'minigame' }>); return startMinigame(rules.game, rules.settings, now); };
-
-/** Placement points of a minigame, given once as it is revealed (after everyone has played). */
-async function minigameAwards(tx: Transaction, stage: StageRun, definition: StageDefinition): Promise<Award[]> {
-  if (definition.kind !== 'minigame') return [];
-  const rows = await tx.submission.findMany({ where: { stageRunId: stage.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true }, orderBy: { receivedAt: 'asc' } });
-  return minigameOutcome(minigameRules(definition), rows, await teamContext(tx, stage), stage.id).awards;
-}
 
 /** Reveals a stage; revealing a vote also puts names on the answers that were voted on. */
 // Never stamped before the close, even if the server clock stepped back since.
@@ -105,13 +101,8 @@ function validateValue(value: SubmissionValue, stage: StageDefinition): void {
   }
 }
 
-function earned(stage: StageDefinition, value: SubmissionValue): { amountMilli: bigint; reason: string } | null {
-  if (stage.kind !== 'collect') return null;
-  const rule = stage.scoring;
-  if (rule.kind === 'correct-choice' && value.kind === 'choice' && value.choiceKey === rule.correctChoiceKey) return { amountMilli: BigInt(rule.awardMilli), reason: 'Correct choice' };
-  if (rule.kind === 'correct-order' && value.kind === 'order' && value.keys.length === rule.correctOrder.length && value.keys.every((key, index) => key === rule.correctOrder[index])) return { amountMilli: BigInt(rule.awardMilli), reason: 'Correct order' };
-  return null;
-}
+/** The most a host may give one player or team in a challenge: its maximum, or its 1st place when it pays by place. */
+const challengeLimit = (stage: Extract<StageDefinition, { kind: 'challenge' }>) => { const top = stagePlaces(stage)?.[0]; const max = BigInt(stage.maxAwardMilli); return top && BigInt(top) > max ? BigInt(top) : max; };
 
 // `now` is the server receipt time, taken before waiting for the room lock.
 export async function applyCommand(tx: Transaction, session: GameSession, definition: GameDefinition, actor: TrustedActor, command: GameCommand, now: Date, live?: LiveSignals): Promise<Effect> {
@@ -193,6 +184,32 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     await spinWheel(tx, session.id, definition, stage, entry.stage, now);
     return { ...empty, stageRunId: stage.id };
   }
+  if (command.type === 'duel.pick') {
+    requireGame(entry.stage.kind === 'duel', 'INVALID_STATE');
+    const picked = await pickDuelists(tx, stage, entry.stage, command.playerIds, await present(tx, session.id));
+    // Betting starts now, with the scene's betting time.
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: picked.duel as object }, eligibility: { formatVersion: 1, playerIds: picked.eligible }, ...timerColumns(entry.stage.durationMs, false, now) } });
+    return { ...empty, stageRunId: stage.id };
+  }
+  if (command.type === 'duel.decide') {
+    // Naming the winner closes the betting, pays out and shows the result, in one step.
+    requireGame(entry.stage.kind === 'duel', 'INVALID_STATE');
+    const decided = await decideDuel(tx, stage, entry.stage, command.winnerId);
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: decided.duel as object },
+      ...(stage.status === 'ACTIVE' ? { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } : {}) } });
+    await reveal(tx, { ...stage, status: 'CLOSED' }, now);
+    return { ...empty, stageRunId: stage.id, awards: decided.awards };
+  }
+  if (command.type === 'duel.move' || command.type === 'duel.resign') {
+    // A duelist plays the duel's game (after betting has closed). A win names the winner and pays out at once; a draw waits for the host.
+    requireGame(actor.role === 'player' && entry.stage.kind === 'duel', 'INVALID_STATE');
+    const played = duelPlay(stage, actor.playerId, command.type === 'duel.move' ? { move: command.move } : { resign: true });
+    if (!played.winnerId) { await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: played.duel as object } } }); return { ...empty, stageRunId: stage.id }; }
+    const decided = await decideDuel(tx, stage, entry.stage, played.winnerId, played.duel);
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: decided.duel as object } } });
+    await reveal(tx, stage, now);
+    return { ...empty, stageRunId: stage.id, awards: decided.awards };
+  }
   if (command.type === 'route.decide') {
     // The host may pick any option, at any time until a route is recorded.
     requireGame(choice, 'INVALID_STATE');
@@ -214,7 +231,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(next !== 'DECISION_PENDING', 'DECISION_PENDING');
     if (stage.status === 'ACTIVE') await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
     let awards: Award[] = [];
-    if (!stage.revealedAt && !isVoteSource(definition, entry.nodeKey, entry.stage.key)) { await reveal(tx, stage, now); awards = await minigameAwards(tx, stage, entry.stage); }
+    if (!stage.revealedAt && !isVoteSource(definition, entry.nodeKey, entry.stage.key)) { await reveal(tx, stage, now); awards = await revealAwards(tx, stage, entry.stage); }
     if (next === 'END') {
       await tx.gameSession.update({ where: { id: session.id }, data: { status: 'FINISHED', endedAt: now, currentNodeKey: null } });
       return { ...empty, awards };
@@ -257,12 +274,13 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   }
   if (command.type === 'stage.reveal') {
     requireGame(stage.status === 'CLOSED' && !stage.revealedAt, 'INVALID_STATE');
-    // Announcing a route needs the route to be decided.
+    // Announcing a route needs the route to be decided; a duel is shown by naming its winner.
     requireGame(!choice || decided, 'DECISION_PENDING');
+    requireGame(entry.stage.kind !== 'duel', 'DECISION_PENDING');
     // Names on answers that are about to be voted on would spoil the anonymous vote.
     requireGame(!isVoteSource(definition, entry.nodeKey, entry.stage.key), 'INVALID_STATE');
     await reveal(tx, stage, now);
-    return { ...empty, stageRunId: stage.id, awards: await minigameAwards(tx, stage, entry.stage) };
+    return { ...empty, stageRunId: stage.id, awards: await revealAwards(tx, stage, entry.stage) };
   }
   if (command.type === 'stage.reopen') {
     // Once the answer has been shown, or a judgment recorded, the stage stays closed.
@@ -284,7 +302,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     const members = (context.members.get(command.teamId) ?? []).filter(id => eligible.data.playerIds.includes(id));
     requireGame(members.length, 'INELIGIBLE');
     const amountMilli = BigInt(command.amountMilli);
-    requireGame(amountMilli <= BigInt(entry.stage.maxAwardMilli), 'INVALID_SUBMISSION');
+    requireGame(amountMilli <= challengeLimit(entry.stage), 'INVALID_SUBMISSION');
     requireGame(await tx.stageJudgment.count({ where: { stageRunId: stage.id, playerId: { in: members } } }) === 0, 'ALREADY_JUDGED');
     return { ...empty, stageRunId: stage.id, judgments: members.map(playerId => ({ playerId, amountMilli, stageRunId: stage.id })),
       awards: route({ amountMilli, stageRunId: stage.id, awardKey: `judgment:${stage.id}:team:${command.teamId}`, reason: 'Host judgment' }, { teamId: command.teamId }, context) };
@@ -293,7 +311,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(stage.status === 'CLOSED' && entry.stage.kind === 'challenge' && !context, 'INVALID_STATE');
     requireGame(eligible.data.playerIds.includes(command.playerId), 'INELIGIBLE');
     const amountMilli = BigInt(command.amountMilli);
-    requireGame(amountMilli <= BigInt(entry.stage.maxAwardMilli), 'INVALID_SUBMISSION');
+    requireGame(amountMilli <= challengeLimit(entry.stage), 'INVALID_SUBMISSION');
     const prior = await tx.stageJudgment.findUnique({ where: { stageRunId_playerId: { stageRunId: stage.id, playerId: command.playerId } } });
     requireGame(!prior, 'ALREADY_JUDGED');
     return { ...empty, stageRunId: stage.id, judgments: [{ playerId: command.playerId, amountMilli, stageRunId: stage.id }],
@@ -334,6 +352,15 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       const vote = await tx.submission.create({ data: { id: randomUUID(), sessionId: session.id, stageRunId: stage.id, actorKey: by.actorKey, playerId: by.playerId, teamId: by.teamId, value } });
       return { stageRunId: stage.id, submissionId: vote.id };
     }
+    if (entry.stage.kind === 'duel') {
+      requireGame(command.value.kind === 'bet', 'INVALID_SUBMISSION');
+      checkBet(stage, command.value.playerId);
+      const earlier = await tx.submission.findUnique({ where: { stageRunId_actorKey_slotKey: { stageRunId: stage.id, actorKey: by.actorKey, slotKey: 'answer' } } });
+      requireGame(!earlier, 'ALREADY_SUBMITTED');
+      const bet = await tx.submission.create({ data: { id: randomUUID(), sessionId: session.id, stageRunId: stage.id, actorKey: by.actorKey, playerId: by.playerId, teamId: by.teamId, value: command.value } });
+      return { stageRunId: stage.id, submissionId: bet.id };
+    }
+    requireGame(command.value.kind !== 'bet', 'INVALID_SUBMISSION');
     if (entry.stage.kind === 'vote') {
       const ballot = VotePresentationSchema.safeParse(stage.presentation);
       requireGame(ballot.success && command.value.kind === 'vote', 'INVALID_SUBMISSION');

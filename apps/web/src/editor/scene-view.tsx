@@ -3,14 +3,14 @@ import type { DefinitionIssue, EditorPeer } from '@party/contracts';
 import { peersOn, PeerTags } from './live/presence.js';
 import { Icon, sceneIcon } from './icons.js';
 import { FormFields, NextFields, StageFields } from './inspector.js';
-import { ScenePalette } from './flow-view.js';
+import { ScenePalette, type SceneChoice } from './scene-palette.js';
 import { FinaleSettings, SpinFields, WheelSettings } from './show-settings.js';
 import { addScene, autoLayout, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from './model.js';
 import type { DraftState } from './use-draft.js';
 
 // What a part is, without the scene's own route or rejoin label.
 const partLabel = (definition: Definition, stage: Node['stages'][number]) => cardText(definition, { key: '\u0000part', stages: [stage] }).label;
-const PART_TYPES: SceneType[] = ['info', 'quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote', 'scoreboard', 'minigame'];
+const PART_TYPES: SceneType[] = ['info', 'quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote', 'scoreboard', 'minigame', 'duel'];
 interface Row { node: Node; depth: number; via: string | null }
 
 /** The scenes in play order: depth-first along the routes, each branch indented under its route, rejoins listed once after them. */
@@ -51,8 +51,8 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
   const onChange = (next: Definition, group?: string) => change(next, undefined, group);
 
   /** A new scene right after the current one: the current scene now leads to it, and it leads where the current one did. */
-  const insertAfter = (type: SceneType) => {
-    const added = addScene(definition, type); let next = added.definition;
+  const insertAfter = ({ type, variant }: SceneChoice) => {
+    const added = addScene(definition, type, variant); let next = added.definition;
     if (!isRoute(current)) {
       const old = definition.edges.find(edge => edge.from === current.key);
       next = connect(next, current.key, undefined, added.key);
@@ -64,8 +64,8 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
     change(next, { ...raw, [added.key]: freeSpot(next, raw, added.key, raw[added.key]!) });
     setSelected([added.key]); setAdding(null);
   };
-  const addPart = (type: SceneType) => {
-    const stage = { ...newStage(type, definition), key: uniqueKey('part', current.stages.map(entry => entry.key)) };
+  const addPart = ({ type, variant }: SceneChoice) => {
+    const stage = { ...newStage(type, definition, variant), key: uniqueKey('part', current.stages.map(entry => entry.key)) };
     change({ ...definition, nodes: definition.nodes.map(node => node.key === current.key ? { ...node, stages: [...node.stages, stage] } : node) });
     setPart(current.stages.length); setAdding(null);
   };
@@ -108,7 +108,7 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
           <button className="small-button" aria-label={`Move part ${position + 1} up`} disabled={position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
           <button className="small-button" aria-label={`Remove part ${position + 1}`} disabled={current.stages.length === 1} onClick={() => removePart(position)}>Remove</button></li>)}</ol>
         <button className="small-button with-icon" onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />Add a part</button>
-        {adding === 'part' && <div className="part-palette"><PartPalette onPick={addPart} onCancel={() => setAdding(null)} /></div>}
+        {adding === 'part' && <div className="part-palette"><ScenePalette label="Add a part" only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
         <p className="hint">Parts play one after another inside this scene, for example a question and then its scoreboard.</p>
       </fieldset>}
       <h3>Part {index + 1}</h3>
@@ -124,11 +124,6 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
   </div>;
 }
 
-function PartPalette({ onPick, onCancel }: { onPick: (type: SceneType) => void; onCancel: () => void }) {
-  return <div className="add-menu inline" role="menu" aria-label="Add a part">
-    {PART_TYPES.map(type => <button key={type} role="menuitem" onClick={() => onPick(type)}><Icon name={type === 'quiz' ? 'quiz' : type} /><span><strong>{{ info: 'Cutscene or info', quiz: 'Quiz question', writing: 'Writing round', upload: 'Picture or video round', drawing: 'Drawing round', order: 'Put in order', challenge: 'Host-judged challenge', vote: 'Vote on answers', scoreboard: 'Scoreboard', minigame: 'Minigame', route: '' }[type]}</strong></span></button>)}
-    <button role="menuitem" className="add-cancel" onClick={onCancel}>Cancel</button></div>;
-}
 function Problems({ problems, parts }: { problems: DefinitionIssue[]; parts: number }) {
   return <div role="alert" className="inspector-problems"><h3>Problems in this scene</h3><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && parts > 1 ? `Part ${issue.stageIndex + 1}: ` : ''}{issue.message}</li>)}</ul></div>;
 }

@@ -6,7 +6,7 @@ type Feature = Game['features'][number];
 const FEATURES: Record<Feature, { label: string; icon: string }> = {
   quiz: { label: 'Quiz questions', icon: 'quiz' }, order: { label: 'Put in order', icon: 'order' }, writing: { label: 'Writing & jokes', icon: 'writing' },
   drawing: { label: 'Drawing', icon: 'drawing' }, uploads: { label: 'Photos & videos', icon: 'upload' }, votes: { label: 'Voting', icon: 'vote' },
-  minigames: { label: 'Minigames', icon: 'minigame' }, challenges: { label: 'Challenges in the room', icon: 'challenge' }, teams: { label: 'Teams', icon: 'scoreboard' }, routes: { label: 'The party picks a route', icon: 'route' },
+  minigames: { label: 'Minigames', icon: 'minigame' }, challenges: { label: 'Challenges in the room', icon: 'challenge' }, teams: { label: 'Teams', icon: 'scoreboard' }, routes: { label: 'The party picks a route', icon: 'route' }, duels: { label: 'Duels with bets', icon: 'duel' },
 };
 /** A different angle and pattern per game, so covers are told apart even when games share colours. */
 const seed = (key: string) => [...key].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7);

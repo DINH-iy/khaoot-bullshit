@@ -14,8 +14,10 @@ import { readRoomState } from '../rooms/reclaim.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
 import { deal, handView, HandStateSchema, move, openPack, outcomeOf, payoutFor, spinReels, type HandState, type Outcome } from './rules.js';
 import { balanceOf, entryFor, lockWallet, startWallet, walletWhere, type Seat } from './wallet.js';
+import { registerChallenges } from './challenges.js';
+import type { Server } from 'socket.io';
 
-const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, NOT_FOUND: 404, NOT_ENOUGH_CHIPS: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409 };
+const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, NOT_FOUND: 404, NOT_ENOUGH_CHIPS: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, ALREADY_SUBMITTED: 409, INVALID_STATE: 409 };
 // A stored hand: the cards (the dealer's hidden one included) and, once over, its result.
 const StoredHandSchema = HandStateSchema.extend({ outcome: z.enum(BLACKJACK_OUTCOMES).nullable() });
 const readHand = (round: SideRound): { hand: HandState; outcome: Outcome | null } => {
@@ -28,7 +30,7 @@ const readHand = (round: SideRound): { hand: HandState; outcome: Outcome | null 
  * Only a player of the room can play, only while the host allows side games,
  * and never while the game needs them (an open round they still have to answer).
  */
-export function registerSideGames(app: FastifyInstance, client: PrismaClient, config: Config, gateway: ReturnType<typeof createRoomGateway>) {
+export function registerSideGames(app: FastifyInstance, client: PrismaClient, config: Config, gateway: ReturnType<typeof createRoomGateway>, io?: Server) {
   const limiter = new RateLimiter(4096);
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
@@ -193,4 +195,6 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
       return { ok: true, data: GamblingBoardSchema.parse({ room: room.map(row), allTime: allTime.map(row) }) };
     } catch (error) { return fail(reply, error); }
   });
+  // Challenges between players share the same sign-in and pause rules.
+  registerChallenges(app, client, { seatOf, fail }, io);
 }

@@ -14,7 +14,7 @@ import { personFromCookie } from '../people/identity.js';
 // requireEditor, signed in with their own person cookie; they never host.
 export const OWNER_COOKIE = 'party_owner';
 const digest = (value: string) => createHash('sha256').update(value).digest();
-const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422, NAME_TAKEN: 409, NOT_ENOUGH_CHIPS: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409 };
+const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422, NAME_TAKEN: 409, NOT_ENOUGH_CHIPS: 409, PREFAB_LIMIT: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409 };
 
 export type OwnerBucket = 'menu' | 'claim' | 'edit';
 export function createOwnerAccess(app: FastifyInstance, config: Config, client: PrismaClient) {

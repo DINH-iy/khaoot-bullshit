@@ -1,12 +1,12 @@
-import { isMinigameKey, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
-import { updateStage, type Definition, type Node, type Stage } from './model.js';
+import { isMinigameKey, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { PlacesFields } from './places-fields.js';
+import { ROUND_TEAMS_PLAY, updateStage, type Definition, type Node, type Stage } from './model.js';
 
 type Change = (next: Definition, group?: string) => void;
 const toPoints = (milli: string) => String(Number(milli) / 1000);
 const toMilli = (text: string) => { const value = Math.round(Number(text)); return Number.isFinite(value) && value >= 0 ? String(Math.min(value, 999_999_999) * 1000) : '0'; };
 const seconds = (ms: number) => String(ms / 1000);
 const ms = (text: string, min: number, max: number) => Math.round(Math.min(max, Math.max(min, Number(text) || 0)) * 1000);
-const ordinal = (place: number) => ['1st', '2nd', '3rd'][place - 1] ?? `${place}th`;
 
 /** Which minigame, its settings, and the points for each place. Everything has a default. */
 export function MinigameFields({ definition, node, index, onChange }: { definition: Definition; node: Node; index: number; onChange: Change }) {
@@ -15,8 +15,10 @@ export function MinigameFields({ definition, node, index, onChange }: { definiti
   const known = isMinigameKey(game);
   const settings = known ? parseMinigameSettings(game, stage['settings']) : null;
   const setSettings = (next: MinigameSettings, field: string) => edit(current => ({ ...current, settings: next }), field);
+  // Points by place: `places` (a list or a split total); older scenes keep `placementMilli` until changed here.
   const placement = (stage['placementMilli'] as string[] | undefined) ?? ['10000', '6000', '3000'];
-  const setPlacement = (next: string[]) => edit(current => ({ ...current, placementMilli: next }), 'placement');
+  const places = (stage['places'] as Places | undefined) ?? { kind: 'list' as const, pointsMilli: placement };
+  const setPlaces = (next: Places | undefined) => edit(current => { const copy: Stage = { ...current }; delete copy['placementMilli']; if (next) copy['places'] = next; else delete copy['places']; return copy; }, 'placement');
   return <fieldset className="minigame-fields"><legend>Minigame</legend>
     <label>Which minigame<select value={known ? game : ''} onChange={event => {
       const next = event.target.value as MinigameKey;
@@ -24,7 +26,7 @@ export function MinigameFields({ definition, node, index, onChange }: { definiti
       // Pass the pencil needs teams: switching to it sets this round to round-only teams of two, which the host can change.
       edit(current => { const copy: Stage = { ...current, game: next, durationMs: MINIGAMES[next].defaultSeconds * 1000 }; delete copy['settings'];
         if (TEAM_MINIGAMES.includes(next) && (copy['play'] as { kind?: string } | undefined)?.kind !== 'teams' && (definition['play'] as { kind?: string } | undefined)?.kind !== 'teams')
-          copy['play'] = { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }, answers: 'everyone', points: 'members' };
+          copy['play'] = structuredClone(ROUND_TEAMS_PLAY);
         return copy; }, 'game');
     }}>
       {!known && <option value="" disabled>Choose a minigame</option>}
@@ -57,11 +59,7 @@ export function MinigameFields({ definition, node, index, onChange }: { definiti
         <label>Seconds to vote<input type="number" min={10} max={120} value={value.voteSeconds} onChange={event => setSettings({ ...value, voteSeconds: Math.round(Math.min(120, Math.max(10, Number(event.target.value) || 10))) }, 'vote')} /></label>
       </div>
       <p className="hint">Played in teams: set “Who plays this” below to teams. Every team gets as many turns as the biggest team has players. The question above is what they draw.</p></>; })()}
-    {known && game !== 'lucky-doors' && <div className="placement-list"><p className="field-title">Points by place (a tie shares the place)</p>
-      {placement.map((amount, position) => <div key={position} className="option-row"><label>{ordinal(position + 1)} place<input type="number" min={0} value={toPoints(amount)} onChange={event => setPlacement(placement.map((entry, at) => at === position ? toMilli(event.target.value) : entry))} /></label>
-        <button className="small-button" disabled={placement.length <= 1} aria-label={`Remove ${ordinal(position + 1)} place`} onClick={() => setPlacement(placement.slice(0, position).concat(placement.slice(position + 1)))}>Remove</button></div>)}
-      <button className="small-button" disabled={placement.length >= 12} onClick={() => setPlacement([...placement, '0'])}>Add a place</button>
-    </div>}
+    {known && game !== 'lucky-doors' && <PlacesFields legend="Points by place" hint="The best results get these, given when the results are shown." required value={places} onChange={setPlaces} fallback={placement} />}
     {known && game !== 'lucky-doors' && game !== 'relay-drawing' && <label>In a team round, a team’s result is<select value={String(stage['teamResult'] ?? 'average')} onChange={event => edit(current => ({ ...current, teamResult: event.target.value }), 'team-result')}>
       <option value="average">The average of its players (fair for 1 against 3)</option><option value="best">Its best player</option>{MINIGAMES[game].better === 'higher' && <option value="total">Everyone added up</option>}</select></label>}
   </fieldset>;

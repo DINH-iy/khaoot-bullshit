@@ -15,6 +15,10 @@ const paths: Record<string, string> = {
   undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
   redo: 'M15 14l5-5-5-5 M20 9H9a5 5 0 0 0 0 10h3',
   plus: 'M12 5v14 M5 12h14',
+  // A duel: two crossed swords.
+  duel: 'M4 4l9 9 M20 4l-9 9 M7 14l3 3 M17 14l-3 3 M5 16l-2 2 2 2 2-2 M19 16l2 2-2 2-2-2',
+  // Prefabs: two stacked cards.
+  prefab: 'M8 8h12v12H8z M4 16V4h12',
 };
 export function Icon({ name, size = 20, label }: { name: string; size?: number; label?: string }) {
   const d = paths[name] ?? paths['quiz']!;

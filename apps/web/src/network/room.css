@@ -149,3 +149,18 @@
 /* Signing in with a typed personal key, on the join screen. */
 .key-sign-in { display: grid; gap: 8px; margin: 0; }
 .key-sign-in input { font-family: ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+/* Challenge by place: one button per place for each player or team. */
+.place-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; } .place-buttons .small-button { margin: 0; }
+/* A duel: the two duelists side by side, their bets, and the host's winner buttons. */
+.duel { display: grid; gap: 12px; }
+.duel-vs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.duel-side { position: relative; display: grid; gap: 6px; justify-items: center; padding: 14px 10px; border-radius: 18px; background: var(--r-card-strong); text-align: center; }
+.duel-side.winner { outline: 3px solid var(--r-accent); } .duel-side.loser { opacity: .6; }
+.duel-side strong { font-size: 1.15rem; }
+.duel-bets { font-size: .9rem; opacity: .85; }
+.duel-bar { width: 100%; height: 8px; border-radius: 999px; background: rgb(0 0 0 / .2); overflow: hidden; } .duel-bar span { display: block; height: 100%; background: var(--r-accent); transition: width .3s; }
+.duel-side button { width: 100%; }
+.duel-vs-mark { position: absolute; right: -22px; top: 40%; z-index: 1; padding: 4px 8px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 900; font-size: .85rem; }
+.duel-result { font-size: 1.3rem; font-weight: 800; margin: 0; } .duel-note { margin: 0; font-weight: 600; }
+.duel-pick { display: grid; gap: 10px; } .duel-pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.duel-pick select { min-height: 44px; border-radius: 8px; padding: 8px; font: inherit; }

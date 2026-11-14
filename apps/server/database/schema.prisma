@@ -81,6 +81,7 @@ model Creator {
   games    Game[]
   versions GameVersion[]
   sessions GameSession[]
+  prefabs  ScenePrefab[]
 
   @@unique([issuer, subject])
   @@map("creators")
@@ -186,6 +187,8 @@ model SessionPlayer {
   chips       ChipEntry[]
   sideRounds  SideRound[]
   items       CollectedItem[]
+  challengesMade     SideChallenge[] @relation("ChallengeChallenger")
+  challengesReceived SideChallenge[] @relation("ChallengeOpponent")
 
   @@unique([sessionId, id])
   // A person has at most one seat per room: joining again continues it.
@@ -635,4 +638,47 @@ model CollectedItem {
   @@index([personId])
   @@index([playerId])
   @@map("collected_items")
+}
+
+// Prefabs: scenes (with the connections between them and their card positions)
+// saved from the editor to insert into any game. Content is checked for shape and
+// size here; the game it is inserted into is validated on save like any draft.
+model ScenePrefab {
+  id         String   @id @db.Uuid
+  creatorId  String   @db.Uuid
+  name       String   @db.VarChar(80)
+  sceneCount Int
+  content    Json     @db.JsonB
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+
+  @@index([creatorId, createdAt])
+  @@map("scene_prefabs")
+}
+
+// A challenge between two players of a room (rock paper scissors, tic-tac-toe,
+// chess…), optionally for a stake in chips. Only kept while the room is on:
+// the clean-up returns any stake still held and deletes the row (and with it
+// the game and its replay) once the room has ended or gone quiet.
+model SideChallenge {
+  id           String   @id @db.Uuid
+  sessionId    String   @db.Uuid
+  challengerId String   @db.Uuid
+  opponentId   String   @db.Uuid
+  game         String   @db.VarChar(20)
+  // Chips each player puts in; the winner takes both, a draw returns them.
+  stake        Int
+  // INVITED, PLAYING, FINISHED, DECLINED or CANCELLED.
+  status       String   @db.VarChar(12)
+  // The match: the game's own state (see src/head-to-head/match.ts).
+  state        Json     @db.JsonB
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  challenger SessionPlayer @relation("ChallengeChallenger", fields: [sessionId, challengerId], references: [sessionId, id], onDelete: Restrict)
+  opponent   SessionPlayer @relation("ChallengeOpponent", fields: [sessionId, opponentId], references: [sessionId, id], onDelete: Restrict)
+
+  @@index([sessionId, status])
+  @@map("side_challenges")
 }

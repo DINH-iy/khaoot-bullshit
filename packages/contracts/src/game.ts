@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from './head-to-head.js';
 import { PresentationSchema, ThemeSchema, AnimationChoiceSchema } from './presentation.js';
 import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames.js';
 import { PlayerLookSchema } from './players.js';
@@ -13,6 +14,32 @@ export const StageDurationSchema = z.number().int().min(1000).max(3_600_000);
 export const AwardMilliSchema = z.string().regex(/^(0|[1-9][0-9]{0,11})$/);
 // Host score corrections may be negative, never zero.
 export const AdjustmentMilliSchema = z.string().regex(/^-?[1-9][0-9]{0,11}$/);
+/**
+ * Points by place: a list (1st, 2nd, 3rd…), or a total the server splits over a
+ * number of places. `curve`: `even` steps down evenly (3, 2, 1 parts), `steep`
+ * halves each place (4, 2, 1), `equal` gives every place the same. Equal
+ * results share a place and each get its points.
+ */
+export const PlacesSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('list'), pointsMilli: z.array(AwardMilliSchema).min(1).max(12) }).strict(),
+  z.object({ kind: z.literal('split'), totalMilli: AwardMilliSchema, places: z.number().int().min(1).max(12), curve: z.enum(['even', 'steep', 'equal']) }).strict(),
+]);
+export type Places = z.infer<typeof PlacesSchema>;
+/**
+ * The points for 1st, 2nd, 3rd… A split total is shared by weight, in whole
+ * points when the total is a whole number of points; whatever does not divide
+ * goes to 1st place, so the parts always add up to the total.
+ */
+export function placePoints(places: Places): string[] {
+  if (places.kind === 'list') return places.pointsMilli;
+  const count = places.places; const total = BigInt(places.totalMilli);
+  const weights = Array.from({ length: count }, (_, index) => places.curve === 'equal' ? 1n : places.curve === 'steep' ? 1n << BigInt(count - 1 - index) : BigInt(count - index));
+  const sum = weights.reduce((a, b) => a + b, 0n);
+  const unit = total % 1000n === 0n ? 1000n : 1n;
+  const shares = weights.map(weight => total * weight / sum / unit * unit);
+  shares[0]! += total - shares.reduce((a, b) => a + b, 0n);
+  return shares.map(String);
+}
 export const MediaKindSchema = z.enum(['image', 'gif', 'video']);
 export type MediaKind = z.infer<typeof MediaKindSchema>;
 export const ChoiceOptionSchema = z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(240) }).strict();
@@ -43,6 +70,8 @@ export const SubmissionValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('vote'), submissionId: GameIdSchema }).strict(),
   // A minigame result, measured on the phone and checked by the server.
   MinigameValueSchema,
+  // A bet in a duel: the duelist this player thinks will win.
+  z.object({ kind: z.literal('bet'), playerId: GameIdSchema }).strict(),
 ]);
 export type SubmissionValue = z.infer<typeof SubmissionValueSchema>;
 
@@ -92,12 +121,19 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('player.removePicture'), playerId: GameIdSchema }).strict(),
   // The host spins the wheel of fortune set on this scene (again, if they like); the server picks the entry.
   z.object({ ...hostEnvelope, type: z.literal('wheel.spin'), stageRunId: GameIdSchema }).strict(),
+  // A duel: the host picks the two duelists (when the scene lets the host pick, or again before anyone bets),
+  // and later the winner, which pays the winner, the loser's place and every right bet at once.
+  z.object({ ...hostEnvelope, type: z.literal('duel.pick'), stageRunId: GameIdSchema, playerIds: z.tuple([GameIdSchema, GameIdSchema]) }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('duel.decide'), stageRunId: GameIdSchema, winnerId: GameIdSchema }).strict(),
+  // A duel played as a head-to-head game: the duelists' moves (once betting has closed), or giving up.
+  z.object({ ...envelope, type: z.literal('duel.move'), stageRunId: GameIdSchema, move: HeadToHeadMoveSchema }).strict(),
+  z.object({ ...envelope, type: z.literal('duel.resign'), stageRunId: GameIdSchema }).strict(),
   // One turn of a relay drawing (Pass the pencil): the strokes this player added in turn `turn`.
   z.object({ ...envelope, type: z.literal('minigame.part'), stageRunId: GameIdSchema, turn: z.number().int().min(0).max(63), assetId: GameIdSchema }).strict(),
 ]);
 export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Commands a player may send; every other command is the host's. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'player.look', 'minigame.part'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'player.look', 'minigame.part', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),
@@ -155,16 +191,29 @@ export const PublicRouteSchema = z.object({
   pending: z.enum(['tie', 'no-votes', 'host']).nullable(), leaders: z.array(GameKeySchema).nullable(),
   decision: z.object({ optionKey: GameKeySchema, reason: z.enum(['vote', 'host', 'tie-break', 'fallback']), resolution: z.enum(['majority', 'host', 'default', 'random']) }).strict().nullable(),
 }).strict();
+// A duel as screens see it: the two duelists (null until picked), the bets on each
+// (live, for everyone), the points at stake and, once decided, the winner.
+export const PublicDuelSchema = z.object({
+  duelistIds: z.tuple([GameIdSchema, GameIdSchema]).nullable(), pick: z.enum(['random', 'host']),
+  bets: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(0) }).strict()),
+  placesMilli: z.array(AwardMilliSchema), betMilli: AwardMilliSchema, winnerId: GameIdSchema.nullable(),
+  // How the duel is won: the host names the winner, or a head-to-head game on the duelists' phones (its board as this viewer sees it).
+  contest: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('host') }).strict(),
+    z.object({ kind: z.literal('game'), game: HeadToHeadKeySchema, view: HeadToHeadViewSchema.nullable() }).strict(),
+  ]),
+}).strict();
 export const PublicStageSchema = z.object({
   id: GameIdSchema, nodeKey: GameKeySchema, stageKey: GameKeySchema,
-  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame']), prompt: z.string().min(1).max(2000),
+  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel']), prompt: z.string().min(1).max(2000),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.
   deadlineAt: z.string().datetime().nullable(), pausedRemainingMs: z.number().int().min(0).nullable(),
   // Progress is public; what was answered is not.
   submittedCount: z.number().int().min(0), eligibleCount: z.number().int().min(0),
-  challenge: z.object({ maxAwardMilli: AwardMilliSchema, judgedPlayerIds: z.array(GameIdSchema), judgedTeamIds: z.array(GameIdSchema) }).strict().nullable(),
+  // `placesMilli`: points for 1st, 2nd… when the challenge pays by place (the host picks each player's place).
+  challenge: z.object({ maxAwardMilli: AwardMilliSchema, placesMilli: z.array(AwardMilliSchema).nullable(), judgedPlayerIds: z.array(GameIdSchema), judgedTeamIds: z.array(GameIdSchema) }).strict().nullable(),
   teams: StageTeamsSchema.nullable(),
   route: PublicRouteSchema.nullable(),
   // Show-only scenes: an info scene's title, a scoreboard scene's standings selection.
@@ -172,6 +221,7 @@ export const PublicStageSchema = z.object({
   scoreboard: z.object({ show: z.enum(['players', 'teams', 'both']) }).strict().nullable(),
   ballot: z.array(BallotEntrySchema).nullable(),
   minigame: PublicMinigameSchema.nullable(),
+  duel: PublicDuelSchema.nullable(),
   // True when a later vote shows these answers without names; they are revealed by that vote.
   revealAfterVote: z.boolean(),
   revealed: z.boolean(), reveal: StageRevealSchema.nullable(),

@@ -72,6 +72,9 @@ Scene types:
 | `scoreboard` | `title`, `show` (`"players"`, `"teams"`, `"both"`) | Shows the standings. |
 | `drawing` | `question`, optional `blind` (`true`: players cannot see what they draw) | Players draw on their phone. Can be voted on. |
 | `minigame` | `question` (title on the screens), `game` (`reaction`, `tap-race`, `stop-clock`, `lucky-doors`, `perfect-circle` or `relay-drawing`, which needs team play), optional `settings`, `points` (list: 1st, 2nd, 3rd place…), `teamResult` (`average`, `best`, `total`) | Played on the phones. Default points 10, 6, 3. Settings: reaction `{ "minWaitMs": 2000, "maxWaitMs": 6000 }`, tap race `{ "seconds": 10 }`, stop the clock `{ "targetMs": 10000, "visibleMs": 3000 }`, lucky doors `{ "doorsMilli": ["0", "5000", "10000"] }` (points × 1000). Works solo or with `play` for teams, including one against the rest. An unknown `game` stays a scene to choose in the editor. |
+| `duel` | `question` (what the two do), optional `pick` (`random`, default, or `host`), `game` (leave out for any contest the host judges, or `rps`, `tictactoe`, `chess` played on the two phones), `settings` (rock paper scissors: `{ "firstTo": 2 }`), `points` (for the winner, default 10) or `places`, `betPoints` (for each right bet, default 1), `seconds` (betting time, default 30) | Two players face off while everyone else bets on the winner. The host names the winner, or the game does. |
+
+**Points by place** (`places`), on a `quiz`, `order`, `vote`, `challenge`, `minigame` or `duel`: either a list, `"places": [10, 6, 3]` (points for 1st, 2nd, 3rd), or a total the server splits, `"places": { "total": 30, "places": 3, "curve": "even" }` (`curve`: `even` 3-2-1, `steep` halves each place, `equal`). Quiz and order: the fastest correct answers, on top of `points`. Vote: the most-voted answers, on top of `pointsPerVote`. Challenge: the host gives each player a place. Minigame: instead of `points`. Duel: 1st is the winner, 2nd the runner-up. Equal results share a place.
 
 Rules the game must follow (the editor explains any break):
 
@@ -128,6 +131,8 @@ You are writing a party game for a web app where people play on their phones whi
   - `"upload"`: `"question"`, `"accept"`: any of `"pictures"`, `"gifs"`, `"videos"`.
   - `"vote"`: `"question"`, `"votesOn"` (id of an earlier writing or upload scene), `"pointsPerVote"`.
   - `"challenge"`: `"question"` (something people do in the room), `"maxPoints"`. The host judges.
+  - `"duel"`: `"question"` (what the two do), optional `"pick"`: `"random"` or `"host"`, optional `"game"`: `"rps"`, `"tictactoe"` or `"chess"` (played on the two phones; leave out for any contest the host judges), `"points"` (for the winner), `"betPoints"` (for each right bet), `"seconds"` (betting time). Everyone else bets on the winner.
+  - Optional on quiz, order, vote, challenge, minigame and duel: `"places"`: a list like `[10, 6, 3]` (points for 1st, 2nd, 3rd: the fastest correct answers, the most-voted answers, the host's places, the minigame's places, the duel's winner and runner-up), or `{ "total": 30, "places": 3, "curve": "even" }` to split a total (`curve`: `"even"`, `"steep"` or `"equal"`).
   - `"party-choice"`: `"question"`, `"options"`: 2–6 objects `{ "label": "Music", "to": "id-of-first-scene-of-that-route" }`, optional `"decidedBy"`: `"players"`, `"captains"` or `"host"`. Each option must go to a DIFFERENT scene. Give the last scene of each route `"next"` set to the scene where the routes come back together.
   - `"scoreboard"`: `"title"`, `"show"`: `"players"`, `"teams"` or `"both"`.
   - `"drawing"`: `"question"` (what to draw), optional `"blind": true`. Can be voted on with a `"vote"` scene.

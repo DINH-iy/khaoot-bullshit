@@ -10,6 +10,7 @@ import { VoteBallot } from './vote.js';
 import { SeatReclaim, SeatRequests } from './seat-reclaim.js';
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
+import { DuelPanel } from './duel.js';
 import { MinigameStage } from '../minigames/minigame-stage.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
@@ -137,14 +138,14 @@ export function RoomScreen() {
   // The one big button the host needs right now, plus the less frequent ones.
   const primary = !state ? null : state.view.status === 'LOBBY' ? { label: t('host.start'), run: () => command('session.start') }
     : state.view.status === 'PAUSED' ? { label: t('host.resume'), run: () => command('session.resume') }
-    : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly ? { label: t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
-    : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
-    : running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
+    : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
+    : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
+    : running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
     : null;
   // What is happening now, in a word or two, above the round.
   const forming = Boolean(stage?.teams?.forming);
   const phase = !stage || stage.kind === 'info' || stage.kind === 'scoreboard' ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams')
-    : stage.revealed ? t('phase.results') : stage.status === 'CLOSED' ? t('phase.locked')
+    : stage.revealed ? t('phase.results') : stage.kind === 'duel' ? (stage.status === 'CLOSED' ? t('phase.duelOn') : t('phase.duel')) : stage.status === 'CLOSED' ? t('phase.locked')
     : stage.kind === 'challenge' ? t('phase.challenge') : stage.kind === 'minigame' ? t('phase.minigame') : stage.kind === 'route' ? t('phase.route') : stage.kind === 'vote' ? t('phase.vote')
     : stage.eligibleCount > 0 && stage.submittedCount >= stage.eligibleCount ? t('phase.allIn') : t('phase.answer');
   // Scores: the host always; phones and the shared screen when the host allows it, and always at a scoreboard scene and the end.
@@ -195,13 +196,14 @@ export function RoomScreen() {
           {!forming && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} />}
           {stage.kind === 'vote' && !stage.revealed && <VoteBallot state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
             onVote={submissionId => command('submission.submit', { stageRunId: stage.id, value: { kind: 'vote', submissionId } })} />}
-          {stage.kind !== 'challenge' && stage.kind !== 'route' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
+          {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
           {host && stage.kind === 'challenge' && stage.status === 'CLOSED' && !stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
           {stage.kind === 'minigame' && <MinigameStage state={state} stage={stage} offset={room.clockOffset} disabled={disabled}
             canPlay={role === 'player' && !answerBlock && stage.status === 'ACTIVE' && running}
             onResult={result => command('submission.submit', { stageRunId: stage.id, value: { kind: 'minigame', ...result } })}
             live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })} />}
           <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />
+          <DuelPanel state={state} stage={stage} disabled={disabled} send={command} />
           {stage.kind !== 'route' && <div ref={resultsRef}><StageResults state={state} stage={stage} /></div>}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>These answers are shown without names in the vote that comes next.</p>}
           {stage.kind === 'minigame' ? (role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p> : null)
@@ -257,7 +259,7 @@ export function RoomScreen() {
     {state && <WheelOverlay wheel={state.view.wheel} offset={room.clockOffset} />}
     {state && role === 'display' && <WheelBadge wheel={state.view.wheel} />}
     {state && <BreakOverlay state={state} host={host} disabled={disabled} onContinue={() => command('session.resume')} />}
-    {state && role === 'player' && <PhoneDock state={state} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
+    {state && role === 'player' && <PhoneDock state={state} challengeTick={room.challengeTick} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
       onBreak={vote => { void roomApi(`/api/rooms/${sessionId}/break`, { vote }).catch(() => setError('Your vote did not go through. Try again.')); }}
       scores={<Scoreboard state={state} disabled={disabled} send={command} />} />}
     {state && role === 'player' && <PointsCelebration roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}

@@ -1,4 +1,4 @@
-import { isMinigameKey, MINIGAMES } from '@party/contracts';
+import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, type PrefabContent } from '@party/contracts';
 // Flow editor model: pure functions over a game draft. The server validates
 // every save; this only keeps edits well formed and the canvas snappy.
 
@@ -42,7 +42,7 @@ export function pointOnCurve(from: Point, to: Point, t: number): Point {
 }
 
 // ---------- scene types ----------
-export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'scoreboard' | 'minigame';
+export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'scoreboard' | 'minigame' | 'duel';
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
   { type: 'info', name: 'Cutscene or info', icon: 'info', hint: 'Text on every screen' },
   { type: 'quiz', name: 'Quiz question', icon: 'quiz', hint: 'Tiles or a list, one correct answer' },
@@ -55,8 +55,76 @@ export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: s
   { type: 'route', name: 'Party choice', icon: 'route', hint: 'Branch into routes' },
   { type: 'scoreboard', name: 'Scoreboard', icon: 'scoreboard', hint: 'Show the standings' },
   { type: 'minigame', name: 'Minigame', icon: 'minigame', hint: 'Reaction, tap race, circles, Pass the pencil…' },
+  { type: 'duel', name: 'Head-to-head duel', icon: 'duel', hint: 'Two players face off, everyone bets on the winner' },
 ];
-export function newStage(type: SceneType, definition: Definition): Stage {
+/**
+ * The kinds within a scene type, offered in a second menu after picking the type.
+ * Types without an entry here are added straight away.
+ */
+export interface SceneVariant { key: string; name: string; hint: string }
+export const SCENE_VARIANTS: Partial<Record<SceneType, SceneVariant[]>> = {
+  quiz: [
+    { key: 'tiles', name: 'Big tiles', hint: 'Coloured answer tiles on the phones' },
+    { key: 'list', name: 'A list', hint: 'Answers as a list, for longer answers' },
+    { key: 'true-false', name: 'True or false', hint: 'Two answers: True and False' },
+  ],
+  writing: [
+    { key: 'free', name: 'Any question', hint: 'Players write an answer' },
+    { key: 'joke', name: 'Finish the joke', hint: 'Players write the punchline' },
+    { key: 'caption', name: 'Caption this', hint: 'A title for a situation' },
+    { key: 'excuse', name: 'Best excuse', hint: 'Talk your way out of it' },
+  ],
+  upload: [
+    { key: 'pictures', name: 'Pictures and GIFs', hint: 'Photos from the phone or GIFs' },
+    { key: 'videos', name: 'Short videos', hint: 'A short clip from the phone' },
+    { key: 'anything', name: 'Anything', hint: 'Pictures, GIFs or videos' },
+  ],
+  drawing: [
+    { key: 'draw', name: 'Draw it', hint: 'Draw on the phone, then vote' },
+    { key: 'blind', name: 'Draw blind', hint: 'Players see their drawing only when it is sent' },
+  ],
+  route: [
+    { key: 'players', name: 'Everyone votes', hint: 'The players choose the route' },
+    { key: 'host', name: 'The host decides', hint: 'You pick the route during the game' },
+  ],
+  scoreboard: [
+    { key: 'players', name: 'Players', hint: 'Points per player' },
+    { key: 'teams', name: 'Teams', hint: 'For team games: points per team' },
+    { key: 'both', name: 'Teams and players', hint: 'For team games: both' },
+  ],
+  minigame: MINIGAME_KEYS.map(key => ({ key, name: MINIGAMES[key].name, hint: MINIGAMES[key].description })),
+  // How a duel is won: any contest in the room (the host names the winner), or a head-to-head game on the two phones.
+  duel: [{ key: 'host', name: 'Any contest', hint: 'In the room: pool, a dance-off… the host names the winner' },
+    ...HEAD_TO_HEAD_KEYS.map(key => ({ key, name: HEAD_TO_HEAD_GAMES[key].name, hint: `On the two phones: ${HEAD_TO_HEAD_GAMES[key].description.toLowerCase()}` }))],
+};
+/** Round-only teams of two, for a team minigame in a game without teams; the host can change it. */
+export const ROUND_TEAMS_PLAY = { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }, answers: 'everyone', points: 'members' } as const;
+const WRITING_PROMPTS: Record<string, string> = { joke: 'Finish the joke: why did the chicken join a band?', caption: 'Write a caption: your boss walks in during karaoke.', excuse: 'Give your best excuse: you are two hours late for dinner.' };
+/** A minigame scene for one game, with its own timer; a team game gets round-only teams unless the game already plays in teams. */
+export function minigameStage(game: MinigameKey, definition: Definition): Stage {
+  const stage: Stage = { key: 'main', kind: 'minigame', prompt: `${MINIGAMES[game].name}!`, game, durationMs: MINIGAMES[game].defaultSeconds * 1000 };
+  if (TEAM_MINIGAMES.includes(game) && (definition['play'] as { kind?: string } | undefined)?.kind !== 'teams') stage['play'] = structuredClone(ROUND_TEAMS_PLAY);
+  return stage;
+}
+/** A new scene's first part: the type's standard start, adjusted for the chosen kind (variant). */
+export function newStage(type: SceneType, definition: Definition, variant?: string): Stage {
+  const stage = baseStage(type, definition);
+  const input = stage['input'] as Record<string, unknown> | undefined;
+  switch (`${type}:${variant ?? ''}`) {
+    case 'quiz:list': return { ...stage, input: { ...input, layout: 'list' } };
+    case 'quiz:true-false': return { ...stage, prompt: 'True or false?', input: { ...input, options: [{ key: 'true', label: 'True' }, { key: 'false', label: 'False' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'true', awardMilli: '10000' } };
+    case 'writing:joke': case 'writing:caption': case 'writing:excuse': return { ...stage, prompt: WRITING_PROMPTS[variant!]! };
+    case 'upload:videos': return { ...stage, prompt: 'Upload a short video.', input: { ...input, accept: ['video'] } };
+    case 'upload:anything': return { ...stage, prompt: 'Upload a picture, GIF or short video.', input: { ...input, accept: ['image', 'gif', 'video'] } };
+    case 'drawing:blind': return { ...stage, input: { ...input, blind: true } };
+    case 'route:host': return { ...stage, durationMs: null, decide: { method: 'host' } };
+    case 'scoreboard:teams': case 'scoreboard:both': return { ...stage, show: variant };
+  }
+  if (type === 'minigame' && variant && isMinigameKey(variant)) return minigameStage(variant, definition);
+  if (type === 'duel' && variant && isHeadToHeadKey(variant)) return { ...stage, prompt: `${HEAD_TO_HEAD_GAMES[variant].name} duel! Who wins?`, contest: { kind: 'game', game: variant } };
+  return stage;
+}
+function baseStage(type: SceneType, definition: Definition): Stage {
   switch (type) {
     case 'info': return { key: 'main', kind: 'info', title: 'New scene', prompt: 'Text shown on every screen.', durationMs: null };
     case 'quiz': return { key: 'main', kind: 'collect', prompt: 'Your question?', durationMs: 20_000,
@@ -77,6 +145,8 @@ export function newStage(type: SceneType, definition: Definition): Stage {
       input: { kind: 'order', items: [{ key: 'first', label: 'First' }, { key: 'second', label: 'Second' }, { key: 'third', label: 'Third' }] },
       scoring: { kind: 'correct-order', correctOrder: ['first', 'second', 'third'], awardMilli: '10000' } };
     case 'minigame': return { key: 'main', kind: 'minigame', prompt: 'Tap race!', game: 'tap-race', durationMs: MINIGAMES['tap-race'].defaultSeconds * 1000 };
+    // The timer is the betting time.
+    case 'duel': return { key: 'main', kind: 'duel', prompt: 'Rock, paper, scissors at the table: best of three!', durationMs: 30_000, pick: 'random', places: { kind: 'list', pointsMilli: ['10000'] }, betMilli: '1000' };
   }
 }
 export const isVotable = (stage: Stage) => stage.kind === 'collect' && ['text', 'media', 'drawing'].includes((stage['input'] as { kind?: string } | undefined)?.kind ?? '') && (stage['scoring'] as { kind?: string } | undefined)?.kind === 'none';
@@ -87,7 +157,7 @@ export function uniqueKey(prefix: string, taken: Iterable<string>): string {
 }
 
 // ---------- card text ----------
-const KIND_LABEL: Record<string, string> = { info: 'Cutscene', route: 'Party choice', challenge: 'Challenge', vote: 'Vote', scoreboard: 'Results', minigame: 'Minigame' };
+const KIND_LABEL: Record<string, string> = { info: 'Cutscene', route: 'Party choice', challenge: 'Challenge', vote: 'Vote', scoreboard: 'Results', minigame: 'Minigame', duel: 'Duel' };
 function stageLabel(stage: Stage): string {
   if (stage.kind !== 'collect') return KIND_LABEL[stage.kind] ?? stage.kind;
   const input = (stage['input'] as { kind?: string } | undefined)?.kind;
@@ -105,6 +175,7 @@ function stageLine(stage: Stage): string {
   if (stage.kind === 'scoreboard') return 'Scoreboard';
   if (stage.kind === 'minigame') { const game = String(stage['game']); return [isMinigameKey(game) ? MINIGAMES[game].name : 'Choose a minigame', timer].filter(Boolean).join(' · '); }
   if (stage.kind === 'vote') return ['Vote on answers', timer].filter(Boolean).join(' · ');
+  if (stage.kind === 'duel') { const contest = stage['contest'] as { kind?: string; game?: string } | undefined; return [contest?.kind === 'game' && isHeadToHeadKey(contest.game) ? HEAD_TO_HEAD_GAMES[contest.game].name : 'Host names the winner', stage['pick'] === 'host' ? 'host picks' : 'random pair', timer ? `${timer} to bet` : null].filter(Boolean).join(' · '); }
   const input = stage['input'] as { kind?: string; options?: unknown[] } | undefined;
   return [stageLabel(stage), input?.kind === 'choice' ? `${input.options?.length ?? 0} options` : null, timer].filter(Boolean).join(' · ');
 }
@@ -196,9 +267,9 @@ export function connect(definition: Definition, from: string, option: string | u
 export const disconnect = (definition: Definition, edgeKey: string): Definition => ({ ...definition, edges: definition.edges.filter(edge => edge.key !== edgeKey) });
 
 // ---------- scenes ----------
-export function addScene(definition: Definition, type: SceneType): { definition: Definition; key: string } {
+export function addScene(definition: Definition, type: SceneType, variant?: string): { definition: Definition; key: string } {
   const key = uniqueKey(type === 'route' ? 'choice' : 'scene', definition.nodes.map(node => node.key));
-  const node: Node = { key, stages: [newStage(type, definition)] };
+  const node: Node = { key, stages: [newStage(type, definition, variant)] };
   return { key, definition: { ...definition, ...(type === 'route' ? { formatVersion: 2 } : {}), nodes: [...definition.nodes, node] } };
 }
 export function deleteScene(definition: Definition, key: string): Definition {
@@ -235,8 +306,8 @@ export function freeSpot(definition: Definition, positions: Positions, key: stri
   return { x, y };
 }
 /** Adds a scene and connects an output to it in one step. */
-export function addConnectedScene(definition: Definition, type: SceneType, from: string, option: string | undefined): { definition: Definition; key: string } {
-  const added = addScene(definition, type);
+export function addConnectedScene(definition: Definition, type: SceneType, from: string, option: string | undefined, variant?: string): { definition: Definition; key: string } {
+  const added = addScene(definition, type, variant);
   return { key: added.key, definition: connect(added.definition, from, option, added.key) };
 }
 
@@ -279,4 +350,30 @@ export function estimateMinutes(definition: Definition): number {
     const total = cost(node) + next; memo.set(key, total); return total;
   };
   return Math.max(1, Math.round(longest(definition.startNodeKey) / 60_000));
+}
+
+// ---------- prefabs ----------
+/** The selected scenes as a prefab: the scenes, the connections between them, and where their cards are. */
+export function prefabFrom(definition: Definition, positions: Positions, keys: string[]): PrefabContent {
+  const chosen = new Set(keys);
+  return {
+    nodes: structuredClone(definition.nodes.filter(node => chosen.has(node.key))) as PrefabContent['nodes'],
+    edges: structuredClone(definition.edges.filter(edge => chosen.has(edge.from) && chosen.has(edge.to))),
+    positions: Object.fromEntries(keys.filter(key => positions[key]).map(key => [key, positions[key]!])),
+    keys: definition.nodes.filter(node => chosen.has(node.key)).map(node => node.key),
+  };
+}
+/**
+ * Inserts a prefab with its top-left card at `at`. When it is added after a scene
+ * (`from`), that scene (or its route `option`) leads to the prefab's first scene:
+ * the first one nothing inside the prefab leads to.
+ */
+export function insertPrefab(definition: Definition, positions: Positions, content: PrefabContent, at: Point, from?: { key: string; option: string | undefined }) {
+  const placed = content.keys.map(key => content.positions[key]).filter((point): point is Point => Boolean(point));
+  const origin = placed.length ? { x: Math.min(...placed.map(point => point.x)), y: Math.min(...placed.map(point => point.y)) } : { x: 0, y: 0 };
+  const source: Definition = { formatVersion: 2, title: '', startNodeKey: content.keys[0]!, nodes: content.nodes as Node[], edges: content.edges as Edge[] };
+  const pasted = pasteScenes(definition, positions, source, content.positions, content.keys, { x: at.x - origin.x, y: at.y - origin.y });
+  const entryIndex = content.keys.findIndex(key => !content.edges.some(edge => edge.to === key));
+  const entry = pasted.keys[Math.max(0, entryIndex)]!;
+  return { ...pasted, definition: from ? connect(pasted.definition, from.key, from.option, entry) : pasted.definition };
 }

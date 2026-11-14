@@ -1,14 +1,17 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
+// `places` (optional everywhere, so earlier definitions keep their hash): extra points
+// by place. Quiz and ordering: the fastest correct answers. Votes: the most-voted answers.
+// Challenges: the places the host gives. Minigames: their result (instead of `placementMilli`).
 const scoring = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
-  z.object({ kind: z.literal('correct-choice'), correctChoiceKey: GameKeySchema, awardMilli: AwardMilliSchema }).strict(),
+  z.object({ kind: z.literal('correct-choice'), correctChoiceKey: GameKeySchema, awardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
   // All or nothing: the award is given only for the exact order.
-  z.object({ kind: z.literal('correct-order'), correctOrder: z.array(GameKeySchema).min(2).max(8), awardMilli: AwardMilliSchema }).strict(),
+  z.object({ kind: z.literal('correct-order'), correctOrder: z.array(GameKeySchema).min(2).max(8), awardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
 ]);
 // How teams are made: a number of balanced teams, or exact sizes where one team
 // may take "the rest" (1 vs 3, 2 vs 2, 1 vs everyone…). Players beyond the fixed
@@ -56,9 +59,9 @@ const look = { presentation: PresentationSchema.optional(), spin: z.object({ whe
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
-  z.object({ ...common, kind: z.literal('challenge'), maxAwardMilli: AwardMilliSchema }).strict(),
+  z.object({ ...common, kind: z.literal('challenge'), maxAwardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
   // Players vote for one answer from an earlier text or upload round. Each vote gives its author points.
-  z.object({ ...common, kind: z.literal('vote'), source: z.object({ nodeKey: GameKeySchema, stageKey: GameKeySchema }).strict(), awardPerVoteMilli: AwardMilliSchema }).strict(),
+  z.object({ ...common, kind: z.literal('vote'), source: z.object({ nodeKey: GameKeySchema, stageKey: GameKeySchema }).strict(), awardPerVoteMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
   // Show-only scenes: no answers, no points, no team play. The host continues
   // whenever they like; an optional countdown only informs the room.
   // An info scene (cutscene, rules, announcement): a title and text on every screen.
@@ -72,7 +75,18 @@ const stageSchema = z.discriminatedUnion('kind', [
   // how members' results make a team's result. All optional, so placeholder
   // scenes saved earlier keep their hash.
   z.object({ ...common, kind: z.literal('minigame'), game: z.string().trim().min(1).max(64), settings: z.record(z.string(), z.json()).optional(),
-    placementMilli: z.array(AwardMilliSchema).min(1).max(12).optional(), teamResult: z.enum(['best', 'average', 'total']).optional() }).strict(),
+    placementMilli: z.array(AwardMilliSchema).min(1).max(12).optional(), places: PlacesSchema.optional(), teamResult: z.enum(['best', 'average', 'total']).optional() }).strict(),
+  // A duel: two players (picked at random or by the host) face off in the room while everyone
+  // else bets on the winner; the host taps the winner. `places`: 1st for the winner, 2nd for the
+  // loser (left out: 10 points for the winner). `betMilli`: for every right bet. The timer is the
+  // betting time. No team play: it is always two players.
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('duel'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
+    pick: z.enum(['random', 'host']), places: PlacesSchema.optional(), betMilli: AwardMilliSchema,
+    // How it is won (left out: the host names the winner). `game`: a head-to-head game on the two phones, with its settings.
+    contest: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('host') }).strict(),
+      z.object({ kind: z.literal('game'), game: HeadToHeadKeySchema, settings: z.record(z.string(), z.json()).optional() }).strict(),
+    ]).optional() }).strict(),
   // Format 2: the party picks one route. It is the only stage of its node, each
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.
@@ -124,6 +138,8 @@ export const GameDefinitionSchema = z.object({
       if (stage.spin && !wheels.has(stage.spin.wheel)) ctx.addIssue({ code: 'custom', message: 'This scene spins a wheel that does not exist', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       // Pass the pencil is drawn by teams: it needs team play, from the round or the game.
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'duel' && stage.contest?.kind === 'game' && !parseHeadToHeadSettings(stage.contest.game, stage.contest.settings)) ctx.addIssue({ code: 'custom', message: 'Duel game settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'minigame' && stage.places && stage.placementMilli) ctx.addIssue({ code: 'custom', message: 'Give the minigame either points per place or places, not both', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-order') {
         const rule = stage.scoring; const keys = stage.input.kind === 'order' ? stage.input.items.map(item => item.key) : [];
@@ -175,10 +191,15 @@ export function minigameRules(stage: MinigameStage): { game: MinigameKey; settin
   if (!isMinigameKey(stage.game)) throw new GameError('UNSUPPORTED_FEATURE');
   const settings = parseMinigameSettings(stage.game, stage.settings);
   if (!settings) throw new GameError('INVALID_DEFINITION');
-  return { game: stage.game, settings, placementMilli: stage.placementMilli ?? ['10000', '6000', '3000'], teamResult: stage.teamResult ?? 'average' };
+  return { game: stage.game, settings, placementMilli: stage.places ? placePoints(stage.places) : stage.placementMilli ?? ['10000', '6000', '3000'], teamResult: stage.teamResult ?? 'average' };
 }
 export { MINIGAMES };
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {
-  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard') throw new GameError('INVALID_STATE');
+  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'duel') throw new GameError('INVALID_STATE');
   return stage.play ?? definition.play ?? { kind: 'solo' };
+}
+/** Points by place for a stage that has them (fastest correct, most votes, host places), or null. */
+export function stagePlaces(stage: StageDefinition): string[] | null {
+  const places = stage.kind === 'collect' && stage.scoring.kind !== 'none' ? stage.scoring.places : stage.kind === 'vote' || stage.kind === 'challenge' ? stage.places : undefined;
+  return places ? placePoints(places) : null;
 }

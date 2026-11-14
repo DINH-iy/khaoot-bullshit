@@ -1,4 +1,4 @@
-import { isMinigameKey, MINIGAME_KEYS, MINIGAMES } from '@party/contracts';
+import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MINIGAME_KEYS, MINIGAMES } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -40,7 +40,23 @@ const findKey = (list: { key: string; label: string }[], wanted: unknown) => {
 
 const TYPES: Record<string, string> = { cutscene: 'info', info: 'info', text: 'info', quiz: 'quiz', question: 'quiz', choice: 'quiz', poll: 'poll', writing: 'writing', write: 'writing', joke: 'writing', caption: 'writing',
   upload: 'upload', picture: 'upload', photo: 'upload', video: 'upload', order: 'order', ordering: 'order', challenge: 'challenge', vote: 'vote', voting: 'vote',
-  route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame', drawing: 'drawing', draw: 'drawing', sketch: 'drawing' };
+  route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame', duel: 'duel', versus: 'duel', 'head-to-head': 'duel', drawing: 'drawing', draw: 'drawing', sketch: 'drawing' };
+
+/**
+ * Points by place in the simple format: `places: [10, 6, 3]` (points for 1st, 2nd, 3rd),
+ * or `places: { total: 30, places: 3, curve: "even" }` (split by the server; curve even, steep or equal).
+ * An exact places object (with `kind`) passes through; the definition check validates it.
+ */
+function placesFrom(raw: Json): Json {
+  const value = raw['places'];
+  if (Array.isArray(value)) { const points = value.map(entry => milli(entry)).filter(entry => entry !== undefined).slice(0, 12); return points.length ? { places: { kind: 'list', pointsMilli: points } } : {}; }
+  if (!isObject(value)) return {};
+  if (typeof value['kind'] === 'string') return { places: value };
+  const total = milli(value['total']); const count = Math.round(Number(value['places'] ?? value['count']));
+  if (!total || !Number.isFinite(count)) return {};
+  const curve = ['even', 'steep', 'equal'].includes(text(value['curve'])) ? text(value['curve']) : 'even';
+  return { places: { kind: 'split', totalMilli: total, places: Math.max(1, Math.min(12, count)), curve } };
+}
 
 /** One stage in the simple format (with `type`) becomes an exact stage. Exact stages (with `kind`) pass through. */
 function stageFrom(raw: Json, key: string): Json {
@@ -68,9 +84,17 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const points = Array.isArray(raw['points']) ? raw['points'].map(entry => milli(entry)).filter(entry => entry !== undefined).slice(0, 12) : [];
       const teamResult = ['best', 'average', 'total'].includes(text(raw['teamResult'])) ? { teamResult: text(raw['teamResult']) } : {};
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...(points.length ? { placementMilli: points } : {}), ...teamResult, ...play };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...play };
     }
-    case 'challenge': return { key, kind: 'challenge', prompt, durationMs, maxAwardMilli: milli(raw['maxPoints'] ?? raw['points'] ?? 10) ?? '10000', ...play };
+    case 'duel': {
+      // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.
+      const wanted = text(raw['game']).toLowerCase().trim().replace(/\s+/g, '-');
+      const game = HEAD_TO_HEAD_KEYS.find(entry => entry === wanted || HEAD_TO_HEAD_GAMES[entry].name.toLowerCase().replace(/\s+/g, '-') === wanted);
+      const points = raw['places'] !== undefined ? placesFrom(raw) : raw['points'] !== undefined ? { places: { kind: 'list', pointsMilli: [milli(raw['points']) ?? '10000'] } } : {};
+      return { key, kind: 'duel', prompt, durationMs: durationMs ?? 30_000, pick: text(raw['pick']) === 'host' ? 'host' : 'random', betMilli: milli(raw['betPoints'] ?? 1) ?? '1000', ...points,
+        ...(game ? { contest: { kind: 'game', game, ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}) } } : {}) };
+    }
+    case 'challenge': return { key, kind: 'challenge', prompt, durationMs, maxAwardMilli: milli(raw['maxPoints'] ?? raw['points'] ?? 10) ?? '10000', ...placesFrom(raw), ...play };
     case 'drawing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'drawing', maxStrokes: 400, ...(raw['blind'] === true ? { blind: true } : {}) }, scoring: { kind: 'none' }, ...play };
     case 'writing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'text', maxLength: Math.max(1, Math.min(2000, Number(raw['maxLength']) || 240)) }, scoring: { kind: 'none' }, ...play };
     case 'upload': {
@@ -81,9 +105,9 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const items = options(raw['items'] ?? raw['answers'] ?? raw['options'], 'item');
       const points = milli(raw['points'] ?? 10);
       return { key, kind: 'collect', prompt, durationMs, input: { kind: 'order', items },
-        scoring: points && points !== '0' ? { kind: 'correct-order', correctOrder: items.map(item => item.key), awardMilli: points } : { kind: 'none' }, ...play };
+        scoring: points && (points !== '0' || raw['places'] !== undefined) ? { kind: 'correct-order', correctOrder: items.map(item => item.key), awardMilli: points, ...placesFrom(raw) } : { kind: 'none' }, ...play };
     }
-    case 'vote': return { key, kind: 'vote', prompt, durationMs, source: raw['source'] ?? { nodeKey: text(raw['votesOn'] ?? raw['on']), stageKey: '' }, awardPerVoteMilli: milli(raw['pointsPerVote'] ?? raw['points'] ?? 5) ?? '5000', ...play };
+    case 'vote': return { key, kind: 'vote', prompt, durationMs, source: raw['source'] ?? { nodeKey: text(raw['votesOn'] ?? raw['on']), stageKey: '' }, awardPerVoteMilli: milli(raw['pointsPerVote'] ?? raw['points'] ?? 5) ?? '5000', ...placesFrom(raw), ...play };
     case 'route': {
       const routes = options(raw['options'] ?? raw['routes'], 'route');
       const method = ['players', 'captains', 'host'].includes(text(raw['decidedBy'] ?? raw['decide'])) ? text(raw['decidedBy'] ?? raw['decide']) : 'players';
@@ -94,7 +118,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const answers = options(raw['answers'] ?? raw['options'], 'answer');
       const correct = findKey(answers, raw['correct'] ?? raw['answer']);
       return { key, kind: 'collect', prompt, durationMs: durationMs ?? 20_000, input: { kind: 'choice', layout: text(raw['layout']) === 'list' ? 'list' : 'tiles', options: answers },
-        scoring: correct && type !== 'poll' ? { kind: 'correct-choice', correctChoiceKey: correct, awardMilli: milli(raw['points'] ?? 10) ?? '10000' } : { kind: 'none' }, ...play };
+        scoring: correct && type !== 'poll' ? { kind: 'correct-choice', correctChoiceKey: correct, awardMilli: milli(raw['points'] ?? 10) ?? '10000', ...placesFrom(raw) } : { kind: 'none' }, ...play };
     }
   }
 }

@@ -2,7 +2,7 @@ import { resolveTheme } from '@party/contracts';
 import type { GameDefinition } from '../game/definition.js';
 import { allStages, maxPathStages } from '../game/graph.js';
 
-type Feature = 'quiz' | 'order' | 'writing' | 'drawing' | 'uploads' | 'votes' | 'minigames' | 'challenges' | 'teams' | 'routes';
+type Feature = 'quiz' | 'order' | 'writing' | 'drawing' | 'uploads' | 'votes' | 'minigames' | 'challenges' | 'teams' | 'routes' | 'duels';
 /**
  * What the host menu says about a game: what kinds of rounds it has, about
  * how long it takes, and the colours of its look (for its cover). Never
@@ -16,6 +16,7 @@ export function gameFacts(definition: GameDefinition): { features: Feature[]; mi
     if (stage.kind === 'minigame') { found.add('minigames'); if (stage.game === 'perfect-circle' || stage.game === 'relay-drawing') found.add('drawing'); }
     if (stage.kind === 'challenge') found.add('challenges');
     if (stage.kind === 'route') found.add('routes');
+    if (stage.kind === 'duel') found.add('duels');
     if ('play' in stage && stage.play?.kind === 'teams') found.add('teams');
   }
   if (definition.play?.kind === 'teams') found.add('teams');

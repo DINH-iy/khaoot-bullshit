@@ -9,6 +9,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
   const [message, setMessage] = useState(''); const [samples, setSamples] = useState<number[]>([]); const [reconnects, setReconnects] = useState(0);
   const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false); const [clockOffset, setClockOffset] = useState(0); const [confirmMs, setConfirmMs] = useState<number | null>(null);
   // Live minigame signals: GO the moment it happens, and the running tap counts of a race.
+  // Counts challenge updates pushed to this phone; the challenges sheet reloads when it changes.
+  const [challengeTick, setChallengeTick] = useState(0);
   const [go, setGo] = useState<{ stageRunId: string; goAt: string; receivedAt: number } | null>(null); const [progress, setProgress] = useState<{ stageRunId: string; counts: { playerId: string; count: number }[] } | null>(null);
   const [liveStrokes] = useState(createLiveStrokes); const [reactions] = useState(createReactionStore);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
@@ -107,12 +109,13 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('room.reaction', (data: unknown) => { if (mounted) reactions.add(data); });
     socket.on('minigame.progress', (data: { stageRunId?: unknown; counts?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && Array.isArray(data.counts)) setProgress({ stageRunId: data.stageRunId, counts: (data.counts as { playerId: string; count: number }[]).filter(entry => typeof entry?.playerId === 'string' && Number.isInteger(entry.count)).slice(0, 512) }); });
     socket.on('room.error', (error: { code: string }) => { if (mounted) setMessage(error.code); });
+    socket.on('side.challenge', () => { if (mounted) setChallengeTick(value => value + 1); });
     const interval = setInterval(() => { void heartbeat(); requestSync(); }, 10000);
     const foreground = () => { if (!document.hidden) { if (!socket.connected) socket.connect(); reconciled = false; requestSync(); void heartbeat(); } };
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
     return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
   }, [sessionId, display, remember, storageKey, liveStrokes, reactions]);
-  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress,
+  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress, challengeTick,
     /** A tap race's running count; fire-and-forget, the final result is the saved one. */
     // Not volatile: a report waits for a busy connection instead of being dropped, so the server sees every tap it can.
     sendTaps(stageRunId: string, count: number) { socketRef.current?.emit('minigame.taps', { stageRunId, count }); },

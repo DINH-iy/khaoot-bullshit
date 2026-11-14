@@ -12,11 +12,11 @@ import type { EditorLive } from '../authoring/live.js';
 import { lockRoom, makeRoomCode } from '../rooms/gateway.js';
 import { joinToken, newToken, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
 import { OWNER_COOKIE, type OwnerAccess } from './owner-access.js';
+import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
 
 // Local owner hosting: the person running this server opens a private link and
 // hosts built-in games from the browser (owner access: ./owner-access.ts). The
 // rooms it creates carry LOCAL_REHEARSAL grants that production rejects anyway.
-const OWNER = { issuer: 'urn:local-owner', subject: 'owner' };
 const HOST_ACCESS_MS = 8 * 60 * 60 * 1000;
 
 export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess, live?: EditorLive) {
@@ -24,7 +24,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
   const authoring = createAuthoring(client);
   const secure = config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : '';
-  const ownerCreator = () => client.creator.upsert({ where: { issuer_subject: OWNER }, create: OWNER, update: {} });
+  const ownerCreator = () => sharedOwnerCreator(client);
   async function versionFor(creatorId: string, game: (typeof builtInGames)[number]): Promise<string> {
     const hash = contentHash(game.definition);
     return client.$transaction(async tx => {

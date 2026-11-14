@@ -6,9 +6,10 @@ import { ReactionTray } from './reactions.js';
 import { setSound, soundOn, unlockSound } from './celebrate.js';
 import './room-extras.css';
 
-type Sheet = 'scores' | 'players' | 'react' | 'games' | null;
-// Side games load only when opened.
+type Sheet = 'scores' | 'players' | 'react' | 'games' | 'challenges' | null;
+// Side games and challenges load only when opened.
 const SideGames = lazy(() => import('../side-games/side-games.js'));
+const Challenges = lazy(() => import('../side-games/challenges.js'));
 
 /** A bottom sheet over the phone screen; Escape or the close button closes it, and focus goes into it. */
 function BottomSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -26,8 +27,8 @@ function BottomSheet({ title, onClose, children }: { title: string; onClose: () 
  * scoreboard (when the host allows it), the players, reactions to the big
  * screen, and sound on or off. Nothing to scroll for.
  */
-export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak }: {
-  state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void; onBreak: (vote: boolean) => void;
+export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak, challengeTick }: {
+  state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void; onBreak: (vote: boolean) => void; challengeTick: number;
 }) {
   const t = useText(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
   // Sound needs a first tap on phones; any tap in the dock (or an answer) prepares it.
@@ -36,8 +37,11 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
   // Side games pause whenever the game needs this player: the sheet closes and a note says why.
   const needed = playerNeeded(state.view, state.selfPlayerId);
   const [pausedNote, setPausedNote] = useState(false);
+  // A dot on Challenge when something changed (an invitation, a move) while the sheet was closed.
+  const [seenTick, setSeenTick] = useState(challengeTick);
+  useEffect(() => { if (sheet === 'challenges') setSeenTick(challengeTick); }, [sheet, challengeTick]);
   useEffect(() => {
-    if (!needed || sheet !== 'games') return;
+    if (!needed || (sheet !== 'games' && sheet !== 'challenges')) return;
     setSheet(null); setPausedNote(true);
     const hide = setTimeout(() => setPausedNote(false), 4000); return () => clearTimeout(hide);
   }, [needed, sheet]);
@@ -51,6 +55,8 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
         <span aria-hidden="true">{t('break.icon')}</span><small>{t('break.vote')} {state.break.votes}/{state.break.needed}</small></button>}
       {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('games'); }}>
         <span aria-hidden="true">🎰</span><small>{needed ? 'Games paused' : 'Games'}</small></button>}
+      {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('challenges'); }}>
+        <span aria-hidden="true">⚔️</span><small>Challenge{challengeTick !== seenTick && <span className="dock-dot" aria-label="news" />}</small></button>}
       <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>Sound</small></button>
     </nav>
     {sheet === 'scores' && <BottomSheet title={t('scores.title')} onClose={close}>{scores}</BottomSheet>}
@@ -60,6 +66,7 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
       <button type="button" className="primary" onClick={() => { close(); onChangeLook(); }}>{t('players.changeLook')}</button>
     </BottomSheet>}
     {sheet === 'games' && <BottomSheet title="Side games" onClose={close}><Suspense fallback={<p role="status">Opening the games…</p>}><SideGames sessionId={state.view.sessionId} selfId={state.selfPlayerId} /></Suspense></BottomSheet>}
+    {sheet === 'challenges' && <BottomSheet title="Challenges" onClose={close}><Suspense fallback={<p role="status">Opening challenges…</p>}><Challenges sessionId={state.view.sessionId} selfId={state.selfPlayerId} players={state.players} tick={challengeTick} /></Suspense></BottomSheet>}
     {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} choices={state.settings.reactionChoices} limit={state.settings.reactionLimit} /></BottomSheet>}
   </>;
 }

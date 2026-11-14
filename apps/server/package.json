@@ -17,6 +17,7 @@
     "@party/contracts": "*",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "chess.js": "1.4.0",
     "fastify": "^5.6.0",
     "jose": "^6.1.0",
     "pg": "8.16.3",

@@ -39,6 +39,8 @@ const RULES: Record<string, string> = {
   'Duplicate wheel': 'Two wheels have the same name. Rename one.', 'Wheel entries must be unique': 'A wheel has the same entry twice.',
   'This minigame needs teams': 'Pass the pencil is played in teams. Set this round (or the game) to play in teams.',
   'Minigame settings are not valid': 'The minigame settings do not fit together. Check the times and points.',
+  'Duel game settings are not valid': 'The settings of the duel’s game do not fit. Check them in the scene settings.',
+  'Give the minigame either points per place or places, not both': 'This minigame has two sets of points by place. Set its points by place again in the scene settings.',
 };
 const FIELDS: Record<string, string> = {
   prompt: 'The text is empty or too long.', title: 'The title is empty or too long.', label: 'An option name is empty or too long.',

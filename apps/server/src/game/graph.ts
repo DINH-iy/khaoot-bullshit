@@ -13,7 +13,7 @@ export interface Located { nodeKey: string; stage: StageDefinition; index: numbe
 
 const nodeOf = (definition: GameDefinition, key: string): Node | undefined => definition.nodes.find(node => node.key === key);
 export const outgoing = (definition: GameDefinition, nodeKey: string): Edge[] => definition.edges.filter(edge => edge.from === nodeKey);
-const playOf = (definition: GameDefinition, stage: StageDefinition) => stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' ? null : stage.play ?? definition.play ?? { kind: 'solo' as const };
+const playOf = (definition: GameDefinition, stage: StageDefinition) => stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'duel' ? null : stage.play ?? definition.play ?? { kind: 'solo' as const };
 
 /** Every stage of every node, in definition order (not a route). */
 export const allStages = (definition: GameDefinition) => definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ nodeKey: node.key, stage, index })));

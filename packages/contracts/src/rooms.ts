@@ -12,7 +12,7 @@ export const JoinRoomSchema = z.object({
 export const ClaimRoomSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict();
 export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.literal(true).optional() }).strict();
 export const NetworkErrorCodeSchema = z.enum([
-  ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN',
+  ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
@@ -55,7 +55,7 @@ export const HeartbeatReplySchema = z.object({ nonce: z.string(), serverTime: z.
 // Browser hosting menu. Lists only titles and shape, never prompts or answers.
 export const HostGameSchema = z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(1).max(160), description: z.string().max(240), stageCount: z.number().int().min(1), timed: z.boolean(), branches: z.boolean(),
   // For the menu: what is in the game, about how long it takes, and its colours (for the cover).
-  features: z.array(z.enum(['quiz', 'order', 'writing', 'drawing', 'uploads', 'votes', 'minigames', 'challenges', 'teams', 'routes'])), minutes: z.number().int().min(1),
+  features: z.array(z.enum(['quiz', 'order', 'writing', 'drawing', 'uploads', 'votes', 'minigames', 'challenges', 'teams', 'routes', 'duels'])), minutes: z.number().int().min(1),
   colors: z.object({ from: z.string(), to: z.string(), accent: z.string() }).strict() }).strict();
 export const HostMenuSchema = z.object({
   games: z.array(HostGameSchema),
