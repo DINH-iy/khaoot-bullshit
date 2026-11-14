@@ -146,3 +146,6 @@
 /* A phone signed in as a person joins under that name. */
 .person-badge { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--r-card-strong); }
 .person-linked { margin: 0; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--r-ok) 22%, transparent); }
+/* Signing in with a typed personal key, on the join screen. */
+.key-sign-in { display: grid; gap: 8px; margin: 0; }
+.key-sign-in input { font-family: ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }

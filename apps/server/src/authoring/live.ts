@@ -17,7 +17,8 @@ import { clientAddress } from '../client-address.js';
 const AUDIENCE = 'party-editor-live';
 const TICKET_SECONDS = 120;
 const MAX_CONNECTED_MS = 12 * 60 * 60 * 1000;
-interface Seat { gameId: string; color: number; presence: EditorPresence }
+// personId: the editor (a person with editor rights) this connection belongs to; null for the owner.
+interface Seat { gameId: string; color: number; presence: EditorPresence; personId: string | null }
 
 export function createEditorLive(io: Server, roomSecret: string, log: FastifyBaseLogger, trustCloudflareLocal = false) {
   // Its own key, so a ticket can never stand in for another kind of room credential.
@@ -37,10 +38,11 @@ export function createEditorLive(io: Server, roomSecret: string, log: FastifyBas
       const join = EditorJoinSchema.parse(socket.handshake.auth);
       const { payload } = await jwtVerify(join.ticket, key, { audience: AUDIENCE, algorithms: ['HS256'], requiredClaims: ['sub', 'exp', 'game'] });
       const gameId = GameIdSchema.parse(payload['game']);
+      const personId = payload['person'] === undefined ? null : GameIdSchema.parse(payload['person']);
       const taken = new Set(present(gameId).map(peer => seat(peer).color));
       const color = Array.from({ length: MAX_EDITORS }, (_, index) => index).find(index => !taken.has(index));
       if (color === undefined) throw new Error('Game is full');
-      socket.data['seat'] = { gameId, color, presence: { name: join.name, view: 'flow', selected: [] } } satisfies Seat;
+      socket.data['seat'] = { gameId, color, presence: { name: join.name, view: 'flow', selected: [] }, personId } satisfies Seat;
     })().then(() => next(), () => { log.warn({ event: 'editor_live_rejected' }, 'Editor connection rejected'); next(new Error('Editor access denied')); });
   });
   editors.on('connection', socket => {
@@ -63,9 +65,11 @@ export function createEditorLive(io: Server, roomSecret: string, log: FastifyBas
 
   return {
     /** A ticket to join one game's editors. Only call this for someone already allowed to edit that game. */
-    ticket: (creatorId: string, gameId: string) => new SignJWT({ game: gameId }).setProtectedHeader({ alg: 'HS256' }).setSubject(creatorId).setAudience(AUDIENCE).setIssuedAt().setExpirationTime(`${TICKET_SECONDS}s`).sign(key),
+    ticket: (creatorId: string, gameId: string, personId: string | null = null) => new SignJWT(personId ? { game: gameId, person: personId } : { game: gameId }).setProtectedHeader({ alg: 'HS256' }).setSubject(creatorId).setAudience(AUDIENCE).setIssuedAt().setExpirationTime(`${TICKET_SECONDS}s`).sign(key),
     /** Hands a newly saved draft to everyone who has the game open. */
     saved: (draft: Draft) => { editors.to(room(draft.gameId)).emit('editor.draft', draft); },
+    /** Closes an editor's open editors at once: their rights were taken away, or their phones signed out. */
+    dropPerson: (personId: string) => { for (const socket of editors.sockets.values()) if (seat(socket)?.personId === personId) socket.disconnect(true); },
   };
 }
 export type EditorLive = ReturnType<typeof createEditorLive>;

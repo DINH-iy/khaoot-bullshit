@@ -13,10 +13,10 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await host.getByRole('link', { name: 'Admin: people (accounts)' }).click();
     await host.getByLabel('Name', { exact: true }).fill(name);
     await host.getByRole('button', { name: 'Add person' }).click();
-    await expect(host.getByRole('heading', { name: `Personal link for ${name}` })).toBeVisible();
+    await expect(host.getByRole('heading', { name: `Personal key for ${name}` })).toBeVisible();
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     const link = (await host.locator('.person-url code').textContent())!;
-    expect(link).toMatch(/\/#person=[A-Za-z0-9_-]{43}$/);
+    expect(link).toMatch(/\/#person=[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     await host.getByRole('button', { name: 'Done' }).click();
     await expect(host.getByRole('row', { name: new RegExp(name) })).toBeVisible();
 

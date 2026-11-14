@@ -22,6 +22,7 @@ import { Avatar, RoomSessionContext } from '../players/avatar.js';
 import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js';
 import { useMe, type Person } from '../people/use-me.js';
 import { wasOwner } from '../owner/owner-session.js';
+import { KeySignIn } from '../people/key-sign-in.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 
@@ -30,10 +31,10 @@ const access = new URLSearchParams(initial.hash.slice(1)).get('access');
 if (access) history.replaceState(null, '', `${initial.pathname}${initial.search}`);
 
 /** Joining from a phone: room code and name, plus seat takeover and a way to host instead. */
-function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title, person, linked, onForget }: {
+function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title, person, linked, onForget, onSignIn }: {
   roomCode: string; setRoomCode: (value: string) => void; name: string; setName: (value: string) => void; busy: boolean; error: string; onJoin: () => void; onReclaim: () => void;
   style: React.CSSProperties; className: string; title: string | null;
-  person: Person | null | undefined; linked: { name: string | null } | null; onForget: () => void;
+  person: Person | null | undefined; linked: { name: string | null } | null; onForget: () => void; onSignIn: (key: string) => Promise<void>;
 }) {
   const t = useText(); const [ownerBrowser] = useState(wasOwner);
   return <main className={`room room-join ${className}`} style={style}>
@@ -48,9 +49,12 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
           : <label>{t('join.name')}<input autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} maxLength={40} required /></label>}
         <button className="primary" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
+      {person === null && <KeySignIn onSignIn={onSignIn} />}
       <p className="join-links">{t('join.reclaim')} <button type="button" className="link-button" onClick={onReclaim}>{t('join.reclaimButton')}</button></p>
       {/* Only for a browser that signed in as the owner before: players never see it, and nothing asks the server. */}
       {ownerBrowser && <p className="join-links"><a href="/?host=1">Host a game instead</a></p>}
+      {/* A person with editor rights (the server says so in /api/people/me). */}
+      {!ownerBrowser && person?.canEdit && <p className="join-links"><a href="/?host=1#my-games">Edit games</a></p>}
     </section>
   </main>;
 }
@@ -110,7 +114,7 @@ export function RoomScreen() {
 
   if (!sessionId && reclaiming) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">Join a game</h1><div className="join-card"><SeatReclaim roomCode={roomCode.trim().toUpperCase()} onCancel={() => setReclaiming(false)} onJoined={id => { history.replaceState(null, '', `/?room=${id}`); setReady(true); setSessionId(id); }} /></div></main>;
   if (!sessionId) return <LookContext.Provider value={look}><JoinScreen style={lookStyle} className={lookClass} title={joinLook?.title ?? null} roomCode={roomCode} setRoomCode={setRoomCode} name={name} setName={setName} busy={busy} error={error} onJoin={() => { void join(); }} onReclaim={() => { setError(''); setReclaiming(true); }}
-    person={account.person} linked={account.linked} onForget={() => { void account.forget().catch(() => setError('Could not sign this phone out. Try again.')); }} /></LookContext.Provider>;
+    person={account.person} linked={account.linked} onForget={() => { void account.forget().catch(() => setError('Could not sign this phone out. Try again.')); }} onSignIn={account.signIn} /></LookContext.Provider>;
 
   const sorted = [...room.samples].sort((a, b) => a - b); const p95 = sorted[Math.max(0, Math.ceil(sorted.length * .95) - 1)];
   const seconds = Number(timerSeconds); const validSeconds = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600;

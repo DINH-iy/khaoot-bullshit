@@ -117,10 +117,10 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   // Editing together shares the rooms' socket server, under its own namespace and its own tickets.
   const live = rooms && config.ROOM_TOKEN_SECRET ? createEditorLive(rooms.io, config.ROOM_TOKEN_SECRET, app.log, config.TRUST_CLOUDFLARE_LOCAL) : undefined;
   if (options.database?.client) {
-    const owner = createOwnerAccess(app, config);
+    const owner = createOwnerAccess(app, config, options.database.client);
     registerLocalHosting(app, options.database.client, config, owner, live);
     registerFeedbackRoutes(app, options.database.client, config, owner);
-    registerPeopleRoutes(app, options.database.client, config, owner);
+    registerPeopleRoutes(app, options.database.client, config, owner, live);
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway);
   }
   if (config.SERVE_WEB) {

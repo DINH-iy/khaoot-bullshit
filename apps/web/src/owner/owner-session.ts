@@ -10,5 +10,5 @@ export function wasOwner() {
   try { return localStorage.getItem(SEEN) === '1'; } catch { return false; }
 }
 
-/** Shown when an owner page is opened in a browser that is not signed in. Says nothing about the key. */
-export const SIGNED_OUT_TEXT = 'This browser is not signed in as the owner. Open your private owner link once in this browser to sign in, then come back here.';
+/** Shown when an owner or editor page is opened in a browser that is not signed in. Says nothing about any key. */
+export const SIGNED_OUT_TEXT = 'This browser is not signed in as the owner or an editor. Open your private owner link once in this browser, or, with editor rights, enter your personal key on the start page. Then come back here.';

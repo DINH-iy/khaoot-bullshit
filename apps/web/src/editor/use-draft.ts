@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type Draft } from '@party/contracts';
 import { newId, roomApi } from '../network/api.js';
+import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import type { Definition, Positions } from './model.js';
 import { combine, fromDoc, toDoc, type Doc, type Snapshot } from './live/document.js';
 import { same } from './live/merge.js';
@@ -38,7 +39,7 @@ export function useDraft(gameId: string) {
       setDraft(loaded); setIssues(loaded.issues); revision.current = loaded.revision; server.current = loaded.definition as Doc; waiting.current = undefined;
       show(fromDoc(loaded.definition as Doc)); setSave('saved'); dirty.current = false;
       setHistory({ undo: [], redo: [] });
-    }).catch(() => setLoadError('This game could not be opened. It may have been removed, or the server is not running.'));
+    }).catch((cause: unknown) => setLoadError(cause instanceof Error && cause.message === 'UNAUTHORIZED' ? SIGNED_OUT_TEXT : 'This game could not be opened. It may have been removed, or the server is not running.'));
   }, [gameId]);
   useEffect(load, [load]);
 

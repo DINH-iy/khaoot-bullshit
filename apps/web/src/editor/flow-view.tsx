@@ -36,7 +36,8 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   const [view, setView] = useState({ x: 48, y: 48, zoom: 1 }); const [guides, setGuides] = useState<Guides>({ x: null, y: null });
   const [connecting, setConnecting] = useState<Connecting | null>(null); const [box, setBox] = useState<Box | null>(null);
   const [pending, setPending] = useState<{ from: string; option: string | undefined } | null>(null);
-  const [adding, setAdding] = useState<{ from: string | null; option: string | undefined; at: Point } | null>(null);
+  // at: where the menu opens; place: where the new scene goes (the right-clicked spot), else beside `at`.
+  const [adding, setAdding] = useState<{ from: string | null; option: string | undefined; at: Point; place?: Point } | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const select = (keys: string[]) => { setSelected(keys); setSelectedEdge(null); };
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -154,6 +155,8 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   const startCanvas = (event: ReactPointerEvent<HTMLDivElement>) => {
     // Empty canvas is anything that is not a card, an arrow, a menu or a button.
     if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button')) return;
+    // The right button opens the add menu (onContextMenu below) instead of panning.
+    if (event.button === 2) return;
     setAdding(null); if (pending) { setPending(null); setNotice(''); }
     const element = event.currentTarget; element.setPointerCapture(event.pointerId);
     if (event.shiftKey) {
@@ -198,9 +201,20 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   const addFromMenu = (type: SceneType) => {
     if (!adding) return;
     const result = adding.from ? addConnectedScene(definition, type, adding.from, adding.option) : addScene(definition, type);
-    const raw = { ...positions, [result.key]: { x: snap(adding.at.x), y: snap(adding.at.y - 72) } };
+    const target = adding.place ?? { x: adding.at.x, y: adding.at.y - 72 };
+    const raw = { ...positions, [result.key]: { x: snap(target.x), y: snap(target.y) } };
     const spot = freeSpot(result.definition, raw, result.key, raw[result.key]!);
     change(result.definition, { ...raw, [result.key]: spot }); setAdding(null); select([result.key]); requestAnimationFrame(() => reveal(spot));
+  };
+  // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
+  const contextMenu = (event: React.MouseEvent) => {
+    if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button, input, textarea, select')) return;
+    event.preventDefault(); setPending(null); setConnecting(null);
+    const rect = canvas.current?.getBoundingClientRect();
+    // From the keyboard there is no pointer position: use the same spot as the toolbar button.
+    const fromKeyboard = event.clientX === 0 && event.clientY === 0;
+    const at = fromKeyboard || !rect ? { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } : toCanvas(event.clientX, event.clientY);
+    select([]); setAdding({ from: null, option: undefined, at, place: { x: at.x - CARD_WIDTH / 2, y: at.y - 24 } });
   };
   const menuSpot = (at: Point) => {
     const rect = canvas.current?.getBoundingClientRect(); if (!rect) return { left: at.x, top: at.y };
@@ -257,10 +271,10 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
       <button onClick={() => change(definition, autoLayout(definition))}>Tidy up</button>
       <button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>−</button><button aria-label="Zoom in" onClick={() => zoomBy(1.2)}>+</button><button onClick={fit}>Fit</button>
       {selectedEdge && <button onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove connection</button>}
-      <span className="flow-hint">Drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several</span>
+      <span className="flow-hint">Right-click to add a scene · drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several</span>
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
-    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
+    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
         <svg className="flow-lines" width="1" height="1" overflow="visible" aria-hidden="true">
           <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="arrow-head" /></marker>

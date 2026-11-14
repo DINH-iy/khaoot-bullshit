@@ -1,41 +1,45 @@
 import { useEffect, useState } from 'react';
+import { HostMenuSchema } from '@party/contracts';
 import { roomApi } from '../network/api.js';
 import { rememberOwner } from './owner-session.js';
+import { openFeedback } from '../feedback/open-feedback.js';
+import { FEEDBACK_UI } from '../feedback/describe-element.js';
 import './owner-nav.css';
 
 export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people';
-// The editor opens per game, so "Editor" leads to the list of your games on the host menu.
-const LINKS: { key: OwnerSection; label: string; href: string }[] = [
-  { key: 'play', label: 'Play', href: '/' },
-  { key: 'host', label: 'Host', href: '/?host=1' },
-  { key: 'editor', label: 'Editor', href: '/?host=1#my-games' },
-  { key: 'admin', label: 'Admin', href: '/?admin' },
-  { key: 'people', label: 'People', href: '/?admin=people' },
+/** Who is working here: the owner, a person with editor rights, or nobody (null). */
+export type HostRole = 'owner' | 'editor';
+// The editor opens per game, so "Editor" leads to the list of games on the host menu.
+const LINKS: { key: OwnerSection; label: string; href: string; editor: boolean }[] = [
+  { key: 'play', label: 'Play', href: '/', editor: true },
+  { key: 'host', label: 'Host', href: '/?host=1', editor: false },
+  { key: 'editor', label: 'Editor', href: '/?host=1#my-games', editor: true },
+  { key: 'admin', label: 'Admin', href: '/?admin', editor: false },
+  { key: 'people', label: 'People', href: '/?admin=people', editor: false },
 ];
 
-/** Asks the owner endpoint once whether this browser is signed in. Never used on the player screen. */
-function useOwnerCheck(skip: boolean) {
-  const [signedIn, setSignedIn] = useState(false);
+/** Asks the host endpoint once who this browser is. Never used on the player screen. */
+export function useHostRole() {
+  const [role, setRole] = useState<HostRole | null>(null);
   useEffect(() => {
-    if (skip) return;
     let mounted = true;
-    roomApi('/api/host').then(() => { rememberOwner(true); if (mounted) setSignedIn(true); }, (cause: unknown) => {
-      // Only a definite "not the owner" forgets the hint; a network hiccup says nothing.
+    roomApi('/api/host').then(data => {
+      const found = HostMenuSchema.shape.role.parse((data as { role?: unknown }).role);
+      rememberOwner(found === 'owner'); if (mounted) setRole(found);
+    }, (cause: unknown) => {
+      // Only a definite "not signed in" forgets the hint; a network hiccup says nothing.
       if (cause instanceof Error && cause.message === 'UNAUTHORIZED') rememberOwner(false);
     });
     return () => { mounted = false; };
-  }, [skip]);
-  return signedIn;
+  }, []);
+  return role;
 }
 
-/**
- * The owner's top bar: shown only to a signed-in owner. Pass `signedIn` when the
- * page already asked the owner endpoint (the host menu); otherwise it asks itself.
- */
-export function OwnerNav({ current, signedIn }: { current: OwnerSection; signedIn?: boolean }) {
-  const checked = useOwnerCheck(signedIn !== undefined);
-  if (!(signedIn ?? checked)) return null;
-  return <nav className="owner-nav" aria-label="Owner">
-    <ul>{LINKS.map(link => <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{link.label}</a></li>)}</ul>
+/** The top bar for the owner (everything) and for editors (Play and Editor only), with Feedback on the right. Nothing for anyone else. */
+export function OwnerNav({ current, role }: { current: OwnerSection; role: HostRole | null }) {
+  if (!role) return null;
+  return <nav className="owner-nav" aria-label={role === 'owner' ? 'Owner' : 'Editor'}>
+    <ul>{LINKS.filter(link => role === 'owner' || link.editor).map(link => <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{link.label}</a></li>)}
+      <li className="owner-nav-end"><button type="button" {...{ [FEEDBACK_UI]: '' }} onClick={openFeedback}>Feedback</button></li></ul>
   </nav>;
 }

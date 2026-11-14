@@ -20,7 +20,7 @@ const OWNER = { issuer: 'urn:local-owner', subject: 'owner' };
 const HOST_ACCESS_MS = 8 * 60 * 60 * 1000;
 
 export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess, live?: EditorLive) {
-  const { fail, guard, isOwner, requireOwner } = owner;
+  const { fail, guard, isOwner, requireOwner, requireEditor } = owner;
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
   const authoring = createAuthoring(client);
   const secure = config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : '';
@@ -61,11 +61,12 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       return { ok: true, data: {} };
     } catch (error) { return fail(reply, error); }
   });
+  // The menu. Editors get the same games, but never the owner's open rooms.
   app.get('/api/host', async (request, reply) => {
     try {
-      requireOwner(request);
+      const { role } = await requireEditor(request);
       const creator = await ownerCreator();
-      const rooms = await client.gameSession.findMany({
+      const rooms = role !== 'owner' ? [] : await client.gameSession.findMany({
         where: { hostId: creator.id, status: { not: 'FINISHED' }, roomCode: { not: null }, createdAt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
         select: { id: true, roomCode: true, status: true, gameVersion: { select: { game: { select: { title: true } } } }, _count: { select: { players: { where: { leftAt: null } } } } },
         orderBy: { createdAt: 'desc' }, take: 10,
@@ -73,6 +74,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       return { ok: true, data: HostMenuSchema.parse({
         games: builtInGames.map(game => ({ key: game.key, title: game.definition.title, description: game.description, stageCount: maxPathStages(game.definition), branches: allStages(game.definition).some(entry => entry.stage.kind === 'route'), timed: allStages(game.definition).some(entry => entry.stage.durationMs !== null), ...gameFacts(game.definition) })),
         myGames: await authoring.list(creator.id),
+        role,
         rooms: rooms.map(room => ({ sessionId: room.id, roomCode: room.roomCode, title: room.gameVersion.game.title, status: room.status, playerCount: room._count.players })),
       }) };
     } catch (error) { return fail(reply, error); }
@@ -109,39 +111,41 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     } catch (error) { return fail(reply, error); }
   });
 
-  // Your games: drafts, problems per scene, and publishing.
+  // Your games: drafts, problems per scene, and publishing. The owner and editors
+  // (people with editor rights) may do all of this, including practice rooms;
+  // opening real rooms (above) stays with the owner.
   const gameParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { gameId?: string }).gameId); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   app.get('/api/host/games', async (request, reply) => {
-    try { requireOwner(request); return { ok: true, data: await authoring.list((await ownerCreator()).id) }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request); return { ok: true, data: await authoring.list((await ownerCreator()).id) }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games', async (request, reply) => {
-    try { requireOwner(request); return { ok: true, data: await authoring.create((await ownerCreator()).id, request.body) }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request); return { ok: true, data: await authoring.create((await ownerCreator()).id, request.body) }; } catch (error) { return fail(reply, error); }
   });
   app.get('/api/host/games/:gameId', async (request, reply) => {
-    try { requireOwner(request, 'edit'); return { ok: true, data: await authoring.get((await ownerCreator()).id, gameParam(request)) }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request, 'edit'); return { ok: true, data: await authoring.get((await ownerCreator()).id, gameParam(request)) }; } catch (error) { return fail(reply, error); }
   });
   // A short-lived ticket for the live channel of one game: who else is editing, and their saves as they happen.
   app.post('/api/host/games/:gameId/live', async (request, reply) => {
     try {
-      requireOwner(request, 'edit'); roomAssert(live, 'AUTH_UNAVAILABLE');
+      const access = await requireEditor(request, 'edit'); roomAssert(live, 'AUTH_UNAVAILABLE');
       const creator = await ownerCreator(); const { gameId } = await authoring.get(creator.id, gameParam(request));
-      return { ok: true, data: { ticket: await live.ticket(creator.id, gameId) } };
+      return { ok: true, data: { ticket: await live.ticket(creator.id, gameId, access.personId) } };
     } catch (error) { return fail(reply, error); }
   });
   // A whole game is larger than ordinary requests, so this route alone accepts up to the draft limit.
   app.put('/api/host/games/:gameId/draft', { bodyLimit: MAX_DRAFT_BYTES + 16 * 1024 }, async (request, reply) => {
-    try { requireOwner(request, 'edit'); const draft = await authoring.save((await ownerCreator()).id, gameParam(request), request.body); live?.saved(draft); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request, 'edit'); const draft = await authoring.save((await ownerCreator()).id, gameParam(request), request.body); live?.saved(draft); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
   });
   // Pasted games can be as large as a draft, so this route alone accepts up to the draft limit.
   app.post('/api/host/games/import', { bodyLimit: MAX_DRAFT_BYTES + 16 * 1024 }, async (request, reply) => {
-    try { requireOwner(request); return { ok: true, data: await authoring.importGame((await ownerCreator()).id, request.body) }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request); return { ok: true, data: await authoring.importGame((await ownerCreator()).id, request.body) }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/archive', async (request, reply) => {
-    try { requireOwner(request); await authoring.archive((await ownerCreator()).id, gameParam(request)); return { ok: true, data: {} }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request); await authoring.archive((await ownerCreator()).id, gameParam(request)); return { ok: true, data: {} }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/rehearse', async (request, reply) => {
     try {
-      const settings = requireOwner(request); const creator = await ownerCreator();
+      const settings = await requireEditor(request); const creator = await ownerCreator();
       const body = request.body as { sessionId?: unknown; commandId?: unknown };
       const versionId = await authoring.rehearsalVersion(creator.id, gameParam(request), request.body);
       const sessionId = String(body.sessionId); const commandId = String(body.commandId);
@@ -151,6 +155,6 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/publish', async (request, reply) => {
-    try { requireOwner(request); const draft = await authoring.publish((await ownerCreator()).id, gameParam(request), request.body); live?.saved(draft); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
+    try { await requireEditor(request); const draft = await authoring.publish((await ownerCreator()).id, gameParam(request), request.body); live?.saved(draft); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
   });
 }

@@ -30,7 +30,7 @@ export function HostMenu() {
     void (async () => {
       if (ownerToken) await roomApi('/api/host/claim', { token: ownerToken });
       const loaded = HostMenuSchema.parse(await roomApi('/api/host'));
-      rememberOwner(true);
+      rememberOwner(loaded.role === 'owner');
       if (mounted) { setMenu(loaded); setGameKey(loaded.games[0]?.key ?? ''); }
     })().catch(cause => {
       if (cause instanceof Error && cause.message === 'UNAUTHORIZED') rememberOwner(false);
@@ -51,23 +51,28 @@ export function HostMenu() {
     setBusy(true); setError('');
     work.then(result => location.assign(`/?room=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
   };
-  return <><OwnerNav current={hash === '#my-games' ? 'editor' : 'host'} signedIn={Boolean(menu)} /><main className="host-page">
-    <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Host</p><h1>Host a game</h1>
-      <p>Pick a game and open a room. Players join on their phones with the room code or the QR code on the next screen.</p></header>
+  // Editors (people with editor rights) work on the games only: no hosting, no open rooms, no admin.
+  const owner = menu?.role === 'owner';
+  return <><OwnerNav current={hash === '#my-games' || (menu && !owner) ? 'editor' : 'host'} role={menu?.role ?? null} /><main className="host-page">
+    {!menu || owner
+      ? <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Host</p><h1>Host a game</h1>
+        <p>Pick a game and open a room. Players join on their phones with the room code or the QR code on the next screen.</p></header>
+      : <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Editor</p><h1>Edit games</h1>
+        <p>Make and change games, publish them and rehearse them in a practice room. Hosting real rooms is up to the organiser.</p></header>}
     {error && <p role="alert" className="error">{error}</p>}
     {busy && !menu && <p role="status">Loading your games…</p>}
     {menu && <>
-      <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">Choose a game</h2>
+      {owner && <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">Choose a game</h2>
         <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))} />
         <p className="hint">These are the built-in games. Make your own under Your games, or import one from text.</p>
-      </section>
-      <MyGames menu={menu} reload={reload} openRoom={gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() }))} />
+      </section>}
+      <MyGames menu={menu} reload={reload} openRoom={owner ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
       <ImportGame />
       {menu.rooms.length > 0 && <section aria-labelledby="rooms-heading"><h2 id="rooms-heading">Your open rooms</h2>
         <ul>{menu.rooms.map(room => <li key={room.sessionId}>{room.title} · room {room.roomCode} · {room.status.toLowerCase()} · {room.playerCount} {room.playerCount === 1 ? 'player' : 'players'}
           <button className="small-button" disabled={busy} aria-label={`Return to room ${room.roomCode}`} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>Return to room</button></li>)}</ul>
       </section>}
     </>}
-    <p className="host-links"><a href="/">Join a game as a player instead</a>{menu && <><a href="/?admin">Admin: feedback from testers</a><a href="/?admin=people">Admin: people (accounts)</a></>}</p>
+    <p className="host-links"><a href="/">Join a game as a player instead</a>{owner && <><a href="/?admin">Admin: feedback from testers</a><a href="/?admin=people">Admin: people (accounts)</a></>}</p>
   </main></>;
 }

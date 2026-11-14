@@ -30,8 +30,8 @@ async function join(roomCode: string, displayName: string, personCookie?: string
 }
 async function makePerson(name: string) {
   const made = await call('POST', '/api/host/people', { name }, await ownerCookie()); expect(made.statusCode).toBe(200);
-  const claimed = await call('POST', '/api/people/claim', { token: made.json().data.token }); expect(claimed.statusCode).toBe(200);
-  return { id: made.json().data.id as string, token: made.json().data.token as string, cookie: cookieOf(claimed) };
+  const claimed = await call('POST', '/api/people/claim', { token: made.json().data.key }); expect(claimed.statusCode).toBe(200);
+  return { id: made.json().data.id as string, token: made.json().data.key as string, cookie: cookieOf(claimed) };
 }
 const both = (a: string, b?: string) => b ? `${a}; ${b}` : a;
 
@@ -65,13 +65,13 @@ describe('people: a phone always joins as the same person', () => {
     expect((await call('GET', '/api/people/me', undefined, secondPhone)).json().data.person).toBeNull();
     expect((await call('POST', `/api/host/people/${person.id}/sign-out`, {}, await ownerCookie())).statusCode).toBe(200);
     expect((await call('GET', '/api/people/me', undefined, person.cookie)).json().data.person).toBeNull();
-    // A new link replaces the old one.
-    const relinked = await call('POST', `/api/host/people/${person.id}/link`, {}, await ownerCookie());
+    // A new key replaces the old one.
+    const relinked = await call('POST', `/api/host/people/${person.id}/key`, {}, await ownerCookie());
     expect((await call('POST', '/api/people/claim', { token: person.token })).statusCode).toBe(401);
-    expect((await call('POST', '/api/people/claim', { token: relinked.json().data.token })).statusCode).toBe(200);
-    // Removing frees the name and stops the link.
+    expect((await call('POST', '/api/people/claim', { token: relinked.json().data.key })).statusCode).toBe(200);
+    // Removing frees the name and stops the key.
     expect((await call('POST', `/api/host/people/${person.id}/remove`, {}, await ownerCookie())).statusCode).toBe(200);
-    expect((await call('POST', '/api/people/claim', { token: relinked.json().data.token })).statusCode).toBe(401);
+    expect((await call('POST', '/api/people/claim', { token: relinked.json().data.key })).statusCode).toBe(401);
     expect((await call('POST', '/api/host/people', { name }, await ownerCookie())).statusCode).toBe(200);
   });
 });

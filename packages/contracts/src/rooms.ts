@@ -61,6 +61,8 @@ export const HostMenuSchema = z.object({
   games: z.array(HostGameSchema),
   // The owner's own games, with their draft and publishing state.
   myGames: z.array(GameSummarySchema),
+  // The owner sees everything; an editor (a person allowed to edit games) gets no open rooms and cannot host.
+  role: z.enum(['owner', 'editor']),
   rooms: z.array(z.object({ sessionId: GameIdSchema, roomCode: RoomCodeSchema, title: z.string().min(1).max(160), status: SessionViewSchema.shape.status, playerCount: z.number().int().min(0) }).strict()),
 }).strict();
 export type HostMenu = z.infer<typeof HostMenuSchema>;

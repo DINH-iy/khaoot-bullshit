@@ -6,20 +6,21 @@ import { PeerBar } from './live/presence.js';
 import { LookView } from './look/look-view.js';
 import { estimateMinutes, isRoute } from './model.js';
 import { useDraft, type SaveState } from './use-draft.js';
-import { OwnerNav } from '../owner/owner-nav.js';
+import { OwnerNav, useHostRole, type HostRole } from '../owner/owner-nav.js';
 import './editor.css';
 
 const saveText: Record<SaveState, string> = { saved: 'All changes saved', pending: 'Saving soon…', saving: 'Saving…', error: 'Not saved: the server could not be reached. Retrying…' };
 type View = 'flow' | 'scene' | 'look';
 const VIEW_NAMES: Record<View, string> = { flow: 'Flow editor', scene: 'Scene editor', look: 'Look & feel' };
 
-/** The editor page: the owner bar (when signed in) above the editors. */
+/** The editor page: the owner or editor bar (when signed in) above the editors. */
 export function EditorShell({ gameId }: { gameId: string }) {
-  return <div className="editor-page"><OwnerNav current="editor" /><EditorBody gameId={gameId} /></div>;
+  const role = useHostRole();
+  return <div className="editor-page"><OwnerNav current="editor" role={role} /><EditorBody gameId={gameId} role={role} /></div>;
 }
 
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
-function EditorBody({ gameId }: { gameId: string }) {
+function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
   const d = useDraft(gameId);
   const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'scene' || wanted === 'look' ? wanted : 'flow'; });
   const [selected, setSelected] = useState<string[]>([]); const [rehearsing, setRehearsing] = useState(false); const [exporting, setExporting] = useState(false);
@@ -59,7 +60,8 @@ function EditorBody({ gameId }: { gameId: string }) {
           </div>}
         </div>
         <button disabled={d.busy || !ready || Boolean(draft.published?.matchesDraft)} onClick={d.publish}>Publish</button>
-        <button className="accent" disabled={d.busy || !draft.published} onClick={d.play}>Play published version ↗</button>
+        {/* Opening a real room is hosting: the owner's alone. Editors rehearse instead. */}
+        {role === 'owner' && <button className="accent" disabled={d.busy || !draft.published} onClick={d.play}>Play published version ↗</button>}
       </div>
     </header>
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}

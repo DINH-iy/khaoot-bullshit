@@ -36,3 +36,6 @@ main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
 .people-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .people-table th, .people-table td { padding: 10px 8px; border-bottom: 1px solid light-dark(#e3def2, #3a3550); text-align: left; vertical-align: middle; }
 .people-table .admin-actions { justify-content: flex-start; flex-wrap: nowrap; }
+.person-key code { display: inline-block; padding: 10px 16px; border-radius: 12px; background: light-dark(#f1edfb, #2c2840); font: 800 1.6rem/1.2 ui-monospace, monospace; letter-spacing: .12em; }
+.person-check { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-weight: 600; }
+.person-check input { width: 20px; height: 20px; margin: 0; }

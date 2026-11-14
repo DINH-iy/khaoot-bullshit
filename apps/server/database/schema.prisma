@@ -527,8 +527,13 @@ model Person {
   name      String    @db.VarChar(40)
   // Lower-case name: two people cannot share a name.
   nameKey   String    @unique @db.VarChar(40)
-  // SHA-256 of the current personal link; a new link replaces it.
+  // SHA-256 of the current personal key (or an older personal link); a new key replaces it.
   linkHash  String    @unique @db.Char(64)
+  // The current key, encrypted with a key derived from ROOM_TOKEN_SECRET, so the
+  // owner can look it up again. Null for people made before keys could be looked up.
+  keySealed String?   @db.VarChar(200)
+  // May edit games (never host rooms or use the admin menu).
+  canEdit   Boolean   @default(false)
   look      Json?     @db.JsonB
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   removedAt DateTime? @db.Timestamptz(3)

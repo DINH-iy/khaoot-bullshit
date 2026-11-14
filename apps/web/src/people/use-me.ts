@@ -25,5 +25,11 @@ export function useMe() {
     return () => { mounted = false; };
   }, []);
   const forget = useCallback(async () => { await roomApi('/api/people/forget', {}); setPerson(null); setLinked(null); }, []);
-  return { person, linked, forget };
+  /** Signs this phone in with a typed personal key. Throws UNAUTHORIZED for a key that does not work. */
+  const signIn = useCallback(async (key: string) => {
+    const result = await roomApi<{ name: string }>('/api/people/claim', { token: key.trim().slice(0, 64) });
+    setLinked({ name: result.name });
+    setPerson(MeSchema.parse(await roomApi('/api/people/me')).person);
+  }, []);
+  return { person, linked, forget, signIn };
 }
