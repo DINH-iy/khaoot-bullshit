@@ -7,14 +7,26 @@ import { LookView } from './look/look-view.js';
 import { estimateMinutes, isRoute } from './model.js';
 import { useDraft, type SaveState } from './use-draft.js';
 import { OwnerNav, useHostRole, type HostRole } from '../owner/owner-nav.js';
+import { GameSettingsPanel } from './game-settings.js';
+import { InvitePanel } from './invite-panel.js';
+import { pendingClaim } from '../people/use-me.js';
 import './editor.css';
 
 const saveText: Record<SaveState, string> = { saved: 'All changes saved', pending: 'Saving soon…', saving: 'Saving…', error: 'Not saved: the server could not be reached. Retrying…' };
 type View = 'flow' | 'scene' | 'look';
 const VIEW_NAMES: Record<View, string> = { flow: 'Flow editor', scene: 'Scene editor', look: 'Look & feel' };
 
-/** The editor page: the owner or editor bar (when signed in) above the editors. */
+/**
+ * The editor page: the owner or editor bar (when signed in) above the editors. An
+ * invite link (…#person=<key>) signs this device in first; the editor waits for it.
+ */
 export function EditorShell({ gameId }: { gameId: string }) {
+  const [ready, setReady] = useState(() => !pendingClaim());
+  useEffect(() => { const claim = pendingClaim(); if (claim) void claim.finally(() => setReady(true)); }, []);
+  return ready ? <EditorPage gameId={gameId} /> : <main className="editor-message"><p role="status">Signing you in…</p></main>;
+}
+
+function EditorPage({ gameId }: { gameId: string }) {
   const role = useHostRole();
   return <div className="editor-page"><OwnerNav current="editor" role={role} /><EditorBody gameId={gameId} role={role} /></div>;
 }
@@ -23,7 +35,7 @@ export function EditorShell({ gameId }: { gameId: string }) {
 function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
   const d = useDraft(gameId);
   const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'scene' || wanted === 'look' ? wanted : 'flow'; });
-  const [selected, setSelected] = useState<string[]>([]); const [rehearsing, setRehearsing] = useState(false); const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]); const [rehearsing, setRehearsing] = useState(false); const [exporting, setExporting] = useState(false); const [settings, setSettings] = useState(false); const [inviting, setInviting] = useState(false);
   // What others see of you: the scenes you have selected (in the Scene editor, the one you are on).
   const first = useMemo(() => d.definition ? sceneOrder(d.definition).rows[0]?.node.key : undefined, [d.definition]);
   const working = useMemo(() => view === 'scene' ? [selected[0] ?? first].filter(key => key !== undefined) : selected, [view, selected, first]);
@@ -50,7 +62,9 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
       <div className="editor-actions">
         <p role="status" className={`save-state save-${d.save}`}>{saveText[d.save]}</p>
         <PeerBar live={live} />
-        <button onClick={() => setExporting(!exporting)} aria-expanded={exporting}>Export as text</button>
+        <button onClick={() => { setInviting(!inviting); setSettings(false); setExporting(false); }} aria-expanded={inviting}>Invite</button>
+        <button onClick={() => { setSettings(!settings); setExporting(false); setInviting(false); }} aria-expanded={settings}>Game settings</button>
+        <button onClick={() => { setExporting(!exporting); setSettings(false); setInviting(false); }} aria-expanded={exporting}>Export as text</button>
         <div className="rehearse">
           <button aria-expanded={rehearsing} disabled={d.busy || d.save !== 'saved'} onClick={() => setRehearsing(!rehearsing)}>Rehearse ▾</button>
           {rehearsing && <div className="rehearse-menu" role="menu" aria-label="Rehearse this draft">
@@ -64,6 +78,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
         {role === 'owner' && <button className="accent" disabled={d.busy || !draft.published} onClick={d.play}>Play published version ↗</button>}
       </div>
     </header>
+    {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
+    {settings && <GameSettingsPanel definition={definition} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}
     <main className="editor-main">
       <div className="editor-bar">

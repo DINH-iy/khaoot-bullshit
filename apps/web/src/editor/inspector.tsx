@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { DefinitionIssue, Places } from '@party/contracts';
+import { placePoints, PlacesSchema, type DefinitionIssue, type Places } from '@party/contracts';
+import { Section } from './section.js';
+import { Icon, sceneIcon } from './icons.js';
+import { WheelOfScene } from './show-settings.js';
 import { PlacesFields } from './places-fields.js';
 import { MinigameFields } from './minigame-fields.js';
 import { DrawingFields } from './drawing-fields.js';
 import { DuelFields } from './duel-fields.js';
-import { cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, setRouteOptions, uniqueKey, updateStage, type Definition, type Node, type Option, type Stage } from './model.js';
+import { isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, setRouteOptions, uniqueKey, updateStage, type Definition, type Node, type Option, type Stage } from './model.js';
 
 type Change = (next: Definition, group?: string) => void;
 const toSeconds = (ms: unknown) => typeof ms === 'number' ? String(Math.round(ms / 1000)) : '';
@@ -13,7 +16,31 @@ const points = (milli: unknown) => typeof milli === 'string' ? String(Number(mil
 const milli = (text: string) => { const value = Math.round(Number(text)); return Number.isFinite(value) && value >= 0 ? String(value * 1000) : '0'; };
 export const sceneName = (definition: Definition, key: string) => { const node = definition.nodes.find(candidate => candidate.key === key); return node ? cardText(definition, node).title : key; };
 
-/** Every field of one part (stage) of a scene. */
+/** What the Points group says when closed: the main points and, when set, the points by place. */
+function pointsSummary(stage: Stage): string {
+  const placesOf = (value: unknown) => { const parsed = PlacesSchema.safeParse(value); return parsed.success ? placePoints(parsed.data).map(entry => Number(entry) / 1000).join('/') : null; };
+  const scoring = stage['scoring'] as { kind?: string; awardMilli?: string; places?: unknown } | undefined;
+  const withPlaces = (main: string, value: unknown, label: string) => { const list = placesOf(value); return list ? `${main} · ${label} ${list}` : main; };
+  if (stage.kind === 'collect') return scoring?.kind === 'none' || !scoring ? 'No points' : withPlaces(`${points(scoring.awardMilli)} points`, scoring.places, 'fastest');
+  if (stage.kind === 'challenge') return withPlaces(`Up to ${points(stage['maxAwardMilli'])}`, stage['places'], 'places');
+  if (stage.kind === 'vote') return withPlaces(`${points(stage['awardPerVoteMilli'])} per vote`, stage['places'], 'most votes');
+  if (stage.kind === 'minigame') return `Places ${placesOf(stage['places']) ?? ((stage['placementMilli'] as string[] | undefined) ?? ['10000', '6000', '3000']).map(entry => Number(entry) / 1000).join('/')}`;
+  if (stage.kind === 'duel') return `Winner ${placesOf(stage['places'])?.split('/')[0] ?? '10'} · right bet ${points(stage['betMilli'])}`;
+  return '';
+}
+/** What the Who plays group says when closed. */
+function playSummary(stage: Stage): string {
+  const play = stage['play'] as { kind: string; lineup?: { kind: string } } | undefined;
+  if (!play) return 'As the game’s default';
+  if (play.kind === 'solo') return 'Everyone for themselves';
+  return { game: 'The game’s teams', round: 'Teams for this round', reform: 'New teams from here on' }[play.lineup?.kind ?? 'game'] ?? 'Teams';
+}
+
+/**
+ * Every field of one part (stage) of a scene, in groups: what players see and do
+ * (open), the points, and who plays. The kind of scene (which minigame, how a
+ * duel is won) is chosen when adding it, so it is shown here, not asked again.
+ */
 export function StageFields({ definition, node, index, onChange }: { definition: Definition; node: Node; index: number; onChange: Change }) {
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
@@ -21,61 +48,77 @@ export function StageFields({ definition, node, index, onChange }: { definition:
   const scoring = stage['scoring'] as { kind?: string; correctChoiceKey?: string; correctOrder?: string[]; awardMilli?: string; places?: Places } | undefined;
   // Optional points by place on a stage (or its scoring): left out entirely when switched off.
   const withPlaces = <T extends Record<string, unknown>>(base: T, places: Places | undefined): T => { const copy: Record<string, unknown> = { ...base }; if (places) copy['places'] = places; else delete copy['places']; return copy as T; };
-  const fastest = (legendFor: string) => <PlacesFields legend={`Extra points for the fastest ${legendFor}`} hint="On top of the points above: the fastest correct answers get these, given when the answer is shown." value={scoring?.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring ?? {}, places) }), 'places')} />;
+  const fastest = (legendFor: string) => <PlacesFields legend={`Extra for the fastest ${legendFor}`} hint="On top of the points above, given when the answer is shown." value={scoring?.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring ?? {}, places) }), 'places')} />;
   const id = (field: string) => `${node.key}-${index}-${field}`;
+  const timed = !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && !isWheelScene(stage);
+  const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || stage.kind === 'duel' || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
+  const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
   return <div className="stage-fields">
-    {stage.kind === 'info' && <label>Title<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
-    <label>{stage.kind === 'info' ? 'Text on every screen' : stage.kind === 'scoreboard' ? 'Heading' : stage.kind === 'route' ? 'Question to the party' : stage.kind === 'minigame' ? 'Title on the screens' : 'Question or instruction'}
-      <textarea value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
-    {!(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' &&
-      <label>{stage.kind === 'duel' ? 'Time to place bets, in seconds (empty: until the host closes betting)' : 'Timer in seconds (empty: no timer)'}<input type="number" inputMode="numeric" min={1} max={3600} value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} /></label>}
+    <Section title="Content" open>
+      {stage.kind === 'info' && <label>Title<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
+      <label>{stage.kind === 'info' ? 'Text on every screen' : stage.kind === 'scoreboard' ? 'Heading' : stage.kind === 'route' ? 'Question to the party' : stage.kind === 'minigame' ? 'Title on the screens' : 'Question or instruction'}
+        <textarea rows={3} value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
+      {timed && <label className="ed-inline">{stage.kind === 'duel' ? 'Betting time' : 'Timer'}
+        <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600} placeholder="none" value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />sec</span></label>}
 
-    {stage.kind === 'collect' && input?.kind === 'choice' && <fieldset><legend>Answer options</legend>
-      {(input.options ?? []).map((option, position) => <div key={option.key} className="option-row">
-        {scoring?.kind === 'correct-choice' && <input type="radio" name={id('correct')} aria-label={`${option.label} is the correct answer`} checked={scoring.correctChoiceKey === option.key} onChange={() => edit(current => ({ ...current, scoring: { ...scoring, correctChoiceKey: option.key } }))} />}
-        <input aria-label={`Answer option ${position + 1}`} value={option.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, options: input.options!.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
-        <button className="small-button" disabled={(input.options ?? []).length <= 2} aria-label={`Remove answer option ${position + 1}`} onClick={() => edit(current => {
-          const options = input.options!.filter(entry => entry.key !== option.key);
-          return { ...current, input: { ...input, options }, ...(scoring?.kind === 'correct-choice' && scoring.correctChoiceKey === option.key ? { scoring: { ...scoring, correctChoiceKey: options[0]!.key } } : {}) };
-        })}>Remove</button></div>)}
-      <button className="small-button" disabled={(input.options ?? []).length >= 12} onClick={() => edit(current => ({ ...current, input: { ...input, options: [...input.options!, { key: uniqueKey('answer', input.options!.map(entry => entry.key)), label: 'New answer' }] } }))}>Add answer option</button>
-      <label>Show answers as<select value={input.layout ?? 'list'} onChange={event => edit(current => ({ ...current, input: { ...input, layout: event.target.value } }))}><option value="tiles">Tiles</option><option value="list">A list</option></select></label>
-      <label>Scoring<select value={scoring?.kind === 'correct-choice' ? 'correct' : 'none'} onChange={event => edit(current => ({ ...current, scoring: event.target.value === 'correct' ? { kind: 'correct-choice', correctChoiceKey: input.options![0]!.key, awardMilli: '10000' } : { kind: 'none' } }))}>
-        <option value="correct">One correct answer gives points</option><option value="none">No points (an opinion question)</option></select></label>
-      {scoring?.kind === 'correct-choice' && <label>Points for the correct answer<input type="number" min={0} value={points(scoring.awardMilli)} onChange={event => edit(current => ({ ...current, scoring: { ...scoring, awardMilli: milli(event.target.value) } }), 'points')} /></label>}
-    </fieldset>}
-    {stage.kind === 'collect' && input?.kind === 'choice' && scoring?.kind === 'correct-choice' && fastest('correct answers')}
-    {stage.kind === 'collect' && input?.kind === 'order' && <fieldset><legend>Items, in the correct order</legend>
-      {(input.items ?? []).map((item, position) => <div key={item.key} className="option-row">
-        <span className="order-number">{position + 1}.</span>
-        <input aria-label={`Item ${position + 1}`} value={item.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, items: input.items!.map(entry => entry.key === item.key ? { ...entry, label: event.target.value } : entry) } }), `item-${item.key}`)} />
-        <button className="small-button" aria-label={`Move item ${position + 1} up`} disabled={position === 0} onClick={() => edit(current => { const items = [...input.items!]; [items[position - 1], items[position]] = [items[position]!, items[position - 1]!]; return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>↑</button>
-        <button className="small-button" aria-label={`Remove item ${position + 1}`} disabled={(input.items ?? []).length <= 2} onClick={() => edit(current => { const items = input.items!.filter(entry => entry.key !== item.key); return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>Remove</button></div>)}
-      <button className="small-button" disabled={(input.items ?? []).length >= 8} onClick={() => edit(current => { const items = [...input.items!, { key: uniqueKey('item', input.items!.map(entry => entry.key)), label: 'New item' }]; return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>Add item</button>
-      <p className="hint">Players see the items shuffled. Points only for the exact order.</p>
-      {scoring?.kind === 'correct-order' && <label>Points for the correct order<input type="number" min={0} value={points(scoring.awardMilli)} onChange={event => edit(current => ({ ...current, scoring: { ...scoring, awardMilli: milli(event.target.value) } }), 'points')} /></label>}
-    </fieldset>}
-    {stage.kind === 'collect' && input?.kind === 'order' && scoring?.kind === 'correct-order' && fastest('correct orders')}
-    {stage.kind === 'collect' && input?.kind === 'text' && <label>Longest answer (characters)<input type="number" min={1} max={2000} value={input.maxLength ?? 240} onChange={event => edit(current => ({ ...current, input: { ...input, maxLength: Math.max(1, Math.min(2000, Math.round(Number(event.target.value) || 1))) } }), 'length')} /></label>}
-    {stage.kind === 'collect' && input?.kind === 'media' && <fieldset><legend>Players may upload</legend>{(['image', 'gif', 'video'] as const).map(kind => <label key={kind} className="choice"><input type="checkbox" checked={(input.accept ?? []).includes(kind)}
-      disabled={(input.accept ?? []).length === 1 && (input.accept ?? []).includes(kind)}
-      onChange={event => edit(current => ({ ...current, input: { ...input, accept: event.target.checked ? [...(input.accept ?? []), kind] : (input.accept ?? []).filter(entry => entry !== kind) } }))} />{{ image: 'Pictures', gif: 'GIFs', video: 'Short videos' }[kind]}</label>)}</fieldset>}
-    {stage.kind === 'collect' && input?.kind === 'drawing' && <DrawingFields stage={stage} onChange={(next, field) => edit(() => next, field)} />}
-    {stage.kind === 'challenge' && <label>Most points the host can give<input type="number" min={0} value={points(stage['maxAwardMilli'])} onChange={event => edit(current => ({ ...current, maxAwardMilli: milli(event.target.value) }), 'points')} /></label>}
-    {stage.kind === 'challenge' && <PlacesFields legend="Points by place" hint="The host gives each player (or team) a place with one tap, instead of typing points." value={stage['places'] as Places | undefined} onChange={places => edit(current => withPlaces(current, places), 'places')} />}
-    {stage.kind === 'vote' && <>
-      <label>Answers to vote on<select value={`${(stage['source'] as { nodeKey: string }).nodeKey}/${(stage['source'] as { stageKey: string }).stageKey}`}
+      {stage.kind === 'collect' && input?.kind === 'choice' && <fieldset><legend>Answers{scoring?.kind === 'correct-choice' ? ' (tick the correct one)' : ''}</legend>
+        {(input.options ?? []).map((option, position) => <div key={option.key} className="option-row">
+          {scoring?.kind === 'correct-choice' && <input type="radio" name={id('correct')} aria-label={`${option.label} is the correct answer`} checked={scoring.correctChoiceKey === option.key} onChange={() => edit(current => ({ ...current, scoring: { ...scoring, correctChoiceKey: option.key } }))} />}
+          <input aria-label={`Answer option ${position + 1}`} value={option.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, options: input.options!.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
+          <button className="icon-button" disabled={(input.options ?? []).length <= 2} aria-label={`Remove answer option ${position + 1}`} onClick={() => edit(current => {
+            const options = input.options!.filter(entry => entry.key !== option.key);
+            return { ...current, input: { ...input, options }, ...(scoring?.kind === 'correct-choice' && scoring.correctChoiceKey === option.key ? { scoring: { ...scoring, correctChoiceKey: options[0]!.key } } : {}) };
+          })}>×</button></div>)}
+        <div className="ed-row">
+          <button className="small-button" disabled={(input.options ?? []).length >= 12} onClick={() => edit(current => ({ ...current, input: { ...input, options: [...input.options!, { key: uniqueKey('answer', input.options!.map(entry => entry.key)), label: 'New answer' }] } }))}>+ Answer</button>
+          <label className="ed-inline ed-compact">Show as<select value={input.layout ?? 'list'} onChange={event => edit(current => ({ ...current, input: { ...input, layout: event.target.value } }))}><option value="tiles">Tiles</option><option value="list">A list</option></select></label>
+        </div>
+      </fieldset>}
+      {stage.kind === 'collect' && input?.kind === 'order' && <fieldset><legend>Items, in the correct order</legend>
+        {(input.items ?? []).map((item, position) => <div key={item.key} className="option-row">
+          <span className="order-number">{position + 1}.</span>
+          <input aria-label={`Item ${position + 1}`} value={item.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, items: input.items!.map(entry => entry.key === item.key ? { ...entry, label: event.target.value } : entry) } }), `item-${item.key}`)} />
+          <button className="icon-button" aria-label={`Move item ${position + 1} up`} disabled={position === 0} onClick={() => edit(current => { const items = [...input.items!]; [items[position - 1], items[position]] = [items[position]!, items[position - 1]!]; return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>↑</button>
+          <button className="icon-button" aria-label={`Remove item ${position + 1}`} disabled={(input.items ?? []).length <= 2} onClick={() => edit(current => { const items = input.items!.filter(entry => entry.key !== item.key); return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>×</button></div>)}
+        <button className="small-button" disabled={(input.items ?? []).length >= 8} onClick={() => edit(current => { const items = [...input.items!, { key: uniqueKey('item', input.items!.map(entry => entry.key)), label: 'New item' }]; return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>+ Item</button>
+        <p className="hint">Players see them shuffled.</p>
+      </fieldset>}
+      {stage.kind === 'collect' && input?.kind === 'text' && <label className="ed-inline">Longest answer<span className="ed-unit"><input type="number" min={1} max={2000} value={input.maxLength ?? 240} onChange={event => edit(current => ({ ...current, input: { ...input, maxLength: Math.max(1, Math.min(2000, Math.round(Number(event.target.value) || 1))) } }), 'length')} />chars</span></label>}
+      {stage.kind === 'collect' && input?.kind === 'media' && <fieldset><legend>Players may upload</legend><div className="ed-checks">{(['image', 'gif', 'video'] as const).map(kind => <label key={kind} className="choice"><input type="checkbox" checked={(input.accept ?? []).includes(kind)}
+        disabled={(input.accept ?? []).length === 1 && (input.accept ?? []).includes(kind)}
+        onChange={event => edit(current => ({ ...current, input: { ...input, accept: event.target.checked ? [...(input.accept ?? []), kind] : (input.accept ?? []).filter(entry => entry !== kind) } }))} />{{ image: 'Pictures', gif: 'GIFs', video: 'Videos' }[kind]}</label>)}</div></fieldset>}
+      {stage.kind === 'collect' && input?.kind === 'drawing' && <DrawingFields stage={stage} onChange={(next, field) => edit(() => next, field)} />}
+      {stage.kind === 'vote' && <label>Answers to vote on<select value={`${(stage['source'] as { nodeKey: string }).nodeKey}/${(stage['source'] as { stageKey: string }).stageKey}`}
         onChange={event => { const [nodeKey, stageKey] = event.target.value.split('/'); edit(current => ({ ...current, source: { nodeKey, stageKey } })); }}>
         <option value="choose/main" disabled>Choose a writing or upload round</option>
-        {definition.nodes.flatMap(other => other.stages.filter(isVotable).map(source => <option key={`${other.key}/${source.key}`} value={`${other.key}/${source.key}`}>{sceneName(definition, other.key)}{other.stages.length > 1 ? ` (part ${other.stages.indexOf(source) + 1})` : ''}</option>))}</select></label>
-      <label>Points per vote received<input type="number" min={0} value={points(stage['awardPerVoteMilli'])} onChange={event => edit(current => ({ ...current, awardPerVoteMilli: milli(event.target.value) }), 'points')} /></label>
-      <PlacesFields legend="Extra points for the most-voted answers" hint="On top of the points per vote: the answers with the most votes get these, given when the votes are shown." value={stage['places'] as Places | undefined} onChange={places => edit(current => withPlaces(current, places), 'places')} />
-    </>}
-    {stage.kind === 'scoreboard' && <label>Show<select value={String(stage['show'])} onChange={event => edit(current => ({ ...current, show: event.target.value }))}><option value="players">Player scores</option><option value="teams">Team scores</option><option value="both">Both</option></select></label>}
-    {stage.kind === 'minigame' && <MinigameFields definition={definition} node={node} index={index} onChange={onChange} />}
-    {stage.kind === 'duel' && <DuelFields stage={stage} onChange={(next, field) => edit(() => next, field)} />}
-    {stage.kind === 'route' && <RouteFields definition={definition} node={node} stage={stage} onChange={onChange} />}
-    {['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind) && <PlayFields definition={definition} node={node} index={index} onChange={onChange} />}
+        {definition.nodes.flatMap(other => other.stages.filter(isVotable).map(source => <option key={`${other.key}/${source.key}`} value={`${other.key}/${source.key}`}>{sceneName(definition, other.key)}{other.stages.length > 1 ? ` (part ${other.stages.indexOf(source) + 1})` : ''}</option>))}</select></label>}
+      {stage.kind === 'scoreboard' && <label className="ed-inline">Show<select value={String(stage['show'])} onChange={event => edit(current => ({ ...current, show: event.target.value }))}><option value="players">Player scores</option><option value="teams">Team scores</option><option value="both">Both</option></select></label>}
+      {stage.kind === 'minigame' && <MinigameFields part="settings" definition={definition} node={node} index={index} onChange={onChange} />}
+      {stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
+      {stage.kind === 'route' && <RouteFields definition={definition} node={node} stage={stage} onChange={onChange} />}
+      {isWheelScene(stage) && <WheelOfScene definition={definition} stage={stage} onChange={onChange} />}
+    </Section>
+
+    {hasPoints && <Section title="Points" summary={pointsSummary(stage)}>
+      {stage.kind === 'collect' && input?.kind === 'choice' && <>
+        <label>Scoring<select value={scoring?.kind === 'correct-choice' ? 'correct' : 'none'} onChange={event => edit(current => ({ ...current, scoring: event.target.value === 'correct' ? { kind: 'correct-choice', correctChoiceKey: input.options![0]!.key, awardMilli: '10000' } : { kind: 'none' } }))}>
+          <option value="correct">The correct answer gives points</option><option value="none">No points (an opinion question)</option></select></label>
+        {scoring?.kind === 'correct-choice' && <><label className="ed-inline">Points for the correct answer<input type="number" min={0} value={points(scoring.awardMilli)} onChange={event => edit(current => ({ ...current, scoring: { ...scoring, awardMilli: milli(event.target.value) } }), 'points')} /></label>{fastest('correct answers')}</>}
+      </>}
+      {stage.kind === 'collect' && input?.kind === 'order' && scoring?.kind === 'correct-order' && <>
+        <label className="ed-inline">Points for the exact order<input type="number" min={0} value={points(scoring.awardMilli)} onChange={event => edit(current => ({ ...current, scoring: { ...scoring, awardMilli: milli(event.target.value) } }), 'points')} /></label>
+        {fastest('correct orders')}</>}
+      {stage.kind === 'challenge' && <>
+        <label className="ed-inline">Most the host can give<input type="number" min={0} value={points(stage['maxAwardMilli'])} onChange={event => edit(current => ({ ...current, maxAwardMilli: milli(event.target.value) }), 'points')} /></label>
+        <PlacesFields legend="Points by place" hint="The host gives each player (or team) a place with one tap." value={stage['places'] as Places | undefined} onChange={places => edit(current => withPlaces(current, places), 'places')} /></>}
+      {stage.kind === 'vote' && <>
+        <label className="ed-inline">Points per vote received<input type="number" min={0} value={points(stage['awardPerVoteMilli'])} onChange={event => edit(current => ({ ...current, awardPerVoteMilli: milli(event.target.value) }), 'points')} /></label>
+        <PlacesFields legend="Extra for the most-voted answers" hint="On top of the points per vote, given when the votes are shown." value={stage['places'] as Places | undefined} onChange={places => edit(current => withPlaces(current, places), 'places')} /></>}
+      {stage.kind === 'minigame' && <MinigameFields part="points" definition={definition} node={node} index={index} onChange={onChange} />}
+      {stage.kind === 'duel' && <DuelFields part="points" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
+    </Section>}
+
+    {hasPlay && <Section title="Who plays" summary={playSummary(stage)}><PlayFields definition={definition} node={node} index={index} onChange={onChange} /></Section>}
   </div>;
 }
 
@@ -86,7 +129,7 @@ function PlayFields({ definition, node, index, onChange }: { definition: Definit
   const set = (next: unknown) => onChange(updateStage(definition, node.key, index, current => { const copy: Stage = { ...current }; if (next === undefined) delete copy['play']; else copy['play'] = next; return copy; }));
   const teamsWith = (lineup: unknown) => ({ kind: 'teams', lineup, answers: play?.answers ?? 'everyone', points: play?.points ?? 'both' });
   const defaultForm: Form = { split: { kind: 'count', teams: 2 }, formation: 'random' };
-  return <fieldset><legend>Who plays this</legend>
+  return <fieldset><legend className="visually-hidden">Who plays this</legend>
     <label>Players<select value={mode} onChange={event => {
       const value = event.target.value;
       set(value === 'game-default' ? undefined : value === 'solo' ? { kind: 'solo' } : value === 'game' ? teamsWith({ kind: 'game' })
@@ -135,26 +178,42 @@ export function NextFields({ definition, node, onChange }: { definition: Definit
       <option value="">{option ? 'Not connected yet' : 'Nothing: the game ends here'}</option>
       {others.map(other => { const problem = connectProblem(definition, node.key, option?.key, other.key); return <option key={other.key} value={other.key} disabled={Boolean(problem) && nextFor(option?.key) !== other.key}>{sceneName(definition, other.key)}{problem === 'circle' ? ' (would go round in a circle)' : problem === 'same-scene' ? ' (another option leads there)' : ''}</option>; })}
     </select></label>;
-  return <fieldset><legend>Where the game goes next</legend>{isRoute(node) ? optionsOf(node).map(option => select(option)) : select(undefined)}
-    <p className="hint">You can also drag from a ● on the card to another scene, or drag an arrow’s end to move it.</p></fieldset>;
+  return <fieldset><legend className="visually-hidden">Where the game goes next</legend>{isRoute(node) ? optionsOf(node).map(option => select(option)) : select(undefined)}
+    <p className="hint">Or drag from a ● on the card to another scene.</p></fieldset>;
 }
 
-/** The Flow editor's side panel for one selected scene. */
+/** Where the scene's output (or each route option) leads, for the closed Where next group. */
+function nextSummary(definition: Definition, node: Node): string {
+  if (isRoute(node)) { const options = optionsOf(node); const linked = options.filter(option => definition.edges.some(edge => edge.from === node.key && edge.option === option.key)).length; return `${linked} of ${options.length} routes connected`; }
+  const next = definition.edges.find(edge => edge.from === node.key);
+  return next ? `→ ${sceneName(definition, next.to)}` : 'The game ends here';
+}
+
+/**
+ * The Flow editor's side panel for one selected scene: what kind of scene it is,
+ * its problems, its settings in groups, where it leads, and the scene's actions
+ * (start here, duplicate, save as prefab, delete) together at the bottom.
+ */
 export function Inspector({ definition, node, problems, onChange, onDelete, onClose, onDuplicate, extra }: { definition: Definition; node: Node; problems: DefinitionIssue[]; onChange: Change; onDelete: (next: Definition) => void; onClose: () => void; onDuplicate?: () => void; extra?: React.ReactNode }) {
   const [confirming, setConfirming] = useState(false);
   useEffect(() => setConfirming(false), [node.key]);
-  const text = cardText(definition, node);
+  const text = cardText(definition, node); const start = definition.startNodeKey === node.key;
   return <aside className="inspector" aria-labelledby="inspector-heading">
-    <div className="inspector-head"><h2 id="inspector-heading">{text.label}</h2><button className="small-button" onClick={onClose}>Close</button></div>
+    <div className="inspector-head">
+      <span className={`ed-kind thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true"><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
+      <div className="ed-kind-text"><h2 id="inspector-heading">{text.label}</h2>{start && <small>The game starts here</small>}</div>
+      <button className="small-button" onClick={onClose}>Close</button></div>
     {node.stages.length > 1 && <p className="hint">This scene has {node.stages.length} parts. This panel edits the first; the Scene editor edits them all.</p>}
-    {problems.length > 0 && <div role="alert" className="inspector-problems"><h3>Problems in this scene</h3><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && node.stages.length > 1 ? `Part ${issue.stageIndex + 1}: ` : ''}{issue.message}</li>)}</ul></div>}
-    {definition.startNodeKey === node.key ? <p className="start-note">The game starts here.</p> : <button onClick={() => onChange({ ...definition, startNodeKey: node.key })}>Start the game here</button>}
-    <StageFields definition={definition} node={node} index={0} onChange={onChange} />
-    <NextFields definition={definition} node={node} onChange={onChange} />
-    {onDuplicate && <button onClick={onDuplicate}>Duplicate scene</button>}
-    {extra}
-    {confirming ? <div className="actions"><button className="danger" onClick={() => onDelete(deleteScene(definition, node.key))}>Yes, delete this scene</button><button onClick={() => setConfirming(false)}>Keep it</button></div>
-      : <button className="danger-outline" onClick={() => setConfirming(true)}>Delete scene</button>}
+    {problems.length > 0 && <div role="alert" className="inspector-problems"><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && node.stages.length > 1 ? `Part ${issue.stageIndex + 1}: ` : ''}{issue.message}</li>)}</ul></div>}
+    <StageFields key={node.key} definition={definition} node={node} index={0} onChange={onChange} />
+    <Section key={`next-${node.key}`} title="Where next" summary={nextSummary(definition, node)}><NextFields definition={definition} node={node} onChange={onChange} /></Section>
+    <div className="ed-actions">
+      {!start && <button className="small-button" onClick={() => onChange({ ...definition, startNodeKey: node.key })}>Start here</button>}
+      {onDuplicate && <button className="small-button" onClick={onDuplicate}>Duplicate</button>}
+      {extra}
+      {confirming ? <span className="ed-confirm"><button className="danger small-button" onClick={() => onDelete(deleteScene(definition, node.key))}>Yes, delete</button><button className="small-button" onClick={() => setConfirming(false)}>Keep</button></span>
+        : <button className="danger-outline small-button" onClick={() => setConfirming(true)}>Delete</button>}
+    </div>
   </aside>;
 }
 
@@ -166,16 +225,16 @@ function RouteFields({ definition, node, stage, onChange }: { definition: Defini
     if (merged.method === 'host') { next.durationMs = null; delete next['defaultOptionKey']; }
     return next;
   }));
-  return <fieldset><legend>Party choice</legend>
+  return <fieldset><legend>Routes</legend>
+    {options.map((option, position) => <div key={option.key} className="option-row">
+      <input aria-label={`Route ${position + 1} name`} value={option.label} maxLength={240} onChange={event => onChange(setRouteOptions(definition, node.key, options.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry)), `${node.key}:route-${option.key}`)} />
+      <button className="icon-button" disabled={options.length <= 2} aria-label={`Remove route ${position + 1}`} onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}>×</button></div>)}
+    <button className="small-button" disabled={options.length >= 6} onClick={() => onChange(setRouteOptions(definition, node.key, [...options, { key: uniqueKey('route', options.map(entry => entry.key)), label: `Route ${options.length + 1}` }]))}>+ Route</button>
     <label>Who decides<select value={decide.method} onChange={event => setDecide({ method: event.target.value })}><option value="players">Everyone votes</option><option value="captains">Team captains vote</option><option value="host">The host decides</option></select></label>
     {decide.method !== 'host' && <>
       <label>On a tie<select value={decide.tie} onChange={event => setDecide({ tie: event.target.value })}><option value="random">A random pick among the tied routes</option><option value="host">The host decides</option></select></label>
       <label>When nobody votes<select value={decide.noVotes} onChange={event => setDecide({ noVotes: event.target.value })}><option value="random">A random route</option><option value="host">The host decides</option></select></label>
       <label>Players see the vote counts<select value={decide.counts} onChange={event => setDecide({ counts: event.target.value })}><option value="reveal">When the route is announced</option><option value="live">Live while voting</option><option value="never">Never</option></select></label>
     </>}
-    {options.map((option, position) => <div key={option.key} className="option-row">
-      <input aria-label={`Route ${position + 1} name`} value={option.label} maxLength={240} onChange={event => onChange(setRouteOptions(definition, node.key, options.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry)), `${node.key}:route-${option.key}`)} />
-      <button className="small-button" disabled={options.length <= 2} aria-label={`Remove route ${position + 1}`} onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}>Remove</button></div>)}
-    <button className="small-button" disabled={options.length >= 6} onClick={() => onChange(setRouteOptions(definition, node.key, [...options, { key: uniqueKey('route', options.map(entry => entry.key)), label: `Route ${options.length + 1}` }]))}>Add route</button>
   </fieldset>;
 }

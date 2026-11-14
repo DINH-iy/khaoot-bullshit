@@ -8,8 +8,12 @@ const toMilli = (text: string) => { const value = Math.round(Number(text)); retu
 const seconds = (ms: number) => String(ms / 1000);
 const ms = (text: string, min: number, max: number) => Math.round(Math.min(max, Math.max(min, Number(text) || 0)) * 1000);
 
-/** Which minigame, its settings, and the points for each place. Everything has a default. */
-export function MinigameFields({ definition, node, index, onChange }: { definition: Definition; node: Node; index: number; onChange: Change }) {
+/**
+ * A minigame's settings (`part="settings"`) or its points (`part="points"`). Which
+ * minigame is chosen when the scene is added; it is only asked here for a scene
+ * whose minigame is still to be chosen (for example one imported from text).
+ */
+export function MinigameFields({ part, definition, node, index, onChange }: { part: 'settings' | 'points'; definition: Definition; node: Node; index: number; onChange: Change }) {
   const stage = node.stages[index]!; const game = String(stage['game'] ?? '');
   const edit = (change: (current: Stage) => Stage, field: string) => onChange(updateStage(definition, node.key, index, change), `${node.key}:${index}:${field}`);
   const known = isMinigameKey(game);
@@ -19,8 +23,14 @@ export function MinigameFields({ definition, node, index, onChange }: { definiti
   const placement = (stage['placementMilli'] as string[] | undefined) ?? ['10000', '6000', '3000'];
   const places = (stage['places'] as Places | undefined) ?? { kind: 'list' as const, pointsMilli: placement };
   const setPlaces = (next: Places | undefined) => edit(current => { const copy: Stage = { ...current }; delete copy['placementMilli']; if (next) copy['places'] = next; else delete copy['places']; return copy; }, 'placement');
-  return <fieldset className="minigame-fields"><legend>Minigame</legend>
-    <label>Which minigame<select value={known ? game : ''} onChange={event => {
+  if (part === 'points') return known && game !== 'lucky-doors' ? <>
+    <PlacesFields legend="Points by place" hint="The best results get these, given when the results are shown." required value={places} onChange={setPlaces} fallback={placement} />
+    {game !== 'relay-drawing' && <label>In a team round, a team’s result is<select value={String(stage['teamResult'] ?? 'average')} onChange={event => edit(current => ({ ...current, teamResult: event.target.value }), 'team-result')}>
+      <option value="average">The average of its players</option><option value="best">Its best player</option>{MINIGAMES[game].better === 'higher' && <option value="total">Everyone added up</option>}</select></label>}
+  </> : null;
+  return <div className="minigame-fields">
+    {known ? <div className="ed-chosen"><strong>{MINIGAMES[game].name}</strong><span>{MINIGAMES[game].howToPlay}</span></div>
+    : <label>Choose the minigame<select value="" onChange={event => {
       const next = event.target.value as MinigameKey;
       // A new minigame starts from its own defaults and a fitting timer.
       // Pass the pencil needs teams: switching to it sets this round to round-only teams of two, which the host can change.
@@ -29,14 +39,13 @@ export function MinigameFields({ definition, node, index, onChange }: { definiti
           copy['play'] = structuredClone(ROUND_TEAMS_PLAY);
         return copy; }, 'game');
     }}>
-      {!known && <option value="" disabled>Choose a minigame</option>}
-      {MINIGAME_KEYS.map(key => <option key={key} value={key}>{MINIGAMES[key].name}: {MINIGAMES[key].description}</option>)}</select></label>
-    {known && <p className="hint">{MINIGAMES[game].howToPlay}</p>}
+      <option value="" disabled>Choose a minigame</option>
+      {MINIGAME_KEYS.map(key => <option key={key} value={key}>{MINIGAMES[key].name}: {MINIGAMES[key].description}</option>)}</select></label>}
     {known && !settings && <p className="hint warn" role="alert">These settings do not fit together. <button className="link-button" onClick={() => edit(current => { const copy = { ...current }; delete copy['settings']; return copy; }, 'reset')}>Use the standard settings</button></p>}
 
     {game === 'reaction' && settings && (() => { const value = settings as MinigameSettings<'reaction'>; return <div className="field-pair">
-      <label>Shortest wait for GO (seconds)<input type="number" min={1} max={10} step={0.5} value={seconds(value.minWaitMs)} onChange={event => setSettings({ ...value, minWaitMs: ms(event.target.value, 1, 10) }, 'min')} /></label>
-      <label>Longest wait for GO (seconds)<input type="number" min={1} max={15} step={0.5} value={seconds(value.maxWaitMs)} onChange={event => setSettings({ ...value, maxWaitMs: ms(event.target.value, 1, 15) }, 'max')} /></label>
+      <label>Earliest GO (sec)<input type="number" min={1} max={10} step={0.5} value={seconds(value.minWaitMs)} onChange={event => setSettings({ ...value, minWaitMs: ms(event.target.value, 1, 10) }, 'min')} /></label>
+      <label>Latest GO (sec)<input type="number" min={1} max={15} step={0.5} value={seconds(value.maxWaitMs)} onChange={event => setSettings({ ...value, maxWaitMs: ms(event.target.value, 1, 15) }, 'max')} /></label>
     </div>; })()}
     {game === 'tap-race' && settings && <label>Race length (seconds)<input type="number" min={3} max={60} value={(settings as MinigameSettings<'tap-race'>).seconds}
       onChange={event => setSettings({ seconds: Math.round(Math.min(60, Math.max(3, Number(event.target.value) || 3))) }, 'seconds')} /></label>}
@@ -59,8 +68,5 @@ export function MinigameFields({ definition, node, index, onChange }: { definiti
         <label>Seconds to vote<input type="number" min={10} max={120} value={value.voteSeconds} onChange={event => setSettings({ ...value, voteSeconds: Math.round(Math.min(120, Math.max(10, Number(event.target.value) || 10))) }, 'vote')} /></label>
       </div>
       <p className="hint">Played in teams: set “Who plays this” below to teams. Every team gets as many turns as the biggest team has players. The question above is what they draw.</p></>; })()}
-    {known && game !== 'lucky-doors' && <PlacesFields legend="Points by place" hint="The best results get these, given when the results are shown." required value={places} onChange={setPlaces} fallback={placement} />}
-    {known && game !== 'lucky-doors' && game !== 'relay-drawing' && <label>In a team round, a team’s result is<select value={String(stage['teamResult'] ?? 'average')} onChange={event => edit(current => ({ ...current, teamResult: event.target.value }), 'team-result')}>
-      <option value="average">The average of its players (fair for 1 against 3)</option><option value="best">Its best player</option>{MINIGAMES[game].better === 'higher' && <option value="total">Everyone added up</option>}</select></label>}
-  </fieldset>;
+  </div>;
 }

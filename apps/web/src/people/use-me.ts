@@ -10,6 +10,9 @@ if (linkToken) history.replaceState(null, '', `${initial.pathname}${initial.sear
 let claiming: Promise<string | null> | null = linkToken
   ? roomApi<{ name: string }>('/api/people/claim', { token: linkToken }).then(result => result.name).catch(() => null) : null;
 
+/** The sign-in from a personal link in this page's address, while it is still going (an editor invite waits for it). */
+export const pendingClaim = () => claiming;
+
 export type Person = NonNullable<Me['person']>;
 /** Who this phone is (a person the owner made), or null for a guest; undefined while loading. */
 export function useMe() {

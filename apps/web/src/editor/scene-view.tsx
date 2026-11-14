@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DefinitionIssue, EditorPeer } from '@party/contracts';
 import { peersOn, PeerTags } from './live/presence.js';
 import { Icon, sceneIcon } from './icons.js';
-import { FormFields, NextFields, StageFields } from './inspector.js';
+import { NextFields, StageFields } from './inspector.js';
 import { ScenePalette, type SceneChoice } from './scene-palette.js';
-import { FinaleSettings, SpinFields, WheelSettings } from './show-settings.js';
-import { addScene, autoLayout, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from './model.js';
+import { SpinFields } from './show-settings.js';
+import { Section } from './section.js';
+import { isWheelScene, addScene, autoLayout, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from './model.js';
 import type { DraftState } from './use-draft.js';
 
 // What a part is, without the scene's own route or rejoin label.
@@ -102,22 +103,19 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
       <h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
       {definition.startNodeKey === current.key ? <p className="start-note">The game starts here.</p> : <button onClick={() => change({ ...definition, startNodeKey: current.key })}>Start the game here</button>}
-      {!isRoute(current) && <fieldset><legend>Parts of this scene</legend>
+      {!isRoute(current) && <fieldset className="parts-box"><legend>Parts of this scene</legend>
         <ol className="part-list">{current.stages.map((stage, position) => <li key={stage.key} className={position === index ? 'current' : undefined}>
           <button className="link-button" onClick={() => setPart(position)}>Part {position + 1}: {partLabel(definition, stage)}</button>
-          <button className="small-button" aria-label={`Move part ${position + 1} up`} disabled={position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
-          <button className="small-button" aria-label={`Remove part ${position + 1}`} disabled={current.stages.length === 1} onClick={() => removePart(position)}>Remove</button></li>)}</ol>
+          <button className="icon-button" aria-label={`Move part ${position + 1} up`} disabled={position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
+          <button className="icon-button" aria-label={`Remove part ${position + 1}`} disabled={current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
         <button className="small-button with-icon" onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />Add a part</button>
         {adding === 'part' && <div className="part-palette"><ScenePalette label="Add a part" only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
         <p className="hint">Parts play one after another inside this scene, for example a question and then its scoreboard.</p>
       </fieldset>}
       <h3>Part {index + 1}</h3>
       <StageFields definition={definition} node={current} index={index} onChange={onChange} />
-      <NextFields definition={definition} node={current} onChange={onChange} />
-      <SpinFields definition={definition} node={current} index={index} onChange={onChange} />
-      <GameSettings definition={definition} onChange={onChange} />
-      <WheelSettings definition={definition} onChange={onChange} />
-      <FinaleSettings definition={definition} onChange={onChange} />
+      <Section key={'next-' + current.key} title="Where next"><NextFields definition={definition} node={current} onChange={onChange} /></Section>
+      {!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title="Wheel of fortune" summary={(current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'Spun here' : 'Not on this scene'}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}
       {confirming ? <div className="actions"><button className="danger" onClick={() => { const kept = { ...positions }; delete kept[current.key]; change(deleteScene(definition, current.key), kept); setSelected([]); }}>Yes, delete this scene</button><button onClick={() => setConfirming(false)}>Keep it</button></div>
         : <button className="danger-outline" onClick={() => setConfirming(true)}>Delete scene</button>}
     </aside>
@@ -126,24 +124,6 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
 
 function Problems({ problems, parts }: { problems: DefinitionIssue[]; parts: number }) {
   return <div role="alert" className="inspector-problems"><h3>Problems in this scene</h3><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && parts > 1 ? `Part ${issue.stageIndex + 1}: ` : ''}{issue.message}</li>)}</ul></div>;
-}
-
-/** Game-wide settings: whether the game has teams, and how rounds play by default. */
-function GameSettings({ definition, onChange }: { definition: Definition; onChange: (next: Definition, group?: string) => void }) {
-  const teams = definition['teams'] as Parameters<typeof FormFields>[0]['form'] | undefined;
-  const play = definition['play'] as { kind: string; answers?: string; points?: string } | undefined;
-  const set = (key: 'teams' | 'play', value: unknown) => { const next = { ...definition }; if (value === undefined) delete next[key]; else next[key] = value; onChange(next); };
-  return <details className="game-settings"><summary>Game settings: teams and default play</summary>
-    <label className="choice"><input type="checkbox" checked={Boolean(teams)} onChange={event => set('teams', event.target.checked ? { split: { kind: 'count', teams: 2 }, formation: 'random' } : undefined)} />This game has teams</label>
-    {teams && <FormFields form={teams} onChange={form => set('teams', form)} />}
-    <label>Rounds play, unless a round says otherwise<select value={play?.kind === 'teams' ? 'teams' : 'solo'} disabled={!teams && play?.kind !== 'teams'}
-      onChange={event => set('play', event.target.value === 'solo' ? undefined : { kind: 'teams', lineup: { kind: 'game' }, answers: 'everyone', points: 'both' })}>
-      <option value="solo">Everyone for themselves</option><option value="teams">In the game’s teams</option></select></label>
-    {play?.kind === 'teams' && <>
-      <label>Who answers<select value={play.answers} onChange={event => set('play', { ...play, answers: event.target.value })}><option value="everyone">Everyone</option><option value="captain">One captain per team</option></select></label>
-      <label>Points go to<select value={play.points} onChange={event => set('play', { ...play, points: event.target.value })}><option value="both">The team and each member</option><option value="team">The team</option><option value="members">Each member</option></select></label>
-    </>}
-  </details>;
 }
 
 /** A rough picture of what the shared screen and a phone show for this part. Not the final game look. */

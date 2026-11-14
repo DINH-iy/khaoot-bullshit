@@ -21,7 +21,7 @@ if (typeof window !== 'undefined') {
  */
 export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }: {
   label: string; onPick: (choice: SceneChoice) => void; onCancel: () => void;
-  onPrefab?: (content: PrefabContent) => void; only?: SceneType[]; inline?: boolean;
+  onPrefab?: ((content: PrefabContent) => void) | undefined; only?: SceneType[]; inline?: boolean;
 }) {
   const [view, setView] = useState<View>({ kind: 'types' });
   const menu = useRef<HTMLDivElement>(null);

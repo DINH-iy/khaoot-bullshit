@@ -42,6 +42,8 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await page.getByRole('button', { name: 'Fit' }).click();
   await page.getByRole('button', { name: 'Add a scene', exact: true }).click();
   await page.getByRole('menu', { name: 'Add a scene' }).getByRole('menuitem', { name: /^Scoreboard/ }).click();
+  // Scoreboards come in kinds: a second menu.
+  await page.getByRole('menu', { name: 'Add a scene · Scoreboard' }).getByRole('menuitem', { name: /^Players/ }).click();
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Fit' }).click();
   const board = card(page, /^Standings$/);
@@ -85,6 +87,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await page.getByRole('button', { name: 'Remove connection' }).click();
   await expect(page.locator('.edge-line')).toHaveCount(6);
   await card(page, /^Standings$/).focus(); await page.keyboard.press('Enter');
+  await inspector.getByText('Where next').click();
   await inspector.getByLabel('Next scene').selectOption({ label: 'Thanks for playing!' });
   await expect(page.locator('.edge-line')).toHaveCount(7);
   await saved(page);
@@ -183,15 +186,18 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   // Add a scoreboard part, which becomes part 3, and see its preview.
   await props.getByRole('button', { name: 'Add a part' }).click();
   await props.getByRole('menuitem', { name: /^Scoreboard/ }).click();
+  await props.getByRole('menuitem', { name: /^Players/ }).click();
   await expect(page.getByRole('tab', { name: /Part 3 · Results/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.tv-scores')).toBeVisible();
   // Insert a quiz question right after the party choice's Music route scene.
   await list.getByRole('button', { name: /Music Mayhem/ }).click();
   await list.getByRole('button', { name: 'Add after this' }).click();
   await list.getByRole('menuitem', { name: /^Quiz question/ }).click();
+  await list.getByRole('menuitem', { name: /^Big tiles/ }).click();
   await expect(list.locator('.scene-row')).toHaveCount(6);
   // Game settings: give the game teams and make rounds team rounds by default.
-  await page.getByText('Game settings: teams and default play').click();
+  await page.getByRole('button', { name: 'Game settings' }).click();
+  await page.getByText('Teams and default play').click();
   await page.getByLabel('This game has teams').check();
   await page.getByLabel('Rounds play, unless a round says otherwise').selectOption('teams');
   await saved(page);

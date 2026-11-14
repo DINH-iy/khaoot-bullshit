@@ -15,6 +15,8 @@ const paths: Record<string, string> = {
   undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
   redo: 'M15 14l5-5-5-5 M20 9H9a5 5 0 0 0 0 10h3',
   plus: 'M12 5v14 M5 12h14',
+  // A wheel of fortune: a wheel with spokes and a pointer.
+  wheel: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 3v18 M3 12h18 M5.6 5.6l12.8 12.8 M18.4 5.6L5.6 18.4 M12 1l-2 3h4z',
   // A duel: two crossed swords.
   duel: 'M4 4l9 9 M20 4l-9 9 M7 14l3 3 M17 14l-3 3 M5 16l-2 2 2 2 2-2 M19 16l2 2-2 2-2-2',
   // Prefabs: two stacked cards.

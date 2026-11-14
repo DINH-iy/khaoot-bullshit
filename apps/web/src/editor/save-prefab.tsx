@@ -22,7 +22,7 @@ export function SavePrefab({ content, defaultName }: { content: () => PrefabCont
     {open ? <form onSubmit={save}>
       <label>Prefab name<input value={name} maxLength={80} required onChange={event => setName(event.target.value)} autoFocus /></label>
       <div className="actions"><button type="submit" disabled={busy || !name.trim()}>{busy ? 'Saving…' : 'Save prefab'}</button><button type="button" onClick={() => setOpen(false)}>Cancel</button></div>
-    </form> : <button type="button" onClick={start}>Save as prefab…</button>}
+    </form> : <button type="button" className="small-button" onClick={start}>Save as prefab</button>}
     {message && <p role={message.error ? 'alert' : 'status'} className={message.error ? 'hint warn' : 'hint'}>{message.text}</p>}
   </div>;
 }

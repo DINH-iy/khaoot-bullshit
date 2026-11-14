@@ -27,16 +27,14 @@ export function PlacesFields({ legend, hint, value, onChange, required = false, 
       <option value="list">Points for each place</option>
       <option value="split">A total, split over the places</option></select></label>
     {list && <>
-      {list.map((amount, position) => <div key={position} className="option-row"><label>{ordinal(position + 1)} place<input type="number" min={0} value={toPoints(amount)}
-        onChange={event => onChange({ kind: 'list', pointsMilli: list.map((entry, at) => at === position ? toMilli(event.target.value) : entry) })} /></label>
-        <button className="small-button" disabled={list.length <= 1} aria-label={`Remove ${ordinal(position + 1)} place`} onClick={() => onChange({ kind: 'list', pointsMilli: list.filter((_, at) => at !== position) })}>Remove</button></div>)}
-      <button className="small-button" disabled={list.length >= 12} onClick={() => onChange({ kind: 'list', pointsMilli: [...list, '0'] })}>Add a place</button>
+      <div className="place-list">{list.map((amount, position) => <div key={position} className="place-row"><label className="ed-inline">{ordinal(position + 1)} place<span className="ed-unit"><input type="number" min={0} value={toPoints(amount)}
+        onChange={event => onChange({ kind: 'list', pointsMilli: list.map((entry, at) => at === position ? toMilli(event.target.value) : entry) })} />pts</span></label>
+        <button className="icon-button" disabled={list.length <= 1} aria-label={`Remove ${ordinal(position + 1)} place`} onClick={() => onChange({ kind: 'list', pointsMilli: list.filter((_, at) => at !== position) })}>×</button></div>)}</div>
+      <button className="small-button" disabled={list.length >= 12} onClick={() => onChange({ kind: 'list', pointsMilli: [...list, '0'] })}>+ Place</button>
     </>}
     {value?.kind === 'split' && <>
-      <div className="field-pair">
-        <label>Points in total<input type="number" min={0} value={toPoints(value.totalMilli)} onChange={event => onChange({ ...value, totalMilli: toMilli(event.target.value) })} /></label>
-        <label>Number of places<input type="number" min={1} max={12} value={value.places} onChange={event => onChange({ ...value, places: Math.max(1, Math.min(12, Math.round(Number(event.target.value) || 1))) })} /></label>
-      </div>
+      <label className="ed-inline">Points in total<span className="ed-unit"><input type="number" min={0} value={toPoints(value.totalMilli)} onChange={event => onChange({ ...value, totalMilli: toMilli(event.target.value) })} />pts</span></label>
+      <label className="ed-inline">Number of places<input type="number" min={1} max={12} value={value.places} onChange={event => onChange({ ...value, places: Math.max(1, Math.min(12, Math.round(Number(event.target.value) || 1))) })} /></label>
       <label>How it is split<select value={value.curve} onChange={event => onChange({ ...value, curve: event.target.value as keyof typeof CURVES })}>
         {(Object.keys(CURVES) as (keyof typeof CURVES)[]).map(curve => <option key={curve} value={curve}>{CURVES[curve]}</option>)}</select></label>
     </>}

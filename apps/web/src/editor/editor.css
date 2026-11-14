@@ -238,3 +238,133 @@
 .save-prefab .hint { margin: 0; }
 /* Points by place: what each place gets when a total is split. */
 .places-fields .places-preview { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--e-accent-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- Scene panel, calmer: groups that open, no boxes in boxes, compact rows ---------- */
+.inspector { display: flex; flex-direction: column; gap: 12px; }
+.inspector-head { display: flex; align-items: center; gap: 10px; }
+.inspector-head .small-button { margin-left: auto; }
+.ed-kind { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--e-accent-soft); color: var(--e-accent); flex: none; }
+.ed-kind-text { display: grid; } .ed-kind-text small { color: var(--e-muted); font-size: .8rem; }
+.inspector-problems ul { margin: 0; padding-left: 18px; font-size: .9rem; }
+.stage-fields { display: grid; gap: 0; }
+.ed-section { border-top: 1px solid var(--e-border); }
+.ed-section > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 46px; cursor: pointer; font-weight: 700; user-select: none; }
+.ed-section > summary::-webkit-details-marker { display: none; }
+.ed-section > summary::before { content: '›'; display: inline-block; width: 12px; color: var(--e-muted); font-size: 1.2rem; transition: transform .15s; }
+.ed-section[open] > summary::before { transform: rotate(90deg); }
+.ed-section > summary:focus-visible { outline: 3px solid var(--e-accent); outline-offset: 2px; border-radius: 6px; }
+.ed-section-summary { margin-left: auto; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: .85rem; color: var(--e-muted); }
+.ed-section-body { display: grid; gap: 12px; padding: 2px 0 16px; }
+.ed-section-body label { font-size: .9rem; gap: 6px; }
+.ed-section-body textarea { min-height: 72px; }
+/* Groups inside a group lose their border; their title becomes a small heading. */
+.ed-section fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.ed-section legend { padding: 0; margin: 4px 0 2px; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--e-muted); }
+.ed-section .hint { font-size: .82rem; }
+.ed-section .places-fields { padding: 10px 12px; border-radius: 10px; background: var(--e-bg); }
+/* A label and a short value on one line. */
+.ed-inline { display: flex !important; align-items: center; justify-content: space-between; gap: 12px; }
+.inspector .ed-inline > input, .inspector .ed-inline > select, .scene-props .ed-inline > input, .scene-props .ed-inline > select { width: auto; max-width: 55%; flex: 0 1 auto; }
+.inspector .ed-inline > input[type=number], .scene-props .ed-inline > input[type=number] { width: 96px; }
+.ed-unit { display: inline-flex; align-items: center; gap: 6px; color: var(--e-muted); font-size: .85rem; }
+.inspector .ed-unit input, .scene-props .ed-unit input { width: 84px !important; }
+.ed-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.ed-compact { gap: 8px !important; } .inspector .ed-compact select { min-height: 36px; padding: 4px 8px; }
+.ed-checks { display: flex; flex-wrap: wrap; gap: 4px 16px; } .ed-checks .choice { min-height: 36px; padding: 0; }
+.icon-button { min-height: 36px !important; width: 36px; padding: 0 !important; display: grid; place-items: center; font-size: 1.05rem; color: var(--e-muted) !important; flex: none; }
+.icon-button:hover:not(:disabled) { color: var(--e-text) !important; }
+.option-row input:not([type=radio]) { min-height: 40px; }
+/* What was chosen when the scene was added (which minigame, how a duel is won). */
+.ed-chosen { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--e-accent-soft); }
+.ed-chosen strong { color: var(--e-text); } .ed-chosen span { font-size: .82rem; color: var(--e-muted); }
+/* The scene's actions, together at the bottom. */
+.ed-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid var(--e-border); }
+.ed-actions .save-prefab { display: contents; }
+.ed-actions .save-prefab form, .ed-actions .save-prefab .hint { flex-basis: 100%; }
+.ed-actions .ed-confirm { display: inline-flex; gap: 8px; }
+/* Game settings: a drawer on the right with the whole game's settings, in the same groups as the scene panel. */
+.game-settings-panel { position: absolute; right: 16px; top: 76px; bottom: 16px; z-index: 20; width: min(440px, calc(100vw - 32px)); overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 18px; border-radius: 16px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 12px 40px rgb(0 0 0 / .35); }
+.game-settings-panel h2 { margin: 0; font-size: 1.05rem; } .game-settings-panel h2:focus { outline: none; }
+.game-settings-panel select, .game-settings-panel input:not([type=radio]):not([type=checkbox]) { width: 100%; min-height: 44px; border-radius: 8px; border: 1px solid var(--e-border); background: var(--e-bg); color: inherit; padding: 6px 10px; font: inherit; }
+.game-settings-panel button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); justify-self: start; }
+/* Wheels and awards are groups of their own: same look as the other groups. */
+.game-settings-panel details.game-settings { border: 0; border-top: 1px solid var(--e-border); padding: 0 0 4px; margin: 0; border-radius: 0; background: none; }
+.game-settings-panel details.game-settings > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 46px; cursor: pointer; font-weight: 700; }
+.game-settings-panel details.game-settings > summary::-webkit-details-marker { display: none; }
+.game-settings-panel details.game-settings > summary::before { content: '›'; display: inline-block; width: 12px; color: var(--e-muted); font-size: 1.2rem; transition: transform .15s; }
+.game-settings-panel details.game-settings[open] > summary::before { transform: rotate(90deg); }
+.game-settings-panel details.game-settings[open] { display: grid; gap: 10px; padding-bottom: 14px; }
+.game-settings-panel fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+/* A confirmation in the middle of the editor (deleting with the keyboard). */
+.ed-dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / .45); }
+.ed-dialog { width: min(420px, 100%); display: grid; gap: 10px; padding: 20px; border-radius: 16px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
+.ed-dialog h2 { margin: 0; font-size: 1.1rem; overflow-wrap: anywhere; } .ed-dialog p { margin: 0; color: var(--e-muted); }
+.ed-dialog .actions { justify-content: flex-end; }
+.ed-dialog button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
+.ed-dialog button.danger { background: var(--e-danger); color: light-dark(#fff, #2a0d12); border-color: var(--e-danger); }
+/* ---------- Spacing and chevrons (overrides) ---------- */
+/* One drawn chevron for every group that opens: points right when closed, down when open, centred on the title. */
+.ed-section > summary::before, .game-settings-panel details.game-settings > summary::before {
+  content: ''; width: 7px; height: 7px; margin: 0 6px 0 2px; flex: none; font-size: 0;
+  border-right: 2px solid var(--e-muted); border-bottom: 2px solid var(--e-muted); transform: rotate(-45deg); transition: transform .15s ease; }
+.ed-section[open] > summary::before, .game-settings-panel details.game-settings[open] > summary::before { transform: rotate(45deg) translate(-2px, -2px); }
+.ed-section > summary:hover::before, .game-settings-panel details.game-settings > summary:hover::before { border-color: var(--e-text); }
+@media (prefers-reduced-motion: reduce) { .ed-section > summary::before, .game-settings-panel details.game-settings > summary::before { transition: none; } }
+/* A boxed group's small heading sits inside the box, not on its edge. */
+.ed-section .places-fields { display: block; padding: 12px; }
+.ed-section .places-fields > legend { float: left; width: 100%; margin: 0 0 8px; }
+.ed-section .places-fields > legend + * { clear: both; }
+.ed-section .places-fields > * + * { margin-top: 10px; }
+.ed-section .places-fields .option-row { margin-top: 8px; }
+/* The chosen minigame or duel and its settings: the same gap as everything else in the group. */
+.minigame-fields, .duel-fields, .drawing-fields { display: grid; gap: 12px; }
+.ed-section .field-pair { gap: 10px; align-items: end; }
+/* ---------- Spacing sweep ---------- */
+/* The site-wide small button has a left margin for inline use; inside the editor's panels it only misaligns. */
+.inspector .small-button, .scene-props .small-button, .game-settings-panel .small-button, .export-panel .small-button, .add-menu .small-button { margin-left: 0; }
+.inspector-head .small-button, .game-settings-panel .inspector-head .small-button { margin-left: auto; }
+/* The drawn chevron of every group. */
+.ed-section > summary::before, .game-settings-panel details.game-settings > summary::before { content: none; display: none; }
+.ed-chevron { flex: none; color: var(--e-muted); transition: transform .15s ease; }
+.ed-section[open] > summary .ed-chevron { transform: rotate(90deg); }
+.ed-section > summary:hover .ed-chevron { color: var(--e-text); }
+@media (prefers-reduced-motion: reduce) { .ed-chevron { transition: none; } }
+/* Groups in the Scene editor and Game settings look the same as in the scene panel. */
+.scene-props .ed-section-body label, .game-settings-panel .ed-section-body label { font-size: .9rem; gap: 6px; }
+.scene-props select, .game-settings-panel select { width: 100%; min-height: 44px; border-radius: 8px; border: 1px solid var(--e-border); background: var(--e-bg); color: inherit; padding: 6px 10px; font: inherit; }
+.scene-props .ed-compact select, .inspector .ed-compact select { width: auto; min-height: 36px; padding: 4px 8px; }
+.scene-props input:not([type=radio]):not([type=checkbox]), .scene-props textarea { background: var(--e-bg); color: inherit; border-color: var(--e-border); }
+/* Checkboxes and radios keep their own size, next to their text. */
+.inspector input[type=checkbox], .scene-props input[type=checkbox], .game-settings-panel input[type=checkbox] { width: 20px !important; height: 20px; min-height: 0; flex: none; margin: 0; accent-color: var(--e-accent); }
+.inspector .choice, .scene-props .choice, .game-settings-panel .choice { display: flex !important; align-items: center; gap: 10px; min-height: 40px; padding: 0; font-size: .9rem; }
+/* Small headings inside a group (a drawing's doodle, a wheel's entries). */
+.ed-section .field-title { margin: 4px 0 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--e-muted); }
+/* Points by place: one line per place. */
+.place-list { display: grid; gap: 6px; }
+.place-row { display: flex; align-items: center; gap: 8px; } .place-row .ed-inline { flex: 1; min-width: 0; }
+.ed-section .places-fields .option-row, .ed-section .places-fields .place-row { margin-top: 0; }
+/* Lists with ↑ and × (awards, parts). */
+.game-settings-panel .part-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.game-settings-panel .part-list li { display: flex; align-items: center; gap: 6px; margin: 0; }
+.game-settings-panel .part-list li > span { flex: 1; min-width: 0; }
+.wheel-fields { display: grid; gap: 8px; }
+.game-settings-panel .wheel-fields { padding: 12px; border-radius: 10px; background: var(--e-bg); }
+.game-settings-panel .wheel-fields > legend { float: left; width: 100%; margin: 0 0 6px; }
+.game-settings-panel .wheel-fields > legend + * { clear: both; }
+/* The selected arrow's menu, in the middle of the arrow. */
+.edge-actions { position: absolute; z-index: 4; display: flex; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 8px 24px rgb(0 0 0 / .35); white-space: nowrap; transform-origin: center; }
+.edge-actions button { min-height: 36px; padding: 6px 12px; border-radius: 9px; background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); font-weight: 600; }
+.edge-actions button:first-child { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1c1d22); }
+.edge-actions .danger-outline { color: var(--e-danger); border-color: var(--e-danger); background: transparent; }
+/* The Scene editor's parts of a scene: a light box like the other boxed groups. */
+.scene-props .parts-box { border: 0; padding: 12px; border-radius: 10px; background: var(--e-bg); }
+.scene-props .parts-box > legend { float: left; width: 100%; margin: 0 0 6px; padding: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--e-muted); }
+.scene-props .parts-box > legend + * { clear: both; }
+.scene-props .parts-box li { display: flex; align-items: center; gap: 6px; } .scene-props .parts-box li > :first-child { flex: 1; min-width: 0; }
+/* Edit together: people to invite, and the plain link. */
+.invite-people { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--e-border); }
+.invite-people h3 { margin: 0; font-size: .95rem; }
+.invite-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; }
+.invite-row > span { display: grid; min-width: 0; } .invite-row small { color: var(--e-muted); font-size: .8rem; }
+.invite-link { display: flex; align-items: center; gap: 8px; } .invite-link code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .8rem; padding: 8px; border-radius: 8px; background: var(--e-bg); }

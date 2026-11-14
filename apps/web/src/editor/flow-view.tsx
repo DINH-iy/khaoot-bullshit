@@ -5,10 +5,11 @@ import { Inspector } from './inspector.js';
 import { Minimap } from './minimap.js';
 import {
   addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, curve, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  insertPrefab, isRoute, prefabFrom, optionsOf, outputPort, pointOnCurve, snap, snapCard, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  insertOnEdge, insertPrefab, isRoute, prefabFrom, optionsOf, outputPort, pointOnCurve, snap, snapCard, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from './model.js';
 import { ScenePalette, type SceneChoice } from './scene-palette.js';
 import { SavePrefab } from './save-prefab.js';
+import { ConfirmDialog } from './confirm-dialog.js';
 import type { PrefabContent } from '@party/contracts';
 import type { DraftState } from './use-draft.js';
 import type { LiveState } from './live/use-live.js';
@@ -31,7 +32,10 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   const [connecting, setConnecting] = useState<Connecting | null>(null); const [box, setBox] = useState<Box | null>(null);
   const [pending, setPending] = useState<{ from: string; option: string | undefined } | null>(null);
   // at: where the menu opens; place: where the new scene goes (the right-clicked spot), else beside `at`.
-  const [adding, setAdding] = useState<{ from: string | null; option: string | undefined; at: Point; place?: Point } | null>(null);
+  // `onEdge`: the arrow a new scene goes on (between the two scenes it connects).
+  const [adding, setAdding] = useState<{ from: string | null; option: string | undefined; at: Point; place?: Point; onEdge?: string } | null>(null);
+  // Delete or Backspace on selected scenes asks first.
+  const [askDelete, setAskDelete] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
   const select = (keys: string[]) => { setSelected(keys); setSelectedEdge(null); };
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -203,12 +207,19 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   };
   const addFromMenu = ({ type, variant }: SceneChoice) => {
     if (!adding) return;
-    const result = adding.from ? addConnectedScene(definition, type, adding.from, adding.option, variant) : addScene(definition, type, variant);
+    const result = (adding.onEdge ? insertOnEdge(definition, adding.onEdge, type, variant) : null) ?? (adding.from ? addConnectedScene(definition, type, adding.from, adding.option, variant) : addScene(definition, type, variant));
+    setSelectedEdge(null);
     const target = adding.place ?? { x: adding.at.x, y: adding.at.y - 72 };
     const raw = { ...positions, [result.key]: { x: snap(target.x), y: snap(target.y) } };
     const spot = freeSpot(result.definition, raw, result.key, raw[result.key]!);
     change(result.definition, { ...raw, [result.key]: spot }); setAdding(null); select([result.key]); requestAnimationFrame(() => reveal(spot));
   };
+  // The middle of the selected arrow, where its menu sits (add a scene on it, or remove it).
+  const edgeMid = (() => {
+    const edge = selectedEdge ? definition.edges.find(entry => entry.key === selectedEdge) : undefined; if (!edge) return null;
+    const fromNode = definition.nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
+    return fromNode && from && to ? pointOnCurve(outputPort(fromNode, from, edge.option), inputPort(to), 0.5) : null;
+  })();
   // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
   const contextMenu = (event: React.MouseEvent) => {
     if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button, input, textarea, select')) return;
@@ -240,7 +251,9 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement).closest('input, textarea, select')) return;
+      if (askDelete) return;
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
+      else if ((event.key === 'Delete' || event.key === 'Backspace') && selected.length) { event.preventDefault(); setAskDelete(true); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && selected.length) { event.preventDefault(); duplicate(selected); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c' && selected.length) {
@@ -264,6 +277,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   };
   const problemsBy = useMemo(() => { const map = new Map<string, DefinitionIssue[]>(); for (const issue of d.issues) if (issue.nodeKey) map.set(issue.nodeKey, [...(map.get(issue.nodeKey) ?? []), issue]); return map; }, [d.issues]);
   const nodes = definition.nodes; const single = selected.length === 1 ? nodes.find(node => node.key === selected[0]) : undefined;
+  const sceneTitle = (key: string) => { const node = definition.nodes.find(entry => entry.key === key); if (!node) return key; const text = cardText(definition, node); return text.banner || text.title; };
   const deleteSelected = () => { let next = definition; for (const key of selected) next = deleteScene(next, key); const kept = { ...positions }; for (const key of selected) delete kept[key]; change(next, kept); select([]); };
   return <div className={`editor-body${selected.length ? ' with-inspector' : ''}`}>
     <div className="flow-tools" role="toolbar" aria-label="Flow tools">
@@ -274,7 +288,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
       <button onClick={() => change(definition, autoLayout(definition))}>Tidy up</button>
       <button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>−</button><button aria-label="Zoom in" onClick={() => zoomBy(1.2)}>+</button><button onClick={fit}>Fit</button>
       {selectedEdge && <button onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove connection</button>}
-      <span className="flow-hint">Right-click to add a scene · drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several</span>
+      <span className="flow-hint">Right-click to add a scene · click an arrow to add a scene on it · drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several</span>
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
@@ -328,7 +342,11 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={addPrefab} onCancel={() => setAdding(null)} /></div>}
+        {selectedEdge && !adding && edgeMid && <div className="edge-actions" style={{ left: edgeMid.x, top: edgeMid.y, transform: `translate(-50%, -50%) scale(${1 / view.zoom})` }} onPointerDown={event => event.stopPropagation()}>
+          <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>
+          <button type="button" className="danger-outline" aria-label="Remove this connection" onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove</button>
+        </div>}
+        {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.onEdge ? 'Add a scene on this arrow' : adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       </div>
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
@@ -336,6 +354,9 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
     {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)}
       onDelete={next => { const kept = { ...positions }; delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
       extra={<SavePrefab key={single.key} content={() => prefabFrom(definition, positions, [single.key])} defaultName={cardText(definition, single).banner || cardText(definition, single).title} />} />}
+    {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? `Delete “${sceneTitle(selected[0]!)}”?` : `Delete ${selected.length} scenes?`}
+      text={`${selected.length === 1 ? 'The scene and its connections go' : 'The scenes and their connections go'}. Undo (Ctrl/Cmd+Z) brings ${selected.length === 1 ? 'it' : 'them'} back.`}
+      confirm={selected.length === 1 ? 'Delete scene' : `Delete ${selected.length} scenes`} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}
     {selected.length > 1 && <MultiPanel count={selected.length} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)}
       savePrefab={<SavePrefab key={selected.join()} content={() => prefabFrom(definition, positions, selected)} defaultName={`${selected.length} scenes`} />} />}
   </div>;
