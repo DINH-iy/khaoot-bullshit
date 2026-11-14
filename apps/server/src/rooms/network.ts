@@ -18,6 +18,7 @@ import { createLiveSignals } from '../minigames/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
 import { registerReactions } from './reactions.js';
 import { breakVotesNeeded, createBreaks } from './breaks.js';
+import { personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
@@ -67,7 +68,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [] });
   };
@@ -75,7 +76,8 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   app.post('/api/rooms/join', async (request, reply) => {
     try {
       requireOrigin(request); roomAssert(limiter.allow(`join:${request.ip}`, 120), 'RATE_LIMITED');
-      const joined = await gateway.join(request.body);
+      const signedIn = await personFromCookie(client, request.headers.cookie);
+      const joined = await gateway.join(request.body, signedIn ? { id: signedIn.person.id, name: signedIn.person.name, look: signedIn.person.look } : null);
       reply.header('set-cookie', roomCookie(config, joined.sessionId, joined.token, joined.expiresAt));
       return { ok: true, data: { sessionId: joined.sessionId } };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }

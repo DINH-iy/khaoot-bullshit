@@ -1,0 +1,42 @@
+/* Feedback tool of the test version: own neutral styling, above every game overlay. */
+.feedback-tab { position: fixed; right: 0; top: 42%; z-index: 1000; min-height: 0; padding: 10px 7px; border: 0; border-radius: 10px 0 0 10px;
+  writing-mode: vertical-rl; transform: rotate(180deg); font-size: .8rem; font-weight: 700; letter-spacing: .04em;
+  background: #2a1d5c; color: #fff; opacity: .8; box-shadow: 0 4px 14px rgb(0 0 0 / .25); transition: opacity .15s; }
+.feedback-tab:hover, .feedback-tab:focus-visible { opacity: 1; }
+
+.feedback-panel { position: fixed; right: 12px; bottom: 12px; z-index: 1001; width: min(400px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
+  margin: 0; padding: 18px; border-radius: 18px; border: 1px solid light-dark(#ddd6f3, #3a3550); background: light-dark(#fff, #1e1c28); color: light-dark(#202020, #f4f4f4);
+  box-shadow: 0 18px 50px rgb(0 0 0 / .35); font-family: system-ui, sans-serif; text-align: start; }
+.feedback-panel header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.feedback-panel h2 { margin: 0; font-size: 1.2rem; }
+.feedback-panel form { display: grid; gap: 14px; }
+.feedback-panel label { display: grid; gap: 6px; font-weight: 600; font-size: .95rem; }
+.feedback-panel small { font-weight: 400; opacity: .7; }
+.feedback-panel input:not([type=radio]), .feedback-panel textarea { width: 100%; min-height: 44px; padding: 10px; border-radius: 9px; border: 1px solid light-dark(#8a8a8a, #888); background: light-dark(#fff, #14131b); color: inherit; font: inherit; font-weight: 400; }
+.feedback-panel textarea { min-height: 90px; resize: vertical; }
+.feedback-panel button { min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 0; background: #6d3fd6; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.feedback-panel button.quiet { background: light-dark(#f1edfb, #2c2840); color: inherit; font-weight: 600; }
+.feedback-panel button:disabled { opacity: .55; cursor: default; }
+.feedback-panel .feedback-close { min-width: 44px; padding: 0; background: transparent; color: inherit; font-size: 1.6rem; line-height: 1; }
+.feedback-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; border: 0; }
+.feedback-kinds legend { padding: 0 0 6px; font-weight: 600; font-size: .95rem; }
+.feedback-kinds label { position: relative; display: block; padding: 8px 12px; border-radius: 999px; border: 2px solid light-dark(#e3def2, #3a3550); font-size: .88rem; cursor: pointer; }
+.feedback-kinds label.chosen { border-color: #6d3fd6; background: light-dark(#f1edfb, #2c2840); }
+.feedback-kinds input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.feedback-kinds label:has(input:focus-visible) { outline: 3px solid #6d3fd6; outline-offset: 2px; }
+.feedback-elements { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: light-dark(#f7f5fc, #25222f); }
+.feedback-elements p { margin: 0; font-size: .9rem; }
+.feedback-elements ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.feedback-elements li { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; font-size: .85rem; }
+.feedback-elements li span { display: grid; min-width: 0; } .feedback-elements li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-elements code { font-size: .75rem; opacity: .75; overflow-wrap: anywhere; }
+.feedback-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.feedback-note { margin: 0; font-size: .78rem; opacity: .7; line-height: 1.4; }
+.feedback-sent p { margin: 0 0 14px; }
+
+.feedback-picker-bar { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 1002; display: flex; gap: 12px; align-items: center;
+  padding: 8px 8px 8px 16px; border-radius: 999px; background: #2a1d5c; color: #fff; font: 600 .95rem system-ui, sans-serif; box-shadow: 0 10px 30px rgb(0 0 0 / .35); white-space: nowrap; }
+.feedback-picker-bar button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 0; background: #ffcf4a; color: #2a1d00; font: inherit; cursor: pointer; }
+.feedback-picker-box { position: fixed; z-index: 1001; pointer-events: none; border: 2px solid #ff3d7f; border-radius: 4px; background: rgb(255 61 127 / .12); }
+.feedback-picker-box span { position: absolute; left: -2px; bottom: 100%; max-width: 80vw; padding: 2px 6px; border-radius: 4px 4px 0 0; background: #ff3d7f; color: #fff; font: 600 .72rem ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { .feedback-tab { transition: none; } }

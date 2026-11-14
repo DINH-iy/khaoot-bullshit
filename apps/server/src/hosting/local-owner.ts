@@ -1,54 +1,29 @@
 import { gameFacts } from './game-facts.js';
-import { createHash, timingSafeEqual } from 'node:crypto';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, GameIdSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, type RoomReply } from '@party/contracts';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { ClaimRoomSchema, GameIdSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash } from '../game/definition.js';
 import { allStages, maxPathStages } from '../game/graph.js';
-import { GameError } from '../game/errors.js';
 import { createGameService } from '../game/service.js';
 import { builtInGames } from '../game/templates.js';
 import { createAuthoring } from '../authoring/drafts.js';
 import type { EditorLive } from '../authoring/live.js';
 import { lockRoom, makeRoomCode } from '../rooms/gateway.js';
-import { allowedOrigin, joinToken, namedCookie, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
+import { joinToken, newToken, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
+import { OWNER_COOKIE, type OwnerAccess } from './owner-access.js';
 
 // Local owner hosting: the person running this server opens a private link and
-// hosts built-in games from the browser. It is an explicit non-production
-// stand-in for creator sign-in. Config refuses the token in production, and the
+// hosts built-in games from the browser (owner access: ./owner-access.ts). The
 // rooms it creates carry LOCAL_REHEARSAL grants that production rejects anyway.
-const OWNER_COOKIE = 'party_owner';
 const OWNER = { issuer: 'urn:local-owner', subject: 'owner' };
 const HOST_ACCESS_MS = 8 * 60 * 60 * 1000;
-const digest = (value: string) => createHash('sha256').update(value).digest();
 
-export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, live?: EditorLive) {
-  const limiter = new RateLimiter(1024);
+export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess, live?: EditorLive) {
+  const { fail, guard, isOwner, requireOwner } = owner;
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
   const authoring = createAuthoring(client);
   const secure = config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : '';
-  const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422 };
-  const fail = (reply: FastifyReply, error: unknown) => {
-    const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
-    app.log.warn({ event: 'host_request_rejected', code }, 'Host request rejected');
-    return reply.code(status[code] ?? (code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
-  };
-  // Each limit has its own counter: a strict key-guessing limit on signing in
-  // must not be used up by the owner's ordinary menu and room requests.
-  // Editing saves every few keystrokes, and people editing together can share one address.
-  const guard = (request: FastifyRequest, bucket: 'menu' | 'claim' | 'edit' = 'menu') => {
-    roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
-    roomAssert(limiter.allow(`host-${bucket}:${request.ip}`, bucket === 'claim' ? 20 : bucket === 'edit' ? 600 : 120), 'RATE_LIMITED');
-    roomAssert(config.NODE_ENV !== 'production' && config.LOCAL_OWNER_TOKEN && config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE');
-    return { ownerToken: config.LOCAL_OWNER_TOKEN, roomSecret: config.ROOM_TOKEN_SECRET };
-  };
-  const isOwner = (expected: string, candidate: string | undefined) => candidate !== undefined && timingSafeEqual(digest(candidate), digest(expected));
-  const requireOwner = (request: FastifyRequest, bucket: 'menu' | 'edit' = 'menu') => {
-    const settings = guard(request, bucket);
-    roomAssert(isOwner(settings.ownerToken, namedCookie(request.headers.cookie, OWNER_COOKIE)), 'UNAUTHORIZED');
-    return settings;
-  };
   const ownerCreator = () => client.creator.upsert({ where: { issuer_subject: OWNER }, create: OWNER, update: {} });
   async function versionFor(creatorId: string, game: (typeof builtInGames)[number]): Promise<string> {
     const hash = contentHash(game.definition);

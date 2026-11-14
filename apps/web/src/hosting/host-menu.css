@@ -38,3 +38,4 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .game-detail button.big { width: 100%; min-height: 56px; font-size: 1.15rem; font-weight: 800; border-radius: 14px; background: #ffcf4a; color: #2a1d00; border: 0; }
 
 @media (max-width: 820px) { .game-picker { grid-template-columns: 1fr; } .game-detail { position: static; order: -1; } main.host-page { padding: 12px 16px 40px; } .host-hero { padding: 22px; } }
+.host-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }

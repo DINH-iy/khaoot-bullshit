@@ -7,6 +7,9 @@ export * from './presentation.js';
 export * from './minigames.js';
 export * from './players.js';
 export * from './drawing.js';
+export * from './feedback.js';
+export * from './people.js';
+export * from './side-games.js';
 
 export const ProblemSchema = z.object({
   error: z.object({

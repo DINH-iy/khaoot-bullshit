@@ -17,7 +17,7 @@ it('upgrades populated initial tables without losing existing game data', async 
   try {
     const directory = new URL('../../database/migrations/', import.meta.url);
     const migrations = (await readdir(directory, { withFileTypes: true })).filter(item => item.isDirectory()).map(item => item.name).sort();
-    expect(migrations).toHaveLength(10);
+    expect(migrations).toHaveLength(12);
     await pool.query(await readFile(new URL(`${migrations[0]}/migration.sql`, directory), 'utf8'));
     const { rows: creators } = await pool.query('INSERT INTO creators (issuer, subject) VALUES ($1, $2) RETURNING id', ['https://identity.example/', randomUUID()]);
     const { rows: games } = await pool.query('INSERT INTO games ("creatorId", title) VALUES ($1, $2) RETURNING id', [creators[0].id, 'Preserved game']);
@@ -29,6 +29,8 @@ it('upgrades populated initial tables without losing existing game data', async 
     expect((await pool.query("SELECT to_regclass('stage_judgments') AS name")).rows).toEqual([{ name: 'stage_judgments' }]);
     // Player looks are optional: earlier players keep the default look made from their ID.
     expect((await pool.query("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'session_players' AND column_name = 'look'")).rows).toEqual([{ is_nullable: 'YES' }]);
+    // Feedback is a table of its own: adding it leaves every game table as it was.
+    expect((await pool.query("SELECT to_regclass('feedback_items') AS name")).rows).toEqual([{ name: 'feedback_items' }]);
   } finally {
     await pool.end();
     await admin.query(`DROP DATABASE "${name}"`);

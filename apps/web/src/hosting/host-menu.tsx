@@ -57,6 +57,6 @@ export function HostMenu() {
           <button className="small-button" disabled={busy} aria-label={`Return to room ${room.roomCode}`} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>Return to room</button></li>)}</ul>
       </section>}
     </>}
-    <p><a href="/">Join a game as a player instead</a></p>
+    <p className="host-links"><a href="/">Join a game as a player instead</a>{menu && <><a href="/?admin">Admin: feedback from testers</a><a href="/?admin=people">Admin: people (accounts)</a></>}</p>
   </main>;
 }

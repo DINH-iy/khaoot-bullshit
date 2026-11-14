@@ -10,6 +10,10 @@ import { RequestMetrics, now } from './observability.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 import { registerRoomNetworking } from './rooms/network.js';
 import { registerLocalHosting } from './hosting/local-owner.js';
+import { createOwnerAccess } from './hosting/owner-access.js';
+import { registerFeedbackRoutes } from './feedback/routes.js';
+import { registerPeopleRoutes } from './people/routes.js';
+import { registerSideGames } from './side-games/routes.js';
 import { createEditorLive } from './authoring/live.js';
 import { registerAssetRoutes } from './assets/routes.js';
 import staticFiles from '@fastify/static';
@@ -109,7 +113,13 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   if (options.database?.client && config.ROOM_TOKEN_SECRET) registerAssetRoutes(app, options.database.client, config);
   // Editing together shares the rooms' socket server, under its own namespace and its own tickets.
   const live = rooms && config.ROOM_TOKEN_SECRET ? createEditorLive(rooms.io, config.ROOM_TOKEN_SECRET, app.log) : undefined;
-  if (options.database?.client) registerLocalHosting(app, options.database.client, config, live);
+  if (options.database?.client) {
+    const owner = createOwnerAccess(app, config);
+    registerLocalHosting(app, options.database.client, config, owner, live);
+    registerFeedbackRoutes(app, options.database.client, config, owner);
+    registerPeopleRoutes(app, options.database.client, config, owner);
+    if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway);
+  }
   if (config.SERVE_WEB) {
     void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: false, index: false, cacheControl: false });
     app.get('/', async (_request, reply) => reply.sendFile('index.html'));

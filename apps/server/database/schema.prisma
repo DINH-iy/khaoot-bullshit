@@ -170,6 +170,8 @@ model SessionPlayer {
   joinedAt    DateTime  @default(now()) @db.Timestamptz(3)
   leftAt      DateTime? @db.Timestamptz(3)
   joinKeyHash String?   @unique @db.Char(64)
+  // The person (account the owner made) this seat belongs to; null for guests.
+  personId    String?   @db.Uuid
   // The player's own look: built-in character parts, validated by PlayerLookSchema. Null means the default made from the ID.
   look        Json?     @db.JsonB
 
@@ -180,8 +182,14 @@ model SessionPlayer {
   scores      ScoreEntry[]
   judgments   StageJudgment[]
   assets      Asset[]
+  person      Person?            @relation(fields: [personId], references: [id], onDelete: Restrict)
+  chips       ChipEntry[]
+  sideRounds  SideRound[]
+  items       CollectedItem[]
 
   @@unique([sessionId, id])
+  // A person has at most one seat per room: joining again continues it.
+  @@unique([sessionId, personId])
   @@map("session_players")
 }
 
@@ -476,4 +484,150 @@ model OutboxEvent {
   @@unique([sessionId, revision, eventIndex, audienceKey])
   @@index([publishedAt, availableAt])
   @@map("outbox_events")
+}
+
+enum FeedbackKind {
+  BUG
+  FEATURE
+  MINIGAME
+}
+
+enum FeedbackStatus {
+  NEW
+  PLANNED
+  IN_PROGRESS
+  DONE
+  DECLINED
+}
+
+// Reports from people trying the test version. The id is chosen by the sending
+// browser, so a retried send is stored once. Context (page, pointed-at
+// elements and where they are in the web code) is validated by the contract.
+model FeedbackItem {
+  id           String         @id @db.Uuid
+  kind         FeedbackKind
+  status       FeedbackStatus @default(NEW)
+  title        String         @db.VarChar(140)
+  details      String         @db.Text
+  reporterName String?        @db.VarChar(60)
+  context      Json           @db.JsonB
+  ownerNote    String?        @db.Text
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@map("feedback_items")
+}
+
+// People: accounts the owner makes so a phone always joins as the same person
+// (name, look, chips across games). A personal link signs a phone in once; each
+// phone then holds its own device key. Players without one join as guests.
+model Person {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @db.VarChar(40)
+  // Lower-case name: two people cannot share a name.
+  nameKey   String    @unique @db.VarChar(40)
+  // SHA-256 of the current personal link; a new link replaces it.
+  linkHash  String    @unique @db.Char(64)
+  look      Json?     @db.JsonB
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  removedAt DateTime? @db.Timestamptz(3)
+
+  devices PersonDevice[]
+  players SessionPlayer[]
+  chips   ChipEntry[]
+  rounds  SideRound[]
+  items   CollectedItem[]
+
+  @@map("people")
+}
+
+model PersonDevice {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  personId   String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@index([personId])
+  @@map("person_devices")
+}
+
+enum ChipReason {
+  START
+  REFILL
+  BET
+  PAYOUT
+}
+
+// Play chips (never money) as an append-only ledger. The wallet is the
+// person's when personId is set (it carries over between games), otherwise the
+// guest seat's (this room only). playerId and sessionId record where it happened.
+model ChipEntry {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String     @db.Uuid
+  playerId  String     @db.Uuid
+  personId  String?    @db.Uuid
+  roundId   String?    @db.Uuid
+  game      String?    @db.VarChar(20)
+  reason    ChipReason
+  amount    Int
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+
+  player SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  person Person?       @relation(fields: [personId], references: [id], onDelete: Restrict)
+  round  SideRound?    @relation(fields: [roundId], references: [id], onDelete: Restrict)
+
+  @@index([personId])
+  @@index([playerId])
+  @@index([sessionId])
+  @@map("chip_entries")
+}
+
+// One go at a side game: a spin, a pack, or a blackjack hand (which can take
+// several moves). The id is chosen by the phone, so a retried request is one go.
+// `state` is server-only (the dealer's hidden card); `step` orders the moves.
+model SideRound {
+  id        String   @id @db.Uuid
+  sessionId String   @db.Uuid
+  playerId  String   @db.Uuid
+  personId  String?  @db.Uuid
+  game      String   @db.VarChar(20)
+  finished  Boolean  @default(false)
+  step      Int      @default(0)
+  bet       Int
+  payout    Int      @default(0)
+  state     Json     @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  player SessionPlayer   @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  person Person?         @relation(fields: [personId], references: [id], onDelete: Restrict)
+  chips  ChipEntry[]
+  items  CollectedItem[]
+
+  @@index([playerId, game, finished])
+  @@map("side_rounds")
+}
+
+// Items from opened packs, owned like chips (person, else guest seat).
+model CollectedItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String   @db.Uuid
+  playerId  String   @db.Uuid
+  personId  String?  @db.Uuid
+  roundId   String   @db.Uuid
+  itemKey   String   @db.VarChar(40)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  player SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  person Person?       @relation(fields: [personId], references: [id], onDelete: Restrict)
+  round  SideRound     @relation(fields: [roundId], references: [id], onDelete: Restrict)
+
+  @@index([personId])
+  @@index([playerId])
+  @@map("collected_items")
 }

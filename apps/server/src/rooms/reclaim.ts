@@ -20,6 +20,8 @@ export const RoomStateSchema = z.object({
   // Breaks: whether players may vote for one, how many must agree, who has voted, and when the running break began.
   breakVotes: z.boolean().default(true), breakPercent: z.number().int().min(10).max(100).default(50), breakVoters: z.array(GameIdSchema).max(200).default([]), breakStartedAt: z.string().datetime().nullable().default(null),
   reactionLimit: z.number().int().min(1).max(30).default(10), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).default(REACTIONS.map((_, index) => index)),
+  // Side games on the phones while waiting (on unless the host switches them off).
+  sideGames: z.boolean().default(true),
   seatRequests: z.array(RequestSchema).max(50).default([]),
 }).strict();
 export type RoomState = z.infer<typeof RoomStateSchema>;
@@ -101,7 +103,7 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices'>>) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames'>>) {
       roomAssert(principal.role === 'host', 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);

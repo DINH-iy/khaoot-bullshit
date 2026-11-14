@@ -1,0 +1,40 @@
+/* Admin menu: a wide working page for the owner. */
+main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
+.admin-head { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
+.admin-head h1 { margin: 0 0 6px; } .admin-head p { margin: 0; max-width: 46rem; }
+.admin-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 24px 0 16px; }
+.admin-filters label { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; }
+.admin-filters input, .admin-filters select { min-height: 44px; }
+.admin-page select { min-height: 40px; padding: 6px 10px; border-radius: 8px; border: 1px solid light-dark(#8a8a8a, #888); background: light-dark(#fff, #171717); color: inherit; font: inherit; }
+.admin-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-page button.quiet, .admin-chips button { background: light-dark(#f1edfb, #2c2840); color: inherit; border: 1px solid light-dark(#e3def2, #3a3550); }
+.admin-chips button[aria-pressed=true] { background: #6d3fd6; color: #fff; border-color: #6d3fd6; }
+.admin-chips span { margin-left: 4px; padding: 0 7px; border-radius: 999px; background: rgb(0 0 0 / .12); font-size: .8rem; }
+.admin-page button.danger { background: transparent; color: light-dark(#9d1717, #ffb4b4); border: 1px solid currentColor; }
+.admin-empty { opacity: .7; }
+.admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.admin-item { margin: 0; padding: 16px 18px; border-radius: 16px; border: 1px solid light-dark(#e3def2, #3a3550); border-left: 6px solid #6d3fd6; background: light-dark(#fff, #1e1c28); display: grid; gap: 10px; }
+.admin-item.kind-bug { border-left-color: #d6336c; } .admin-item.kind-minigame { border-left-color: #f0a400; }
+.admin-item-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.admin-item-head h2 { flex: 1; min-width: 12rem; margin: 0; font-size: 1.1rem; }
+.admin-kind { padding: 3px 10px; border-radius: 999px; background: light-dark(#f1edfb, #2c2840); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.admin-meta { margin: 0; font-size: .85rem; opacity: .75; }
+.admin-details { margin: 0; white-space: pre-wrap; }
+.admin-elements { list-style: none; margin: 0; padding: 10px 12px; border-radius: 10px; background: light-dark(#f7f5fc, #25222f); display: grid; gap: 10px; }
+.admin-elements li { margin: 0; display: grid; gap: 2px; font-size: .88rem; line-height: 1.4; }
+.admin-elements code { font-size: .82rem; overflow-wrap: anywhere; } .admin-elements small { opacity: .75; overflow-wrap: anywhere; }
+.admin-selector { font-family: ui-monospace, monospace; font-size: .75rem; }
+.admin-note { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; } .admin-note textarea { min-height: 56px; font-weight: 400; }
+.admin-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 700px) { main.admin-page { padding: 12px 16px 40px; } .admin-head { flex-direction: column; } }
+.admin-nav { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.admin-nav a[aria-current=page] { font-weight: 800; text-decoration: none; }
+.admin-intro { margin: 16px 0; max-width: 46rem; }
+.person-add { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 0 0 20px; } .person-add label { min-width: 16rem; }
+.person-link { display: grid; gap: 10px; justify-items: start; } .person-link h2 { margin: 0; } .person-link p { margin: 0; max-width: 44rem; }
+.person-link img { border-radius: 12px; background: #fff; image-rendering: pixelated; }
+.person-url code { overflow-wrap: anywhere; font-size: .85rem; }
+.people-table-wrap { overflow-x: auto; }
+.people-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.people-table th, .people-table td { padding: 10px 8px; border-bottom: 1px solid light-dark(#e3def2, #3a3550); text-align: left; vertical-align: middle; }
+.people-table .admin-actions { justify-content: flex-start; flex-wrap: nowrap; }

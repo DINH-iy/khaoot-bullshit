@@ -41,9 +41,63 @@ npm run host
 - `apps/server`: Fastify API, authentication enforcement, logs and instrumentation.
 - `packages/contracts`: public runtime schemas/types; no secrets or privileged engine code.
 
-The room screens (phone, host, shared display) have a first party design: join card, lobby with QR and big room code, colour-coded answers, a host control panel and results bars. The admin dashboard remains unbuilt.
+The room screens (phone, host, shared display) have a first party design: join card, lobby with QR and big room code, colour-coded answers, a host control panel and results bars. The admin dashboard is partly built: feedback and people (see the instructions below).
 
-Detailed deployment notes live in [docs/deployment/raspberry-pi.md](docs/deployment/raspberry-pi.md). The target is a home-hosted Raspberry Pi 4 (8 GB) or NUC, with PostgreSQL and SSD-backed persistent storage. A local Docker PostgreSQL setup and migrations are available; nothing has been deployed to the home server. Folder and contributor conventions are in [AGENTS.md](AGENTS.md).
+## Instructions: test version, feedback, people and side games
+
+Step by step for the owner. Starting, checking and stopping everything is in [Running the party game](docs/guides/running.md).
+
+### 1. Put out a test version for other people
+
+1. Once: `npm ci`, `npm run db:env`, `npm run db:up`. After pulling new code, every time: `npm run db:migrate:deploy` (it only adds what is new).
+2. `npm run build`, then `npm run network:public`. It prints `PUBLIC ADDRESS: https://….trycloudflare.com` and opens the host menu, signed in as you.
+3. Testers open that address on their phone or computer. Players join a room with the room code or the QR code.
+4. The address changes every time the test link starts. Send the new one each time. Lost the host tab? `npm run host:link`.
+
+### 2. Feedback: bugs, wishes and minigame ideas
+
+For testers (no account needed):
+
+1. Tap **Feedback** on the right edge of any screen.
+2. Choose *Something is broken*, *Idea or wish* or *Minigame idea*, and give it a title (and details if you like).
+3. Optional: **Point at something**, then tap the thing on the screen you mean. The tap picks it instead of pressing it. Up to five things.
+4. Optional: your name (the phone remembers it). **Send**.
+
+For you: open **Admin: feedback from testers** at the bottom of the host menu (`/?admin`).
+
+- Filter by kind, status (open, all, new, planned, in progress, done, declined) and text.
+- Change a report's status or kind, write a note, or delete it.
+- **Copy as text** (one report) or **Copy N as text** (everything shown) gives a description with the screen, the page and, for each pointed-at thing, the file and line in the code (for example `JoinScreen in apps/web/src/network/room-screen.tsx:38`). Paste that into a request to fix it.
+
+What a report keeps: the page address without the part after `#` (so never a key), the screen (player phone, host screen, shared screen, editor…), its size, the browser, and for each pointed-at thing its text, where it sits in the page and its file and line. Nothing typed into the game. The file and line come from the build, which writes them onto every element (`apps/web/tooling/source-tags.ts`, about 2% more download; `PARTY_SOURCE_TAGS=off npm run build` leaves them out). Limits: 30 reports a minute and 200 an hour per address (testers coming in through the test link count as one address), at most 5000 unhandled reports, no screenshots.
+
+### 3. People: accounts so you are always yourself
+
+1. Host menu → **Admin: people (accounts)** (`/?admin=people`).
+2. Type a name (for example *Dinny*) → **Add person**. A personal link and its QR code appear, **only this once**.
+3. Open the link on that person's phone: scan the QR code or send the link. The phone says "This phone now plays as Dinny".
+4. From then on that phone joins every room as Dinny: the name is filled in, the character comes back, and the chips carry over between games. Joining the same room from a second phone of the same person continues the same seat.
+5. On a phone, **Not Dinny?** on the join screen signs that phone out.
+
+In the People list: **New link** (the old link stops working; phones already signed in stay signed in), **Rename**, **Sign out phones** (all of that person's phones become guests), **Remove** (signs out, frees the name; past games and chips stay in the history). The list shows phones, last seen, games played, chips and how much they bet in total.
+
+Good to know:
+
+- Anyone with a personal link can become that person: send it only to them. There are no passwords.
+- A phone's sign-in belongs to one address. The temporary test link gets a new address at every start, so on a new address people need a new link (**New link**, then send it). This goes away with the fixed home-server domain.
+- Players without a personal link still join as guests by typing a name.
+
+### 4. Side games on the phones
+
+Players play on their own phone while waiting: in the lobby, between rounds, after answering, during a break.
+
+- Bottom bar → **Games**: **Slot machine**, **Blackjack**, **Packs** (open packs, collect 15 items in four rarities) and the **Leaderboard**.
+- Chips are play money only. Everyone starts with 1000. When they are almost out, **Broke? Get 500**; the leaderboard counts how often.
+- People (accounts) keep their chips across games; guests' chips are for that room only.
+- The leaderboard shows this room and all time (people only): bet in total, net result, chips now, best win.
+- **Pausing**: as soon as a round needs the player (a question to answer, a vote, a minigame, picking teams), the side game closes with "Round started: your side game is paused" and the button says *Games paused*. An unfinished blackjack hand waits until the next time. The server refuses side-game moves while the player is needed, so this cannot be skipped.
+- The host can switch side games off for a room: host screen → Room settings → *Side games on the phones while waiting*. On by default.
+- What pays and the chances are shown in each game. The slot machine pays back about 94 of every 100 chips bet, blackjack pays 3 to 2 for a blackjack (dealer stands on 17, doubling on the first two cards, no splitting), packs never pay chips back. The server draws every card, reel and pack.
 
 ## Authentication boundary
 
@@ -106,4 +160,4 @@ npm run db:test           # migration and integration checks
 npm run db:test:stop
 ```
 
-Use Prisma **7.10.1** commands, not the current Prisma 8 prerelease workflow. There are six migrations; the latest two add the stage reveal time and uploaded media. Uploaded files are stored in `.local/media` (or `MEDIA_DIR`), not in the database. `npm run db:migrate:create -- --name describe_change` generates SQL for review; `npm run db:migrate:dev` applies it to a guarded local development database. `npm run db:generate` is also run by root build/test/typecheck commands. No database is reset or migrated automatically by the web server.
+Use Prisma **7.10.1** commands, not the current Prisma 8 prerelease workflow. There are twelve migrations; the latest two add feedback reports, and people with side-game chips. Uploaded files are stored in `.local/media` (or `MEDIA_DIR`), not in the database. `npm run db:migrate:create -- --name describe_change` generates SQL for review; `npm run db:migrate:dev` applies it to a guarded local development database. `npm run db:generate` is also run by root build/test/typecheck commands. No database is reset or migrated automatically by the web server.

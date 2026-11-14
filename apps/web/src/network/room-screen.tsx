@@ -20,6 +20,7 @@ import { BreakOverlay, FinaleShow, WheelBadge, WheelOverlay } from '../room-extr
 import { formatPoints } from './results.js';
 import { Avatar, RoomSessionContext } from '../players/avatar.js';
 import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js';
+import { useMe, type Person } from '../people/use-me.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 
@@ -28,9 +29,10 @@ const access = new URLSearchParams(initial.hash.slice(1)).get('access');
 if (access) history.replaceState(null, '', `${initial.pathname}${initial.search}`);
 
 /** Joining from a phone: room code and name, plus seat takeover and a way to host instead. */
-function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title }: {
+function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title, person, linked, onForget }: {
   roomCode: string; setRoomCode: (value: string) => void; name: string; setName: (value: string) => void; busy: boolean; error: string; onJoin: () => void; onReclaim: () => void;
   style: React.CSSProperties; className: string; title: string | null;
+  person: Person | null | undefined; linked: { name: string | null } | null; onForget: () => void;
 }) {
   const t = useText();
   return <main className={`room room-join ${className}`} style={style}>
@@ -38,9 +40,11 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
       <p className="brand">party<span>.</span></p>
       <h1 id="join-heading">{t('join.title')}</h1>{title && <p className="room-game">{title}</p>}
       {error && <p role="alert" className="error">{error}</p>}
+      {linked && <p role="status" className={linked.name ? 'person-linked' : 'error'}>{linked.name ? `This phone now plays as ${linked.name}. Join any room and you are ${linked.name}.` : 'This personal link no longer works. Ask the organiser for a new one.'}</p>}
       <form onSubmit={event => { event.preventDefault(); onJoin(); }}>
         <label>{t('join.code')}<input className="code-input" autoComplete="off" autoCapitalize="characters" value={roomCode} onChange={event => setRoomCode(event.target.value)} maxLength={6} required placeholder="ABC123" /></label>
-        <label>{t('join.name')}<input autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} maxLength={40} required /></label>
+        {person ? <div className="person-badge"><span>Playing as <strong>{person.name}</strong></span><button type="button" className="link-button" onClick={onForget}>Not {person.name}?</button></div>
+          : <label>{t('join.name')}<input autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} maxLength={40} required /></label>}
         <button className="primary" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
       <p className="join-links">{t('join.reclaim')} <button type="button" className="link-button" onClick={onReclaim}>{t('join.reclaimButton')}</button></p>
@@ -55,6 +59,7 @@ export function RoomScreen() {
   const [error, setError] = useState(''); const [busy, setBusy] = useState(Boolean(access)); const [ready, setReady] = useState(!access);
   const [draft, setDraft] = useState(emptyDraft(null)); const [editingLook, setEditingLook] = useState(false); const [displayUrl, setDisplayUrl] = useState(''); const [timerSeconds, setTimerSeconds] = useState('30'); const [reclaiming, setReclaiming] = useState(false);
   const room = useRoom(ready ? sessionId : undefined, initial.searchParams.get('display') === '1'); const state = room.snapshot;
+  const account = useMe();
   useEffect(() => {
     if (!access || !sessionId) return; let mounted = true;
     void roomApi(`/api/rooms/${sessionId}/claim`, { token: access }).then(() => { if (mounted) setReady(true); }).catch(() => { if (mounted) setError('Host/display access could not be verified. Open a fresh access link.'); }).finally(() => { if (mounted) setBusy(false); });
@@ -69,7 +74,8 @@ export function RoomScreen() {
       try { joinId = localStorage.getItem(key); } catch { /* Online join can still work. */ }
       if (!joinId) { joinId = newId(); try { localStorage.setItem(key, joinId); } catch { /* optional recovery */ } }
       const look = savedLook();
-      const result = await roomApi<{ sessionId: string }>('/api/rooms/join', { roomCode, displayName: name, joinId, ...(look ? { look } : {}) });
+      // A person joins under their own name (the server decides), with the look they had last time unless this phone has its own.
+      const result = await roomApi<{ sessionId: string }>('/api/rooms/join', { roomCode, displayName: account.person?.name ?? name, joinId, ...(look ? { look } : {}) });
       history.replaceState(null, '', `/?room=${result.sessionId}`); setReady(true); setSessionId(result.sessionId);
     } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error ? cause.message : 'Joining failed. Please retry.'); } finally { setBusy(false); }
   };
@@ -101,7 +107,8 @@ export function RoomScreen() {
   useMoment(playersRef, 'lobbyJoin', state?.view.status === 'LOBBY' && state.players.length ? state.players.length : null, {}, look);
 
   if (!sessionId && reclaiming) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">Join a game</h1><div className="join-card"><SeatReclaim roomCode={roomCode.trim().toUpperCase()} onCancel={() => setReclaiming(false)} onJoined={id => { history.replaceState(null, '', `/?room=${id}`); setReady(true); setSessionId(id); }} /></div></main>;
-  if (!sessionId) return <LookContext.Provider value={look}><JoinScreen style={lookStyle} className={lookClass} title={joinLook?.title ?? null} roomCode={roomCode} setRoomCode={setRoomCode} name={name} setName={setName} busy={busy} error={error} onJoin={() => { void join(); }} onReclaim={() => { setError(''); setReclaiming(true); }} /></LookContext.Provider>;
+  if (!sessionId) return <LookContext.Provider value={look}><JoinScreen style={lookStyle} className={lookClass} title={joinLook?.title ?? null} roomCode={roomCode} setRoomCode={setRoomCode} name={name} setName={setName} busy={busy} error={error} onJoin={() => { void join(); }} onReclaim={() => { setError(''); setReclaiming(true); }}
+    person={account.person} linked={account.linked} onForget={() => { void account.forget().catch(() => setError('Could not sign this phone out. Try again.')); }} /></LookContext.Provider>;
 
   const sorted = [...room.samples].sort((a, b) => a - b); const p95 = sorted[Math.max(0, Math.ceil(sorted.length * .95) - 1)];
   const seconds = Number(timerSeconds); const validSeconds = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600;

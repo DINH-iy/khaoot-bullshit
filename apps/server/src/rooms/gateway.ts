@@ -57,7 +57,8 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
       roomAssert(config.NODE_ENV !== 'production' || credential.source !== 'LOCAL_REHEARSAL', 'UNAUTHORIZED');
       return { expiresAt: credential.expiresAt, display: credential.role === 'DISPLAY' };
     },
-    async join(input: unknown) {
+    /** Joins a room. A person (signed-in phone) joins under their own name, and a second phone of theirs continues their seat. */
+    async join(input: unknown, person: { id: string; name: string; look: unknown } | null = null) {
       const parsed = JoinRoomSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE'); const data = parsed.data;
       const room = await client.gameSession.findUnique({ where: { roomCode: data.roomCode }, select: { id: true } });
@@ -75,9 +76,22 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
           roomAssert(credential.expiresAt.getTime() > Date.now(), 'CREDENTIAL_EXPIRED');
           return { sessionId: room.id, token, expiresAt: credential.expiresAt };
         }
-        const player = await tx.sessionPlayer.create({ data: { sessionId: room.id, displayName: data.displayName, joinKeyHash, // A picture is never taken over at joining: it would belong to another room (or someone else). Only the character parts.
-          ...(data.look ? { look: (({ picture: _picture, ...parts }) => parts)(data.look) } : {}) } });
         const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
+        if (person) {
+          const seat = await tx.sessionPlayer.findUnique({ where: { sessionId_personId: { sessionId: room.id, personId: person.id } } });
+          if (seat) {
+            // The host removed this person from the room: they stay out.
+            roomAssert(!seat.leftAt, 'SEAT_DENIED');
+            const previous = await tx.playerCredential.findUnique({ where: { tokenHash: tokenHash(token) } });
+            if (previous) { roomAssert(!previous.revokedAt && previous.expiresAt.getTime() > Date.now(), 'UNAUTHORIZED'); return { sessionId: room.id, token, expiresAt: previous.expiresAt }; }
+            await tx.playerCredential.create({ data: { sessionId: room.id, playerId: seat.id, tokenHash: tokenHash(token), expiresAt } });
+            await recordRoomChange(tx, room.id, 'player.rejoined');
+            return { sessionId: room.id, token, expiresAt };
+          }
+        }
+        // A picture is never taken over at joining: it would belong to another room (or someone else). Only the character parts.
+        const look = data.look ? (({ picture: _picture, ...parts }) => parts)(data.look) : person?.look ?? null;
+        const player = await tx.sessionPlayer.create({ data: { sessionId: room.id, displayName: person?.name ?? data.displayName, joinKeyHash, personId: person?.id ?? null, ...(look ? { look } : {}) } });
         await tx.playerCredential.create({ data: { sessionId: room.id, playerId: player.id, tokenHash: tokenHash(token), expiresAt } });
         await recordRoomChange(tx, room.id, 'player.joined');
         return { sessionId: room.id, token, expiresAt };

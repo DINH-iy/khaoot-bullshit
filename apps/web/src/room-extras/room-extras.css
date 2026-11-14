@@ -95,3 +95,4 @@
 .room-display .room-connection .ghost, .room-display .conn-details, .room-display .conn.conn-ok { display: none; }
 .room-display .room-bar { padding-block: 10px; }
 @media (prefers-reduced-motion: reduce) { .break-icon, .wheel-disc, .finale-slide, .wheel-result.shown { animation: none; } .wheel-disc { transform: rotate(var(--turn)); } }
+.room .phone-dock button[aria-disabled=true] { opacity: .5; }

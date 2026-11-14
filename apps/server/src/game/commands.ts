@@ -124,7 +124,9 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     // A picture must be this player's own, stored as a picture, of the right kind.
     const picture = command.look.picture;
     if (picture) requireGame(await tx.asset.count({ where: { id: picture.assetId, sessionId: session.id, playerId: actor.playerId, purpose: 'AVATAR', removedAt: null, kind: picture.kind === 'photo' ? 'IMAGE' : 'DRAWING' } }) === 1, 'INVALID_COMMAND');
-    await tx.sessionPlayer.update({ where: { id: actor.playerId }, data: { look: command.look } });
+    const seat = await tx.sessionPlayer.update({ where: { id: actor.playerId }, data: { look: command.look } });
+    // A person keeps their character for the next game (the parts only; a picture belongs to this room).
+    if (seat.personId) { const { picture: _picture, ...parts } = command.look; await tx.person.update({ where: { id: seat.personId }, data: { look: parts } }); }
     return empty;
   }
   if (command.type === 'player.removePicture') {

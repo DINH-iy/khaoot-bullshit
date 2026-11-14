@@ -142,3 +142,7 @@
 .room.tiles-outline .tile:nth-of-type(8n+3), .room.tiles-outline .options-board li:nth-child(8n+3) { border-color: var(--a3); } .room.tiles-outline .tile:nth-of-type(8n+4), .room.tiles-outline .options-board li:nth-child(8n+4) { border-color: var(--a4); }
 .room.tiles-outline .tile:nth-of-type(8n+5), .room.tiles-outline .options-board li:nth-child(8n+5) { border-color: var(--a5); } .room.tiles-outline .tile:nth-of-type(8n+6), .room.tiles-outline .options-board li:nth-child(8n+6) { border-color: var(--a6); }
 .room.tiles-glass .tile, .room.tiles-glass .options-board li { backdrop-filter: blur(8px); box-shadow: inset 0 0 0 1px color-mix(in srgb, white 25%, transparent); }
+
+/* A phone signed in as a person joins under that name. */
+.person-badge { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--r-card-strong); }
+.person-linked { margin: 0; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--r-ok) 22%, transparent); }

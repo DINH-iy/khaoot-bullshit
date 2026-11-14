@@ -12,7 +12,7 @@ export const JoinRoomSchema = z.object({
 export const ClaimRoomSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict();
 export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.literal(true).optional() }).strict();
 export const NetworkErrorCodeSchema = z.enum([
-  ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED',
+  ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
@@ -20,7 +20,7 @@ export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()) }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
@@ -40,6 +40,8 @@ export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤�
 export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int().min(1).max(30),
   // `breakVotes`: players may vote for a break; it starts when `breakPercent` of the players agree. The host can always call one.
   breakVotes: z.boolean(), breakPercent: z.number().int().min(10).max(100),
+  // `sideGames`: slot machine, blackjack and packs on the phones while waiting.
+  sideGames: z.boolean(),
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();

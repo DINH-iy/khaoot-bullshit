@@ -13,7 +13,12 @@ Updated 13 November 2026. The owner's wishes and decisions, in build order. Deta
 - Running guide with `npm run status`, `npm run stop` and `npm run host:link`.
 - Editing a game together, live: other people's changes, selected scenes and pointers show at once; changes to different things are merged; undo/redo only affects your own steps. Everyone still opens the editor with the owner link.
 
+- People (accounts made by the owner, joined through a personal link) and side games on the phones while waiting: slot machine, blackjack, packs, a chips leaderboard for the room and all time; they pause when a round needs the player.
+- Feedback from testers: a Feedback tab on every screen (bug, wish, minigame idea, pointing at things on the screen, which records the file and line in the web code) and the first admin page, `/?admin`, to sort and copy the reports.
+
 ## Next, in order
+
+0. **Owner's requests of 13 November 2026** (entered in the feedback list; where they go in this order is for the owner to decide). Built: games on the phone while waiting with a gambling leaderboard, and accounts. Still to do: 1 v 1 challenges such as chess with a sped-up replay at the end; the minigames Galgje and Undercover / Mr. White; building scenes as customisable kits from shared mechanics. See [scenes from building blocks](../architecture/composable-scenes.md).
 
 1. **Own media in scenes:** pictures, sounds and music that the author uploads for scenes.
 2. **Own reactions and sounds** (needs step 1):
@@ -33,7 +38,7 @@ Updated 13 November 2026. The owner's wishes and decisions, in build order. Deta
 5. **Collaborators:**
    - invite someone to a game as editor or viewer (needs step 4)
    - live editing together is built; with accounts it shows real names and respects the viewer role
-6. **Admin dashboard** (owner only):
+6. **Admin dashboard** (owner only; the feedback page is built):
    - people and invites
    - all games
    - live rooms
@@ -49,6 +54,8 @@ Updated 13 November 2026. The owner's wishes and decisions, in build order. Deta
 | Domain details for the home server | To follow from the owner |
 
 ## Known limits of what is built
+
+- A phone's sign-in as a person belongs to one address: after the temporary test link restarts (new address), people need a new personal link.
 
 - "Most reactions" in the awards counts only since the last server start.
 - A screen that connects in the middle of a Pass the pencil turn sees that turn's earlier strokes only once the turn is saved.

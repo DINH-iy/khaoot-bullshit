@@ -76,6 +76,8 @@ Legend: **Built** · **Parts ready** (can be made in the editor now, maybe as a 
 | Shake it | Shake the phone fastest | New mechanic: motion sensors (needs permission on iPhone) |
 | Balance | Keep a ball in the middle by tilting the phone | New mechanic: motion sensors |
 | Rhythm | Tap on the beat of a song | New mechanic: audio and timing (research first) |
+| Galgje (Hangman) | Guess a hidden word letter by letter before the drawing is finished | Requested by the owner; kit "Guess the word" |
+| Undercover / Mr. White | Everyone gets a secret word, the undercover players a similar one and Mr. White none; give clues, vote someone out; Mr. White may guess the word | Requested by the owner; kit "Secret words" |
 
 ## 6. Team and show formats
 
@@ -87,6 +89,19 @@ Legend: **Built** · **Parts ready** (can be made in the editor now, maybe as a 
 | Lifelines / jokers | Double points, skip, 50/50 once per game | New mechanic |
 | Final round with all-in bets | Bet part of your score on the last question | New mechanic: wagers |
 | Show host character | A presenter with lines and reactions on the TV | New mechanic (planned) |
+
+## 6a. Side games and 1 v 1 challenges (requested 13 November 2026)
+
+Played on a player's own phone while waiting, next to the game rather than as a scene. How to build them from shared mechanics: [scenes from building blocks](../architecture/composable-scenes.md).
+
+| Game | How it plays | Status |
+| --- | --- | --- |
+| Slot machine | Bet play chips, spin the reels | Built 14 November 2026 |
+| Blackjack | Against the bank, with play chips | Built 14 November 2026 (no splitting) |
+| Pack opening / loot box | Open packs with items of different rarity; collect them | Built 14 November 2026 |
+| Gambling leaderboard | Who bet, won and lost how many chips | Built 14 November 2026 (this room and all time) |
+| 1 v 1 challenge | Challenge another player on the phones; chess for example | Requested; kit "1 v 1 board" |
+| Replays | Every 1 v 1 game is replayed sped up at the end, like a GIF | Requested; move log and replay |
 
 ## 7. Drinking games
 
