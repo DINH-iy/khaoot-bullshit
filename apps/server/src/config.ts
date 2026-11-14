@@ -16,6 +16,9 @@ const EnvironmentSchema = z.object({
   // Days after a room ends (or is last used) before its pictures, videos and drawings are deleted.
   MEDIA_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   SERVE_WEB: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  // Behind a cloudflared tunnel on this machine: take the visitor's address from CF-Connecting-IP,
+  // but only for connections from loopback. Off by default; never turn it on without such a tunnel.
+  TRUST_CLOUDFLARE_LOCAL: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   DATABASE_URL: z.url().refine(value => ['postgresql:', 'postgres:'].includes(new URL(value).protocol), 'PostgreSQL URL is required').optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
   AUTH_ISSUER: httpsUrl.optional(),
