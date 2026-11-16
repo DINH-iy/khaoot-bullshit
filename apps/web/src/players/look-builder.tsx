@@ -94,6 +94,6 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, 
     {working && <p role="status">Sending your picture…</p>}
     {error && <p role="alert" className="error">{error}</p>}
     <div className="actions">{confirm ? <><button type="button" className="primary" disabled={busy || working} onClick={() => onSave(look)}>Save my look</button><button type="button" className="ghost" onClick={onCancel}>Cancel</button></>
-      : <button type="button" className="primary" disabled={busy || working} onClick={() => void finish()}>Done</button>}</div>
+      : <button type="button" className="primary" disabled={working} onClick={() => void finish()}>Done</button>}</div>
   </section>;
 }
