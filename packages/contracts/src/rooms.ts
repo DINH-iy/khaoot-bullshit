@@ -25,11 +25,13 @@ export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), confirmLooks: z.boolean() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
   seatRequests: z.array(z.object({ requestId: GameIdSchema, playerId: GameIdSchema, requestedAt: z.string().datetime() }).strict()),
+  // The host went back to the lobby: this room has ended and everyone moves into this one (phones and the shared screen follow by themselves).
+  nextRoom: GameIdSchema.nullable(),
 }).strict();
 // Seat takeover from a new phone. The request ID is created by that phone and
 // kept while it waits; repeating the request checks on it.
@@ -48,6 +50,8 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   // `sideGames`: games on the phones while waiting (challenges between players). `chips`: the games played with chips
   // (slot machine, blackjack, packs) and stakes in challenges; only with `sideGames` on.
   sideGames: z.boolean(), chips: z.boolean(),
+  // `confirmLooks`: players confirm a new look before it is used (off: used as soon as it is chosen).
+  confirmLooks: z.boolean(),
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();
@@ -75,6 +79,8 @@ export type HostMenu = z.infer<typeof HostMenuSchema>;
 // Open a room for a built-in game (`gameKey`) or for the latest published version of one of your games (`gameId`).
 export const HostRoomSchema = z.object({ gameKey: HostGameSchema.shape.key.optional(), gameId: GameIdSchema.optional(), sessionId: GameIdSchema, commandId: GameIdSchema }).strict()
   .refine(input => (input.gameKey === undefined) !== (input.gameId === undefined), 'Choose a built-in game or one of your games');
+/** Back to the lobby: the IDs of the fresh room (made by the host's browser, so a retry opens the same room). */
+export const RestartRoomSchema = z.object({ sessionId: GameIdSchema, commandId: GameIdSchema }).strict();
 
 // The public look of a room, for its join screen: title, texts and theme only.
 export const RoomLookSchema = z.object({ title: z.string().min(1).max(160), presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), z.unknown()), themes: z.array(z.unknown()).max(2) }).strict() }).strict();

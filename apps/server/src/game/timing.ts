@@ -13,8 +13,13 @@ export const SETTLE_MS = 250;
 export const MAX_REMAINING_MS = 24 * 60 * 60 * 1000;
 export type Clock = () => Date;
 
-export const acceptsUntil = (deadlineAt: Date) => deadlineAt.getTime() + ACCEPTANCE_GRACE_MS;
-export const closesAt = (deadlineAt: Date) => acceptsUntil(deadlineAt) + SETTLE_MS;
+// A drawing still in progress when time runs out is sent by the phone at that moment: it first stores the
+// drawing, then answers with it. Two requests take longer than one tap, so drawing rounds get more grace.
+export const DRAWING_GRACE_MS = 3000;
+/** How long after the deadline a round still takes answers: longer for drawings (see above). */
+export const graceFor = (stage: { kind: string; input?: { kind: string } }) => stage.kind === 'collect' && stage.input?.kind === 'drawing' ? DRAWING_GRACE_MS : ACCEPTANCE_GRACE_MS;
+export const acceptsUntil = (deadlineAt: Date, grace = ACCEPTANCE_GRACE_MS) => deadlineAt.getTime() + grace;
+export const closesAt = (deadlineAt: Date, grace = ACCEPTANCE_GRACE_MS) => acceptsUntil(deadlineAt, grace) + SETTLE_MS;
 
 /** Remaining nominal time of an active stage, or null when it has no limit. */
 export function remainingMs(stage: Pick<StageRun, 'deadlineAt' | 'pausedRemainingMs'>, now: Date): number | null {
@@ -38,6 +43,7 @@ const RETRY_AFTER_MS = 30_000;
 export async function closeExpiredStages(client: PrismaClient, service: TimeoutExecutor, clock: Clock = () => new Date(), backoff: Map<string, number> = new Map()): Promise<{ closed: number; failed: number }> {
   const at = clock().getTime();
   for (const [id, until] of backoff) if (until <= at) backoff.delete(id);
+  // Rounds with a longer grace (drawings) are found here too early; their close refuses until it is due, and a later pass closes them.
   const cutoff = new Date(at - ACCEPTANCE_GRACE_MS - SETTLE_MS);
   const due = await client.stageRun.findMany({ where: { status: 'ACTIVE', deadlineAt: { lte: cutoff }, session: { status: 'RUNNING' }, ...(backoff.size ? { id: { notIn: [...backoff.keys()] } } : {}) },
     select: { id: true, sessionId: true, session: { select: { hostId: true } } }, orderBy: { deadlineAt: 'asc' }, take: 50 });

@@ -285,3 +285,8 @@
 .team-columns.compact .team-names { margin: 0; font-weight: 600; }
 /* The shared screen is read from across the room. */
 .room-display .team-column-head strong { font-size: 1.5rem; }
+
+/* Back to lobby: an inline "are you sure" in the host panel. */
+.reset-confirm { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--r-bad); background: color-mix(in srgb, var(--r-bad) 12%, transparent); }
+.reset-confirm p { margin: 0; }
+.room .reset-confirm button.danger { background: var(--r-bad); color: #fff; border: 0; }

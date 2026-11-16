@@ -24,6 +24,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
     catch { setMessage('This browser cannot retain pending actions across refreshes. Keep this page open until Saved.'); }
   }, [storageKey]);
   useEffect(() => {
+    // Another room (back to the lobby): nothing of the previous room may show or act in the meantime.
+    setSnapshot(undefined);
     if (!sessionId) return;
     try { const saved = localStorage.getItem(storageKey); if (saved && saved.length < 6000) { const parsed = GameCommandSchema.safeParse(JSON.parse(saved)); if (parsed.success && parsed.data.sessionId === sessionId) { pendingRef.current = parsed.data; setPending(parsed.data); } } } catch { /* Online submission remains available. */ }
     let mounted = true; let syncing = false; let syncAgain = false; let reconciled = false; let connections = 0; let debounce: ReturnType<typeof setTimeout> | undefined;

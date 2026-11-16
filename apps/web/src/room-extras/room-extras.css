@@ -122,3 +122,10 @@
 .side-switch.on .side-switch-track span { transform: translateX(20px); }
 .side-switch .hint { margin: 0; font-size: .85rem; color: var(--r-muted); }
 .side-switches { display: grid; gap: 8px; } .side-switch.disabled { opacity: .55; }
+
+/* Awards: swipe or step through; auto-play is a choice on each screen. */
+.room .finale { touch-action: pan-y; user-select: none; }
+.finale-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.room .finale-step { min-height: 44px; min-width: 44px; padding: 0; border-radius: 50%; font-size: 1.6rem; line-height: 1; background: var(--r-card-strong); border: 0; }
+.finale-count { font-variant-numeric: tabular-nums; color: var(--r-muted); font-weight: 700; }
+.room .finale-auto { min-height: 36px; padding: 4px 14px; font-size: .85rem; background: transparent; border: 1px solid var(--r-line); }

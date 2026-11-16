@@ -34,10 +34,20 @@ async function sendPhoto(sessionId: string, file: File): Promise<string> {
   const reply = await response.json() as RoomReply<{ assetId: string }>; if (!reply.ok) throw new Error(reply.error.code); return reply.data.assetId;
 }
 
-/** Put a character together from built-in parts (each choice shows how it would look), or use a photo or a drawing. */
-export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel }: { initial: PlayerLook; name: string; busy: boolean; sessionId: string; onSave: (look: PlayerLook) => void; onCancel: () => void }) {
-  const [look, setLook] = useState(initial); const [tab, setTab] = useState<Tab>('body');
-  const [drawing, setDrawing] = useState(emptyDrawing()); const [working, setWorking] = useState(false); const [error, setError] = useState('');
+/**
+ * Put a character together from built-in parts (each choice shows how it would look), or use a photo or a drawing.
+ * With `confirm` (a room setting) nothing is used until "Save my look". Without it every choice is used at once
+ * (`onApply`), and a drawing in progress is used when the player is done or `finishSignal` changes (the game starts).
+ */
+export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, confirm = true, onApply, finishSignal = 0 }: { initial: PlayerLook; name: string; busy: boolean; sessionId: string; onSave: (look: PlayerLook) => void; onCancel: () => void; confirm?: boolean; onApply?: (look: PlayerLook) => void; finishSignal?: number }) {
+  const [look, setLookState] = useState(initial); const [tab, setTab] = useState<Tab>('body');
+  const [drawing, setDrawingState] = useState(emptyDrawing()); const [working, setWorking] = useState(false); const [error, setError] = useState('');
+  // Used at once (debounced, so tapping through options sends one change), unless the room wants a confirmation.
+  const applyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const setLook = (next: PlayerLook) => { setLookState(next); if (confirm || !onApply) return; clearTimeout(applyTimer.current); applyTimer.current = setTimeout(() => onApply(next), 500); };
+  useEffect(() => () => clearTimeout(applyTimer.current), []);
+  // A drawing that has changed since it was last sent.
+  const [drawn, setDrawn] = useState(false); const setDrawing = (next: typeof drawing) => { setDrawingState(next); setDrawn(true); };
   const heading = useRef<HTMLHeadingElement>(null); useEffect(() => { heading.current?.focus(); }, []);
   const character = withoutPicture(look);
   const options: { key: string; label: string; look: PlayerLook }[] = tab === 'photo' || tab === 'draw' ? [] : tab === 'color'
@@ -46,10 +56,20 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel }
   const chosen = tab === 'color' ? String(look.color) : tab === 'photo' || tab === 'draw' ? '' : look[tab];
   const attempt = async (work: () => Promise<string>, kind: 'photo' | 'drawing') => {
     setWorking(true); setError('');
-    try { const assetId = await work(); setLook({ ...look, picture: { assetId, kind } }); }
+    try { const assetId = await work(); setLook({ ...look, picture: { assetId, kind } }); if (kind === 'drawing') setDrawn(false); return { ...look, picture: { assetId, kind } } as PlayerLook; }
     catch (cause) { setError(cause instanceof Error && cause.message === 'UNSUPPORTED_MEDIA' ? 'That picture could not be used. Try another one.' : cause instanceof Error && cause.message === 'RATE_LIMITED' ? 'Too many pictures in a short time. Wait a moment.' : 'The picture could not be sent. Try again.'); }
     finally { setWorking(false); }
+    return null;
   };
+  // Done: without confirmation a drawing still in progress is sent and used first.
+  const finish = async () => {
+    clearTimeout(applyTimer.current);
+    const sent = !confirm && drawn && drawing.strokes.length ? await attempt(async () => (await uploadDrawing(sessionId, 'avatar', drawing)).assetId, 'drawing') : null;
+    onSave(sent ?? look);
+  };
+  // The game starts while the look is open: use what there is and close.
+  const firstSignal = useRef(finishSignal);
+  useEffect(() => { if (finishSignal !== firstSignal.current && !confirm) void finish(); }, [finishSignal]);
   return <section className="look-builder" aria-labelledby="look-builder-heading">
     <h2 id="look-builder-heading" tabIndex={-1} ref={heading}>Your look</h2>
     <div className="look-hero"><Avatar look={look} size={132} label={`${name}: ${describeLook(look)}`} />
@@ -69,9 +89,11 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel }
     {tab === 'draw' && <div className="look-picture">
       <DrawingPad value={drawing} onChange={setDrawing} maxStrokes={200} label="Draw your picture" disabled={working} />
       <button type="button" disabled={working || !drawing.strokes.length} onClick={() => { void attempt(async () => (await uploadDrawing(sessionId, 'avatar', drawing)).assetId, 'drawing'); }}>Use this drawing</button>
+      {!confirm && <p className="hint">Your drawing is used when you tap Done, or when the game starts.</p>}
     </div>}
     {working && <p role="status">Sending your picture…</p>}
     {error && <p role="alert" className="error">{error}</p>}
-    <div className="actions"><button type="button" className="primary" disabled={busy || working} onClick={() => onSave(look)}>Save my look</button><button type="button" className="ghost" onClick={onCancel}>Cancel</button></div>
+    <div className="actions">{confirm ? <><button type="button" className="primary" disabled={busy || working} onClick={() => onSave(look)}>Save my look</button><button type="button" className="ghost" onClick={onCancel}>Cancel</button></>
+      : <button type="button" className="primary" disabled={busy || working} onClick={() => void finish()}>Done</button>}</div>
   </section>;
 }

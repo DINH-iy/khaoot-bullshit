@@ -12,7 +12,7 @@ import { firstStage, locateStage, nextStage, type Located } from './graph.js';
 import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes.js';
 import { GameError, requireGame } from './errors.js';
 import { actorKey, EligibilitySchema, requireHost, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
-import { acceptsUntil, closesAt, MAX_REMAINING_MS, remainingMs, timerColumns } from './timing.js';
+import { acceptsUntil, closesAt, graceFor, MAX_REMAINING_MS, remainingMs, timerColumns } from './timing.js';
 import { formingCommand, gameLineupForRound, readForming, route, startForming, teamContext, type Award, type TeamContext } from './teams.js';
 
 export interface Effect {
@@ -252,7 +252,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     // validator) rely on a lineup existing once a team round has run.
     requireGame(!readForming(stage.presentation), 'INVALID_STATE');
     // Automatic closing can never end a stage early or override a pause/extension.
-    if (command.type === 'stage.timeout') requireGame(stage.deadlineAt && now.getTime() >= closesAt(stage.deadlineAt), 'INVALID_STATE');
+    if (command.type === 'stage.timeout') requireGame(stage.deadlineAt && now.getTime() >= closesAt(stage.deadlineAt, graceFor(entry.stage)), 'INVALID_STATE');
     await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
     // A route vote tallies once as it closes; a tie or empty vote may wait for the host.
     return { ...empty, stageRunId: stage.id, decision: choice ? await closeRoute(tx, definition, stage, choice, command.type === 'stage.timeout' ? 'timeout' : 'close') : null };
@@ -347,7 +347,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type === 'submission.submit') {
     requireGame(actor.role === 'player', 'FORBIDDEN');
     requireGame(stage.status === 'ACTIVE', 'INVALID_STATE');
-    requireGame(!stage.deadlineAt || now.getTime() <= acceptsUntil(stage.deadlineAt), 'TOO_LATE');
+    requireGame(!stage.deadlineAt || now.getTime() <= acceptsUntil(stage.deadlineAt, graceFor(entry.stage)), 'TOO_LATE');
     requireGame(!forming, 'INVALID_STATE');
     requireGame(eligible.data.playerIds.includes(actor.playerId), 'INELIGIBLE');
     const by = answerer(actor, context);

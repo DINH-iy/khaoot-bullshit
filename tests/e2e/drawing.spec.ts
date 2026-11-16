@@ -39,9 +39,9 @@ test('players draw blind and vote, draw the roundest circle, and pass the pencil
   const builder = ada.getByRole('dialog', { name: 'Your look' });
   await builder.getByRole('tab', { name: 'Draw' }).click();
   await draw(ada, [[0.3, 0.3], [0.7, 0.3], [0.7, 0.7], [0.3, 0.7], [0.3, 0.3]]);
-  await builder.getByRole('button', { name: 'Use this drawing' }).click();
-  await expect(builder.getByRole('img', { name: 'Ada: a drawing' })).toBeVisible();
-  await builder.getByRole('button', { name: 'Save my look' }).click();
+  // No need to tap Use this drawing: unless the host wants confirmation, Done uses the drawing.
+  await builder.getByRole('button', { name: 'Done' }).click();
+  await expect(builder).toHaveCount(0);
   await expect(host.locator('.lobby-crowd .avatar-picture')).toHaveCount(1);
   await expect(host.locator('.lobby-crowd .avatar-picture path')).not.toHaveCount(0);
   await host.getByRole('button', { name: 'Remove the picture of Ada' }).click();

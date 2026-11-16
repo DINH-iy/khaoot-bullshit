@@ -14,6 +14,7 @@ import { closeExpiredStages } from '../game/timing.js';
 import { parseDefinition } from '../game/definition.js';
 import { createRoomGateway, lockRoom, type Principal } from './gateway.js';
 import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js';
+import { followRoom } from './restart.js';
 import { createLiveSignals } from '../minigames/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
 import { registerReactions } from './reactions.js';
@@ -69,9 +70,9 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, confirmLooks: state.confirmLooks },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
-      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [] });
+      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], nextRoom: state.nextRoom });
   };
 
   app.post('/api/rooms/join', async (request, reply) => {
@@ -132,6 +133,17 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       if (principal.role === 'host') await breaks.call(id, principal); else await breaks.vote(id, principal, body.data.vote ?? true);
       return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  // Back to the lobby: a phone or the shared screen of the ended room moves into the next one (restart.ts).
+  app.post('/api/rooms/:sessionId/follow', async (request, reply) => {
+    try {
+      requireOrigin(request); roomAssert(limiter.allow(`follow:${request.ip}`, 120), 'RATE_LIMITED');
+      const display = (request.body as { display?: unknown } | null)?.display === true;
+      const principal = await gateway.authenticate(sessionId(request), cookie(request), display);
+      const moved = await followRoom(client, config, principal);
+      reply.header('set-cookie', roomCookie(config, moved.sessionId, moved.token, moved.expiresAt, moved.display));
+      return { ok: true, data: { sessionId: moved.sessionId } };
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
   });
   app.post('/api/rooms/:sessionId/claim', async (request, reply) => {
     try {

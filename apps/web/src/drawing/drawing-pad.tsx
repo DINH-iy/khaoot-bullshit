@@ -57,6 +57,9 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
   };
   const finish = () => { if (current) { const next = { ...value, strokes: [...value.strokes, current] }; onChange(next); onStrokeEnd?.(current, next); } setCurrent(null); };
   const end = (event: React.PointerEvent) => { if (pointer.current !== event.pointerId) return; pointer.current = null; finish(); };
+  // Locked mid-line (time is up): the line drawn so far is kept instead of lost.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (disabled && current) { pointer.current = null; finish(); } }, [disabled]);
   const key = (event: React.KeyboardEvent) => {
     if (disabled) return;
     const step = event.shiftKey ? 50 : 10; const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };

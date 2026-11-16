@@ -119,3 +119,27 @@ test('owner opens a room from the host menu and stays in control of a timed stag
     await expect(host.getByRole('button', { name: 'Close answers' })).toBeVisible();
   } finally { await hostContext.close(); }
 });
+
+test('the host goes back to the lobby: a fresh room with a new code, and the phone follows by itself', async ({ browser, page, baseURL }) => {
+  const hostContext = await browser.newContext(); const host = await hostContext.newPage();
+  try {
+    await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+    await host.getByRole('radio', { name: /Timed quiz/ }).check();
+    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    const firstCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await page.goto(`/?code=${firstCode}`);
+    await page.getByLabel('Your name').fill('Stays along');
+    await page.getByRole('button', { name: 'Join room', exact: true }).click();
+    await expect(host.getByText('Stays along · connected', { exact: false })).toBeVisible();
+    await host.getByRole('button', { name: 'Start the game' }).click();
+    await expect(page.getByRole('timer', { name: 'Time left' })).toBeVisible();
+    // It asks first, then starts over in a new lobby; the phone moves along with its name.
+    await host.getByRole('button', { name: 'Back to lobby' }).click();
+    await host.getByRole('button', { name: 'Yes, back to lobby' }).click();
+    await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
+    const secondCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    expect(secondCode).not.toBe(firstCode);
+    await expect(page.getByRole('heading', { name: `Room ${secondCode}` })).toBeVisible();
+    await expect(host.getByText('Stays along · connected', { exact: false })).toBeVisible();
+  } finally { await hostContext.close(); }
+});

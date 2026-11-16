@@ -24,6 +24,10 @@ export const RoomStateSchema = z.object({
   // New rooms store both (games on, chips off, unless the game says otherwise); the defaults only cover rooms opened
   // before that, which keep both on as they had.
   sideGames: z.boolean().default(true), chips: z.boolean().default(true),
+  // Players confirm a new look (picture, drawing, character) before it is used; off: every choice is used at once.
+  confirmLooks: z.boolean().default(false),
+  // Set when the host went back to the lobby: the fresh room everyone moves into (see restart.ts).
+  nextRoom: GameIdSchema.nullable().default(null),
   seatRequests: z.array(RequestSchema).max(50).default([]),
 }).strict();
 export type RoomState = z.infer<typeof RoomStateSchema>;
@@ -105,7 +109,7 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips'>>) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'confirmLooks'>>) {
       roomAssert(principal.role === 'host', 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);

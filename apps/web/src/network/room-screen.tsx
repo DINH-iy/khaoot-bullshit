@@ -95,6 +95,24 @@ export function RoomScreen() {
   }, [sessionId]);
   // Each stage starts from its own blank answer (and its own item order).
   useEffect(() => { setDraft(emptyDraft(state?.view.stage?.input)); }, [state?.view.stage?.id]);
+  // Back to the lobby: this room has ended and the game goes on in a fresh one. Phones and the shared screen
+  // move over by themselves; a host tab enters it with the owner key.
+  const moveTo = (next: string) => { const url = new URL(location.href); url.searchParams.set('room', next); url.hash = ''; history.replaceState(null, '', url); setSessionId(next); };
+  // Only the snapshot of the room this screen is in counts (never a stale one from before a move).
+  const nextRoom = state && state.view.sessionId === sessionId ? state.nextRoom : null; const myRole = state?.role;
+  useEffect(() => {
+    if (!nextRoom || !sessionId || !myRole) return; let mounted = true;
+    const follow = myRole === 'host' ? roomApi(`/api/host/rooms/${nextRoom}/enter`, {}).then(() => nextRoom)
+      : roomApi<{ sessionId: string }>(`/api/rooms/${sessionId}/follow`, { display: myRole === 'display' }).then(result => result.sessionId);
+    void follow.then(next => { if (mounted) moveTo(next); }).catch(() => { if (mounted) setError('The game moved to a new lobby. Ask the host for the new room code.'); });
+    return () => { mounted = false; };
+  }, [nextRoom, sessionId, myRole]);
+  const [resetting, setResetting] = useState(false);
+  const backToLobby = () => {
+    if (!sessionId) return; setResetting(false);
+    void roomApi<{ sessionId: string }>(`/api/host/rooms/${sessionId}/restart`, { sessionId: newId(), commandId: newId() }).then(result => moveTo(result.sessionId))
+      .catch(() => setError('Could not go back to the lobby. Try again.'));
+  };
   const join = async () => {
     setBusy(true); setError('');
     try {
@@ -113,6 +131,15 @@ export function RoomScreen() {
   };
   const stage = state?.view.stage; const disabled = room.saving || Boolean(room.pending) || room.connection !== 'Connected';
   const remaining = useRemaining(stage, room.clockOffset); const timeUp = remaining === 0 && stage?.pausedRemainingMs === null;
+  // Time is up with an answer chosen or typed but not sent (a choice, text, an order, an upload, a route vote): send it
+  // anyway; the server still takes it during its short grace period. Drawings do the same in DrawingAnswer.
+  useEffect(() => {
+    if (!timeUp || state?.role !== 'player' || !stage?.input || stage.status !== 'ACTIVE' || state.view.ownSubmission || stage.input.kind === 'drawing') return;
+    if (stage.route && !stage.route.canVote) return;
+    if (stage.teams) { const mine = ownTeam(stage.teams); if (stage.teams.forming || !mine || (captainAnswers(stage.teams) && mine.captainId !== state.selfPlayerId)) return; }
+    const value = draftValue(stage.input, draft);
+    if (value) command('submission.submit', { stageRunId: stage.id, value });
+  }, [timeUp]);
   // The game's look: from the room once joined, or (on the join screen) the look of the room whose code was entered.
   const [joinLook, setJoinLook] = useState<{ title: string; presentation: LookInput } | null>(null);
   useEffect(() => {
@@ -261,11 +288,17 @@ export function RoomScreen() {
         <div className="actions">
           {running && <button className="ghost" disabled={disabled} onClick={() => command('session.pause')}>{t('host.pause')}</button>}
           {running && <button className="ghost" disabled={disabled} onClick={() => { void roomApi(`/api/rooms/${sessionId}/break`, {}).catch(() => setError('The break could not be started.')); }}>{t('break.icon')} {t('break.vote')}</button>}
+          {/* Start the game again from the lobby, with everyone; also "play again" once the game is over. */}
+          {state.view.status !== 'LOBBY' && !resetting && <button className="ghost" disabled={disabled} onClick={() => setResetting(true)}>Back to lobby</button>}
           {running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.route?.decision && stage.route?.method !== 'host' && <>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: 30_000 })}>Reopen for 30 seconds</button>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>Reopen without time limit</button></>}
         </div>
         {/* Time: one compact row; the full wording is there for screen readers. */}
+        {resetting && <div className="reset-confirm" role="group" aria-label="Back to lobby">
+          <p>Start the game again in a new lobby? Everyone comes along (the room gets a new code); the scores of this game stay in its history.</p>
+          <div className="actions"><button className="danger" onClick={backToLobby}>Yes, back to lobby</button><button className="ghost" onClick={() => setResetting(false)}>Cancel</button></div>
+        </div>}
         {stage && stage.status === 'ACTIVE' && !stage.teams?.forming && <div className="timer-controls" role="group" aria-label="Time controls">
           <h3>Time</h3>
           <div className="time-row">
@@ -295,7 +328,9 @@ export function RoomScreen() {
       </aside>}
     </div>}
     {state && me && editingLook && <div className="look-sheet" role="dialog" aria-modal="true" aria-labelledby="look-builder-heading" onKeyDown={event => { if (event.key === 'Escape') setEditingLook(false); }}><LookBuilder initial={me.look} name={me.displayName} busy={disabled} sessionId={state.view.sessionId}
-      onCancel={() => setEditingLook(false)} onSave={next => { rememberLook(next); command('player.look', { look: next }); setEditingLook(false); }} /></div>}
+      onCancel={() => setEditingLook(false)} onSave={next => { rememberLook(next); command('player.look', { look: next }); setEditingLook(false); }}
+      // Unless the host wants players to confirm, every choice is used at once, and the game starting finishes the look.
+      confirm={state.settings.confirmLooks} onApply={next => { rememberLook(next); command('player.look', { look: next }); }} finishSignal={state.view.status === 'LOBBY' ? 0 : 1} /></div>}
     {state && <WheelOverlay wheel={state.view.wheel} offset={room.clockOffset} />}
     {state && role === 'display' && <WheelBadge wheel={state.view.wheel} />}
     {state && <BreakOverlay state={state} host={host} disabled={disabled} onContinue={() => command('session.resume')} />}

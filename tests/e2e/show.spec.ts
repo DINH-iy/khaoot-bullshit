@@ -21,9 +21,12 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await section.getByRole('button', { name: 'Import' }).click();
   // The editor shows how long the game takes, and the wheel can be changed there.
   await expect(page.locator('.editor-bar')).toContainText(/about \d+ min/);
-  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  // The wheels belong to the whole game (Game settings); the scene that spins one says which.
+  await page.getByRole('button', { name: 'Game settings' }).click();
   await page.getByText('Wheels of fortune').click();
   await expect(page.getByLabel('Entry 1 of Forfeits', { exact: true })).toHaveValue('Sing a song');
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('tab', { name: 'Scene editor' }).click();
   await expect(page.getByLabel('On this scene')).toHaveValue('forfeits');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
@@ -59,6 +62,10 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   const awards = phone.getByRole('region', { name: 'The awards' });
   await expect(awards).toContainText('Wim');
-  await expect(awards.getByRole('button')).toHaveCount(2);
+  // Two awards: one dot each, stepped through by hand on a phone (auto-play is off there until chosen).
+  await expect(awards.getByRole('group', { name: 'Awards' }).getByRole('button')).toHaveCount(2);
+  await expect(awards.getByRole('button', { name: '▶ Auto-play' })).toHaveAttribute('aria-pressed', 'false');
+  await awards.getByRole('button', { name: 'Next award' }).click();
+  await expect(awards).toContainText('2 / 2');
   expect((await new AxeBuilder({ page: phone }).analyze()).violations).toEqual([]);
 });

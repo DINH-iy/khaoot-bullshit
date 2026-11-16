@@ -84,4 +84,43 @@ describe('hosting a room from the browser as the local owner', () => {
       expect((await closed.inject({ method: 'GET', url: '/api/host', headers: { ...headers, cookie: `party_owner=${ownerToken}` } })).statusCode).toBe(503);
     } finally { await closed.close(); }
   });
+
+  it('goes back to the lobby in a fresh room: the old one ends with its history, players and the shared screen follow', async () => {
+    const cookie = await owner();
+    const body = { gameKey: 'timed-quiz', sessionId: randomUUID(), commandId: randomUUID() };
+    const opened = await call('POST', '/api/host/rooms', body, cookie); const host = cookieOf(opened);
+    const old = await prisma.gameSession.findUniqueOrThrow({ where: { id: body.sessionId } });
+    expect((await call('POST', `/api/rooms/${old.id}/settings`, { showScores: false }, host)).statusCode).toBe(200);
+    const phone = cookieOf(await call('POST', '/api/rooms/join', { roomCode: old.roomCode, joinId: randomUUID(), displayName: 'Ada' }));
+    const token = (await call('POST', `/api/rooms/${old.id}/display`, {}, host)).json().data.token as string;
+    const screen = cookieOf(await call('POST', `/api/rooms/${old.id}/claim`, { token }));
+    const started = await createGameService(prisma).execute({ role: 'host', creatorId: old.hostId }, { formatVersion: 1, type: 'session.start', sessionId: old.id, commandId: randomUUID(), expectedRevision: (await prisma.gameSession.findUniqueOrThrow({ where: { id: old.id } })).revision });
+    expect(started.stageRunId).toBeTruthy();
+    // Only the owner can do it; a retry with the same IDs opens the same room.
+    const restart = { sessionId: randomUUID(), commandId: randomUUID() };
+    expect((await call('POST', `/api/host/rooms/${old.id}/restart`, restart)).statusCode).toBe(401);
+    const moved = await call('POST', `/api/host/rooms/${old.id}/restart`, restart, cookie); expect(moved.statusCode).toBe(200);
+    expect((await call('POST', `/api/host/rooms/${old.id}/restart`, restart, cookie)).json().data.sessionId).toBe(restart.sessionId);
+    expect((await call('POST', `/api/host/rooms/${old.id}/restart`, { sessionId: randomUUID(), commandId: randomUUID() }, cookie)).statusCode).not.toBe(200);
+    // The old room has ended, its round closed and its history kept; it points at the new one.
+    const ended = await prisma.gameSession.findUniqueOrThrow({ where: { id: old.id } });
+    expect(ended.status).toBe('FINISHED');
+    expect(await prisma.stageRun.count({ where: { sessionId: old.id, status: 'ACTIVE' } })).toBe(0);
+    expect(await prisma.stageRun.count({ where: { sessionId: old.id } })).toBe(1);
+    expect((await call('GET', `/api/rooms/${old.id}`, undefined, phone)).json().data.nextRoom).toBe(restart.sessionId);
+    // The new room is a fresh lobby with the host's settings and access.
+    const fresh = (await call('GET', `/api/rooms/${restart.sessionId}`, undefined, cookieOf(moved))).json().data;
+    expect(fresh).toMatchObject({ role: 'host', nextRoom: null, settings: { showScores: false }, view: { status: 'LOBBY' } });
+    expect(fresh.roomCode).not.toBe(old.roomCode);
+    // The phone follows into the same seat each time, with its name; the shared screen follows as a shared screen.
+    const followed = await call('POST', `/api/rooms/${old.id}/follow`, {}, phone); expect(followed.statusCode).toBe(200);
+    expect((await call('POST', `/api/rooms/${old.id}/follow`, {}, phone)).json().data.sessionId).toBe(restart.sessionId);
+    const seat = (await call('GET', `/api/rooms/${restart.sessionId}`, undefined, cookieOf(followed))).json().data;
+    expect(seat).toMatchObject({ role: 'player', players: [{ displayName: 'Ada' }] });
+    const shown = await call('POST', `/api/rooms/${old.id}/follow`, { display: true }, screen); expect(shown.statusCode).toBe(200);
+    expect(String(shown.headers['set-cookie'])).toContain('_display=');
+    expect(await prisma.roomCredential.count({ where: { sessionId: restart.sessionId, role: 'DISPLAY' } })).toBe(1);
+    // Without access to the old room, nobody gets into the new one this way.
+    expect((await call('POST', `/api/rooms/${old.id}/follow`, {})).statusCode).toBe(400);
+  });
 });

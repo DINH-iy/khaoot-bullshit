@@ -3,12 +3,13 @@ import { REACTIONS, type RoomSnapshot } from '@party/contracts';
 import { roomApi } from '../network/api.js';
 import './room-extras.css';
 
-type Setting = 'showScores' | 'reactions' | 'autoClose' | 'breakVotes';
+type Setting = 'showScores' | 'reactions' | 'autoClose' | 'breakVotes' | 'confirmLooks';
 const LABELS: Record<Setting, string> = {
   showScores: 'Players see the scores during the game',
   reactions: 'Players can send reactions to the screen',
   autoClose: 'End a round soon after everyone answered',
   breakVotes: 'Players can vote for a break',
+  confirmLooks: 'Players confirm their look (character, photo or drawing) before it is used',
 };
 
 /** Host: how the room behaves. Changes apply straight away for everyone. */

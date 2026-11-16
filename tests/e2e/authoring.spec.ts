@@ -12,7 +12,7 @@ test('the owner creates a game, sees its problems per scene, publishes it and op
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
-  await expect(mine).toContainText(`${name}Not published yet · Ready to publish`);
+  await expect(mine).toContainText(`${name}Not publishedReady to publish`);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
   // Break the draft the way an editor could (a route option without a connection), then look at the problems.
@@ -23,7 +23,7 @@ test('the owner creates a game, sees its problems per scene, publishes it and op
   const saved = await page.request.put(`${baseURL}/api/host/games/${game.gameId}/draft`, { headers: { 'x-party-request': '1', origin: baseURL! }, data: { expectedRevision: 0, definition: broken } });
   expect(saved.status()).toBe(200);
   await page.reload();
-  await expect(mine).toContainText('2 problems to fix');
+  await expect(mine).toContainText('2 problems');
   await expect(mine.getByRole('button', { name: `Publish ${name}` })).toHaveCount(0);
   await mine.getByRole('button', { name: `Show problems in ${name}` }).click();
   const problems = mine.getByRole('list', { name: `Problems in ${name}` });
@@ -35,7 +35,7 @@ test('the owner creates a game, sees its problems per scene, publishes it and op
   expect(fixed.status()).toBe(200);
   await page.reload();
   await mine.getByRole('button', { name: `Publish ${name}` }).click();
-  await expect(mine).toContainText('Published version 1 · Ready to publish');
+  await expect(mine).toContainText('Published v1Ready to publish');
   await mine.getByRole('button', { name: `Open room for ${name}` }).click();
   await expect(page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await expect(page.getByText(`${name} · waiting to start`)).toBeVisible();

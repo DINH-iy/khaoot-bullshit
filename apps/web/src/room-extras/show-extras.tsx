@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RoomSnapshot, TextKey } from '@party/contracts';
 import { useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
@@ -57,17 +57,30 @@ export function WheelBadge({ wheel }: { wheel: View['wheel'] }) {
 /** The end-of-game show: one award per slide, moving on by itself; anyone can also step through it. */
 export function FinaleShow({ state }: { state: RoomSnapshot }) {
   const t = useText(); const slides = state.view.awards ?? []; const [at, setAt] = useState(0);
-  useEffect(() => { if (slides.length < 2) return; const timer = setInterval(() => setAt(value => (value + 1) % slides.length), 6000); return () => clearInterval(timer); }, [slides.length]);
+  // Swipe or tap through the awards. Playing them by itself is a choice on each screen: on for the shared screen (nobody
+  // touches a TV), off on phones and for the host.
+  const [auto, setAuto] = useState(state.role === 'display');
+  useEffect(() => { if (!auto || slides.length < 2) return; const timer = setInterval(() => setAt(value => (value + 1) % slides.length), 6000); return () => clearInterval(timer); }, [auto, slides.length]);
+  const startX = useRef<number | null>(null);
   if (!slides.length) return null;
+  const go = (step: number) => setAt(value => (value + step + slides.length) % slides.length);
   const slide = slides[Math.min(at, slides.length - 1)]!;
   const players = slide.playerIds.map(id => state.players.find(player => player.id === id)).filter(player => player !== undefined);
-  return <section className="finale" aria-labelledby="finale-heading">
+  return <section className="finale" aria-labelledby="finale-heading"
+    onPointerDown={event => { startX.current = event.clientX; }}
+    onPointerUp={event => { const from = startX.current; startX.current = null; if (from === null) return; const dx = event.clientX - from; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); }}>
     <h2 id="finale-heading">{t('stat.title')}</h2>
     <div className="finale-slide" key={slide.stat} aria-live="polite">
       <p className="finale-stat">{t(`stat.${slide.stat}` as TextKey)}</p>
       <div className="finale-people">{players.length ? players.map(player => <span key={player.id}><Avatar look={player.look} size={84} /><strong>{player.displayName}</strong></span>) : <strong>—</strong>}</div>
       <p className="finale-value">{slide.value}</p>
     </div>
+    {slides.length > 1 && <div className="finale-nav">
+      <button type="button" className="finale-step" aria-label="Previous award" onClick={() => go(-1)}>‹</button>
+      <span className="finale-count">{Math.min(at, slides.length - 1) + 1} / {slides.length}</span>
+      <button type="button" className="finale-step" aria-label="Next award" onClick={() => go(1)}>›</button>
+      <button type="button" className="finale-auto" aria-pressed={auto} onClick={() => setAuto(value => !value)}>{auto ? '⏸ Stop auto-play' : '▶ Auto-play'}</button>
+    </div>}
     {slides.length > 1 && <div className="finale-dots" role="group" aria-label="Awards">{slides.map((entry, index) => <button key={entry.stat} type="button" aria-pressed={index === at} aria-label={t(`stat.${entry.stat}` as TextKey)} onClick={() => setAt(index)} />)}</div>}
   </section>;
 }

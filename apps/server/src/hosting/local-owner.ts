@@ -1,6 +1,6 @@
 import { gameFacts } from './game-facts.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, GameIdSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES } from '@party/contracts';
+import { ClaimRoomSchema, GameIdSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash } from '../game/definition.js';
@@ -12,6 +12,8 @@ import type { EditorLive } from '../authoring/live.js';
 import { lockRoom, makeRoomCode } from '../rooms/gateway.js';
 import { joinToken, newToken, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
 import { OWNER_COOKIE, type OwnerAccess } from './owner-access.js';
+import { readRoomState } from '../rooms/reclaim.js';
+import { linkNextRoom } from '../rooms/restart.js';
 import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
 
 // Local owner hosting: the person running this server opens a private link and
@@ -108,6 +110,24 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       });
       reply.header('set-cookie', roomCookie(config, id.data, token, expiresAt));
       return { ok: true, data: { sessionId: id.data } };
+    } catch (error) { return fail(reply, error); }
+  });
+
+  // Back to the lobby: the same game again in a fresh room; the old one ends and everyone follows (rooms/restart.ts).
+  // The phone of the host makes up the new room's IDs, so a retry opens the same room.
+  app.post('/api/host/rooms/:sessionId/restart', async (request, reply) => {
+    try {
+      const settings = requireOwner(request);
+      const id = GameIdSchema.safeParse((request.params as { sessionId?: string }).sessionId); roomAssert(id.success, 'INVALID_COMMAND');
+      const body = RestartRoomSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      const creator = await ownerCreator();
+      const old = await client.gameSession.findUnique({ where: { id: id.data } });
+      roomAssert(old && old.hostId === creator.id && old.roomCode, 'ROOM_NOT_AVAILABLE');
+      const next = readRoomState(old.state).nextRoom; roomAssert(next === null || next === body.data.sessionId, 'ROOM_NOT_AVAILABLE');
+      const expiresAt = await openRoom(settings.roomSecret, creator.id, old.gameVersionId, body.data.sessionId, body.data.commandId);
+      await client.$transaction(tx => linkNextRoom(tx, old.id, body.data.sessionId));
+      reply.header('set-cookie', roomCookie(config, body.data.sessionId, joinToken(settings.roomSecret, body.data.sessionId, `owner:${body.data.commandId}`), expiresAt));
+      return { ok: true, data: { sessionId: body.data.sessionId } };
     } catch (error) { return fail(reply, error); }
   });
 

@@ -25,6 +25,11 @@ export function DrawingAnswer({ sessionId, stageRunId, input, disabled, timeUp, 
     catch (cause) { setError(problems[cause instanceof Error ? cause.message : ''] ?? 'Sending failed. Check the connection and send again.'); }
     finally { setSending(false); }
   };
+  // Time is up with a drawing that was not sent yet: send it as it is (drawing rounds take answers a few seconds after
+  // the deadline for this). Sent one render later, so a line the pad just finished at the lock is included.
+  const [autoSend, setAutoSend] = useState<'no' | 'due' | 'done'>('no');
+  useEffect(() => { if (timeUp) setAutoSend(current => current === 'no' ? 'due' : current); }, [timeUp]);
+  useEffect(() => { if (autoSend === 'due' && !sending) { setAutoSend('done'); if (drawing.strokes.length) void send(); } }, [autoSend, drawing]);
   return <div className="drawing-answer">
     <DrawingPad value={drawing} onChange={setDrawing} under={input.start ? [input.start] : []} blind={input.blind ?? false} maxStrokes={input.maxStrokes} disabled={timeUp || sending} label="Your drawing" />
     {error && <p role="alert" className="error">{error}</p>}

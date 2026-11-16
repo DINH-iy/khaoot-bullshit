@@ -38,6 +38,24 @@ async function world(players = 2) {
 afterAll(async () => { await db.close(); });
 
 describe('timed stages', () => {
+  it('gives a drawing round more grace, so a drawing sent when time runs out still counts', async () => {
+    let now = Date.now(); const clock = () => new Date(now); const service = createGameService(prisma, undefined, clock);
+    const f = await fixture(1, parseDefinition({ formatVersion: 1, title: 'Draw', startNodeKey: 'draw', nodes: [{ key: 'draw', stages: [{ key: 'pic', kind: 'collect', prompt: 'Draw', durationMs: DURATION, input: { kind: 'drawing', maxStrokes: 50 }, scoring: { kind: 'none' } }] }], edges: [] }));
+    const session = await prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } });
+    const stageRunId = (await service.execute(f.host, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, expectedRevision: session.revision, type: 'session.start' })).stageRunId!;
+    const send = () => service.execute({ role: 'player', playerId: f.players[0]!.id }, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'submission.submit', stageRunId, value: { kind: 'drawing', assetId: randomUUID() } });
+    // 2.5 seconds late is still on time for a drawing (this one fails only because its picture was never stored)…
+    now += DURATION + 2500;
+    await expect(send()).rejects.not.toMatchObject({ code: 'TOO_LATE' });
+    // …and the round is not closed yet, even though a quiz would be.
+    await closeExpiredStages(prisma, service, clock);
+    expect((await prisma.stageRun.findUniqueOrThrow({ where: { id: stageRunId } })).status).toBe('ACTIVE');
+    now += 1000;
+    await expect(send()).rejects.toMatchObject({ code: 'TOO_LATE' });
+    await closeExpiredStages(prisma, service, clock);
+    expect((await prisma.stageRun.findUniqueOrThrow({ where: { id: stageRunId } })).status).toBe('CLOSED');
+  });
+
   it('accepts answers through the grace period by server receipt time, then closes after the settle delay', async () => {
     const w = await world();
     expect((await w.stage()).deadlineAt?.getTime()).toBe(w.start + DURATION);
