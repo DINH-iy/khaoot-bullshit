@@ -57,7 +57,9 @@ function ScreenView({ state, minigame, offset, progress }: { state: RoomSnapshot
   return <div className={`mg-screen mg-${minigame.game}`}>
     <p className="mg-name">{info.name}</p>
     <p className="mg-how">{info.howToPlay}</p>
-    {left !== null && left > 0 ? <p className="mg-big" role="timer" aria-label="Starts in">{Math.ceil(left / 1000)}</p>
+    {/* Paused: no countdown or GO; continuing starts a fresh countdown. */}
+    {state.view.status === 'PAUSED' ? <p className="mg-big wait" role="status">{t('minigame.paused')}</p>
+      : left !== null && left > 0 ? <p className="mg-big" role="timer" aria-label="Starts in">{Math.ceil(left / 1000)}</p>
       : minigame.game === 'reaction' && minigame.startsAt ? <p className={`mg-big ${go ? 'go' : 'wait'}`}>{go ? t('minigame.go') : t('minigame.wait')}</p>
       : minigame.game === 'tap-race' && minigame.startsAt ? <RaceBars state={state} progress={progress} />
       : minigame.game === 'lucky-doors' ? <p className="mg-sub">{t('minigame.pickDoor')} · {(minigame.settings as MinigameSettings<'lucky-doors'>).doorsMilli.map(formatPoints).join(' · ')}</p> : null}

@@ -25,6 +25,22 @@ describe('importing a game from text', () => {
     expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(8);
   });
 
+  it('makes teams in a Pick teams scene and plays the rounds after it in them; a game without one is solo', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Team night', scenes: [
+      { id: 'teams', type: 'pick-teams', teams: 3, how: 'host', captains: true },
+      { id: 'q1', type: 'quiz', question: 'Longest river?', answers: ['Nile', 'Amazon'], correct: 'Nile', inTeams: true, captain: true },
+      { id: 'q2', type: 'quiz', question: 'Two plus two?', answers: ['4', '5'], correct: '4' },
+    ] }));
+    expect(issues).toEqual([]);
+    const stages = (definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes.map(node => node.stages[0]!);
+    expect(stages[0]).toMatchObject({ kind: 'teams', form: { split: { kind: 'count', teams: 3 }, formation: 'host' }, captains: true });
+    expect(stages[1]).toMatchObject({ play: { kind: 'teams', lineup: { kind: 'game' }, answers: 'captain' } });
+    expect(stages[2]!['play']).toBeUndefined();
+    // A round in teams with no Pick teams scene before it is a problem to fix, not a silent team game.
+    const solo = check(JSON.stringify({ title: 'Oops', scenes: [{ id: 'q', type: 'quiz', question: 'Q?', answers: ['A', 'B'], correct: 'A', inTeams: true }] }));
+    expect(solo.issues.map(issue => issue.message).join(' ')).toContain('Pick teams');
+  });
+
   it('accepts the answer wrapped in code fences with chatter around it', () => {
     expect(check(`Sure! Here is your game:\n\n\`\`\`json\n${example}\n\`\`\`\nHave fun!`).issues).toEqual([]);
   });

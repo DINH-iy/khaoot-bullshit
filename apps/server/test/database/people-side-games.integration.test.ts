@@ -4,7 +4,10 @@ import { PACK_PRICE, START_CHIPS } from '@party/contracts';
 import { buildApp } from '../../src/app.js';
 import { readConfig } from '../../src/config.js';
 import { createGameService } from '../../src/game/service.js';
-import { db, prisma } from './game-fixture.js';
+import { readRoomState } from '../../src/rooms/reclaim.js';
+import { db, fixture, prisma } from './game-fixture.js';
+import { parseDefinition } from '../../src/game/definition.js';
+import { preparedGame } from '../../src/game/prepared-game.js';
 
 const ownerToken = 'p'.repeat(43);
 const config = readConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent', ROOM_TOKEN_SECRET: 'e'.repeat(64), PUBLIC_ORIGIN: 'http://127.0.0.1:4173', LOCAL_OWNER_TOKEN: ownerToken });
@@ -18,11 +21,15 @@ const call = (method: Method, url: string, body?: unknown, cookie?: string) =>
 const cookieOf = (response: Awaited<ReturnType<typeof call>>) => String(response.headers['set-cookie']).split(';')[0]!;
 let owner = '';
 async function ownerCookie() { if (!owner) owner = cookieOf(await call('POST', '/api/host/claim', { token: ownerToken })); return owner; }
-async function openRoom() {
+/** A room of a built-in game: side games on, chips off, as a new room starts. With `chips`, the host switches chips on. */
+async function openRoom({ chips = true } = {}) {
   const body = { gameKey: 'timed-quiz', sessionId: randomUUID(), commandId: randomUUID() };
   const opened = await call('POST', '/api/host/rooms', body, await ownerCookie()); expect(opened.statusCode).toBe(200);
   const session = await prisma.gameSession.findUniqueOrThrow({ where: { id: body.sessionId } });
-  return { sessionId: body.sessionId, roomCode: session.roomCode!, host: cookieOf(opened) };
+  const host = cookieOf(opened);
+  expect(readRoomState(session.state)).toMatchObject({ sideGames: true, chips: false });
+  if (chips) expect((await call('POST', `/api/rooms/${body.sessionId}/settings`, { chips: true }, host)).statusCode).toBe(200);
+  return { sessionId: body.sessionId, roomCode: session.roomCode!, host };
 }
 async function join(roomCode: string, displayName: string, personCookie?: string) {
   const joined = await call('POST', '/api/rooms/join', { roomCode, joinId: randomUUID(), displayName }, personCookie); expect(joined.statusCode).toBe(200);
@@ -139,6 +146,35 @@ describe('side games and chips', () => {
     expect(hand.outcome).not.toBeNull(); expect(hand.dealer.every((card: number | null) => card !== null)).toBe(true);
     const balance = (await call('GET', `/api/rooms/${room.sessionId}/side`, undefined, phone)).json().data.balance;
     expect(balance).toBe(START_CHIPS - hand.bet + hand.payout);
+  });
+
+  it('opens a room with side games for fun, unless its game asks for chips or no side games', async () => {
+    const opened = async (extra: object) => readRoomState((await prisma.gameSession.findUniqueOrThrow({ where: { id: (await fixture(0, parseDefinition({ ...preparedGame, ...extra }))).sessionId } })).state);
+    expect(await opened({})).toMatchObject({ sideGames: true, chips: false });
+    expect(await opened({ chips: true })).toMatchObject({ sideGames: true, chips: true });
+    expect(await opened({ sideGames: false })).toMatchObject({ sideGames: false });
+  });
+
+  it('plays every side game just for fun without chips: no bets, free packs, the wallet untouched', async () => {
+    const room = await openRoom({ chips: false }); const phone = await join(room.roomCode, 'Just fun');
+    const wallet = (await call('GET', `/api/rooms/${room.sessionId}/side`, undefined, phone)).json().data;
+    expect(wallet).toMatchObject({ enabled: true, chips: false, balance: 0, canRefill: false });
+    // The phone may still send a bet; without chips it counts for nothing.
+    const spin = (await call('POST', `/api/rooms/${room.sessionId}/side/slots`, { roundId: randomUUID(), bet: 100 }, phone)).json().data;
+    expect(spin).toMatchObject({ bet: 0, payout: 0, balance: 0 }); expect(spin.reels).toHaveLength(3);
+    const pack = (await call('POST', `/api/rooms/${room.sessionId}/side/packs`, { roundId: randomUUID() }, phone)).json().data;
+    expect(pack.items.length).toBeGreaterThan(0); expect(pack.balance).toBe(0);
+    const hand = (await call('POST', `/api/rooms/${room.sessionId}/side/blackjack`, { roundId: randomUUID(), bet: 50 }, phone)).json().data.hand;
+    expect(hand.bet).toBe(0);
+    const player = await prisma.sessionPlayer.findFirstOrThrow({ where: { sessionId: room.sessionId, displayName: 'Just fun' } });
+    expect(await prisma.chipEntry.count({ where: { playerId: player.id } })).toBe(0);
+    // Refills and stakes are chips only; a challenge for fun is fine.
+    expect((await call('POST', `/api/rooms/${room.sessionId}/side/refill`, {}, phone)).json().error.code).toBe('CHIPS_OFF');
+    const other = await join(room.roomCode, 'Opponent'); const opponent = await prisma.sessionPlayer.findFirstOrThrow({ where: { sessionId: room.sessionId, displayName: 'Opponent' } });
+    const base = `/api/rooms/${room.sessionId}/side/challenges`;
+    expect((await call('POST', base, { challengeId: randomUUID(), opponentId: opponent.id, game: 'rps', stake: 10 }, phone)).json().error.code).toBe('CHIPS_OFF');
+    expect((await call('POST', base, { challengeId: randomUUID(), opponentId: opponent.id, game: 'rps', stake: 0 }, phone)).statusCode).toBe(200);
+    expect((await call('GET', base, undefined, other)).json().data).toMatchObject({ chips: false });
   });
 
   it('pauses while a round needs the player, and stays off when the host switches side games off', async () => {

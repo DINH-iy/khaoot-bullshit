@@ -49,7 +49,12 @@ export function registerMinigameEvents(io: Server, client: PrismaClient, live: L
     const current = await running(sessionId, true);
     if (!current?.goAt) return;
     const key = `${current.stageRunId}:${current.goAt}`; if (scheduled.has(key)) return;
-    const timer = setTimeout(() => { scheduled.delete(key); io.to(`session:${sessionId}`).emit('minigame.go', { stageRunId: current.stageRunId, goAt: current.goAt }); },
+    // A pause (or the host closing the stage) may have happened since: announce GO only while this exact run still plays.
+    const announce = async () => {
+      const now = await running(sessionId, true);
+      if (now?.stageRunId === current.stageRunId && now.goAt === current.goAt) io.to(`session:${sessionId}`).emit('minigame.go', { stageRunId: current.stageRunId, goAt: current.goAt });
+    };
+    const timer = setTimeout(() => { scheduled.delete(key); void announce().catch(() => log.warn({ event: 'minigame_go_unavailable' }, 'Could not announce GO')); },
       Math.max(0, Date.parse(current.goAt) - Date.now()));
     timer.unref(); scheduled.set(key, timer);
     for (const old of [...scheduled.keys()].slice(0, Math.max(0, scheduled.size - 256))) { clearTimeout(scheduled.get(old)!); scheduled.delete(old); }

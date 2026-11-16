@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -24,6 +25,11 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await host.getByRole('radio', { name: /Timed quiz/ }).check();
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    // Side games are on and chips off in a new room; the host switches chips on in the lobby.
+    await expect(host.getByRole('switch', { name: 'Side games', exact: true })).toHaveAttribute('aria-checked', 'true');
+    const chips = host.getByRole('switch', { name: 'Chips', exact: true });
+    await expect(chips).toHaveAttribute('aria-checked', 'false');
+    await chips.click(); await expect(chips).toHaveAttribute('aria-checked', 'true');
 
     // The phone opens its personal link once; the key leaves the address bar at once.
     await page.goto(link);
@@ -34,7 +40,7 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect(host.getByText(`${name} · connected`, { exact: false })).toBeVisible();
 
-    const dock = page.getByRole('navigation', { name: 'More' });
+    const dock = await openPhoneMenu(page);
     await dock.getByRole('button', { name: 'Games' }).click();
     const sheet = page.getByRole('dialog', { name: 'Side games' });
     await expect(sheet.getByText('1,000 chips')).toBeVisible();
@@ -48,6 +54,6 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await host.getByRole('button', { name: 'Start the game' }).click();
     await expect(sheet).toHaveCount(0);
     await expect(page.getByText('Round started: your side game is paused')).toBeVisible();
-    await expect(dock.getByRole('button', { name: 'Games paused' })).toBeVisible();
+    await expect((await openPhoneMenu(page)).getByRole('button', { name: 'Games paused' })).toBeVisible();
   } finally { await ownerContext.close(); }
 });

@@ -1,4 +1,5 @@
 import { useText } from '../presentation/look.js';
+import { routeArrow } from './answer-input.js';
 import type { RoomSnapshot } from '@party/contracts';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
@@ -19,7 +20,7 @@ export function RouteChoice({ state, stage, disabled, send }: { state: RoomSnaps
     {decided ? <p role="status" className="route-decision">The party goes: <strong>{labelOf(route, decided.optionKey)}</strong> ({why[decided.resolution]}).{host && !stage.revealed ? ' Reveal to announce it.' : ''}</p>
       : stage.status === 'CLOSED' && !host ? <p role="status">{route.method === 'host' ? t('route.hostChoosing') : t('route.closed')}</p> : null}
     {host && route.pending && <p role="alert" className="route-pending">{route.pending === 'tie' ? `Tie between ${(route.leaders ?? []).map(key => labelOf(route, key)).join(' and ')}. Choose a route.` : route.pending === 'no-votes' ? 'Nobody voted. Choose a route.' : 'Choose a route.'}</p>}
-    {host && !decided && state.view.status === 'RUNNING' && <div className="actions">{route.options.map(option =>
-      <button key={option.key} disabled={disabled} onClick={() => send('route.decide', { stageRunId: stage.id, optionKey: option.key })}>{stage.status === 'ACTIVE' && route.method !== 'host' ? `Close voting and choose ${option.label}` : `Choose ${option.label}`}</button>)}</div>}
+    {host && !decided && state.view.status === 'RUNNING' && <div className="actions">{route.options.map((option, index) =>
+      <button key={option.key} className="route-button" disabled={disabled} onClick={() => send('route.decide', { stageRunId: stage.id, optionKey: option.key })}><span aria-hidden="true">{routeArrow(index, route.options.length)}</span> {stage.status === 'ACTIVE' && route.method !== 'host' ? `Close voting and choose ${option.label}` : `Choose ${option.label}`}</button>)}</div>}
   </div>;
 }

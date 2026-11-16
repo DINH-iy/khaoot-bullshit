@@ -87,6 +87,11 @@ const stageSchema = z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('host') }).strict(),
       z.object({ kind: z.literal('game'), game: HeadToHeadKeySchema, settings: z.record(z.string(), z.json()).optional() }).strict(),
     ]).optional() }).strict(),
+  // Pick teams: the teams are made here (`form`) and the rounds after it play in them (a round's `play` of the game's
+  // teams) until the next Pick teams scene. The host sees the proposal, can change it (also add or remove teams) and
+  // confirms; then moves on. `carryover`: the team scores when teams are made again. `captains`: each team gets a captain.
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('teams'), prompt: z.string().trim().min(1).max(2000), durationMs: z.null(),
+    form: FormationSchema, carryover: z.enum(['keep', 'fresh', 'members']).optional(), captains: z.boolean().optional() }).strict(),
   // Format 2: the party picks one route. It is the only stage of its node, each
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.
@@ -114,6 +119,9 @@ export const GameDefinitionSchema = z.object({
   presentation: PresentationSchema.optional(),
   // Wheels of fortune that scenes can spin, and the statistics of the end-of-game show (left out: the standard set; empty: no show).
   wheels: z.array(WheelSchema).max(10).optional(), finale: z.object({ stats: z.array(z.enum(FINALE_STATS)).max(FINALE_STATS.length) }).strict().optional(),
+  // What a room of this game starts with on the phones: side games (challenges between players; left out: on) and
+  // chips (slot machine, blackjack, packs and stakes; left out: off). The host can switch both in the room.
+  sideGames: z.boolean().optional(), chips: z.boolean().optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),
   // `option` names the route option an edge belongs to (format 2 choice nodes only).
   edges: z.array(z.object({ key: GameKeySchema, from: GameKeySchema, to: GameKeySchema, option: GameKeySchema.optional() }).strict()).max(300),
@@ -195,7 +203,7 @@ export function minigameRules(stage: MinigameStage): { game: MinigameKey; settin
 }
 export { MINIGAMES };
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {
-  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'duel') throw new GameError('INVALID_STATE');
+  if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'duel' || stage.kind === 'teams') throw new GameError('INVALID_STATE');
   return stage.play ?? definition.play ?? { kind: 'solo' };
 }
 /** Points by place for a stage that has them (fastest correct, most votes, host places), or null. */

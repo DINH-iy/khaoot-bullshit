@@ -54,7 +54,7 @@
 .gamble-board .up { color: var(--r-ok); } .gamble-board .down { color: var(--r-bad); }
 
 /* A short note on the phone when a round takes over from a side game. */
-.side-paused-note { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 16; margin: 0; padding: 8px 14px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 800; box-shadow: 0 8px 20px rgb(0 0 0 / .3); white-space: nowrap; }
+.side-paused-note { position: fixed; left: 50%; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 16; margin: 0; padding: 8px 14px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 800; box-shadow: 0 8px 20px rgb(0 0 0 / .3); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .reels.spinning .reel, .pack-reveal li { animation: none; } }
 /* Challenges between players. */
 .challenges { display: grid; gap: 14px; }

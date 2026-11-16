@@ -23,7 +23,7 @@ export async function closeSoonWhenAllIn(tx: Transaction, session: GameSession, 
   const stage = await tx.stageRun.findUnique({ where: { id: stageRunId } });
   if (!stage || stage.status !== 'ACTIVE' || readForming(stage.presentation)) return;
   const entry = locateStage(definition, stage.nodeKey, stage.stageKey);
-  if (!entry || ['info', 'scoreboard', 'challenge'].includes(entry.stage.kind)) return;
+  if (!entry || ['info', 'scoreboard', 'challenge', 'teams'].includes(entry.stage.kind)) return;
   // Who still has to answer: each eligible player, or each team when its captain answers for it, or the route's voters.
   const eligible = EligibilitySchema.safeParse(stage.eligibility); if (!eligible.success) return;
   const context = await teamContext(tx, stage);

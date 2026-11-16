@@ -368,3 +368,8 @@
 .invite-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; }
 .invite-row > span { display: grid; min-width: 0; } .invite-row small { color: var(--e-muted); font-size: .8rem; }
 .invite-link { display: flex; align-items: center; gap: 8px; } .invite-link code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .8rem; padding: 8px; border-radius: 8px; background: var(--e-bg); }
+
+/* Character counter under a nearly full text field (field-limit.tsx). */
+.field-limit { position: fixed; z-index: 60; transform: translate(-100%, 4px); padding: 2px 8px; border-radius: 6px; font-size: .78rem; font-variant-numeric: tabular-nums; pointer-events: none;
+  background: light-dark(#2b2540, #ece8f8); color: light-dark(#fff, #1d1b2e); }
+.field-limit.full { background: var(--e-danger); color: light-dark(#fff, #2a0d12); }

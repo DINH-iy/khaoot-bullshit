@@ -2,13 +2,28 @@
 .room .phase-pill { justify-self: start; margin: 0; padding: 6px 14px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 800; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; }
 .room .phase-pill.teams { font-size: 1rem; }
 
-/* Phone: the round fills the screen; scores, players, reactions and sound live in a bar at the bottom. */
-.room-player { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-.phone-dock { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 15; display: flex; gap: 6px; padding: 6px;
-  border-radius: 22px; background: color-mix(in srgb, var(--r-surface) 92%, black); border: 1px solid var(--r-line); box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
-.room .phone-dock button { display: grid; justify-items: center; gap: 2px; min-width: 72px; min-height: 56px; padding: 6px 8px; border-radius: 16px; background: transparent; border: 0; }
-.room .phone-dock button:active { background: var(--r-card-strong); }
-.phone-dock span { font-size: 1.4rem; line-height: 1; } .phone-dock small { font-size: .7rem; font-weight: 700; color: var(--r-muted); white-space: nowrap; }
+/* Phone: the round fills the screen; one Menu button holds scores, players, reactions, break, side games and sound. */
+.room-player { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.room .dock-button { position: fixed; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 15; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 52px; padding: 0 20px; border-radius: 999px; font-weight: 800; background: color-mix(in srgb, var(--r-surface) 92%, black); color: var(--r-text);
+  border: 1px solid var(--r-line); box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
+.room .dock-button > span[aria-hidden] { font-size: 1.2rem; line-height: 1; }
+.room .dock-button .dock-dot { width: 10px; height: 10px; margin-left: 0; }
+/* Inside the menu: big tiles in a grid, easy to hit with a thumb. */
+.phone-dock { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.room .phone-dock button { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 84px; padding: 10px 6px; border-radius: 16px; background: var(--r-card); border: 1px solid var(--r-line); }
+.room .phone-dock button:active, .room .phone-dock button[aria-pressed=true] { background: var(--r-card-strong); }
+.phone-dock span { font-size: 1.6rem; line-height: 1; } .phone-dock small { font-size: .78rem; font-weight: 700; color: var(--r-text); text-align: center; }
+/* Challenged (or your move): a banner at the top of the phone that stays until Open or Later. */
+.challenge-alert { position: fixed; z-index: 40; top: calc(10px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; max-width: 520px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center;
+  padding: 12px 14px; border-radius: 18px; background: color-mix(in srgb, var(--r-surface) 94%, black); border: 2px solid var(--r-accent); box-shadow: 0 12px 36px rgb(0 0 0 / .45); animation: alert-in .35s ease-out; }
+.challenge-alert p { margin: 0; font-size: 1.05rem; line-height: 1.3; }
+.challenge-alert-icon { grid-row: span 2; font-size: 2rem; line-height: 1; animation: alert-shake 1.6s ease-in-out .35s 2; }
+.challenge-alert-actions { display: flex; gap: 8px; }
+.challenge-alert-actions .primary { flex: 1; }
+@keyframes alert-in { from { transform: translateY(-120%); opacity: 0; } }
+@keyframes alert-shake { 0%, 100% { transform: rotate(0); } 20%, 60% { transform: rotate(-14deg); } 40%, 80% { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .challenge-alert, .challenge-alert-icon { animation: none; } }
 
 .sheet-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; align-items: end; justify-items: center; background: rgb(0 0 0 / .5); padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 .room .bottom-sheet { width: min(560px, 100%); max-height: min(80dvh, 720px); display: grid; grid-template-rows: auto 1fr; border-radius: var(--r-radius) var(--r-radius) 18px 18px; background: var(--r-surface); border: 1px solid var(--r-line); overflow: hidden; }
@@ -58,7 +73,7 @@
 /* Break: a calm full-screen pause for everyone. */
 .break-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; text-align: center;
   background: color-mix(in srgb, var(--r-bg2) 94%, transparent); backdrop-filter: blur(8px); color: var(--r-text); }
-.break-icon { margin: 0; font-size: clamp(5rem, 22vw, 11rem); line-height: 1; animation: break-sway 4s ease-in-out infinite; }
+.break-overlay .break-icon { margin: 0; font-size: clamp(6rem, 30vw, 12rem); line-height: 1; animation: break-sway 4s ease-in-out infinite; }
 .break-overlay h2 { margin: 0; font-size: clamp(2.2rem, 8vw, 5rem); } .break-overlay p { margin: 0; font-size: 1.2rem; }
 .break-time { color: var(--r-muted); } .room .break-overlay button.big { width: auto; padding: 12px 32px; margin-top: 12px; }
 @keyframes break-sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
@@ -96,3 +111,14 @@
 .room-display .room-bar { padding-block: 10px; }
 @media (prefers-reduced-motion: reduce) { .break-icon, .wheel-disc, .finale-slide, .wheel-result.shown { animation: none; } .wheel-disc { transform: rotate(var(--turn)); } }
 .room .phone-dock button[aria-disabled=true] { opacity: .5; }
+
+/* Host: the chips & side games switch, always visible in the host panel. */
+.side-switch { display: grid; gap: 4px; padding: 12px; border-radius: 14px; background: rgb(0 0 0 / .18); border: 1px solid var(--r-line); }
+.side-switch.on { border-color: var(--r-accent); }
+.room .side-switch button { display: flex; align-items: center; gap: 12px; justify-content: flex-start; width: 100%; min-height: 44px; padding: 0; background: transparent; border: 0; font-weight: 800; font-size: 1rem; color: var(--r-text); }
+.side-switch-track { flex: none; position: relative; width: 48px; height: 28px; border-radius: 999px; background: var(--r-line); transition: background .2s; }
+.side-switch-track span { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.side-switch.on .side-switch-track { background: var(--r-ok); }
+.side-switch.on .side-switch-track span { transform: translateX(20px); }
+.side-switch .hint { margin: 0; font-size: .85rem; color: var(--r-muted); }
+.side-switches { display: grid; gap: 8px; } .side-switch.disabled { opacity: .55; }

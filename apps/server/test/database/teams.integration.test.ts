@@ -113,6 +113,41 @@ describe('team rounds', () => {
     expect(await totals(f)).toEqual(new Map([['Red', '10000'], ['Blue', '0']]));
   });
 
+  it('makes the game teams in a Pick teams scene: players choose, the host adds and removes teams, later rounds play in them', async () => {
+    const pick = { key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players' }, captains: true }] };
+    const f = await fixture(4, game([pick, quiz('a', teams('captain', 'team')), quiz('b', { kind: 'solo' })]));
+    const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
+    expect((await hostView(f)).stage).toMatchObject({ kind: 'teams', teams: { forming: true, formation: 'players', scope: 'game', answers: 'captain' } });
+    // Not before the teams are confirmed.
+    await expect(hostCommand(f, 'stage.advance', { stageRunId })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    // A third team, then the empty second one goes again: the third moves up.
+    await hostCommand(f, 'teams.add', { stageRunId });
+    expect((await hostView(f)).stage!.teams!.teams.map(team => team.name)).toEqual(['Red', 'Blue', 'Green']);
+    for (const [index, team] of [[0, 0], [1, 0], [2, 2], [3, 2]] as const) await act(f, index, 'teams.choose', { stageRunId, teamIndex: team });
+    await hostCommand(f, 'teams.remove', { stageRunId, teamIndex: 1 });
+    expect((await hostView(f)).stage!.teams!.teams.map(team => [team.name, team.memberIds.length])).toEqual([['Red', 2], ['Green', 2]]);
+    await hostCommand(f, 'teams.captain', { stageRunId, playerId: f.players[0]!.id });
+    await hostCommand(f, 'teams.confirm', { stageRunId });
+    // Confirmed: the scene asks nothing more, the host moves on, and the next round plays in these teams.
+    const round = (await hostCommand(f, 'stage.advance', { stageRunId })).stageRunId!;
+    expect((await hostView(f)).stage!.teams).toMatchObject({ forming: false, answers: 'captain' });
+    expect((await hostView(f)).stage!.teams!.teams.map(team => team.name)).toEqual(['Red', 'Green']);
+    await answer(f, 0, round);
+    await close(f, round);
+    expect(await totals(f)).toEqual(new Map([['Red', '10000'], ['Green', '0']]));
+    // At least one team stays, and never more than twelve.
+    const again = await fixture(2, game([{ key: 'pick', stages: [{ ...pick.stages[0]!, form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }] }]));
+    const run = (await hostCommand(again, 'session.start')).stageRunId!;
+    await hostCommand(again, 'teams.remove', { stageRunId: run, teamIndex: 0 });
+    await expect(hostCommand(again, 'teams.remove', { stageRunId: run, teamIndex: 0 })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    for (let count = 1; count < 12; count++) await hostCommand(again, 'teams.add', { stageRunId: run });
+    await expect(hostCommand(again, 'teams.add', { stageRunId: run })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+  });
+
+  it('refuses a round in the game teams with no Pick teams scene before it', () => {
+    expect(() => game([quiz('a', teams('everyone', 'team'))])).toThrow('INVALID_DEFINITION');
+  });
+
   it('keeps game teams across rounds, places late joiners, and lets a round override them', async () => {
     const definition = game([quiz('a'), quiz('b'), quiz('c', { kind: 'solo' }),
       { key: 'd', stages: [{ key: 'show', kind: 'challenge', prompt: 'Team challenge', durationMs: null, maxAwardMilli: '20000' }] }], { teams: two, play: teams('everyone', 'both') });
@@ -200,5 +235,26 @@ describe('team rounds', () => {
     await close(f, vote);
     expect(await totals(f)).toEqual(new Map([['Blue', '10000'], ['Red', '5000']]));
     expect((await hostView(f)).stage!.reveal!.answer).toMatchObject({ kind: 'vote', entries: [{ submissionId: blue, playerId: null, votes: 2 }, { submissionId: red, playerId: null, votes: 1 }] });
+  });
+
+  it('carries on when players leave a team empty: the round, the next team round and a vote all work', async () => {
+    const pick = { kind: 'reform', form: { split: { kind: 'count', teams: 2 }, formation: 'players' }, carryover: 'members' };
+    const f = await fixture(3, game([
+      { key: 'w', stages: [{ key: 'joke', kind: 'collect', prompt: 'Team joke', durationMs: 60_000, input: { kind: 'text', maxLength: 100 }, scoring: { kind: 'none' }, play: teams('captain', 'team', pick) }] },
+      { key: 'v', stages: [{ key: 'pick', kind: 'vote', prompt: 'Vote', durationMs: 30_000, source: { nodeKey: 'w', stageKey: 'joke' }, awardPerVoteMilli: '5000', play: { kind: 'solo' } }] },
+      quiz('q', teams('everyone', 'team')),
+    ], { teams: two, play: teams('everyone', 'team') }));
+    const write = (await hostCommand(f, 'session.start')).stageRunId!;
+    for (const index of [0, 1, 2]) await act(f, index, 'teams.choose', { stageRunId: write, teamIndex: 0 });
+    await hostCommand(f, 'teams.confirm', { stageRunId: write });
+    const captain = (await hostView(f)).stage!.teams!.teams[0]!.captainId!;
+    await act(f, f.players.findIndex(p => p.id === captain), 'submission.submit', { stageRunId: write, value: { kind: 'text', text: 'Only joke' } });
+    await close(f, write);
+    const vote = (await hostCommand(f, 'stage.advance', { stageRunId: write })).stageRunId!;
+    await close(f, vote);
+    const quizRun = (await hostCommand(f, 'stage.advance', { stageRunId: vote })).stageRunId!;
+    expect((await hostView(f)).stage!.teams).toMatchObject({ forming: false });
+    await answer(f, 0, quizRun);
+    await close(f, quizRun);
   });
 });

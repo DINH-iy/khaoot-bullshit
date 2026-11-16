@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { ChallengeListSchema, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, type Challenge, type HeadToHeadKey, type HeadToHeadMove } from '@party/contracts';
 import { newId } from '../network/api.js';
-import { chips, sideApi, sideProblem } from './side-api.js';
+import { chips, sideApi, sideProblem, isMyTurn } from './side-api.js';
 import './side-games.css';
 
 // The boards (and chess) load only when a game is opened.
@@ -17,9 +17,9 @@ const STATUS: Record<Challenge['status'], string> = { INVITED: 'waiting for an a
  * connection (`tick`), so nothing polls.
  */
 export default function Challenges({ sessionId, selfId, players, tick }: { sessionId: string; selfId: string | null; players: { id: string; displayName: string }[]; tick: number }) {
-  const [list, setList] = useState<Challenge[]>(); const [balance, setBalance] = useState(0); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const [list, setList] = useState<Challenge[]>(); const [balance, setBalance] = useState(0); const [withChips, setWithChips] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null); const [creating, setCreating] = useState(false);
-  const load = useCallback(() => sideApi(sessionId, '/challenges').then(data => { const parsed = ChallengeListSchema.parse(data); setList(parsed.challenges); setBalance(parsed.balance); }).catch(cause => setError(explain(cause))), [sessionId]);
+  const load = useCallback(() => sideApi(sessionId, '/challenges').then(data => { const parsed = ChallengeListSchema.parse(data); setList(parsed.challenges); setBalance(parsed.balance); setWithChips(parsed.chips); }).catch(cause => setError(explain(cause))), [sessionId]);
   useEffect(() => { void load(); }, [load, tick]);
   const name = (id: string) => players.find(player => player.id === id)?.displayName ?? 'Someone';
   const act = (path: string, body: unknown = {}) => { setBusy(true); setError(''); void sideApi(sessionId, path, body).then(data => { const updated = ChallengeSchema.parse(data); setList(current => [updated, ...(current ?? []).filter(entry => entry.id !== updated.id)]); return load(); }).catch(cause => setError(explain(cause))).finally(() => setBusy(false)); };
@@ -47,13 +47,13 @@ export default function Challenges({ sessionId, selfId, players, tick }: { sessi
           <button type="button" className="ghost" disabled={busy} onClick={() => act(`/challenges/${entry.id}/close`)}>No thanks</button></div>
         {balance < entry.stake && <p className="hint">You need {chips(entry.stake)} to accept.</p>}
       </li>)}</ul></section>}
-    {creating ? <NewChallenge players={players.filter(player => player.id !== selfId)} balance={balance} busy={busy} onCancel={() => setCreating(false)}
+    {creating ? <NewChallenge players={players.filter(player => player.id !== selfId)} balance={balance} busy={busy} withChips={withChips} onCancel={() => setCreating(false)}
       onSend={body => { act('/challenges', body); setCreating(false); }} />
       : <button type="button" className="primary" onClick={() => setCreating(true)}>Challenge someone</button>}
     <section aria-labelledby="mine-heading" className="challenge-group"><h3 id="mine-heading">Your challenges</h3>
       {rest.length === 0 ? <p className="hint">None yet. Challenge someone in the room to rock paper scissors, tic-tac-toe or chess.</p>
         : <ul className="plain-list">{rest.map(entry => { const other = entry.mine === 'challenger' ? entry.opponentId : entry.challengerId;
-          const myTurn = entry.status === 'PLAYING' && (entry.view.turn === 'both' ? !(entry.view.board.game === 'rps' && entry.view.seat !== null && entry.view.board.picked[entry.view.seat]) : entry.view.turn === entry.view.seat);
+          const myTurn = isMyTurn(entry);
           return <li key={entry.id} className="challenge-card">
             <p>{HEAD_TO_HEAD_GAMES[entry.game].name} with <strong>{name(other)}</strong>{entry.stake ? ` · ${chips(entry.stake)}` : ''} · {myTurn ? <strong>your move</strong> : STATUS[entry.status]}</p>
             <div className="actions">
@@ -65,17 +65,18 @@ export default function Challenges({ sessionId, selfId, players, tick }: { sessi
   </div>;
 }
 
-function NewChallenge({ players, balance, busy, onSend, onCancel }: { players: { id: string; displayName: string }[]; balance: number; busy: boolean; onSend: (body: unknown) => void; onCancel: () => void }) {
+function NewChallenge({ players, balance, busy, onSend, onCancel, withChips }: { players: { id: string; displayName: string }[]; balance: number; busy: boolean; onSend: (body: unknown) => void; onCancel: () => void; withChips: boolean }) {
   const [opponentId, setOpponent] = useState(players[0]?.id ?? ''); const [game, setGame] = useState<HeadToHeadKey>('rps');
   const [stake, setStake] = useState('0'); const [firstTo, setFirstTo] = useState(String(HEAD_TO_HEAD_DEFAULTS.rps.firstTo));
-  const amount = Math.max(0, Math.round(Number(stake) || 0));
+  // Without chips in the room a challenge is always for fun.
+  const amount = withChips ? Math.max(0, Math.round(Number(stake) || 0)) : 0;
   if (!players.length) return <p className="hint">Nobody else is in the room yet. <button type="button" className="link-button" onClick={onCancel}>Back</button></p>;
   return <form className="challenge-form" onSubmit={event => { event.preventDefault(); onSend({ challengeId: newId(), opponentId, game, stake: amount, ...(game === 'rps' ? { settings: { firstTo: Number(firstTo) } } : {}) }); }}>
     <label>Who<select value={opponentId} onChange={event => setOpponent(event.target.value)}>{players.map(player => <option key={player.id} value={player.id}>{player.displayName}</option>)}</select></label>
     <label>Game<select value={game} onChange={event => setGame(event.target.value as HeadToHeadKey)}>{HEAD_TO_HEAD_KEYS.map(key => <option key={key} value={key}>{HEAD_TO_HEAD_GAMES[key].name}</option>)}</select></label>
     <p className="hint">{HEAD_TO_HEAD_GAMES[game].howToPlay}</p>
     {game === 'rps' && <label>First to<select value={firstTo} onChange={event => setFirstTo(event.target.value)}>{[1, 2, 3, 4, 5].map(count => <option key={count} value={count}>{count} {count === 1 ? 'win' : 'wins'}</option>)}</select></label>}
-    <label>Stake in chips (0: just for fun)<input type="number" inputMode="numeric" min={0} max={balance} value={stake} onChange={event => setStake(event.target.value)} /></label>
+    {withChips && <label>Stake in chips (0: just for fun)<input type="number" inputMode="numeric" min={0} max={balance} value={stake} onChange={event => setStake(event.target.value)} /></label>}
     {amount > 0 && <p className="hint">You each put in {chips(amount)}; the winner takes {chips(amount * 2)}, a draw gives it back.</p>}
     <div className="actions"><button type="submit" className="primary" disabled={busy || !opponentId || amount > balance}>Send challenge</button><button type="button" className="ghost" onClick={onCancel}>Cancel</button></div>
   </form>;

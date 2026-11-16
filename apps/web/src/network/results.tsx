@@ -27,6 +27,10 @@ export function pointsToMilli(text: string, allowNegative: boolean): string | nu
 }
 const nameOf = (state: RoomSnapshot, playerId: string) => state.players.find(player => player.id === playerId)?.displayName ?? 'Former player';
 
+function PointsFold({ folded, label, children }: { folded: boolean; label: string; children: React.ReactNode }) {
+  return folded ? <details className="results-more"><summary>{label}</summary>{children}</details> : <>{children}</>;
+}
+
 export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Stage }) {
   const t = useText();
   const reveal = stage.reveal; if (!reveal) return null;
@@ -35,6 +39,8 @@ export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Sta
   const own = state.selfPlayerId ? reveal.awards.find(award => award.playerId === state.selfPlayerId) : undefined;
   return <div className="results" role="region" aria-label="Round results">
     <h3>{t('results.title')}</h3>
+    {/* On a phone your own result comes first, big: that is what you look for. */}
+    {state.role === 'player' && stage.input?.kind !== 'media' && <p role="status" className={`results-own${own ? ' earned' : ''}`}>{own ? t('results.earned', { points: formatPoints(own.amountMilli) }) : t('results.nothing')}</p>}
     {answer?.kind === 'choice' && <>
       {answer.correctChoiceKey && <p>{t('results.correct', { answer: label(answer.correctChoiceKey) })}</p>}
       <ul className="plain-list answer-bars">{answer.counts.map(row => { const total = answer.counts.reduce((sum, entry) => sum + entry.count, 0);
@@ -50,10 +56,12 @@ export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Sta
       return <li key={row.submissionId} className="ballot-entry"><strong>{author} · {row.votes} {row.votes === 1 ? 'vote' : 'votes'}</strong>{entry && <BallotContent sessionId={state.view.sessionId} entry={entry} label={`Entry from ${author}`} />}</li>;
     })}</ol> : <p>There was nothing to vote on.</p>)}
     {answer?.kind === 'media' && (answer.entries.length ? <ul className="gallery">{answer.entries.map(entry => <li key={entry.assetId}><MediaView sessionId={state.view.sessionId} media={entry} label={`Upload from ${nameOf(state, entry.playerId)}`} /><span>{nameOf(state, entry.playerId)}</span></li>)}</ul> : <p>Nobody uploaded anything.</p>)}
-    {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
-    {state.role === 'player' && stage.input?.kind !== 'media' && <p role="status">{own ? t('results.earned', { points: formatPoints(own.amountMilli) }) : t('results.nothing')}</p>}
-    {stage.input?.kind !== 'media' && <h4>{t('results.points')}</h4>}
-    {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list">{[...reveal.awards].sort((a, b) => { const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli); return difference > 0n ? 1 : difference < 0n ? -1 : 0; }).map(award => <li key={award.playerId}>{nameOf(state, award.playerId)} · {formatPoints(award.amountMilli)}</li>)}</ul> : <p>{t('results.nobody')}</p>}
+    {/* Everyone's points: folded on phones so the round fits on one screen; open on the host and shared screens. */}
+    <PointsFold folded={state.role === 'player'} label={t('results.points')}>
+      {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
+      {stage.input?.kind !== 'media' && <h4>{t('results.points')}</h4>}
+      {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list">{[...reveal.awards].sort((a, b) => { const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli); return difference > 0n ? 1 : difference < 0n ? -1 : 0; }).map(award => <li key={award.playerId}>{nameOf(state, award.playerId)} · {formatPoints(award.amountMilli)}</li>)}</ul> : <p>{t('results.nobody')}</p>}
+    </PointsFold>
   </div>;
 }
 

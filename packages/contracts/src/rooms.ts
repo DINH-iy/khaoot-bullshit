@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { GameIdSchema, GameErrorCodeSchema, SessionViewSchema } from './game.js';
 import { PlayerLookSchema } from './players.js';
 
+export const ROOM_CODE_LENGTH = 6;
 export const RoomCodeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
+/** What someone typed or pasted, as a code: capitals, only characters a code can have, never longer than a code. */
+export const cleanRoomCode = (typed: string) => typed.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, ROOM_CODE_LENGTH);
+/** A code as people read it: ABC-123. The dash is only for reading; it is never part of the code. */
+export const formatRoomCode = (code: string) => code.length > 3 ? `${code.slice(0, 3)}-${code.slice(3)}` : code;
 export const JoinRoomSchema = z.object({
   roomCode: RoomCodeSchema, joinId: GameIdSchema,
   displayName: z.string().trim().min(1).max(40),
@@ -12,7 +17,7 @@ export const JoinRoomSchema = z.object({
 export const ClaimRoomSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict();
 export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.literal(true).optional() }).strict();
 export const NetworkErrorCodeSchema = z.enum([
-  ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
+  ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'CHIPS_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
@@ -20,7 +25,7 @@ export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
@@ -40,8 +45,9 @@ export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤�
 export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int().min(1).max(30),
   // `breakVotes`: players may vote for a break; it starts when `breakPercent` of the players agree. The host can always call one.
   breakVotes: z.boolean(), breakPercent: z.number().int().min(10).max(100),
-  // `sideGames`: slot machine, blackjack and packs on the phones while waiting.
-  sideGames: z.boolean(),
+  // `sideGames`: games on the phones while waiting (challenges between players). `chips`: the games played with chips
+  // (slot machine, blackjack, packs) and stakes in challenges; only with `sideGames` on.
+  sideGames: z.boolean(), chips: z.boolean(),
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();

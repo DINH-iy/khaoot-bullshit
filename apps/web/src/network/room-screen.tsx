@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { GameCommandSchema, PLAYER_COMMANDS, RoomLookSchema, type TextKey } from '@party/contracts';
+import { cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { JoinQr } from './join-qr.js';
-import { StageTimer, useRemaining } from './stage-timer.js';
-import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
+import { useRemaining } from './stage-timer.js';
+import { RoundInfo } from './round-info.js';
+import { AnswerInput, draftValue, emptyDraft, routeArrow } from './answer-input.js';
 import { JudgePanel, Scoreboard, StageResults } from './results.js';
 import { VoteBallot } from './vote.js';
 import { SeatReclaim, SeatRequests } from './seat-reclaim.js';
@@ -15,7 +16,7 @@ import { MinigameStage } from '../minigames/minigame-stage.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
-import { RoomSettings } from '../room-extras/room-settings.js';
+import { RoomSettings, SideGamesSwitch } from '../room-extras/room-settings.js';
 import { PointsCelebration } from '../room-extras/celebrate.js';
 import { BreakOverlay, FinaleShow, WheelBadge, WheelOverlay } from '../room-extras/show-extras.js';
 import { formatPoints } from './results.js';
@@ -38,32 +39,52 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
   person: Person | null | undefined; linked: { name: string | null } | null; onForget: () => void; onSignIn: (key: string) => Promise<void>;
 }) {
   const t = useText(); const [ownerBrowser] = useState(wasOwner);
+  // Our own messages under the field, instead of the browser's small "fill in this field" bubble.
+  const [problems, setProblems] = useState<{ code?: string; name?: string }>({});
+  const codeRef = useRef<HTMLInputElement>(null); const nameRef = useRef<HTMLInputElement>(null);
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const found = { ...(roomCode.length !== ROOM_CODE_LENGTH ? { code: t('join.codeMissing') } : {}), ...(!person && !name.trim() ? { name: t('join.nameMissing') } : {}) };
+    setProblems(found);
+    if (found.code) codeRef.current?.focus(); else if (found.name) nameRef.current?.focus(); else onJoin();
+  };
   return <main className={`room room-join ${className}`} style={style}>
     <section className="join-card" aria-labelledby="join-heading">
       <p className="brand">party<span>.</span></p>
-      <h1 id="join-heading">{t('join.title')}</h1>{title && <p className="room-game">{title}</p>}
-      {error && <p role="alert" className="error">{error}</p>}
-      {linked && <p role="status" className={linked.name ? 'person-linked' : 'error'}>{linked.name ? `This phone now plays as ${linked.name}. Join any room and you are ${linked.name}.` : 'This personal link no longer works. Ask the organiser for a new one.'}</p>}
-      <form onSubmit={event => { event.preventDefault(); onJoin(); }}>
-        <label>{t('join.code')}<input className="code-input" autoComplete="off" autoCapitalize="characters" value={roomCode} onChange={event => setRoomCode(event.target.value)} maxLength={6} required placeholder="ABC123" /></label>
+      <div className="join-head"><h1 id="join-heading">{t('join.title')}</h1>{title && <p className="room-game">{title}</p>}</div>
+      {error && <p role="alert" className="join-error">{error}</p>}
+      {linked && <p role="status" className={linked.name ? 'person-linked' : 'join-error'}>{linked.name ? `This phone now plays as ${linked.name}. Join any room and you are ${linked.name}.` : 'This personal link no longer works. Ask the organiser for a new one.'}</p>}
+      <form className="join-form" noValidate onSubmit={submit}>
+        <label>{t('join.code')}
+          {/* Shown as ABC-123 and always in capitals; only the six code characters are kept, so it can never get longer than a code. */}
+          <input ref={codeRef} className="code-input" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} inputMode="text" enterKeyHint="next"
+            value={formatRoomCode(roomCode)} maxLength={ROOM_CODE_LENGTH + 1} placeholder="ABC-123" aria-invalid={problems.code ? true : undefined} aria-describedby={problems.code ? 'join-code-problem' : undefined}
+            onChange={event => { setRoomCode(cleanRoomCode(event.target.value)); setProblems(({ code: _code, ...rest }) => rest); }} /></label>
+        {problems.code && <p id="join-code-problem" className="field-problem" role="alert">{problems.code}</p>}
         {person ? <div className="person-badge"><span>Playing as <strong>{person.name}</strong></span><button type="button" className="link-button" onClick={onForget}>Not {person.name}?</button></div>
-          : <label>{t('join.name')}<input autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} maxLength={40} required /></label>}
-        <button className="primary" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
+          : <><label>{t('join.name')}<input ref={nameRef} autoComplete="nickname" enterKeyHint="go" value={name} maxLength={40} aria-invalid={problems.name ? true : undefined} aria-describedby={problems.name ? 'join-name-problem' : undefined}
+            onChange={event => { setName(event.target.value); setProblems(({ name: _name, ...rest }) => rest); }} /></label>
+            {problems.name && <p id="join-name-problem" className="field-problem" role="alert">{problems.name}</p>}</>}
+        <button className="primary big" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
-      {person === null && <KeySignIn onSignIn={onSignIn} />}
-      <p className="join-links">{t('join.reclaim')} <button type="button" className="link-button" onClick={onReclaim}>{t('join.reclaimButton')}</button></p>
-      {/* Only for a browser that signed in as the owner before: players never see it, and nothing asks the server. */}
-      {ownerBrowser && <p className="join-links"><a href="/?host=1">Host a game instead</a></p>}
-      {/* A person with editor rights (the server says so in /api/people/me). */}
-      {!ownerBrowser && person?.canEdit && <p className="join-links"><a href="/?host=1#my-games">Edit games</a></p>}
+      {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
+      <details className="join-more">
+        <summary>More options</summary>
+        {person === null && <KeySignIn onSignIn={onSignIn} />}
+        <p className="join-links">{t('join.reclaim')} <button type="button" className="link-button" onClick={onReclaim}>{t('join.reclaimButton')}</button></p>
+        {/* Only for a browser that signed in as the owner before: players never see it, and nothing asks the server. */}
+        {ownerBrowser && <p className="join-links"><a href="/?host=1">Host a game instead</a></p>}
+        {/* A person with editor rights (the server says so in /api/people/me). */}
+        {!ownerBrowser && person?.canEdit && <p className="join-links"><a href="/?host=1#my-games">Edit games</a></p>}
+      </details>
     </section>
   </main>;
 }
 
 export function RoomScreen() {
   const [sessionId, setSessionId] = useState(initial.searchParams.get('room') ?? undefined);
-  const [roomCode, setRoomCode] = useState(initial.searchParams.get('code') ?? ''); const [name, setName] = useState('');
-  const [error, setError] = useState(''); const [busy, setBusy] = useState(Boolean(access)); const [ready, setReady] = useState(!access);
+  const [roomCode, setRoomCode] = useState(cleanRoomCode(initial.searchParams.get('code') ?? '')); const [name, setName] = useState('');
+  const [error, setError] = useState(''); const [closedMessage, setClosedMessage] = useState(''); const [busy, setBusy] = useState(Boolean(access)); const [ready, setReady] = useState(!access);
   const [draft, setDraft] = useState(emptyDraft(null)); const [editingLook, setEditingLook] = useState(false); const [displayUrl, setDisplayUrl] = useState(''); const [timerSeconds, setTimerSeconds] = useState('30'); const [reclaiming, setReclaiming] = useState(false);
   const room = useRoom(ready ? sessionId : undefined, initial.searchParams.get('display') === '1'); const state = room.snapshot;
   const account = useMe();
@@ -126,7 +147,8 @@ export function RoomScreen() {
     ? stage.route.method === 'host' ? t('wait.hostRoute') : stage.teams && !stage.teams.forming && myTeam && captainAnswers(stage.teams) ? null : t('wait.lateVoter') : null;
   const answerBlock = routeBlock ?? (!stage?.teams ? null : stage.teams.forming ? t('wait.forming')
     : !myTeam ? t('wait.sitOut') : captainAnswers(stage.teams) && myTeam.captainId !== state?.selfPlayerId ? t('wait.captain', { captain: state?.players.find(player => player.id === myTeam.captainId)?.displayName ?? '', team: myTeam.name }) : null);
-  const showOnly = stage?.kind === 'info' || stage?.kind === 'scoreboard';
+  // Scenes that ask nothing: info, scoreboard, and a Pick teams scene once its teams are confirmed.
+  const showOnly = stage?.kind === 'info' || stage?.kind === 'scoreboard' || (stage?.kind === 'teams' && !stage.teams?.forming);
   const timer = (change: Record<string, unknown>) => { if (stage) command('stage.timer', { stageRunId: stage.id, change }); };
   const role = state?.role ?? (initial.searchParams.get('display') === '1' ? 'display' : 'player');
   const host = role === 'host'; const running = state?.view.status === 'RUNNING';
@@ -138,13 +160,15 @@ export function RoomScreen() {
   // The one big button the host needs right now, plus the less frequent ones.
   const primary = !state ? null : state.view.status === 'LOBBY' ? { label: t('host.start'), run: () => command('session.start') }
     : state.view.status === 'PAUSED' ? { label: t('host.resume'), run: () => command('session.resume') }
+    // While teams are picked, confirming them is the host's next step (possible once anyone is in a team).
+    : running && stage?.status === 'ACTIVE' && stage.teams?.forming ? { label: t('host.startTeams'), run: () => command('teams.confirm', { stageRunId: stage.id }), blocked: stage.teams.teams.every(team => team.memberIds.length === 0) }
     : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
     : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
     : running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
     : null;
   // What is happening now, in a word or two, above the round.
   const forming = Boolean(stage?.teams?.forming);
-  const phase = !stage || stage.kind === 'info' || stage.kind === 'scoreboard' ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams')
+  const phase = !stage || showOnly ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams')
     : stage.revealed ? t('phase.results') : stage.kind === 'duel' ? (stage.status === 'CLOSED' ? t('phase.duelOn') : t('phase.duel')) : stage.status === 'CLOSED' ? t('phase.locked')
     : stage.kind === 'challenge' ? t('phase.challenge') : stage.kind === 'minigame' ? t('phase.minigame') : stage.kind === 'route' ? t('phase.route') : stage.kind === 'vote' ? t('phase.vote')
     : stage.eligibleCount > 0 && stage.submittedCount >= stage.eligibleCount ? t('phase.allIn') : t('phase.answer');
@@ -161,6 +185,8 @@ export function RoomScreen() {
         <div><p className="room-game">{state?.view.title ?? 'Connecting…'}{state ? ` · ${t(state.view.status === 'LOBBY' ? 'status.waiting' : state.view.status === 'PAUSED' ? 'status.paused' : state.view.status === 'FINISHED' ? 'status.finished' : 'status.playing')}` : ''}</p>
           {state && <h2 id="room-heading" className="room-code">Room {state.roomCode}</h2>}</div></div>
       <section className="room-connection" aria-labelledby="connection-heading"><h2 id="connection-heading" className="visually-hidden">Connection</h2>
+        {/* Sending an action shows as a small spinner here, so nothing on the page moves. */}
+        {room.saving && <span className="saving-spinner" role="status" aria-label="Saving"><span aria-hidden="true" /></span>}
         <p role="status" aria-label="Connection status" className={`conn ${connected ? 'conn-ok' : 'conn-bad'}`}>{busy ? 'Verifying access…' : room.connection}</p>
         <button className="ghost" onClick={room.reconnect} disabled={busy}>Reconnect and sync</button>
         <details className="conn-details"><summary>Details</summary>
@@ -169,22 +195,27 @@ export function RoomScreen() {
           <p>Round trip includes the connection and the server’s access check.</p></details>
       </section>
     </header>
-    {error && <p role="alert" className="error room-toast">{error}</p>}
-    {room.message && <p role="status" aria-label="Action status" className="room-toast">{room.message}</p>}
-    {room.pending && <div className="room-toast pending" role="region" aria-label="Unconfirmed action"><p role="status">{room.saving ? 'Sending… waiting for the server to confirm.' : 'Your last action is not confirmed yet.'}</p>
-      <div className="actions"><button onClick={room.retry} disabled={room.saving}>Check / retry original action</button><button className="ghost" onClick={room.discard}>Discard pending action</button></div></div>}
+    {stage && <RoundInfo stage={stage} phase={phase} remaining={remaining} timerRef={timerRef} />}
+    {/* Messages float over the page instead of pushing it down. An action still being sent only shows the spinner above;
+        the retry choice appears once it is really stuck (sending stopped without a confirmation). */}
+    <div className="room-toasts">
+      {error && <p role="alert" className="error room-toast">{error}</p>}
+      {room.message && room.message !== closedMessage && <div className="room-toast"><p role="status" aria-label="Action status">{room.message}</p>
+        <button type="button" className="toast-close" aria-label="Close message" onClick={() => setClosedMessage(room.message)}>×</button></div>}
+      {room.pending && !room.saving && <div className="room-toast pending" role="region" aria-label="Unconfirmed action"><p role="status">Your last action is not confirmed yet.</p>
+        <div className="actions"><button onClick={room.retry}>Check / retry original action</button><button className="ghost" onClick={room.discard}>Discard pending action</button></div></div>}
+    </div>
 
     {state && <div className="room-grid">
       <div className="room-main">
         {state.view.status === 'LOBBY' && <section className="lobby" aria-labelledby="lobby-heading">
           {role === 'player' ? <><h2 id="lobby-heading">{t('lobby.playerTitle')}</h2><p>{t('lobby.playerText')}</p>
             {me && <div className="my-look"><Avatar look={me.look} size={96} /><button className="ghost" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button></div>}</>
-            : <><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2><div className="lobby-join"><JoinQr origin={location.origin} roomCode={state.roomCode} />
-              <div><p>{t('lobby.screenGo', { host: location.host })}</p><p className="big-code">{state.roomCode}</p></div></div>
+            : <><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2><div className="lobby-join"><JoinQr origin={location.origin} roomCode={state.roomCode} copy={role !== 'display'} />
+              <div><p>{t('lobby.screenGo', { host: location.host })}</p><p className="big-code" aria-label={`Room code ${state.roomCode}`}>{formatRoomCode(state.roomCode)}</p></div></div>
               {state.players.length > 0 && <ul className="lobby-crowd" aria-label="Players who joined">{state.players.map(player => <li key={player.id}><Avatar look={player.look} size={72} /><span>{player.displayName}</span></li>)}</ul>}</>}
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}`} aria-labelledby="stage-heading">
-          {phase && <p className={`phase-pill${forming ? ' teams' : ''}`} role="status">{phase}</p>}
           {stage.info && <p className="stage-banner">{stage.info.title}</p>}
           {/* While teams are picked, the round's question waits: one thing at a time. */}
           <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? 'Scoreboard' : stage.prompt)}</h2>
@@ -192,8 +223,7 @@ export function RoomScreen() {
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
           <TeamSummary state={state} stage={stage} />
-          {!stage.teams?.forming && <div ref={timerRef}><StageTimer stage={stage} remaining={remaining} /></div>}
-          {!forming && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} />}
+          {!forming && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
           {stage.kind === 'vote' && !stage.revealed && <VoteBallot state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
             onVote={submissionId => command('submission.submit', { stageRunId: stage.id, value: { kind: 'vote', submissionId } })} />}
           {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
@@ -214,7 +244,7 @@ export function RoomScreen() {
             : role === 'player' && stage.input && stage.status === 'ACTIVE' && running ? <form className="answer-form" onSubmit={event => {
               event.preventDefault(); const value = stage.input && draftValue(stage.input, draft); if (value) command('submission.submit', { stageRunId: stage.id, value });
             }}>
-              <AnswerInput sessionId={state.view.sessionId} input={stage.input} draft={draft} onChange={setDraft} legend={stage.kind === 'route' ? t('vote.legend') : t('answer.legend')} />
+              <AnswerInput sessionId={state.view.sessionId} input={stage.input} draft={draft} onChange={setDraft} legend={stage.kind === 'route' ? t('vote.legend') : t('answer.legend')} route={stage.kind === 'route'} />
               <button className="primary" disabled={disabled || !draftValue(stage.input, draft) || timeUp}>{timeUp ? t('timer.up') : stage.kind === 'route' ? t('vote.submit') : t('answer.submit')}</button></form>
             : role === 'player' ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly ? '' : t('wait.screen')}</p> : null}</div></>}
         </section>}
@@ -225,7 +255,7 @@ export function RoomScreen() {
       </div>
 
       {host && <aside className="room-controls" aria-label="Host controls">
-        {primary && <button className="primary big" disabled={disabled} onClick={primary.run}>{primary.label}</button>}
+        {primary && <button className="primary big" disabled={disabled || ('blocked' in primary && primary.blocked)} onClick={primary.run}>{primary.label}</button>}
         {nextAlso && <button disabled={disabled} onClick={() => command('stage.advance', { stageRunId: stage!.id })}>{t('host.next')}</button>}
         {running && stage && state.view.wheel.canSpin && <button disabled={disabled} onClick={() => command('wheel.spin', { stageRunId: stage.id })}>{state.view.wheel.spin ? t('wheel.again') : t('wheel.spin')}</button>}
         <div className="actions">
@@ -235,23 +265,33 @@ export function RoomScreen() {
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: 30_000 })}>Reopen for 30 seconds</button>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>Reopen without time limit</button></>}
         </div>
+        {/* Time: one compact row; the full wording is there for screen readers. */}
         {stage && stage.status === 'ACTIVE' && !stage.teams?.forming && <div className="timer-controls" role="group" aria-label="Time controls">
           <h3>Time</h3>
-          {remaining !== null && <><button className="ghost" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 30_000 })}>Add 30 seconds</button>
-            <button className="ghost" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 60_000 })}>Add 1 minute</button>
-            <button className="ghost" disabled={disabled} onClick={() => timer({ kind: 'clear' })}>Remove time limit</button></>}
-          <form className="inline-form" onSubmit={event => { event.preventDefault(); if (validSeconds) timer({ kind: 'set', ms: seconds * 1000 }); }}>
+          <div className="time-row">
+            {remaining !== null && <><button className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 30_000 })}>+30 s<span className="visually-hidden"> (add 30 seconds)</span></button>
+              <button className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 60_000 })}>+1 min<span className="visually-hidden"> (add 1 minute)</span></button>
+              <button className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'clear' })}>No limit<span className="visually-hidden"> (remove time limit)</span></button></>}
+          </div>
+          <form className="inline-form time-set" onSubmit={event => { event.preventDefault(); if (validSeconds) timer({ kind: 'set', ms: seconds * 1000 }); }}>
             <label>Time left (seconds)<input type="number" inputMode="numeric" min={1} max={3600} step={1} value={timerSeconds} onChange={event => setTimerSeconds(event.target.value)} /></label>
-            <button className="ghost" disabled={disabled || !validSeconds}>Set time</button></form>
+            <button className="ghost small-button" disabled={disabled || !validSeconds}>Set time</button></form>
         </div>}
-        <div className="control-block"><h3>Shared screen</h3>
-          <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>
-          {displayUrl && <p><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a> on the TV or a second screen.</p>}
-          {state.view.status !== 'LOBBY' && <JoinQr origin={location.origin} roomCode={state.roomCode} />}
-        </div>
-        <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} />
         <SeatRequests state={state} sessionId={state.view.sessionId} onError={setError} />
-        <p><a href="/?host=1">Back to the host menu</a></p>
+        {/* Always in sight, in the lobby and during the game: whether the phones get chips and side games. */}
+        <SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
+        {/* Less frequent things fold away, so the panel fits next to the round. */}
+        <details className="control-fold"><summary>Shared screen &amp; invite</summary>
+          <div className="control-block">
+            <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>
+            {displayUrl && <p><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a> on the TV or a second screen.</p>}
+            {state.view.status !== 'LOBBY' && <JoinQr origin={location.origin} roomCode={state.roomCode} />}
+          </div>
+        </details>
+        <details className="control-fold"><summary>Room settings</summary>
+          <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} />
+        </details>
+        <p className="control-back"><a href="/?host=1">Back to the host menu</a></p>
       </aside>}
     </div>}
     {state && me && editingLook && <div className="look-sheet" role="dialog" aria-modal="true" aria-labelledby="look-builder-heading" onKeyDown={event => { if (event.key === 'Escape') setEditingLook(false); }}><LookBuilder initial={me.look} name={me.displayName} busy={disabled} sessionId={state.view.sessionId}
@@ -275,9 +315,9 @@ export function RoomScreen() {
 
 type StageInput = NonNullable<NonNullable<ReturnType<typeof useRoom>['snapshot']>['view']['stage']>['input'];
 /** The answers as the shared screen and host see them: the same colours as the phone tiles, not clickable. */
-function OptionsBoard({ input }: { input: NonNullable<StageInput> }) {
+function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>; route?: boolean }) {
   const entries = input.kind === 'choice' ? input.options : input.kind === 'order' ? input.items : [];
   if (!entries.length) return null;
-  return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}`} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
-    {entries.map((entry, index) => <li key={entry.key}><span aria-hidden="true">{input.kind === 'order' ? '•' : String.fromCharCode(65 + index)}</span>{entry.label}</li>)}</ol>;
+  return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
+    {entries.map((entry, index) => <li key={entry.key}><span aria-hidden="true">{input.kind === 'order' ? '•' : route ? routeArrow(index, entries.length) : String.fromCharCode(65 + index)}</span>{entry.label}</li>)}</ol>;
 }

@@ -15,8 +15,8 @@ function Card({ card }: { card: number | null }) {
     <span aria-hidden="true">{RANKS[cardRank(card)]}{SUITS[suit]}</span></span>;
 }
 
-/** Blackjack against the dealer. A hand left open (a round started) is picked up again later. */
-export function Blackjack({ sessionId, balance, onBalance, open }: { sessionId: string; balance: number; onBalance: (balance: number) => void; open: BlackjackView | null }) {
+/** Blackjack against the dealer. A hand left open (a round started) is picked up again later. Without chips it is played for fun. */
+export function Blackjack({ sessionId, balance, onBalance, open, chips: forChips }: { sessionId: string; balance: number; onBalance: (balance: number) => void; open: BlackjackView | null; chips: boolean }) {
   const [bet, setBet] = useState<typeof BETS[number]>(10);
   const [hand, setHand] = useState<BlackjackView | null>(open); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const send = async (path: string, body: unknown) => {
@@ -30,17 +30,17 @@ export function Blackjack({ sessionId, balance, onBalance, open }: { sessionId: 
       <div className="hand"><p>Dealer {hand.dealerTotal !== null && <strong>{hand.dealerTotal}</strong>}</p><div className="cards">{hand.dealer.map((card, index) => <Card key={index} card={card} />)}</div></div>
       <div className="hand"><p>You <strong>{hand.playerTotal}</strong></p><div className="cards">{hand.player.map((card, index) => <Card key={index} card={card} />)}</div></div>
     </div> : <p className="side-outcome">Get closer to 21 than the dealer without going over. Blackjack pays 3 to 2.</p>}
-    <p className="side-outcome" role="status">{hand?.outcome ? `${OUTCOMES[hand.outcome]}${hand.payout ? ` You get ${chips(hand.payout)}.` : ''}` : hand ? `Bet: ${chips(hand.bet)}` : ''}</p>
+    <p className="side-outcome" role="status">{hand?.outcome ? `${hand.outcome === 'push' && !hand.bet ? 'A draw.' : OUTCOMES[hand.outcome]}${hand.payout ? ` You get ${chips(hand.payout)}.` : ''}` : hand?.bet ? `Bet: ${chips(hand.bet)}` : ''}</p>
     {error && <p role="alert" className="error">{error}</p>}
     {playing ? <div className="side-actions">
       <button type="button" className="primary" disabled={busy} onClick={() => void send('/blackjack/move', { roundId: hand.roundId, step: hand.step, move: 'hit' })}>Hit</button>
       <button type="button" disabled={busy} onClick={() => void send('/blackjack/move', { roundId: hand.roundId, step: hand.step, move: 'stand' })}>Stand</button>
       {hand.canDouble && <button type="button" disabled={busy} onClick={() => void send('/blackjack/move', { roundId: hand.roundId, step: hand.step, move: 'double' })}>Double</button>}
     </div> : <>
-      <fieldset className="bet-picker"><legend>Bet</legend>
+      {forChips && <fieldset className="bet-picker"><legend>Bet</legend>
         {BETS.map(amount => <label key={amount} className={bet === amount ? 'chosen' : ''}><input type="radio" name="blackjack-bet" checked={bet === amount} onChange={() => setBet(amount)} />{amount}</label>)}
-      </fieldset>
-      <button type="button" className="primary big" disabled={busy || balance < bet} onClick={() => void send('/blackjack', { roundId: newId(), bet })}>Deal for {chips(bet)}</button>
+      </fieldset>}
+      <button type="button" className="primary big" disabled={busy || (forChips && balance < bet)} onClick={() => void send('/blackjack', { roundId: newId(), bet })}>{forChips ? `Deal for ${chips(bet)}` : 'Deal'}</button>
     </>}
   </div>;
 }

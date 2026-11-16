@@ -64,6 +64,8 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .my-game-actions .quiet-danger { border-color: transparent; color: light-dark(#9d1717, #ffb4b4); }
 .my-game-confirm { display: inline-flex; flex-wrap: wrap; gap: 8px; }
 .my-game-actions button.danger { background: light-dark(#b42318, #f97066); border-color: transparent; color: light-dark(#fff, #2a0d0b); }
+/* Stays red on hover: the general hover background above would leave its light text unreadable. */
+.my-game-actions button.danger:hover:not(:disabled) { background: light-dark(#912018, #fda29b); }
 .my-game-note { margin: 0; font-size: .9rem; opacity: .85; }
 .my-game-problems { margin: 0; padding: 10px 12px 10px 28px; border-radius: 10px; background: light-dark(#fff6e8, #2d2414); font-size: .92rem; }
 .my-game-problems li { margin: 0 0 4px; }

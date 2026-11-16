@@ -36,21 +36,22 @@ const pictureParty = parseDefinition({
   edges: [{ key: 'pet-to-vote', from: 'pet', to: 'pet-vote' }, { key: 'vote-to-clip', from: 'pet-vote', to: 'clip' }],
 });
 
-// Game teams by default, with rounds that override it: solo, a one-off 1 vs the rest, and re-formed teams.
+// Teams are made in a Pick teams scene; rounds play in them, solo, as a one-off 1 vs the rest, and in new teams picked later.
 const captainTeams = { kind: 'teams', lineup: { kind: 'game' }, answers: 'captain', points: 'both' } as const;
 const teamParty = parseDefinition({
-  formatVersion: 1, title: 'Team party', startNodeKey: 'team-quiz',
-  teams: { split: { kind: 'count', teams: 2 }, formation: 'random' }, play: captainTeams,
+  formatVersion: 1, title: 'Team party', startNodeKey: 'pick',
   nodes: [
-    { key: 'team-quiz', stages: [choice('team-quiz', 'Team question: which is the longest river?', [['nile', 'Nile'], ['amazon', 'Amazon'], ['yangtze', 'Yangtze'], ['danube', 'Danube']], 'nile', 45_000, 'tiles')].map(({ nodeKey: _node, ...stage }) => stage) },
+    { key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'random' }, captains: true }] },
+    { key: 'team-quiz', stages: [choice('team-quiz', 'Team question: which is the longest river?', [['nile', 'Nile'], ['amazon', 'Amazon'], ['yangtze', 'Yangtze'], ['danube', 'Danube']], 'nile', 45_000, 'tiles')].map(({ nodeKey: _node, ...stage }) => ({ ...stage, play: captainTeams })) },
     { key: 'solo-quiz', stages: [{ ...choice('solo-quiz', 'Everyone for themselves: how many legs does a spider have?', [['six', '6'], ['eight', '8'], ['ten', '10']], 'eight', 20_000, 'tiles'), nodeKey: undefined, play: { kind: 'solo' } }].map(({ nodeKey: _node, ...stage }) => stage) },
     { key: 'one-vs-rest', stages: [{ key: 'perform', kind: 'challenge', prompt: 'One player against everyone else: the lone player hums a song, the others must guess it. The host judges each side.', durationMs: 60_000, maxAwardMilli: '30000',
       play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'sizes', sizes: [1, 'rest'] }, formation: 'random', names: ['Soloist', 'Everyone else'] } }, answers: 'everyone', points: 'members' } }] },
-    { key: 'pick-teams', stages: [{ key: 'write', kind: 'collect', prompt: 'Pick your new team. Then: write your team\'s best excuse for losing.', durationMs: 90_000, input: { kind: 'text', maxLength: 240 }, scoring: { kind: 'none' },
-      play: { kind: 'teams', lineup: { kind: 'reform', form: { split: { kind: 'count', teams: 2 }, formation: 'players' }, carryover: 'members' }, answers: 'captain', points: 'team' } }] },
+    { key: 'pick-again', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your new team', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players' }, carryover: 'members', captains: true }] },
+    { key: 'pick-teams', stages: [{ key: 'write', kind: 'collect', prompt: 'Write your team\'s best excuse for losing.', durationMs: 90_000, input: { kind: 'text', maxLength: 240 }, scoring: { kind: 'none' },
+      play: { kind: 'teams', lineup: { kind: 'game' }, answers: 'captain', points: 'team' } }] },
     { key: 'excuse-vote', stages: [{ key: 'vote', kind: 'vote', prompt: 'Vote for the best excuse. Not your own team\'s.', durationMs: 45_000, source: { nodeKey: 'pick-teams', stageKey: 'write' }, awardPerVoteMilli: '5000', play: { kind: 'solo' } }] },
   ],
-  edges: [{ key: 'a', from: 'team-quiz', to: 'solo-quiz' }, { key: 'b', from: 'solo-quiz', to: 'one-vs-rest' }, { key: 'c', from: 'one-vs-rest', to: 'pick-teams' }, { key: 'd', from: 'pick-teams', to: 'excuse-vote' }],
+  edges: [{ key: 'start', from: 'pick', to: 'team-quiz' }, { key: 'a', from: 'team-quiz', to: 'solo-quiz' }, { key: 'b', from: 'solo-quiz', to: 'one-vs-rest' }, { key: 'c', from: 'one-vs-rest', to: 'pick-again' }, { key: 'c2', from: 'pick-again', to: 'pick-teams' }, { key: 'd', from: 'pick-teams', to: 'excuse-vote' }],
 });
 
 // Format 2: the party votes on a route; both routes rejoin at the finale (the owner's flow-editor reference).
@@ -116,7 +117,7 @@ const drawParty = parseDefinition({
 export const builtInGames: readonly { key: string; description: string; definition: GameDefinition }[] = [
   { key: 'timed-quiz', description: 'Timed questions with tiles and a list, an ordering round and a writing round. The host can add time, change it or close early.', definition: timedQuiz },
   { key: 'friday-night-chaos', description: 'The party votes on a route: Music Mayhem or Living Sculpture. Both routes end in the same finale.', definition: fridayNightChaos },
-  { key: 'team-party', description: 'Two random teams with captains, a solo round, one player against the rest, then players pick new teams and vote.', definition: teamParty },
+  { key: 'team-party', description: 'Teams picked at the start (two random teams with captains), a solo round, one player against the rest, then players pick new teams and vote.', definition: teamParty },
   { key: 'minigame-madness', description: 'Reaction duel, tap race, stop the clock and lucky doors, then one player against everyone in a final tap race.', definition: minigameMadness },
   { key: 'draw-party', description: 'A blind portrait of the host and a vote, a doodle to finish, the roundest circle, then teams pass the pencil and vote for the best drawing.', definition: drawParty },
   { key: 'picture-party', description: 'Players answer by uploading pictures, GIFs or short videos, shown to everyone at the reveal.', definition: pictureParty },

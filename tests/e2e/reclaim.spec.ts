@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { closeRoundsByHand } from './helpers.js';
+import { closeRoundsByHand, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -31,6 +31,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
 
     // While the old phone is connected, its seat is not offered.
     await newPhone.goto(`${baseURL}/?code=${roomCode}`);
+    await newPhone.getByText('More options').click();
     await newPhone.getByRole('button', { name: 'Take over my seat' }).click();
     await expect(newPhone.getByText('No seat is free right now.')).toBeVisible();
     // The battery dies.
@@ -49,7 +50,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
 
     await expect(newPhone.getByRole('heading', { name: `Room ${roomCode}` })).toBeVisible();
     // The player list is behind the phone's bottom bar now.
-    await newPhone.getByRole('navigation', { name: 'More' }).getByRole('button', { name: /^Players/ }).click();
+    await (await openPhoneMenu(newPhone)).getByRole('button', { name: /^Players/ }).click();
     await expect(newPhone.getByRole('dialog', { name: /^Players/ })).toContainText('Sam (you)');
     await newPhone.keyboard.press('Escape');
     await expect(newPhone.getByText('Your answer is in!')).toBeVisible();

@@ -9,6 +9,7 @@ import { useDraft, type SaveState } from './use-draft.js';
 import { OwnerNav, useHostRole, type HostRole } from '../owner/owner-nav.js';
 import { GameSettingsPanel } from './game-settings.js';
 import { InvitePanel } from './invite-panel.js';
+import { FieldLimit } from './field-limit.js';
 import { pendingClaim } from '../people/use-me.js';
 import './editor.css';
 
@@ -28,7 +29,7 @@ export function EditorShell({ gameId }: { gameId: string }) {
 
 function EditorPage({ gameId }: { gameId: string }) {
   const role = useHostRole();
-  return <div className="editor-page"><OwnerNav current="editor" role={role} /><EditorBody gameId={gameId} role={role} /></div>;
+  return <div className="editor-page"><OwnerNav current="editor" role={role} /><EditorBody gameId={gameId} role={role} /><FieldLimit /></div>;
 }
 
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */

@@ -15,7 +15,7 @@ import { balanceOf, entryFor, lockWallet, startWallet, type Seat } from './walle
 // refused while the game needs the player. Rows only live as long as the room
 // (see cleanUpChallenges): the game and its replay go with it.
 interface Access {
-  seatOf(request: FastifyRequest): Promise<{ seat: Seat; enabled: boolean; paused: boolean }>;
+  seatOf(request: FastifyRequest): Promise<{ seat: Seat; enabled: boolean; chips: boolean; paused: boolean }>;
   fail(reply: FastifyReply, error: unknown): unknown;
 }
 const OPEN = ['INVITED', 'PLAYING'];
@@ -58,10 +58,10 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
 
   app.get(base, async (request, reply) => {
     try {
-      const { seat } = await access.seatOf(request);
+      const { seat, chips } = await access.seatOf(request);
       const rows = await client.sideChallenge.findMany({ where: { sessionId: seat.sessionId, OR: [{ challengerId: seat.id }, { opponentId: seat.id }] }, orderBy: { createdAt: 'desc' }, take: 20 });
       const { balance } = await client.$transaction(tx => balanceOf(tx, seat));
-      return { ok: true, data: ChallengeListSchema.parse({ challenges: rows.map(row => view(row, seat.id)), balance }) };
+      return { ok: true, data: ChallengeListSchema.parse({ challenges: rows.map(row => view(row, seat.id)), balance, chips }) };
     } catch (error) { return access.fail(reply, error); }
   });
 
@@ -69,8 +69,9 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
     try {
       const parsed = NewChallengeSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const { challengeId, opponentId, game, stake, settings } = parsed.data;
-      const { seat, enabled, paused } = await access.seatOf(request);
-      roomAssert(enabled, 'SIDE_GAMES_OFF'); roomAssert(!paused, 'SIDE_GAMES_PAUSED');
+      const { seat, enabled, chips, paused } = await access.seatOf(request);
+      // Without chips a challenge is for fun only: no stake.
+      roomAssert(enabled, 'SIDE_GAMES_OFF'); roomAssert(chips || stake === 0, 'CHIPS_OFF'); roomAssert(!paused, 'SIDE_GAMES_PAUSED');
       const match = startMatch(game as HeadToHeadKey, settings); roomAssert(match, 'INVALID_COMMAND');
       const row = await client.$transaction(async tx => {
         // A repeated tap returns the same challenge.
@@ -80,8 +81,8 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
         roomAssert(await tx.sessionPlayer.count({ where: { id: opponentId, sessionId: seat.sessionId, leftAt: null } }) === 1, 'NOT_FOUND');
         roomAssert(await tx.sideChallenge.count({ where: { sessionId: seat.sessionId, status: { in: OPEN }, OR: [{ challengerId: seat.id, opponentId }, { challengerId: opponentId, opponentId: seat.id }] } }) === 0, 'ALREADY_SUBMITTED');
         roomAssert(await tx.sideChallenge.count({ where: { sessionId: seat.sessionId, challengerId: seat.id, status: 'INVITED' } }) < MAX_OPEN_INVITES, 'RATE_LIMITED');
-        await lockWallet(tx, seat); await startWallet(tx, seat);
-        roomAssert((await balanceOf(tx, seat)).balance >= stake, 'NOT_ENOUGH_CHIPS');
+        // Only a stake touches the wallet; a challenge for fun needs no chips at all.
+        if (stake > 0) { await lockWallet(tx, seat); await startWallet(tx, seat); roomAssert((await balanceOf(tx, seat)).balance >= stake, 'NOT_ENOUGH_CHIPS'); }
         return tx.sideChallenge.create({ data: { id: challengeId, sessionId: seat.sessionId, challengerId: seat.id, opponentId, game, stake, status: 'INVITED', state: match as object } });
       });
       notify(row);
@@ -92,11 +93,13 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
   // The opponent accepts: both stakes go in and the game starts.
   app.post(`${base}/:challengeId/accept`, async (request, reply) => {
     try {
-      const { seat, enabled, paused } = await access.seatOf(request);
+      const { seat, enabled, chips, paused } = await access.seatOf(request);
       roomAssert(enabled, 'SIDE_GAMES_OFF'); roomAssert(!paused, 'SIDE_GAMES_PAUSED');
       const row = await client.$transaction(async tx => {
         const row = await locked(tx, idOf(request), seat);
         roomAssert(row.opponentId === seat.id && row.status === 'INVITED', 'INVALID_STATE');
+        // A stake made while chips were on cannot go in once the host has switched them off.
+        roomAssert(chips || row.stake === 0, 'CHIPS_OFF');
         const challenger = await seatRow(tx, row.sessionId, row.challengerId);
         await lockBoth(tx, challenger, seat); await startWallet(tx, challenger); await startWallet(tx, seat);
         if (row.stake > 0) {

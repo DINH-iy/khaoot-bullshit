@@ -17,7 +17,7 @@ const RULES: Record<string, string> = {
   'Host route choice has no timer': 'When the host decides the route, the choice cannot have a timer.',
   'Invalid vote source': 'This vote needs a writing or upload round, without points, that comes before it on every route.',
   'Vote source may never be revealed': 'On some routes these answers are never voted on, so they would never be shown with names.',
-  'Game teams are used before they are defined': 'This round uses the game’s teams, but on some route no teams have been made yet.',
+  'Game teams are used before they are defined': 'This round is played in teams, but on some route no Pick teams scene comes before it. Add one, or let everyone play for themselves.',
   'Captain vote needs teams earlier on every path': 'A captain vote needs teams to be made earlier on every route.',
   'Missing start node': 'Choose the scene the game starts with.',
   'Missing edge endpoint': 'A connection points to a scene that no longer exists.',

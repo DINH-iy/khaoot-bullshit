@@ -31,9 +31,8 @@ function pointsSummary(stage: Stage): string {
 /** What the Who plays group says when closed. */
 function playSummary(stage: Stage): string {
   const play = stage['play'] as { kind: string; lineup?: { kind: string } } | undefined;
-  if (!play) return 'As the game’s default';
-  if (play.kind === 'solo') return 'Everyone for themselves';
-  return { game: 'The game’s teams', round: 'Teams for this round', reform: 'New teams from here on' }[play.lineup?.kind ?? 'game'] ?? 'Teams';
+  if (!play || play.kind === 'solo') return 'Everyone for themselves';
+  return { game: 'In the teams', round: 'Special teams for this round', reform: 'New teams from here on' }[play.lineup?.kind ?? 'game'] ?? 'Teams';
 }
 
 /**
@@ -50,7 +49,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
   const withPlaces = <T extends Record<string, unknown>>(base: T, places: Places | undefined): T => { const copy: Record<string, unknown> = { ...base }; if (places) copy['places'] = places; else delete copy['places']; return copy as T; };
   const fastest = (legendFor: string) => <PlacesFields legend={`Extra for the fastest ${legendFor}`} hint="On top of the points above, given when the answer is shown." value={scoring?.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring ?? {}, places) }), 'places')} />;
   const id = (field: string) => `${node.key}-${index}-${field}`;
-  const timed = !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && !isWheelScene(stage);
+  const timed = !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
   const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || stage.kind === 'duel' || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
   const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
   return <div className="stage-fields">
@@ -96,6 +95,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
       {stage.kind === 'minigame' && <MinigameFields part="settings" definition={definition} node={node} index={index} onChange={onChange} />}
       {stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
       {stage.kind === 'route' && <RouteFields definition={definition} node={node} stage={stage} onChange={onChange} />}
+      {stage.kind === 'teams' && <PickTeamsFields definition={definition} node={node} stage={stage} onChange={(next, field) => edit(() => next, field)} />}
       {isWheelScene(stage) && <WheelOfScene definition={definition} stage={stage} onChange={onChange} />}
     </Section>
 
@@ -122,21 +122,43 @@ export function StageFields({ definition, node, index, onChange }: { definition:
   </div>;
 }
 
+/**
+ * A Pick teams scene: how many teams, how they are made, captains, and (when teams are made again) what happens
+ * to the team scores. The rounds after it play in these teams when their "Who plays" says so.
+ */
+function PickTeamsFields({ definition, node, stage, onChange }: { definition: Definition; node: Node; stage: Stage; onChange: (next: Stage, field: string) => void }) {
+  const form = stage['form'] as Form; const set = (key: string, value: unknown) => { const copy: Stage = { ...stage }; if (value === undefined) delete copy[key]; else copy[key] = value; onChange(copy, key); };
+  // Making teams again later in the game: the team scores can start over or carry on.
+  const again = definition.nodes.some(other => other.key !== node.key && other.stages.some(part => part.kind === 'teams'));
+  return <>
+    <FormFields form={form} onChange={next => set('form', next)} />
+    <label className="choice"><input type="checkbox" checked={stage['captains'] === true} onChange={event => set('captains', event.target.checked ? true : undefined)} />Each team gets a captain (who can answer for the team)</label>
+    {again && <label>Team scores when teams are made again<select value={String(stage['carryover'] ?? 'fresh')} onChange={event => set('carryover', event.target.value === 'fresh' ? undefined : event.target.value)}>
+      <option value="fresh">Start from zero</option><option value="keep">Keep each team’s score</option><option value="members">Add up the members’ scores</option></select></label>}
+    <p className="hint">In the room the host sees the teams first, can move players, add or remove teams, and starts when they are right. The rounds after this scene play in these teams until the next Pick teams scene.</p>
+  </>;
+}
+
 /** Solo or teams for one part; empty means it follows the game's setting. */
 function PlayFields({ definition, node, index, onChange }: { definition: Definition; node: Node; index: number; onChange: Change }) {
   const stage = node.stages[index]!; const play = stage['play'] as { kind: string; lineup?: { kind: string; form?: Form; carryover?: string }; answers?: string; points?: string } | undefined;
-  const mode = !play ? 'game-default' : play.kind === 'solo' ? 'solo' : play.lineup?.kind ?? 'game';
+  // Without a game-wide default (games made with Pick teams scenes), no setting means everyone for themselves.
+  const gameDefault = Boolean(definition['play']);
+  const mode = !play ? (gameDefault ? 'game-default' : 'solo') : play.kind === 'solo' ? 'solo' : play.lineup?.kind ?? 'game';
+  // A solo game has no teams to play in: that choice appears once the game has a Pick teams scene.
+  const teamScenes = definition.nodes.some(other => other.stages.some(part => part.kind === 'teams'));
   const set = (next: unknown) => onChange(updateStage(definition, node.key, index, current => { const copy: Stage = { ...current }; if (next === undefined) delete copy['play']; else copy['play'] = next; return copy; }));
   const teamsWith = (lineup: unknown) => ({ kind: 'teams', lineup, answers: play?.answers ?? 'everyone', points: play?.points ?? 'both' });
   const defaultForm: Form = { split: { kind: 'count', teams: 2 }, formation: 'random' };
   return <fieldset><legend className="visually-hidden">Who plays this</legend>
     <label>Players<select value={mode} onChange={event => {
       const value = event.target.value;
-      set(value === 'game-default' ? undefined : value === 'solo' ? { kind: 'solo' } : value === 'game' ? teamsWith({ kind: 'game' })
+      set(value === 'game-default' ? undefined : value === 'solo' ? (gameDefault ? { kind: 'solo' } : undefined) : value === 'game' ? teamsWith({ kind: 'game' })
         : value === 'round' ? teamsWith({ kind: 'round', form: play?.lineup?.form ?? defaultForm }) : teamsWith({ kind: 'reform', form: play?.lineup?.form ?? defaultForm, carryover: 'fresh' }));
     }}>
-      <option value="game-default">As the game’s default</option><option value="solo">Everyone for themselves</option><option value="game">The game’s teams</option>
-      <option value="round">Teams for this round only</option><option value="reform">New teams from here on</option></select></label>
+      {gameDefault && <option value="game-default">As the game’s default</option>}<option value="solo">Everyone for themselves</option>{(teamScenes || mode === 'game') && <option value="game">In the teams (made in the last Pick teams scene)</option>}
+      <option value="round">Special teams for this round only (like 1 against the rest)</option>{mode === 'reform' && <option value="reform">New teams from here on</option>}</select></label>
+    {mode === 'game' && !teamScenes && <p className="hint warn">This game has no Pick teams scene yet: add one before this round, or choose everyone for themselves.</p>}
     {play?.kind === 'teams' && <>
       {(play.lineup?.kind === 'round' || play.lineup?.kind === 'reform') && <FormFields form={play.lineup.form ?? defaultForm} onChange={form => set({ ...play, lineup: { ...play.lineup, form } })} />}
       {play.lineup?.kind === 'reform' && <label>Team scores<select value={play.lineup.carryover} onChange={event => set({ ...play, lineup: { ...play.lineup, carryover: event.target.value } })}>

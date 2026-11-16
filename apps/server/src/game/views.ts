@@ -95,7 +95,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       const run = rules && current ? readMinigameRun(current.presentation) : null;
       const relay = rules?.game === 'relay-drawing' && run && context && current ? await relayView(tx, current.id, relayPlan(context, rules.settings as MinigameSettings<'relay-drawing'>, run), context.teamOf) : null;
       const minigame = rules ? { game: rules.game, settings: rules.settings, relay, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
-        goAt: current?.status === 'ACTIVE' && run?.goAt && Date.parse(run.goAt) <= clock().getTime() ? run.goAt : null } : null;
+        // A paused room shows no GO: continuing restarts the duel with a fresh countdown and a new GO.
+        goAt: current?.status === 'ACTIVE' && session.status === 'RUNNING' && run?.goAt &&Date.parse(run.goAt) <= clock().getTime() ? run.goAt : null } : null;
       const minigameAnswer = rules && revealed ? { kind: 'minigame', game: rules.game, doorsMilli: run?.doorsMilli ?? null,
         entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id).entries } : null;
       const voteAnswer = revealed && voteSource?.success ? { kind: 'vote', entries: candidates.map(candidate => ({ submissionId: candidate.id, playerId: candidate.playerId, teamId: candidate.teamId, votes: votesFor(candidate.id) })).sort((a, b) => b.votes - a.votes || (a.submissionId < b.submissionId ? -1 : 1)) } : null;

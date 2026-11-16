@@ -39,11 +39,11 @@ Top level:
 | `title` | Name of the game (required). |
 | `scenes` | The scenes, in play order (required). |
 | `start` | `id` of the first scene. Default: the first scene. |
-| `teams` | Optional game teams, see "Teams". |
-| `play` | Optional default for all rounds, see "Teams". |
 | `look` | Optional texts, style and animations, see "Look & feel". |
 | `wheels` | Optional wheels of fortune: `[{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke"], "removePicked": true, "spinSeconds": 5 }]`. A scene with `"spin": "Forfeits"` lets the host spin it there; `"wheelClear": true` stops showing the last result. |
 | `awards` | The end-of-game awards in order, from `winner`, `mostCorrect`, `mostWrong`, `fastest`, `slowest`, `mostVotes`, `minigameChamp`, `luckiest`, `mostReactions`. Leave out for all of them; `[]` for none. |
+| `sideGames` | `false` to leave out the side games on the phones (slot machine, blackjack, packs, challenges). Default: on, just for fun. |
+| `chips` | `true` to play the side games with chips (play money): bets, stakes in challenges and a leaderboard. Default: off. The host can still switch both in the room. |
 
 Every scene can have:
 
@@ -85,17 +85,19 @@ Rules the game must follow (the editor explains any break):
 
 ### Teams
 
-Leave teams out for everyone-for-themselves. For a team game, add game teams and say how rounds use them:
+Leave teams out for everyone-for-themselves; most games are. For a team game, add a **Pick teams** scene where the teams are made, and mark the rounds after it that are played in those teams:
 
 ```json
-"teams": { "split": { "kind": "count", "teams": 2 }, "formation": "random" },
-"play": { "kind": "teams", "lineup": { "kind": "game" }, "answers": "captain", "points": "both" }
+{ "id": "teams", "type": "pick-teams", "title": "Pick your teams", "teams": 2, "how": "players", "captains": true, "next": "q1" },
+{ "id": "q1", "type": "quiz", "question": "…", "inTeams": true, "captain": true, "next": "…" }
 ```
 
-- `split`: `{ "kind": "count", "teams": 3 }` for equal teams, or `{ "kind": "sizes", "sizes": [1, "rest"] }` for exact sizes such as one against the rest, or `[2, 2]`.
-- `formation`: `"random"`, `"host"` or `"players"`. The host can always change the teams before a round starts.
-- `answers`: `"everyone"` or `"captain"`. `points`: `"team"`, `"members"` or `"both"`.
-- One scene can differ from the game: add `"play": { "kind": "solo" }` for everyone-for-themselves. For teams in this round only, add `"play": { "kind": "teams", "lineup": { "kind": "round", "form": { "split": { "kind": "sizes", "sizes": [1, "rest"] }, "formation": "random" } }, "answers": "everyone", "points": "members" }`.
+- `teams`: how many equal teams (2–12, default 2). For exact sizes use `"form": { "split": { "kind": "sizes", "sizes": [1, "rest"] }, "formation": "random" }`.
+- `how`: `"random"`, `"host"` or `"players"` (default). In the room the host always sees the teams first, can move players, add or remove teams, and starts when they are right.
+- `captains`: `true` gives each team a captain.
+- On a round, `"inTeams": true` plays it in the teams of the last Pick teams scene; `"captain": true` lets only the captain answer. Rounds without it are everyone for themselves. Duels, party choices, cutscenes and scoreboards are never played in teams.
+- One round with its own teams (like one against the rest): `"play": { "kind": "teams", "lineup": { "kind": "round", "form": { "split": { "kind": "sizes", "sizes": [1, "rest"] }, "formation": "random" } }, "answers": "everyone", "points": "members" }`.
+- Older games with game-wide `teams` and `play` still import; the editor turns them into a Pick teams scene at the start.
 
 ### Look & feel
 
@@ -138,7 +140,7 @@ You are writing a party game for a web app where people play on their phones whi
   - `"drawing"`: `"question"` (what to draw), optional `"blind": true`. Can be voted on with a `"vote"` scene.
   - `"minigame"`: `"question"` (a short title), `"game"`: `"reaction"` (tap at GO), `"tap-race"` (tap fast), `"stop-clock"` (stop a vanishing clock at a target), `"lucky-doors"` (pick a door with hidden points), `"perfect-circle"` (draw the roundest circle) or `"relay-drawing"` (teams take turns drawing one picture, then vote; add team `"play"`); optional `"points"`: list of points for 1st, 2nd, 3rd place. Use `"seconds"` of 20–30.
 - Rules: no loops (never lead back to an earlier scene); every scene must be reachable; a `"vote"` must come after the scene it votes on, on every route, and every route through that scene must reach the vote; only a party-choice may lead to more than one scene.
-- Optional teams: add at top level `"teams": { "split": { "kind": "count", "teams": 2 }, "formation": "random" }` and `"play": { "kind": "teams", "lineup": { "kind": "game" }, "answers": "captain", "points": "both" }`. A single scene can use `"play": { "kind": "solo" }` to be everyone-for-themselves.
+- Teams are optional; most games are everyone-for-themselves. Only for a team game: add a scene `{ "type": "pick-teams", "title": "Pick your teams", "teams": 2, "how": "random" | "host" | "players", "captains": true }` where the teams are made, and `"inTeams": true` (plus `"captain": true` if only captains answer) on the rounds after it that are played in those teams. Quiz, writing, upload, drawing, order, challenge, vote and minigame rounds can be played in teams; duels, party choices, cutscenes and scoreboards cannot.
 - Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Presets: `party`, `neon`, `pub`, `clean`, `retro`, `kids`, `elegant`, `ocean`. Animation presets: `fade`, `rise`, `drop`, `zoom`, `pop`, `flip`, `spin`, `bounce`, `shake`, `pulse`. Only add a look if the user asks for a style.
 - Use timers on quiz questions (15–30 seconds), writing (45–90 seconds) and votes (30–45 seconds). Keep phone texts short; answers fit on a small screen.
 

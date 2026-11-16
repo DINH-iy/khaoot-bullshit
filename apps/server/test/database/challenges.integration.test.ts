@@ -20,7 +20,9 @@ const cookieOf = (response: Awaited<ReturnType<typeof call>>) => String(response
 /** A room (the timed quiz, not started) with three guests on their phones. */
 async function room() {
   const body = { gameKey: 'timed-quiz', sessionId: randomUUID(), commandId: randomUUID() };
-  expect((await call('POST', '/api/host/rooms', body, owner)).statusCode).toBe(200);
+  const opened = await call('POST', '/api/host/rooms', body, owner); expect(opened.statusCode).toBe(200);
+  // Chips are off in a new room (challenges are just for fun); these tests are about stakes, so the host switches chips on.
+  expect((await call('POST', `/api/rooms/${body.sessionId}/settings`, { chips: true }, cookieOf(opened))).statusCode).toBe(200);
   const { roomCode } = await prisma.gameSession.findUniqueOrThrow({ where: { id: body.sessionId } });
   const phones = [];
   for (const name of ['Ada', 'Bo', 'Cy']) phones.push(cookieOf(await call('POST', '/api/rooms/join', { roomCode, joinId: randomUUID(), displayName: name })));

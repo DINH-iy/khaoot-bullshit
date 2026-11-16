@@ -37,7 +37,7 @@ export function LookPreview({ definition, scope, style, className }: { definitio
     <div className="look-devices">
       <figure className="look-tv"><figcaption>Shared screen</figcaption>
         <div className={`room room-display room-preview ${className}`} style={style}><div ref={tvRef} className="preview-body">
-          {shown === 'join' || shown === 'lobby' ? <section className="lobby"><h2>{t('lobby.screenTitle')}</h2><p>{t('lobby.screenGo', { host: 'party.example' })}</p><p className="big-code">ABC123</p>
+          {shown === 'join' || shown === 'lobby' ? <section className="lobby"><h2>{t('lobby.screenTitle')}</h2><p>{t('lobby.screenGo', { host: 'party.example' })}</p><p className="big-code">ABC-123</p>
             {shown === 'lobby' && <ul className="players preview-players">{players.map(name => <li key={name}>{name}</li>)}</ul>}</section>
             : shown === 'scores' ? <section className="stage-card"><h2>{t('scores.title')}</h2><ol className="scoreboard plain-list">{players.map((name, index) => <li key={name}>{name} · {40 - index * 10}</li>)}</ol><p>{t('scores.note')}</p></section>
             : <section className="stage-card"><h2>{sample.prompt}</h2>
@@ -50,7 +50,7 @@ export function LookPreview({ definition, scope, style, className }: { definitio
       <figure className="look-phone"><figcaption>Phone</figcaption>
         <div className={`room room-player room-preview ${className}`} style={style}><div ref={phoneRef} className="preview-body">
           {shown === 'join' ? <section className="join-card"><p className="brand">party<span>.</span></p><h2>{t('join.title')}</h2><p className="room-game">{definition.title}</p>
-            <label>{t('join.code')}<input className="code-input" readOnly value="ABC123" /></label><label>{t('join.name')}<input readOnly value="Sam" /></label><button className="primary" type="button">{t('join.button')}</button></section>
+            <label>{t('join.code')}<input className="code-input" readOnly value="ABC-123" /></label><label>{t('join.name')}<input readOnly value="Sam" /></label><button className="primary" type="button">{t('join.button')}</button></section>
             : shown === 'lobby' ? <section className="lobby"><h2>{t('lobby.playerTitle')}</h2><p>{t('lobby.playerText')}</p></section>
             : <section className="stage-card"><h2>{sample.prompt}</h2>
               {shown === 'question' ? <><p className="timer">{t('timer.left', { time: '0:15' })}</p><fieldset className="tiles"><legend>{t('answer.legend')}</legend>

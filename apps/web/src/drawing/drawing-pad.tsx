@@ -72,6 +72,8 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
     } else if ((event.key === 'Enter' || event.key === 'Escape') && current && pointer.current === null) { event.preventDefault(); finish(); }
   };
   return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}`}>
+    {/* Impossible to miss: in a blind round your own lines stay hidden until you send the drawing. */}
+    {blind && <p className="blind-banner"><span aria-hidden="true">🙈</span><strong>{t('drawing.blindTitle')}</strong><small>{t('drawing.blindHint')}</small></p>}
     <svg ref={surface} className="drawing-surface" viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription="drawing area" aria-label={label}
       aria-describedby={hintId} tabIndex={disabled ? -1 : 0} onKeyDown={key} onBlur={() => setPen(previous => ({ ...previous, active: false }))}
       onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>

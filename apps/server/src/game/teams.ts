@@ -97,6 +97,22 @@ export async function gameLineupForRound(tx: Transaction, sessionId: string, pre
 export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null }, actorPlayerId: string | null, presentIds: string[]) {
   const present = new Set(presentIds);
   const size = (index: number) => Object.entries(forming.assignment).filter(([id, team]) => team === index && present.has(id)).length;
+  // More or fewer teams than the game proposed: a new team gets the next free colour name; at least one team stays.
+  if (command.type === 'teams.add') {
+    requireGame(forming.teams.length < 12, 'INVALID_COMMAND');
+    const taken = new Set(forming.teams.map(team => team.name.toLowerCase()));
+    const name = DEFAULT_TEAM_NAMES.find(candidate => !taken.has(candidate.toLowerCase())) ?? `Team ${forming.teams.length + 1}`;
+    return { forming: { ...forming, teams: [...forming.teams, { name, targetSize: null }] } };
+  }
+  if (command.type === 'teams.remove') {
+    const index = command.teamIndex ?? -1;
+    requireGame(index >= 0 && index < forming.teams.length && forming.teams.length > 1, 'INVALID_COMMAND');
+    // Later teams move up one place; the removed team's players and captain are unassigned.
+    const shift = (team: number | null) => team === null || team < index ? team : team === index ? null : team - 1;
+    const assignment = Object.fromEntries(Object.entries(forming.assignment).map(([id, team]) => [id, shift(team)]));
+    const captains = Object.fromEntries(Object.entries(forming.captains).flatMap(([team, id]) => { const next = shift(Number(team)); return next === null ? [] : [[String(next), id]]; }));
+    return { forming: { ...forming, teams: forming.teams.filter((_, position) => position !== index), assignment, captains } };
+  }
   if (command.type === 'teams.shuffle') return { forming: { ...forming, assignment: randomAssignment(forming.teams, presentIds, forming.teams.every(team => team.targetSize === null)), captains: {} } };
   if (command.type === 'teams.assign' || command.type === 'teams.choose') {
     const playerId = command.type === 'teams.choose' ? actorPlayerId : command.playerId;

@@ -1,27 +1,17 @@
 import { useEffect, useRef } from 'react';
-import { FormFields, sceneName } from './inspector.js';
+import { sceneName } from './inspector.js';
 import { Section } from './section.js';
 import { FinaleSettings, WheelSettings } from './show-settings.js';
 import { estimateMinutes, type Definition } from './model.js';
 
 type Change = (next: Definition, group?: string) => void;
 
-/** Whether the game has teams, and how rounds play unless a round says otherwise. */
-export function TeamSettings({ definition, onChange }: { definition: Definition; onChange: Change }) {
-  const teams = definition['teams'] as Parameters<typeof FormFields>[0]['form'] | undefined;
-  const play = definition['play'] as { kind: string; answers?: string; points?: string } | undefined;
-  const set = (key: 'teams' | 'play', value: unknown) => { const next = { ...definition }; if (value === undefined) delete next[key]; else next[key] = value; onChange(next); };
-  return <>
-    <label className="choice"><input type="checkbox" checked={Boolean(teams)} onChange={event => set('teams', event.target.checked ? { split: { kind: 'count', teams: 2 }, formation: 'random' } : undefined)} />This game has teams</label>
-    {teams && <FormFields form={teams} onChange={form => set('teams', form)} />}
-    <label>Rounds play, unless a round says otherwise<select value={play?.kind === 'teams' ? 'teams' : 'solo'} disabled={!teams && play?.kind !== 'teams'}
-      onChange={event => set('play', event.target.value === 'solo' ? undefined : { kind: 'teams', lineup: { kind: 'game' }, answers: 'everyone', points: 'both' })}>
-      <option value="solo">Everyone for themselves</option><option value="teams">In the game’s teams</option></select></label>
-    {play?.kind === 'teams' && <>
-      <label>Who answers<select value={play.answers} onChange={event => set('play', { ...play, answers: event.target.value })}><option value="everyone">Everyone</option><option value="captain">One captain per team</option></select></label>
-      <label>Points go to<select value={play.points} onChange={event => set('play', { ...play, points: event.target.value })}><option value="both">The team and each member</option><option value="team">The team</option><option value="members">Each member</option></select></label>
-    </>}
-  </>;
+/** Teams are not a game setting: a game is solo unless it has Pick teams scenes. This only says which it is. */
+function TeamsNote({ definition }: { definition: Definition }) {
+  const picks = definition.nodes.filter(node => node.stages.some(stage => stage.kind === 'teams'));
+  return picks.length
+    ? <p className="hint">Teams are made in {picks.length === 1 ? 'the Pick teams scene' : `${picks.length} Pick teams scenes`} ({picks.map(node => sceneName(definition, node.key)).join(', ')}). Each round says under “Who plays” whether it is played in those teams or by everyone for themselves.</p>
+    : <p className="hint">Everyone plays for themselves. For a team game, add a Pick teams scene where the teams should be made; the rounds after it can then be played in teams.</p>;
 }
 
 /**
@@ -32,9 +22,7 @@ export function TeamSettings({ definition, onChange }: { definition: Definition;
 export function GameSettingsPanel({ definition, onChange, onLook, onClose }: { definition: Definition; onChange: Change; onLook: () => void; onClose: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
-  const teams = definition['teams'] as { split?: { kind: string; teams?: number; sizes?: unknown[] } } | undefined;
-  const play = definition['play'] as { kind?: string } | undefined;
-  const teamCount = teams?.split?.kind === 'count' ? teams.split.teams : teams?.split?.sizes?.length;
+  const teamGame = definition.nodes.some(node => node.stages.some(stage => stage.kind === 'teams'));
   return <section className="game-settings-panel" aria-labelledby="game-settings-heading" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
     <div className="inspector-head"><h2 id="game-settings-heading" ref={heading} tabIndex={-1}>Game settings</h2><button className="small-button" onClick={onClose}>Close</button></div>
     <p className="hint">These apply to the whole game. A scene’s own settings are in the panel that opens when you select it.</p>
@@ -43,8 +31,18 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose }: { d
       <label>The game starts with<select value={definition.startNodeKey} onChange={event => onChange({ ...definition, startNodeKey: event.target.value })}>
         {definition.nodes.map(node => <option key={node.key} value={node.key}>{sceneName(definition, node.key)}</option>)}</select></label>
     </Section>
-    <Section title="Teams and default play" summary={teams ? `${teamCount ?? 2} teams · ${play?.kind === 'teams' ? 'team rounds' : 'solo rounds'}` : 'No teams'}>
-      <TeamSettings definition={definition} onChange={onChange} />
+    <Section title="Teams" summary={teamGame ? 'Made in Pick teams scenes' : 'Everyone for themselves'}>
+      <TeamsNote definition={definition} />
+    </Section>
+    {/* Only what differs from the defaults is stored: side games on, chips off. */}
+    <Section title="Side games & chips" summary={definition['sideGames'] === false ? 'No side games' : definition['chips'] === true ? 'Side games with chips' : 'Side games for fun'}>
+      <label className="choice"><input type="checkbox" checked={definition['sideGames'] !== false}
+        onChange={event => { const next = { ...definition }; if (event.target.checked) delete next['sideGames']; else { next['sideGames'] = false; delete next['chips']; } onChange(next); }} />
+        Side games on the phones while players wait</label>
+      <label className="choice"><input type="checkbox" checked={definition['sideGames'] !== false && definition['chips'] === true} disabled={definition['sideGames'] === false}
+        onChange={event => { const next = { ...definition }; if (event.target.checked) next['chips'] = true; else delete next['chips']; onChange(next); }} />
+        Play them with chips</label>
+      <p className="hint">Side games: slot machine, blackjack, packs and challenges between players, on by default. Chips (play money only) add bets, stakes and a leaderboard; off by default, so the games are just for fun. The host can still switch both in the room.</p>
     </Section>
     <WheelSettings definition={definition} onChange={onChange} />
     <FinaleSettings definition={definition} onChange={onChange} />

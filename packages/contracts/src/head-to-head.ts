@@ -95,4 +95,5 @@ export const ChallengeSchema = z.object({
   view: HeadToHeadViewSchema, updatedAt: z.string(),
 }).strict();
 export type Challenge = z.infer<typeof ChallengeSchema>;
-export const ChallengeListSchema = z.object({ challenges: z.array(ChallengeSchema), balance: z.number().int() }).strict();
+// `chips`: whether challenges in this room may have a stake (else they are for fun only).
+export const ChallengeListSchema = z.object({ challenges: z.array(ChallengeSchema), balance: z.number().int(), chips: z.boolean() }).strict();

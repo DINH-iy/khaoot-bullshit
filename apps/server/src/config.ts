@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 
 const httpsUrl = z.url().refine(value => new URL(value).protocol === 'https:', 'HTTPS is required');
@@ -12,7 +13,8 @@ const EnvironmentSchema = z.object({
   // Explicit local owner access for hosting from the browser. Never valid in production.
   LOCAL_OWNER_TOKEN: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Use a generated 32-byte base64url owner token').optional(),
   // Where uploaded pictures and videos are stored. Defaults to the ignored .local/media folder.
-  MEDIA_DIR: z.string().min(1).max(1024).refine(value => value.startsWith('/'), 'Use an absolute path').optional(),
+  // Absolute for this system: /srv/media on Linux, C:\party\media on Windows (local development).
+  MEDIA_DIR: z.string().min(1).max(1024).refine(value => isAbsolute(value), 'Use an absolute path').optional(),
   // Days after a room ends (or is last used) before its pictures, videos and drawings are deleted.
   MEDIA_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   SERVE_WEB: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),

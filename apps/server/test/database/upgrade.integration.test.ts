@@ -17,7 +17,7 @@ it('upgrades populated initial tables without losing existing game data', async 
   try {
     const directory = new URL('../../database/migrations/', import.meta.url);
     const migrations = (await readdir(directory, { withFileTypes: true })).filter(item => item.isDirectory()).map(item => item.name).sort();
-    expect(migrations).toHaveLength(15);
+    expect(migrations).toHaveLength(16);
     await pool.query(await readFile(new URL(`${migrations[0]}/migration.sql`, directory), 'utf8'));
     const { rows: creators } = await pool.query('INSERT INTO creators (issuer, subject) VALUES ($1, $2) RETURNING id', ['https://identity.example/', randomUUID()]);
     const { rows: games } = await pool.query('INSERT INTO games ("creatorId", title) VALUES ($1, $2) RETURNING id', [creators[0].id, 'Preserved game']);
@@ -34,6 +34,9 @@ it('upgrades populated initial tables without losing existing game data', async 
     // Prefabs and phone challenges are tables of their own.
     expect((await pool.query("SELECT to_regclass('side_challenges') AS name")).rows).toEqual([{ name: 'side_challenges' }]);
     expect((await pool.query("SELECT to_regclass('scene_prefabs') AS name")).rows).toEqual([{ name: 'scene_prefabs' }]);
+    // Challenge stakes may be bets and payouts without a side-game round; slot and blackjack ones still need their round.
+    const rule = (await pool.query("SELECT pg_get_constraintdef(oid) AS rule FROM pg_constraint WHERE conname = 'chips_valid_amount'")).rows[0].rule as string;
+    expect(rule).toContain('tictactoe'); expect(rule).toContain('"roundId" IS NOT NULL');
     // Keys and editor rights only add columns: nobody becomes an editor by upgrading.
     expect((await pool.query("SELECT column_name, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'people' AND column_name IN ('canEdit', 'keySealed') ORDER BY column_name")).rows).toEqual([{ column_name: 'canEdit', is_nullable: 'NO', column_default: 'false' }, { column_name: 'keySealed', is_nullable: 'YES', column_default: null }]);
   } finally {

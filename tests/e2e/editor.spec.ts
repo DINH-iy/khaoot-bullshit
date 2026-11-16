@@ -195,11 +195,11 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   await list.getByRole('menuitem', { name: /^Quiz question/ }).click();
   await list.getByRole('menuitem', { name: /^Big tiles/ }).click();
   await expect(list.locator('.scene-row')).toHaveCount(6);
-  // Game settings: give the game teams and make rounds team rounds by default.
+  // A solo game: its rounds offer no team play, and Game settings says how to make it a team game.
+  await expect(page.getByLabel('Players')).not.toContainText('In the teams');
   await page.getByRole('button', { name: 'Game settings' }).click();
-  await page.getByText('Teams and default play').click();
-  await page.getByLabel('This game has teams').check();
-  await page.getByLabel('Rounds play, unless a round says otherwise').selectOption('teams');
+  await page.getByText('Teams', { exact: true }).click();
+  await expect(page.getByText('Everyone plays for themselves. For a team game, add a Pick teams scene', { exact: false })).toBeVisible();
   await saved(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   // The Flow editor shows the same draft.

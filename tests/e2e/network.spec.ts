@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import jsQR from 'jsqr';
 import { createDatabase } from '../../apps/server/src/database/client.js';
 import { provisionRehearsal } from '../../apps/server/src/rooms/rehearsal.js';
+import { openHostFold } from './helpers.js';
 
 const url = process.env['DATABASE_URL'];
 if (!url || !new URL(url).pathname.endsWith('_test') || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E test database required');
@@ -63,6 +64,7 @@ test('display stays read-only without replacing host credentials in another tab'
   const f = await provisionRehearsal(db.client); const context = await browser.newContext();
   try {
     const host = await context.newPage(); await host.goto(`${baseURL}/?room=${f.sessionId}#access=${f.hostToken}`);
+    await openHostFold(host, 'Shared screen');
     await host.getByRole('button', { name: 'Create display link' }).click();
     const href = await host.getByRole('link', { name: 'Open shared display' }).getAttribute('href'); expect(href).toBeTruthy();
     const display = await context.newPage(); await display.goto(href!);
@@ -71,4 +73,19 @@ test('display stays read-only without replacing host credentials in another tab'
     await host.getByRole('button', { name: 'Reconnect and sync' }).click();
     await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
   } finally { await context.close(); }
+});
+
+test('the join form keeps the code readable and capped, and says what is missing', async ({ page }) => {
+  const f = await provisionRehearsal(db.client);
+  await page.goto('/');
+  const code = page.getByLabel('Room code');
+  // Lower case, spaces and a paste that is too long all become the code itself, shown as ABC-123.
+  await code.pressSequentially(`${f.roomCode.slice(0, 2).toLowerCase()} ${f.roomCode.slice(2)}XYZ`);
+  await expect(code).toHaveValue(`${f.roomCode.slice(0, 3)}-${f.roomCode.slice(3)}`);
+  await page.getByRole('button', { name: 'Join room', exact: true }).click();
+  await expect(page.getByText('Type a name so the others know who you are.')).toBeVisible();
+  await expect(page.getByLabel('Your name')).toBeFocused();
+  await page.getByLabel('Your name').fill('Dash tester');
+  await page.getByRole('button', { name: 'Join room', exact: true }).click();
+  await expect(page.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
 });

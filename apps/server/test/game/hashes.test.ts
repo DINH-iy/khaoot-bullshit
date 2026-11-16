@@ -14,7 +14,7 @@ describe('published definitions stay byte-identical', () => {
         "first-reliable-game": "737e2310437da699a9084c78ed7a9b536b70b1258e01709b12f8aaa19817b4ea",
         "picture-party": "1360c36063e9934039575899fbedd600828169b6cf5e8efa583754fcd8f01c0b",
         "prepared": "737e2310437da699a9084c78ed7a9b536b70b1258e01709b12f8aaa19817b4ea",
-        "team-party": "1ec94491954f66506cbc2e2c510b4f7524f215d3cbecbd4bdea8bd2172a1348b",
+        "team-party": "13630e1c2f51fb9b50a60235e32f0fce7025af154316bb7a4dfb01d71d9aabcd",
         "timed-quiz": "2df2da9971c473132494527db2d2a0862f588f2f3b990cf3e5d35065a2eae6d9",
       }
     `);

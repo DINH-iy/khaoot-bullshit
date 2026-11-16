@@ -22,27 +22,29 @@ export default function SideGames({ sessionId, selfId }: { sessionId: string; se
       .catch(cause => setError(sideProblem(cause)));
   }, [sessionId]);
   if (error && !wallet) return <p role="alert" className="error">{error}</p>;
-  if (!wallet) return <p role="status">Getting your chips…</p>;
+  if (!wallet) return <p role="status">Opening the games…</p>;
   if (!wallet.enabled) return <p>The host has switched side games off for this room.</p>;
+  // Without chips every game is played just for fun: no balance, no bets, no leaderboard.
+  const forChips = wallet.chips; const tabs = forChips ? TABS : TABS.filter(entry => entry.key !== 'board');
   const setBalance = (balance: number) => setWallet(current => current && { ...current, balance, canRefill: balance < 10 });
   const refill = () => { setError(''); void sideApi<{ balance: number }>(sessionId, '/refill', {}).then(result => setWallet(current => current && { ...current, balance: result.balance, canRefill: false, refills: current.refills + 1 })).catch(cause => setError(sideProblem(cause))); };
   return <div className="side-games">
-    <div className="chip-bar">
+    {forChips ? <div className="chip-bar">
       <p><span aria-hidden="true">🪙</span> <strong>{chips(wallet.balance)}</strong>{wallet.account === 'guest' && <small> · this room only</small>}</p>
       {wallet.canRefill && <button type="button" className="small-button" onClick={refill}>Broke? Get {REFILL_CHIPS}</button>}
-    </div>
+    </div> : <p className="chip-bar">Just for fun: no chips in this room.</p>}
     {error && <p role="alert" className="error">{error}</p>}
     <div className="side-tabs" role="tablist" aria-label="Side games">
-      {TABS.map(entry => <button key={entry.key} type="button" role="tab" id={`side-tab-${entry.key}`} aria-controls="side-panel" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)}>
+      {tabs.map(entry => <button key={entry.key} type="button" role="tab" id={`side-tab-${entry.key}`} aria-controls="side-panel" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)}>
         <span aria-hidden="true">{entry.icon}</span>{entry.label}</button>)}
     </div>
     <div id="side-panel" role="tabpanel" aria-labelledby={`side-tab-${tab}`}>
-      {tab === 'slots' && <Slots sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} />}
-      {tab === 'blackjack' && <Blackjack sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} open={wallet.blackjack} />}
-      {tab === 'packs' && <Packs sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} collection={collection}
+      {tab === 'slots' && <Slots sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} chips={forChips} />}
+      {tab === 'blackjack' && <Blackjack sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} open={wallet.blackjack} chips={forChips} />}
+      {tab === 'packs' && <Packs sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} collection={collection} chips={forChips}
         onCollected={items => setCollection(current => { const next = new Map(current); for (const key of items) next.set(key, (next.get(key) ?? 0) + 1); return next; })} />}
-      {tab === 'board' && <Board sessionId={sessionId} self={selfId} />}
+      {tab === 'board' && forChips && <Board sessionId={sessionId} self={selfId} />}
     </div>
-    <p className="sheet-title">Play chips only, never real money.{wallet.account === 'guest' ? ' With a personal link from the organiser your chips carry over to the next game.' : ''}</p>
+    {forChips && <p className="sheet-title">Play chips only, never real money.{wallet.account === 'guest' ? ' With a personal link from the organiser your chips carry over to the next game.' : ''}</p>}
   </div>;
 }

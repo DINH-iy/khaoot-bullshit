@@ -120,6 +120,21 @@ describe('minigames', () => {
     expect(saved.value).toEqual({ kind: 'minigame', value: 620 });
   });
 
+  it('shows no GO while a reaction duel is paused, and a new one after the fresh countdown', async () => {
+    const w = world(); const f = await fixture(1, game({ game: 'reaction', settings: { minWaitMs: 2000, maxWaitMs: 2000 } }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+    const view = (ms: number) => readSessionView(prisma, { role: 'player', playerId: f.players[0]!.id }, f.sessionId, () => new Date(w.now() + ms));
+    const first = readMinigameRun((await prisma.stageRun.findUniqueOrThrow({ where: { id: stageRunId } })).presentation)!;
+    await host(w, f, 'session.pause');
+    // Long past the old GO moment, the paused room still shows none.
+    expect((await view(60_000)).stage!.minigame!.goAt).toBeNull();
+    w.advance(60_000); await host(w, f, 'session.resume');
+    const next = readMinigameRun((await prisma.stageRun.findUniqueOrThrow({ where: { id: stageRunId } })).presentation)!;
+    expect(next.goAt).not.toBe(first.goAt);
+    expect((await view(4900)).stage!.minigame!.goAt).toBeNull();
+    expect((await view(5000)).stage!.minigame!.goAt).toBe(next.goAt);
+  });
+
   it('stops a running minigame while paused and gives a fresh countdown on resume; results already in stay', async () => {
     const w = world(); const f = await fixture(2, game({ game: 'tap-race', settings: { seconds: 5 } }));
     const stageRunId = (await host(w, f, 'session.start')).stageRunId!;

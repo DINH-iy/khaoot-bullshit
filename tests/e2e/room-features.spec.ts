@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { openHostFold, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -15,23 +16,24 @@ test('the host keeps scores secret, players react on the big screen, and a round
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await openHostFold(host, 'Room settings');
     await host.getByLabel('Players see the scores during the game').uncheck();
 
     await page.goto(`/?code=${roomCode}`);
     await page.getByLabel('Your name').fill('Rea');
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
-    const dock = page.getByRole('navigation', { name: 'More' });
+    const dock = await openPhoneMenu(page);
     await expect(dock.getByRole('button', { name: 'Players · 1' })).toBeVisible();
     await expect(dock.getByRole('button', { name: 'Scoreboard' })).toHaveCount(0); // scores are secret
 
     // A reaction from the phone floats up on the host screen.
-    await dock.getByRole('button', { name: 'React' }).click();
+    await (await openPhoneMenu(page)).getByRole('button', { name: 'React' }).click();
     await page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Send 🔥' }).click();
     await expect(host.locator('.reactions-overlay')).toContainText('🔥');
     await page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Close' }).click();
     // The host blocks a reaction: it disappears from the phone.
     await host.getByRole('button', { name: '🔥, allowed' }).click();
-    await dock.getByRole('button', { name: 'React' }).click();
+    await (await openPhoneMenu(page)).getByRole('button', { name: 'React' }).click();
     await expect(page.getByRole('button', { name: 'Send 🔥' })).toHaveCount(0);
     await page.keyboard.press('Escape');
 
@@ -47,8 +49,9 @@ test('the host keeps scores secret, players react on the big screen, and a round
     await expect(host.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Scoreboard' })).toHaveCount(0);
     // Allowed again: the phone gets the scoreboard button and an overlay, no scrolling.
+    await openHostFold(host, 'Room settings');
     await host.getByLabel('Players see the scores during the game').check();
-    await dock.getByRole('button', { name: 'Scoreboard' }).click();
+    await (await openPhoneMenu(page)).getByRole('button', { name: 'Scoreboard' }).click();
     await expect(page.getByRole('dialog', { name: 'Scoreboard' })).toContainText('Rea');
   } finally { await hostContext.close(); }
 });

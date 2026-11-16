@@ -10,6 +10,7 @@ import { z } from 'zod';
 export const TEXT_DEFAULTS = {
   'join.title': 'Join a game', 'join.code': 'Room code', 'join.name': 'Your name', 'join.button': 'Join room', 'join.joining': 'Joining…',
   'join.reclaim': 'Phone died during a game?', 'join.reclaimButton': 'Take over my seat', 'join.notFound': 'No open room has that code. Check the code on the shared screen.',
+  'join.codeMissing': 'Type the 6-character room code from the shared screen.', 'join.nameMissing': 'Type a name so the others know who you are.',
   'status.waiting': 'waiting to start', 'status.playing': 'playing', 'status.paused': 'paused', 'status.finished': 'finished',
   'lobby.playerTitle': 'You’re in!', 'lobby.playerText': 'Waiting for the host to start. Keep this screen open.',
   'lobby.screenTitle': 'Join on your phone', 'lobby.screenGo': 'Go to {host} and enter',
@@ -37,8 +38,8 @@ export const TEXT_DEFAULTS = {
   'minigame.stop': 'Stop', 'minigame.pickDoor': 'Pick a door', 'minigame.door': 'Door {number}', 'minigame.result': 'Your result: {result}', 'minigame.played': 'Done! Waiting for the others…', 'minigame.paused': 'Paused. When the host continues, you get a new countdown.',
   'minigame.places': 'Places', 'minigame.behindDoors': 'Behind the doors',
   'minigame.drawCircle': 'Draw one circle, in one go', 'minigame.yourTurn': 'Your turn! Add to the drawing', 'minigame.theirTurn': '{name} is drawing…', 'minigame.voteBest': 'Vote for the best drawing',
-  'drawing.submit': 'Send my drawing', 'drawing.undo': 'Undo', 'drawing.clear': 'Start over', 'drawing.blind': 'Drawing blind: you see it when it is sent', 'drawing.colour': 'Colour', 'drawing.size': 'Pen size',
-  'host.start': 'Start the game', 'host.close': 'Close answers', 'host.reveal': 'Reveal results', 'host.announce': 'Announce the route', 'host.next': 'Next', 'host.pause': 'Pause', 'host.resume': 'Resume',
+  'drawing.submit': 'Send my drawing', 'drawing.undo': 'Undo', 'drawing.clear': 'Start over', 'drawing.blind': 'Drawing blind: you see it when it is sent', 'drawing.blindTitle': 'BLIND ROUND', 'drawing.blindHint': 'Your lines stay hidden until you send it', 'drawing.colour': 'Colour', 'drawing.size': 'Pen size',
+  'host.start': 'Start the game', 'host.close': 'Close answers', 'host.reveal': 'Reveal results', 'host.announce': 'Announce the route', 'host.next': 'Next', 'host.pause': 'Pause', 'host.resume': 'Resume', 'host.startTeams': 'Start round with these teams',
 } as const;
 export type TextKey = keyof typeof TEXT_DEFAULTS;
 export const TEXT_KEYS = Object.keys(TEXT_DEFAULTS) as TextKey[];

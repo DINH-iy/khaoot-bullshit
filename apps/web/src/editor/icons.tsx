@@ -8,6 +8,7 @@ const paths: Record<string, string> = {
   challenge: 'M5 21V4 M5 4h11l-2 4 2 4H5',
   vote: 'M5 11h14v9H5z M9 15l2 2 4-4 M8 11V5h8v6',
   route: 'M4 12h6l4-6h6 M10 12l4 6h6 M17 3l3 3-3 3 M17 15l3 3-3 3',
+  teams: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20a6 6 0 0 1 12 0 M17 11a2.5 2.5 0 1 0 0-5 M16 14.5a5 5 0 0 1 5 5.5',
   scoreboard: 'M8 21h8 M12 17v4 M7 4h10v5a5 5 0 0 1-10 0z M7 6H4v2a3 3 0 0 0 3 3 M17 6h3v2a3 3 0 0 1-3 3',
   minigame: 'M6 9h12a4 4 0 0 1 4 4v1a3 3 0 0 1-5.5 1.7L15 14H9l-1.5 1.7A3 3 0 0 1 2 14v-1a4 4 0 0 1 4-4z M7 11v3 M5.5 12.5h3 M16 12h.01 M18 14h.01',
   drawing: 'M3 21c3 0 4-2 4-4a2 2 0 0 1 4 0c0 2-2 4-8 4z M9.5 14.5L20 4 M17 3l4 4',

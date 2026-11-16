@@ -39,9 +39,15 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   }
   // Show-only scenes have nobody answering.
   if (isShowOnly(entry.stage)) eligible = [];
+  // A Pick teams scene: the game's teams are proposed here and wait, untimed, for the host to confirm them.
+  if (entry.stage.kind === 'teams') {
+    const teamPlay = { kind: 'teams' as const, lineup: { kind: 'game' as const }, answers: entry.stage.captains ? 'captain' as const : 'everyone' as const, points: 'both' as const };
+    presentation = { teamPlay: { answers: teamPlay.answers, points: teamPlay.points }, forming: startForming(entry.stage.form, teamPlay, 'game', entry.stage.carryover ?? 'fresh', ids) };
+    eligible = []; timed = false;
+  }
   // A duel: everyone but the two duelists bets; when the host picks the pair, betting waits (untimed) until then.
   if (entry.stage.kind === 'duel') { const opened = openDuel(entry.stage, ids); presentation = { duel: opened.duel }; eligible = opened.eligible; timed = opened.timed; }
-  const play = entry.stage.kind === 'route' || entry.stage.kind === 'duel' || isShowOnly(entry.stage) ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
+  const play = entry.stage.kind === 'route' || entry.stage.kind === 'duel' || entry.stage.kind === 'teams' || isShowOnly(entry.stage) ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
   if (play.kind === 'teams') {
     const teamPlay = { answers: play.answers, points: play.points };
     const existing = play.lineup.kind === 'game' ? await gameLineupForRound(tx, sessionId, ids) : null;
@@ -223,7 +229,9 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   }
   if (command.type === 'stage.advance') {
     // A show-only scene ends when the host moves on; other stages are closed first.
-    requireGame((stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && isShowOnly(entry.stage))) && latest?.id === stage.id, 'INVALID_STATE');
+    // A Pick teams scene ends once its teams are confirmed.
+    const done = isShowOnly(entry.stage) || (entry.stage.kind === 'teams' && !readForming(stage.presentation));
+    requireGame((stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && done)) && latest?.id === stage.id, 'INVALID_STATE');
     // Moving on makes the finished stage's results public, except answers that a
     // later vote still needs to show without names; the vote's reveal uncovers those.
     // A route goes where its recorded decision says, even after a restart; never a fresh vote.

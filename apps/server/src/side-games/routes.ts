@@ -17,7 +17,7 @@ import { balanceOf, entryFor, lockWallet, startWallet, walletWhere, type Seat } 
 import { registerChallenges } from './challenges.js';
 import type { Server } from 'socket.io';
 
-const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, NOT_FOUND: 404, NOT_ENOUGH_CHIPS: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, ALREADY_SUBMITTED: 409, INVALID_STATE: 409 };
+const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, NOT_FOUND: 404, NOT_ENOUGH_CHIPS: 409, CHIPS_OFF: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, ALREADY_SUBMITTED: 409, INVALID_STATE: 409 };
 // A stored hand: the cards (the dealer's hidden one included) and, once over, its result.
 const StoredHandSchema = HandStateSchema.extend({ outcome: z.enum(BLACKJACK_OUTCOMES).nullable() });
 const readHand = (round: SideRound): { hand: HandState; outcome: Outcome | null } => {
@@ -51,13 +51,18 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
       client.gameSession.findUniqueOrThrow({ where: { id: id.data }, select: { state: true } }),
       readSessionView(client, principal.actor, id.data),
     ]);
-    return { seat: player as Seat, enabled: readRoomState(session.state).sideGames, paused: playerNeeded(view, principal.actor.playerId) };
+    const room = readRoomState(session.state);
+    // Chips need side games: switching side games off stops everything.
+    return { seat: player as Seat, enabled: room.sideGames, chips: room.sideGames && room.chips, paused: playerNeeded(view, principal.actor.playerId) };
   }
-  /** Runs one change to a wallet: side games on, not paused, wallet locked and started. */
-  async function play<T>(request: FastifyRequest, work: (tx: Transaction, seat: Seat) => Promise<T>) {
-    const { seat, enabled, paused } = await seatOf(request);
+  /**
+   * Runs one go of a side game: side games on, not paused, wallet locked. With chips on the wallet is started and
+   * the go is played for chips; with chips off it is played just for fun (no bet, nothing paid, the wallet untouched).
+   */
+  async function play<T>(request: FastifyRequest, work: (tx: Transaction, seat: Seat, chips: boolean) => Promise<T>) {
+    const { seat, enabled, chips, paused } = await seatOf(request);
     roomAssert(enabled, 'SIDE_GAMES_OFF'); roomAssert(!paused, 'SIDE_GAMES_PAUSED');
-    return client.$transaction(async tx => { await lockWallet(tx, seat); await startWallet(tx, seat); return work(tx, seat); });
+    return client.$transaction(async tx => { await lockWallet(tx, seat); if (chips) await startWallet(tx, seat); return work(tx, seat, chips); });
   }
   /** A go the phone already made (same id) is answered from what was stored; someone else's id is refused. */
   const earlier = async (tx: Transaction, seat: Seat, roundId: string, game: string) => {
@@ -70,15 +75,15 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
 
   app.get('/api/rooms/:sessionId/side', async (request, reply) => {
     try {
-      const { seat, enabled, paused } = await seatOf(request);
+      const { seat, enabled, chips, paused } = await seatOf(request);
       const data = await client.$transaction(async tx => {
-        await lockWallet(tx, seat); if (enabled) await startWallet(tx, seat);
+        await lockWallet(tx, seat); if (chips) await startWallet(tx, seat);
         const [money, refills, collection, open] = await Promise.all([
           balance(tx, seat), tx.chipEntry.count({ where: { ...walletWhere(seat), reason: 'REFILL' } }),
           tx.collectedItem.groupBy({ by: ['itemKey'], where: walletWhere(seat), _count: { _all: true } }),
           tx.sideRound.findFirst({ where: { playerId: seat.id, game: 'blackjack', finished: false } }),
         ]);
-        return WalletSchema.parse({ enabled, paused, account: seat.personId ? 'person' : 'guest', balance: money, canRefill: enabled && money < REFILL_BELOW, refills,
+        return WalletSchema.parse({ enabled, chips, paused, account: seat.personId ? 'person' : 'guest', balance: money, canRefill: chips && money < REFILL_BELOW, refills,
           collection: collection.map(item => ({ itemKey: item.itemKey, count: item._count._all })), blackjack: open ? await handOf(tx, seat, open) : null });
       });
       return { ok: true, data };
@@ -87,8 +92,8 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
 
   app.post('/api/rooms/:sessionId/side/refill', async (request, reply) => {
     try {
-      return { ok: true, data: await play(request, async (tx, seat) => {
-        roomAssert(await balance(tx, seat) < REFILL_BELOW, 'INVALID_COMMAND');
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
+        roomAssert(chips, 'CHIPS_OFF'); roomAssert(await balance(tx, seat) < REFILL_BELOW, 'INVALID_COMMAND');
         await tx.chipEntry.create({ data: { ...entryFor(seat), reason: 'REFILL', amount: REFILL_CHIPS } });
         return { balance: await balance(tx, seat) };
       }) };
@@ -97,14 +102,16 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
 
   app.post('/api/rooms/:sessionId/side/slots', async (request, reply) => {
     try {
-      const parsed = SlotSpinSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId, bet } = parsed.data;
-      return { ok: true, data: await play(request, async (tx, seat) => {
+      const parsed = SlotSpinSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId } = parsed.data;
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
         const before = await earlier(tx, seat, roundId, 'slots');
         if (before) return SlotResultSchema.parse({ roundId, reels: (before.state as { reels: SlotSymbol[] }).reels, bet: before.bet, payout: before.payout, balance: await balance(tx, seat) });
+        // Without chips the reels spin just for fun.
+        const bet = chips ? parsed.data.bet : 0;
         roomAssert(await balance(tx, seat) >= bet, 'NOT_ENOUGH_CHIPS');
         const reels = spinReels(); const payout = bet * slotMultiplier(reels);
         await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'slots', finished: true, bet, payout, state: { reels } } });
-        await tx.chipEntry.createMany({ data: [{ ...entryFor(seat), roundId, game: 'slots', reason: 'BET', amount: -bet }, ...(payout ? [{ ...entryFor(seat), roundId, game: 'slots', reason: 'PAYOUT' as const, amount: payout }] : [])] });
+        if (chips) await tx.chipEntry.createMany({ data: [{ ...entryFor(seat), roundId, game: 'slots', reason: 'BET', amount: -bet }, ...(payout ? [{ ...entryFor(seat), roundId, game: 'slots', reason: 'PAYOUT' as const, amount: payout }] : [])] });
         return SlotResultSchema.parse({ roundId, reels, bet, payout, balance: await balance(tx, seat) });
       }) };
     } catch (error) { return fail(reply, error); }
@@ -113,13 +120,15 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
   app.post('/api/rooms/:sessionId/side/packs', async (request, reply) => {
     try {
       const parsed = PackOpenSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId } = parsed.data;
-      return { ok: true, data: await play(request, async (tx, seat) => {
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
         const before = await earlier(tx, seat, roundId, 'packs');
         if (before) return PackResultSchema.parse({ roundId, items: (before.state as { items: string[] }).items, balance: await balance(tx, seat) });
-        roomAssert(await balance(tx, seat) >= PACK_PRICE, 'NOT_ENOUGH_CHIPS');
+        // Without chips a pack is free.
+        const price = chips ? PACK_PRICE : 0;
+        roomAssert(await balance(tx, seat) >= price, 'NOT_ENOUGH_CHIPS');
         const items = openPack();
-        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: PACK_PRICE, state: { items } } });
-        await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -PACK_PRICE } });
+        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: price, state: { items } } });
+        if (chips) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -PACK_PRICE } });
         await tx.collectedItem.createMany({ data: items.map(itemKey => ({ ...entryFor(seat), roundId, itemKey })) });
         return PackResultSchema.parse({ roundId, items, balance: await balance(tx, seat) });
       }) };
@@ -128,16 +137,18 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
 
   app.post('/api/rooms/:sessionId/side/blackjack', async (request, reply) => {
     try {
-      const parsed = BlackjackStartSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId, bet } = parsed.data;
-      return { ok: true, data: await play(request, async (tx, seat) => {
+      const parsed = BlackjackStartSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId } = parsed.data;
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
         const before = await earlier(tx, seat, roundId, 'blackjack')
           // One hand at a time: an unfinished hand is picked up again instead of dealing a new one.
           ?? await tx.sideRound.findFirst({ where: { playerId: seat.id, game: 'blackjack', finished: false } });
         if (before) return BlackjackResultSchema.parse({ hand: await handOf(tx, seat, before), balance: await balance(tx, seat) });
+        // Without chips the hand is played just for fun.
+        const bet = chips ? parsed.data.bet : 0;
         roomAssert(await balance(tx, seat) >= bet, 'NOT_ENOUGH_CHIPS');
         const hand = deal(); const outcome = outcomeOf(hand, false); const payout = payoutFor(outcome, bet);
         const round = await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'blackjack', finished: outcome !== null, bet, payout, state: { ...hand, outcome } } });
-        await tx.chipEntry.createMany({ data: [{ ...entryFor(seat), roundId, game: 'blackjack', reason: 'BET', amount: -bet }, ...(payout ? [{ ...entryFor(seat), roundId, game: 'blackjack', reason: 'PAYOUT' as const, amount: payout }] : [])] });
+        if (chips) await tx.chipEntry.createMany({ data: [{ ...entryFor(seat), roundId, game: 'blackjack', reason: 'BET', amount: -bet }, ...(payout ? [{ ...entryFor(seat), roundId, game: 'blackjack', reason: 'PAYOUT' as const, amount: payout }] : [])] });
         return BlackjackResultSchema.parse({ hand: await handOf(tx, seat, round), balance: await balance(tx, seat) });
       }) };
     } catch (error) { return fail(reply, error); }
@@ -146,18 +157,22 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
   app.post('/api/rooms/:sessionId/side/blackjack/move', async (request, reply) => {
     try {
       const parsed = BlackjackMoveSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId, step, move: action } = parsed.data;
-      return { ok: true, data: await play(request, async (tx, seat) => {
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
         const round = await earlier(tx, seat, roundId, 'blackjack'); roomAssert(round, 'NOT_FOUND');
         // A repeated or out-of-date move changes nothing: the phone gets the hand as it is.
         if (round.finished || round.step !== step) return BlackjackResultSchema.parse({ hand: await handOf(tx, seat, round), balance: await balance(tx, seat) });
         const { hand } = readHand(round); let bet = round.bet;
         if (action === 'double') {
           roomAssert(hand.player.length === 2 && !hand.doubled, 'INVALID_COMMAND');
-          roomAssert(await balance(tx, seat) >= round.bet, 'NOT_ENOUGH_CHIPS');
-          await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'blackjack', reason: 'BET', amount: -round.bet } }); bet *= 2;
+          // Doubling a hand played for chips puts the bet in again; a hand without a bet (no chips) just doubles for fun.
+          if (round.bet > 0) {
+            roomAssert(chips, 'CHIPS_OFF'); roomAssert(await balance(tx, seat) >= round.bet, 'NOT_ENOUGH_CHIPS');
+            await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'blackjack', reason: 'BET', amount: -round.bet } }); bet *= 2;
+          }
         }
         const result = move(hand, action); const payout = payoutFor(result.outcome, bet);
         const saved = await tx.sideRound.update({ where: { id: roundId }, data: { step: step + 1, bet, payout, finished: result.outcome !== null, state: { ...result.state, outcome: result.outcome } } });
+        // A hand bet while chips were on still pays out, even if the host switched chips off in between.
         if (payout) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'blackjack', reason: 'PAYOUT', amount: payout } });
         return BlackjackResultSchema.parse({ hand: await handOf(tx, seat, saved), balance: await balance(tx, seat) });
       }) };

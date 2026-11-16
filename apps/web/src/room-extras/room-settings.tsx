@@ -3,13 +3,12 @@ import { REACTIONS, type RoomSnapshot } from '@party/contracts';
 import { roomApi } from '../network/api.js';
 import './room-extras.css';
 
-type Setting = 'showScores' | 'reactions' | 'autoClose' | 'breakVotes' | 'sideGames';
+type Setting = 'showScores' | 'reactions' | 'autoClose' | 'breakVotes';
 const LABELS: Record<Setting, string> = {
   showScores: 'Players see the scores during the game',
   reactions: 'Players can send reactions to the screen',
   autoClose: 'End a round soon after everyone answered',
   breakVotes: 'Players can vote for a break',
-  sideGames: 'Side games on the phones while waiting (slot machine, blackjack, packs)',
 };
 
 /** Host: how the room behaves. Changes apply straight away for everyone. */
@@ -45,4 +44,33 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
     </div>}
     {!shown.showScores && <p className="hint">Scores stay secret on phones and the shared screen until a scoreboard scene or the end of the game.</p>}
   </fieldset>;
+}
+
+/** One on/off switch with a line saying what it means right now. */
+function Switch({ label, on, disabled = false, onToggle, hint }: { label: string; on: boolean; disabled?: boolean; onToggle: () => void; hint: string }) {
+  return <div className={`side-switch${on ? ' on' : ''}${disabled ? ' disabled' : ''}`}>
+    <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={onToggle}><span className="side-switch-track" aria-hidden="true"><span /></span>{label}</button>
+    <p className="hint">{hint}</p>
+  </div>;
+}
+
+/**
+ * The phones' extras, as two switches the host always sees (lobby and during the game). Side games
+ * (slot machine, blackjack, packs, challenges) are on unless the game says otherwise; chips are an extra on
+ * top, off unless the game says otherwise: without them every game is played just for fun.
+ */
+export function SideGamesSwitch({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
+  const [pending, setPending] = useState<{ sideGames?: boolean; chips?: boolean }>({});
+  const games = pending.sideGames ?? state.settings.sideGames; const chips = pending.chips ?? state.settings.chips;
+  const change = (setting: 'sideGames' | 'chips', value: boolean) => {
+    setPending(current => ({ ...current, [setting]: value }));
+    void roomApi(`/api/rooms/${sessionId}/settings`, { [setting]: value }).catch(() => onError('That could not be switched. Try again.'))
+      .finally(() => setTimeout(() => setPending(current => { const { [setting]: _done, ...rest } = current; return rest; }), 1500));
+  };
+  return <div className="side-switches" role="group" aria-label="Phones while waiting">
+    <Switch label="Side games" on={games} onToggle={() => change('sideGames', !games)}
+      hint={games ? 'On: slot machine, blackjack, packs and challenges on the phones while players wait.' : 'Off: nothing to play on the phones between rounds.'} />
+    <Switch label="Chips" on={games && chips} disabled={!games} onToggle={() => change('chips', !chips)}
+      hint={!games ? 'Needs side games.' : chips ? 'On: players bet chips (play money), stake them in challenges and see a leaderboard.' : 'Off: every side game is just for fun, no bets.'} />
+  </div>;
 }

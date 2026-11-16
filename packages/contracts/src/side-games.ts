@@ -71,7 +71,8 @@ export function handTotal(cards: readonly number[]): { total: number; soft: bool
 }
 export const BLACKJACK_OUTCOMES = ['blackjack', 'win', 'lose', 'push', 'bust'] as const;
 export const BlackjackViewSchema = z.object({
-  roundId: z.uuid(), step: z.number().int().min(0), bet: z.number().int().min(1),
+  // `bet`: 0 for a hand played just for fun (chips off).
+  roundId: z.uuid(), step: z.number().int().min(0), bet: z.number().int().min(0),
   player: z.array(CardSchema), dealer: z.array(CardSchema.nullable()), playerTotal: z.number().int(), dealerTotal: z.number().int().nullable(),
   outcome: z.enum(BLACKJACK_OUTCOMES).nullable(), payout: z.number().int().min(0), canDouble: z.boolean(),
 }).strict();
@@ -91,7 +92,8 @@ export type PackResult = z.infer<typeof PackResultSchema>;
 export const BlackjackResultSchema = z.object({ hand: BlackjackViewSchema, balance: z.number().int() }).strict();
 
 export const WalletSchema = z.object({
-  enabled: z.boolean(), paused: z.boolean(),
+  // `chips`: the host allows the chip games (slot machine, blackjack, packs) and stakes; off, only challenges for fun.
+  enabled: z.boolean(), chips: z.boolean(), paused: z.boolean(),
   account: z.enum(['person', 'guest']), balance: z.number().int(), canRefill: z.boolean(), refills: z.number().int().min(0),
   collection: z.array(z.object({ itemKey: z.string(), count: z.number().int().min(1) }).strict()),
   blackjack: BlackjackViewSchema.nullable(),
@@ -116,6 +118,8 @@ export function playerNeeded(view: SessionView, selfId: string | null): boolean 
   if (view.status !== 'RUNNING' || !stage || stage.status !== 'ACTIVE' || !selfId) return false;
   if (stage.kind === 'info' || stage.kind === 'scoreboard') return false;
   if (stage.teams?.forming) return stage.teams.formation === 'players';
+  // A Pick teams scene asks nothing more once the teams are confirmed.
+  if (stage.kind === 'teams') return false;
   if (stage.kind === 'route') return stage.route?.canVote === true && !view.ownSubmission;
   if (stage.kind === 'challenge') return true;
   if (stage.teams && stage.teams.answers === 'captain') {

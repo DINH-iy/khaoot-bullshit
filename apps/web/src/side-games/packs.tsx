@@ -6,9 +6,9 @@ import { chips, sideApi, sideProblem } from './side-api.js';
 const item = (key: string) => PACK_ITEMS.find(entry => entry.key === key);
 const rarityName = (key: string) => RARITIES.find(rarity => rarity.key === key)?.name ?? key;
 
-/** Packs: pay chips, get four items by rarity; collect them all. */
-export function Packs({ sessionId, balance, onBalance, collection, onCollected }: {
-  sessionId: string; balance: number; onBalance: (balance: number) => void; collection: Map<string, number>; onCollected: (items: string[]) => void;
+/** Packs: pay chips (or, without chips, nothing), get four items by rarity; collect them all. */
+export function Packs({ sessionId, balance, onBalance, collection, onCollected, chips: forChips }: {
+  sessionId: string; balance: number; onBalance: (balance: number) => void; collection: Map<string, number>; onCollected: (items: string[]) => void; chips: boolean;
 }) {
   const [opened, setOpened] = useState<PackResult>(); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const open = async () => {
@@ -21,7 +21,7 @@ export function Packs({ sessionId, balance, onBalance, collection, onCollected }
     {opened && <ul className="pack-reveal" aria-label="In this pack">{opened.items.map((key, index) => { const found = item(key); return <li key={`${opened.roundId}-${index}`} className={`rarity-${found?.rarity ?? 'common'}`} style={{ animationDelay: `${index * 180}ms` }}>
       <span aria-hidden="true">{found?.emoji}</span><strong>{found?.name ?? key}</strong><small>{rarityName(found?.rarity ?? '')}</small></li>; })}</ul>}
     {error && <p role="alert" className="error">{error}</p>}
-    <button type="button" className="primary big" disabled={busy || balance < PACK_PRICE} onClick={() => void open()}>{busy ? 'Opening…' : `Open a pack for ${chips(PACK_PRICE)}`}</button>
+    <button type="button" className="primary big" disabled={busy || (forChips && balance < PACK_PRICE)} onClick={() => void open()}>{busy ? 'Opening…' : forChips ? `Open a pack for ${chips(PACK_PRICE)}` : 'Open a pack'}</button>
     <details className="odds"><summary>Chances per item</summary>
       <ul>{RARITIES.map(rarity => <li key={rarity.key}>{rarity.name}: {rarity.percent}%</li>)}</ul>
     </details>

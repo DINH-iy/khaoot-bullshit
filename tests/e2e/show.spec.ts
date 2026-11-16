@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -43,7 +44,7 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await expect(page.getByRole('button', { name: 'Spin again' })).toBeVisible();
 
   // The only player votes for a break: the game pauses with a break screen until the host continues.
-  await phone.getByRole('navigation', { name: 'More' }).getByRole('button', { name: /^Break 0\/1/ }).click();
+  await (await openPhoneMenu(phone)).getByRole('button', { name: /^Break 0\/1/ }).click();
   await expect(phone.getByRole('dialog', { name: 'Smoke break!' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Smoke break!' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue the game' }).click();

@@ -164,3 +164,124 @@
 .duel-result { font-size: 1.3rem; font-weight: 800; margin: 0; } .duel-note { margin: 0; font-weight: 600; }
 .duel-pick { display: grid; gap: 10px; } .duel-pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .duel-pick select { min-height: 44px; border-radius: 8px; padding: 8px; font: inherit; }
+
+/* Characters used in a written answer (answer-input.tsx). */
+.char-count { display: block; text-align: right; font-size: .8rem; font-weight: 400; opacity: .7; font-variant-numeric: tabular-nums; }
+.char-count.full { opacity: 1; font-weight: 700; color: light-dark(#b42318, #f97066); }
+
+/* Join card: the code, a name and one button; everything else under "More options". */
+.join-head { display: grid; gap: 4px; }
+.join-head .room-game { font-size: 1rem; }
+.join-form { display: grid; gap: 14px; }
+.join-form label { display: grid; gap: 6px; font-weight: 700; }
+.join-form .code-input { letter-spacing: .18em; font-variant-numeric: tabular-nums; }
+.join-form input[aria-invalid="true"] { border-color: var(--r-bad) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-bad) 35%, transparent); }
+.field-problem, .join-error { margin: 0; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; font-weight: 600; line-height: 1.35;
+  color: var(--r-text); background: color-mix(in srgb, var(--r-bad) 22%, transparent); border: 1px solid color-mix(in srgb, var(--r-bad) 60%, transparent); }
+.field-problem { margin-top: -6px; font-size: .95rem; }
+.field-problem::before, .join-error::before { content: '!'; flex: none; display: grid; place-items: center; width: 1.3em; height: 1.3em; border-radius: 50%; background: var(--r-bad); color: #fff; font-weight: 900; font-size: .85em; }
+.join-more { border-top: 1px solid var(--r-line); padding-top: 12px; }
+.join-more summary { cursor: pointer; color: var(--r-muted); font-weight: 600; }
+.join-more[open] { display: grid; gap: 12px; }
+.join-more[open] summary { margin-bottom: 4px; }
+
+/* Round strip under the top bar: what to do, the time, team round. Slim chips, never a wall of text. */
+.round-info { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 20px; border-bottom: 1px solid var(--r-line); background: rgb(0 0 0 / .12); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(6px); }
+.round-info .chip { margin: 0; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--r-card); font-size: .9rem; font-weight: 600; line-height: 1.2; }
+.round-info .phase-pill { justify-self: auto; }
+.round-info .chip-timer { margin-left: auto; font-variant-numeric: tabular-nums; }
+.round-info .chip-timer .timer { font-size: 1.05rem; font-weight: 800; }
+.round-info .chip-timer.no-limit .timer { font-size: .9rem; font-weight: 600; color: var(--r-muted); }
+.round-info .chip-timer:has(.timer-ending) { background: color-mix(in srgb, var(--r-bad) 25%, var(--r-card)); }
+/* The shared screen is read from across the room: a bigger timer there. */
+.room-display .round-info .chip-timer .timer { font-size: 1.8rem; }
+.room-display .round-info .chip { font-size: 1.1rem; padding: 8px 16px; }
+
+/* Saving: a small spinner next to the connection status instead of a box pushing the page down. */
+.saving-spinner { display: inline-grid; place-items: center; width: 22px; height: 22px; }
+.saving-spinner span { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--r-line); border-top-color: var(--r-accent); animation: room-spin .8s linear infinite; }
+@keyframes room-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .saving-spinner span { animation-duration: 2.4s; } }
+
+/* Messages float at the bottom, above the phone's bar, and never move the page. */
+.room-toasts { position: fixed; z-index: 70; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(520px, calc(100% - 32px)); display: grid; gap: 8px; pointer-events: none; }
+.room-toasts:empty { display: none; }
+.room-toasts .room-toast { pointer-events: auto; margin: 0; display: flex; gap: 10px; align-items: flex-start; box-shadow: 0 8px 28px rgb(0 0 0 / .35); border: 1px solid var(--r-line); }
+.room-toasts .room-toast p { margin: 0; flex: 1; }
+.room-toasts .room-toast.pending { display: grid; }
+.room-toasts .toast-close { min-height: 32px; min-width: 32px; padding: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 1.2rem; line-height: 1; }
+
+/* Copy code / copy link under the QR. */
+.join-qr .copy-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.join-qr .copy-button { min-height: 36px; }
+
+/* Host panel: fits beside the round and scrolls on its own instead of making the page long. */
+.room-host .room-controls { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; align-content: start; }
+.room-controls .time-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.room-controls .time-row:empty { display: none; }
+.room-controls .time-set { display: flex; gap: 6px; align-items: end; flex-wrap: wrap; }
+.room-controls .time-set label { display: grid; gap: 4px; font-size: .85rem; }
+.control-fold { border-top: 1px solid var(--r-line); padding-top: 10px; }
+.control-fold > summary { cursor: pointer; font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); font-weight: 700; }
+.control-fold[open] > summary { margin-bottom: 10px; }
+.control-fold .room-settings { border: 0; padding: 0; margin: 0; }
+.control-fold .room-settings legend { display: none; }
+.control-back { margin: 0; font-size: .9rem; }
+/* Narrow screens: the panel sits under the round, so it needs no scroll of its own. */
+@media (max-width: 860px) { .room-host .room-controls { max-height: none; position: static; } }
+
+/* Round results on a phone: your result first and big, the rest compact, everyone's points folded. All on one screen. */
+.results-own { margin: 0; padding: 14px; border-radius: 14px; text-align: center; font-size: 1.25rem; font-weight: 800; background: rgb(0 0 0 / .2); }
+.results-own.earned { background: rgb(94 230 168 / .15); color: var(--r-ok); }
+.results-more > summary { cursor: pointer; color: var(--r-muted); font-weight: 600; }
+.results-more[open] { display: grid; gap: 8px; }
+.room-player .results { gap: 8px; padding: 12px; }
+.room-player .results > h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); }
+.room-player .answer-bars { gap: 6px; }
+.room-player .answer-bars li { padding: 8px 12px; font-size: .95rem; }
+/* Pictures, drawings and voted entries: small tiles side by side instead of one big picture after another. */
+.room-player .results :is(.gallery, .drawing-gallery) { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.room-player .results :is(.gallery, .drawing-gallery) :is(img, video, canvas, svg) { max-height: 120px; width: 100%; object-fit: cover; }
+.room-player .results .ballot { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; padding: 0; }
+.room-player .results .ballot-entry { padding: 8px; font-size: .9rem; }
+.room-player .results .ballot-entry :is(img, video, canvas, svg) { max-height: 110px; width: 100%; object-fit: cover; }
+.round-info .chip-warn { background: #ffcf4a; color: #2a1d00; font-weight: 800; }
+
+/* Party choice: each route is a signpost with a big arrow, so it is clear a direction is being chosen. */
+.room .route-tiles .tile { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; text-align: left; font-size: 1.3rem; font-weight: 800; min-height: 104px; }
+.room .route-arrow { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: rgb(0 0 0 / .25); font-size: 2.4rem; line-height: 1; font-weight: 900; }
+.options-board.route li > span { font-size: 1.6em; }
+.route-button > span { font-size: 1.3em; font-weight: 900; }
+
+/* Teams: a coloured column per team with its players (team-forming in teams.tsx). */
+.team-forming { display: grid; gap: 14px; }
+.team-forming-head h3 { margin: 0 0 4px; }
+.team-forming-head p { margin: 0; color: var(--r-muted); }
+.team-columns { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.team-column { --team: var(--r-accent); --team-strong: color-mix(in srgb, var(--team) 58%, black); display: grid; align-content: start; gap: 10px; margin: 0; padding: 12px; border-radius: 18px; min-height: 140px;
+  background: color-mix(in srgb, var(--team) 16%, var(--r-card)); border: 2px solid color-mix(in srgb, var(--team) 55%, transparent); transition: border-color .15s, transform .15s; }
+.team-column.mine { border-color: var(--team); box-shadow: 0 0 0 3px color-mix(in srgb, var(--team) 40%, transparent); }
+.team-column.target { border-style: dashed; border-color: var(--team); }
+.team-column-head { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; background: var(--team-strong); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .35); }
+.team-column-head strong { font-size: 1.15rem; }
+.team-column-head .team-count { font-weight: 700; opacity: .9; }
+.room .team-remove { margin-left: auto; min-height: 30px; min-width: 30px; padding: 0; border-radius: 50%; border: 0; background: rgb(0 0 0 / .25); color: #fff; font-size: 1.1rem; line-height: 1; }
+.team-members { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.team-members li { margin: 0; }
+.team-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; background: rgb(0 0 0 / .22); font-weight: 700; color: var(--r-text); }
+.room button.team-chip { min-height: 0; border: 2px solid transparent; cursor: grab; }
+.room button.team-chip[aria-pressed=true] { border-color: #fff; background: var(--r-card-strong); }
+.team-crown { font-size: 1rem; }
+.team-empty { margin: 0; color: var(--r-muted); font-size: .9rem; }
+.room .team-put { min-height: 40px; background: var(--team-strong, var(--r-card)); color: #fff; border: 0; font-weight: 800; }
+.room .team-join { min-height: 64px; font-size: 1.2rem; font-weight: 900; border: 0; background: var(--team-strong); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .35); }
+.room .team-join:disabled { opacity: 1; background: color-mix(in srgb, var(--team-strong) 75%, black); }
+.team-column.add { place-content: center; border-style: dashed; border-color: var(--r-line); background: transparent; }
+.room .team-add { min-height: 56px; background: transparent; border: 0; color: var(--r-muted); font-weight: 800; font-size: 1.05rem; }
+.team-bench { display: grid; gap: 8px; padding: 12px; border-radius: 16px; border: 2px dashed var(--r-line); }
+.team-bench p { margin: 0; color: var(--r-muted); font-weight: 600; }
+.team-actions { flex-wrap: wrap; }
+.team-columns.compact .team-column { min-height: 0; padding: 8px; gap: 6px; }
+.team-columns.compact .team-names { margin: 0; font-weight: 600; }
+/* The shared screen is read from across the room. */
+.room-display .team-column-head strong { font-size: 1.5rem; }

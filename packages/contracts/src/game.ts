@@ -103,6 +103,9 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('teams.assign'), stageRunId: GameIdSchema, playerId: GameIdSchema, teamIndex: z.number().int().min(0).max(11).nullable() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.captain'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.confirm'), stageRunId: GameIdSchema }).strict(),
+  // The host adds a team (up to 12) or removes one; a removed team's players become unassigned.
+  z.object({ ...hostEnvelope, type: z.literal('teams.add'), stageRunId: GameIdSchema }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('teams.remove'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11) }).strict(),
   z.object({ ...envelope, type: z.literal('teams.choose'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11) }).strict(),
   // In a team round the host judges each team.
   z.object({ ...hostEnvelope, type: z.literal('stage.judgeTeam'), stageRunId: GameIdSchema, teamId: GameIdSchema, amountMilli: AwardMilliSchema }).strict(),
@@ -205,7 +208,7 @@ export const PublicDuelSchema = z.object({
 }).strict();
 export const PublicStageSchema = z.object({
   id: GameIdSchema, nodeKey: GameKeySchema, stageKey: GameKeySchema,
-  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel']), prompt: z.string().min(1).max(2000),
+  kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel', 'teams']), prompt: z.string().min(1).max(2000),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.

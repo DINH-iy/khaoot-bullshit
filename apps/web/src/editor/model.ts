@@ -42,7 +42,7 @@ export function pointOnCurve(from: Point, to: Point, t: number): Point {
 }
 
 // ---------- scene types ----------
-export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'scoreboard' | 'minigame' | 'duel' | 'wheel';
+export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel';
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
   { type: 'info', name: 'Cutscene or info', icon: 'info', hint: 'Text on every screen' },
   { type: 'quiz', name: 'Quiz question', icon: 'quiz', hint: 'Tiles or a list, one correct answer' },
@@ -53,6 +53,7 @@ export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: s
   { type: 'challenge', name: 'Host-judged challenge', icon: 'challenge', hint: 'The host gives points' },
   { type: 'vote', name: 'Vote on answers', icon: 'vote', hint: 'Vote for a writing or upload round' },
   { type: 'route', name: 'Party choice', icon: 'route', hint: 'Branch into routes' },
+  { type: 'teams', name: 'Pick teams', icon: 'teams', hint: 'Make the teams; the rounds after it play in them' },
   { type: 'scoreboard', name: 'Scoreboard', icon: 'scoreboard', hint: 'Show the standings' },
   { type: 'minigame', name: 'Minigame', icon: 'minigame', hint: 'Reaction, tap race, circles, Pass the pencil…' },
   { type: 'duel', name: 'Head-to-head duel', icon: 'duel', hint: 'Two players face off, everyone bets on the winner' },
@@ -145,6 +146,7 @@ function baseStage(type: SceneType, definition: Definition): Stage {
     case 'route': return { key: 'main', kind: 'route', prompt: 'Choose your route!', durationMs: 20_000,
       options: [{ key: 'left', label: 'Left' }, { key: 'right', label: 'Right' }], decide: { method: 'players', tie: 'random', noVotes: 'random', counts: 'reveal' } };
     case 'scoreboard': return { key: 'main', kind: 'scoreboard', prompt: 'Standings', show: 'players', durationMs: null };
+    case 'teams': return { key: 'main', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players' } };
     case 'order': return { key: 'main', kind: 'collect', prompt: 'Put these in the right order.', durationMs: 30_000,
       input: { kind: 'order', items: [{ key: 'first', label: 'First' }, { key: 'second', label: 'Second' }, { key: 'third', label: 'Third' }] },
       scoring: { kind: 'correct-order', correctOrder: ['first', 'second', 'third'], awardMilli: '10000' } };
@@ -163,7 +165,7 @@ export function uniqueKey(prefix: string, taken: Iterable<string>): string {
 }
 
 // ---------- card text ----------
-const KIND_LABEL: Record<string, string> = { info: 'Cutscene', route: 'Party choice', challenge: 'Challenge', vote: 'Vote', scoreboard: 'Results', minigame: 'Minigame', duel: 'Duel' };
+const KIND_LABEL: Record<string, string> = { info: 'Cutscene', route: 'Party choice', challenge: 'Challenge', vote: 'Vote', scoreboard: 'Results', minigame: 'Minigame', duel: 'Duel', teams: 'Pick teams' };
 function stageLabel(stage: Stage): string {
   if (stage.kind !== 'collect') return KIND_LABEL[stage.kind] ?? stage.kind;
   const input = (stage['input'] as { kind?: string } | undefined)?.kind;
@@ -179,6 +181,11 @@ function stageLine(stage: Stage): string {
     return [method === 'host' ? 'Host decides' : method === 'captains' ? 'Captains vote' : 'Everyone votes', timer].filter(Boolean).join(' · ');
   }
   if (stage.kind === 'challenge') return 'Challenge · Host judges';
+  if (stage.kind === 'teams') {
+    const form = stage['form'] as { split?: { kind?: string; teams?: number; sizes?: unknown[] }; formation?: string } | undefined;
+    const count = form?.split?.kind === 'count' ? `${form.split.teams} teams` : `${form?.split?.sizes?.length ?? 2} teams`;
+    return [count, form?.formation === 'players' ? 'players choose' : form?.formation === 'host' ? 'host decides' : 'at random'].join(' · ');
+  }
   if (stage.kind === 'scoreboard') return 'Scoreboard';
   if (stage.kind === 'minigame') { const game = String(stage['game']); return [isMinigameKey(game) ? MINIGAMES[game].name : 'Choose a minigame', timer].filter(Boolean).join(' · '); }
   if (stage.kind === 'vote') return ['Vote on answers', timer].filter(Boolean).join(' · ');
@@ -406,4 +413,28 @@ export function insertPrefab(definition: Definition, positions: Positions, conte
   const entryIndex = content.keys.findIndex(key => !content.edges.some(edge => edge.to === key));
   const entry = pasted.keys[Math.max(0, entryIndex)]!;
   return { ...pasted, definition: from ? connect(pasted.definition, from.key, from.option, entry) : pasted.definition };
+}
+
+// ---------- teams: from game settings to Pick teams scenes ----------
+const PLAYABLE = ['collect', 'challenge', 'vote', 'minigame'];
+/**
+ * Games made before Pick teams scenes kept their teams in the game settings (`teams`) and could
+ * default every round to team play (`play`). Opening such a game turns that into the new shape: a
+ * Pick teams scene at the start with the same teams, and each round's own setting written out.
+ * Returns null when there is nothing to convert. Rounds with teams of their own stay as they are.
+ */
+export function convertLegacyTeams(definition: Definition): { definition: Definition; added: string | null } | null {
+  const teams = definition['teams']; const play = definition['play'] as { kind?: string; answers?: string } | undefined;
+  if (!teams && !play) return null;
+  const { teams: _teams, play: _play, ...rest } = definition;
+  let nodes = definition.nodes.map(node => ({ ...node, stages: node.stages.map(stage => play && PLAYABLE.includes(stage.kind) && !stage['play'] ? { ...stage, play } : stage) }));
+  let edges = definition.edges; let startNodeKey = definition.startNodeKey; let added: string | null = null;
+  if (teams) {
+    added = uniqueKey('pick-teams', nodes.map(node => node.key));
+    const captains = nodes.some(node => node.stages.some(stage => (stage['play'] as { answers?: string } | undefined)?.answers === 'captain'));
+    nodes = [{ key: added, stages: [{ key: 'main', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: teams, ...(captains ? { captains: true } : {}) }] }, ...nodes];
+    edges = [{ key: uniqueKey('edge', edges.map(edge => edge.key)), from: added, to: startNodeKey }, ...edges];
+    startNodeKey = added;
+  }
+  return { definition: { ...rest, startNodeKey, nodes, edges } as Definition, added };
 }

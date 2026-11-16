@@ -12,15 +12,22 @@ export function draftValue(input: Input, draft: Draft): SubmissionValue | null {
   return null;
 }
 
+/** Signpost arrows for the routes of a party choice: left and right for two, fanning out for more. */
+const ROUTE_ARROWS: Record<number, string[]> = { 2: ['←', '→'], 3: ['←', '↑', '→'], 4: ['←', '↖', '↗', '→'], 5: ['←', '↖', '↑', '↗', '→'], 6: ['↙', '←', '↖', '↗', '→', '↘'] };
+export const routeArrow = (index: number, count: number) => ROUTE_ARROWS[count]?.[index] ?? '➜';
+
 /** The answer control for one round. Which one appears is set per round in the game. */
-export function AnswerInput({ sessionId, input, draft, onChange, legend = 'Your private answer' }: { sessionId: string; input: Input; draft: Draft; onChange: (draft: Draft) => void; legend?: string }) {
+export function AnswerInput({ sessionId, input, draft, onChange, legend = 'Your private answer', route = false }: { sessionId: string; input: Input; draft: Draft; onChange: (draft: Draft) => void; legend?: string; route?: boolean }) {
   if (input.kind === 'choice') {
-    const tiles = input.layout === 'tiles';
-    return <fieldset className={tiles ? 'tiles' : undefined}><legend>{legend}</legend>{input.options.map((option, index) => <label className={tiles ? 'tile' : 'choice'} key={option.key}>
+    // A route vote is a fork in the road: big tiles with arrows, always, so it is clear a direction is being chosen.
+    const tiles = route || input.layout === 'tiles';
+    return <fieldset className={`${tiles ? 'tiles' : ''}${route ? ' route-tiles' : ''}`.trim() || undefined}><legend>{legend}</legend>{input.options.map((option, index) => <label className={tiles ? 'tile' : 'choice'} key={option.key}>
       <input type="radio" name="answer" value={option.key} checked={draft.text === option.key} onChange={() => onChange({ ...draft, text: option.key })} />
-      {tiles && <span className="tile-mark" aria-hidden="true">{String.fromCharCode(65 + index)}</span>}{option.label}</label>)}</fieldset>;
+      {tiles && <span className={route ? 'route-arrow' : 'tile-mark'} aria-hidden="true">{route ? routeArrow(index, input.options.length) : String.fromCharCode(65 + index)}</span>}{option.label}</label>)}</fieldset>;
   }
-  if (input.kind === 'text') return <label>Your private answer<textarea value={draft.text} onChange={event => onChange({ ...draft, text: event.target.value })} maxLength={input.maxLength} /></label>;
+  if (input.kind === 'text') return <><label>Your private answer<textarea value={draft.text} onChange={event => onChange({ ...draft, text: event.target.value })} maxLength={input.maxLength} /></label>
+    {/* How much room is left, so the limit never comes as a surprise. */}
+    <span className={`char-count${draft.text.length >= input.maxLength ? ' full' : ''}`} aria-live={draft.text.length >= input.maxLength * 0.8 ? 'polite' : 'off'}>{draft.text.length} / {input.maxLength}</span></>;
   if (input.kind === 'order') {
     const labels = new Map(input.items.map(item => [item.key, item.label]));
     const move = (index: number, by: -1 | 1) => {

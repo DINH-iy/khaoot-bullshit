@@ -40,7 +40,8 @@ const findKey = (list: { key: string; label: string }[], wanted: unknown) => {
 
 const TYPES: Record<string, string> = { cutscene: 'info', info: 'info', text: 'info', quiz: 'quiz', question: 'quiz', choice: 'quiz', poll: 'poll', writing: 'writing', write: 'writing', joke: 'writing', caption: 'writing',
   upload: 'upload', picture: 'upload', photo: 'upload', video: 'upload', order: 'order', ordering: 'order', challenge: 'challenge', vote: 'vote', voting: 'vote',
-  route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame', duel: 'duel', versus: 'duel', 'head-to-head': 'duel', drawing: 'drawing', draw: 'drawing', sketch: 'drawing' };
+  route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame', duel: 'duel', versus: 'duel', 'head-to-head': 'duel', drawing: 'drawing', draw: 'drawing', sketch: 'drawing',
+  teams: 'teams', 'pick-teams': 'teams', 'make-teams': 'teams' };
 
 /**
  * Points by place in the simple format: `places: [10, 6, 3]` (points for 1st, 2nd, 3rd),
@@ -64,7 +65,8 @@ function stageFrom(raw: Json, key: string): Json {
   const type = TYPES[text(raw['type']).toLowerCase()] ?? (Array.isArray(raw['answers'] ?? raw['options']) ? 'quiz' : 'info');
   const prompt = text(raw['prompt'] ?? raw['question'] ?? raw['text'] ?? raw['title'], 'Untitled');
   const durationMs = seconds(raw);
-  const play = isObject(raw['play']) ? { play: raw['play'] } : {};
+  // `"inTeams": true` is short for playing the round in the teams made by the last Pick teams scene.
+  const play = isObject(raw['play']) ? { play: raw['play'] } : raw['inTeams'] === true ? { play: { kind: 'teams', lineup: { kind: 'game' }, answers: raw['captain'] === true ? 'captain' : 'everyone', points: 'both' } } : {};
   const stage = stageOfType(raw, key, type, prompt, durationMs, play);
   // A scene can have its own look (texts, style, animations); the definition check validates it.
   // `spin`: the name of a wheel of fortune the host spins on this scene.
@@ -75,6 +77,13 @@ function stageFrom(raw: Json, key: string): Json {
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
   switch (type) {
     case 'info': return { key, kind: 'info', title: text(raw['title'], prompt).slice(0, 120), prompt: text(raw['text'] ?? raw['prompt'], prompt), durationMs };
+    // Pick teams: `"teams": 3` (equal teams, default 2) or a full `form`; `"how"`: random, host or players (default players).
+    case 'teams': {
+      const how = ['random', 'host', 'players'].includes(text(raw['how'] ?? raw['formation'])) ? text(raw['how'] ?? raw['formation']) : 'players';
+      const count = Math.max(2, Math.min(12, Math.round(Number(raw['teams']) || 2)));
+      return { key, kind: 'teams', prompt: text(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how },
+        ...(raw['captains'] === true ? { captains: true } : {}) };
+    }
     case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
     case 'minigame': {
       // `game` by key or by name ("Tap race"); unknown names stay a placeholder to choose in the editor.
@@ -185,6 +194,8 @@ export function importDefinition(input: string): Json | null {
     ...(Array.isArray(raw['wheels']) ? { wheels: raw['wheels'].filter(isObject).slice(0, 10).map((wheel, index) => ({ key: slug(text(wheel['title'] ?? wheel['key']), `wheel-${index + 1}`), title: text(wheel['title'], `Wheel ${index + 1}`).slice(0, 80),
       entries: options(wheel['entries'], 'entry'), removePicked: wheel['removePicked'] !== false, spinSeconds: Math.max(2, Math.min(15, Math.round(Number(wheel['spinSeconds']) || 5))) })) } : {}),
     ...(Array.isArray(raw['awards']) ? { finale: { stats: raw['awards'].map(entry => text(entry)) } } : isObject(raw['finale']) ? { finale: raw['finale'] } : {}),
+    // Side games on the phones are on unless switched off; chips only with an explicit true.
+    ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;

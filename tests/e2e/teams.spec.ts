@@ -25,18 +25,24 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     // A random proposal appears everywhere; nobody can answer yet.
     await expect(ada.getByRole('region', { name: 'Team forming' })).toContainText('Teams were drawn at random');
     await expect(ada.getByText('Answers open once the host starts the round')).toBeVisible();
+    // The Pick teams scene: a coloured column per team. The host taps a player, then the team to put them in.
     const forming = host.getByRole('region', { name: 'Team forming' });
     for (const [name, team] of [['Ada', 'Red'], ['Ben', 'Red'], ['Cleo', 'Blue']] as const) {
-      await forming.getByLabel(`Team for ${name}`).selectOption({ label: team });
-      await expect(forming.getByLabel(`Team for ${name}`)).toHaveValue(team === 'Red' ? '0' : '1');
+      await forming.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+      const put = forming.getByRole('button', { name: `Put ${name} in ${team}` });
+      if (await put.count()) await put.click(); else await forming.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+      await expect(forming.locator('.team-column', { hasText: team })).toContainText(name);
     }
+    await forming.getByRole('button', { name: /^Ada/ }).click();
     await forming.getByRole('button', { name: 'Make Ada captain' }).click();
     await expect(forming).toContainText('captain: Ada');
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     expect((await new AxeBuilder({ page: ada }).analyze()).violations).toEqual([]);
-    await forming.getByRole('button', { name: 'Start round with these teams' }).click();
+    await host.getByRole('button', { name: 'Start round with these teams' }).click();
 
     await expect(ada.getByText('You are in Red with Ben. Captain: you.')).toBeVisible();
+    // The teams are set: the host moves on to the first round, played in them.
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(ben.getByText('Your captain Ada answers for Red.')).toBeVisible();
     await expect(ben.getByRole('button', { name: 'Save answer' })).toHaveCount(0);
     await expect(ada.getByRole('timer', { name: 'Time left' })).toHaveText(/left$/);
@@ -64,7 +70,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     const oneVsRest = host.getByRole('region', { name: 'Team forming' });
     await expect(oneVsRest).toContainText('Teams for this round');
     await expect(oneVsRest).toContainText('Soloist · 1 of 1');
-    await oneVsRest.getByRole('button', { name: 'Start round with these teams' }).click();
+    await host.getByRole('button', { name: 'Start round with these teams' }).click();
     await host.getByRole('button', { name: 'Close answers' }).click();
     const judging = host.getByRole('group', { name: 'Judge teams' });
     await judging.getByLabel('Points for Soloist').fill('30');
@@ -79,7 +85,8 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await expect(cleo.getByRole('button', { name: 'You are in Red' })).toBeVisible();
     await ada.getByRole('button', { name: 'Join Blue' }).click();
     await ben.getByRole('button', { name: 'Join Blue' }).click();
-    await expect(host.getByRole('region', { name: 'Team forming' })).toContainText('Ada, Ben');
+    const blue = host.getByRole('region', { name: 'Team forming' }).locator('.team-column', { hasText: 'Blue' });
+    await expect(blue).toContainText('Ada'); await expect(blue).toContainText('Ben');
     await host.getByRole('button', { name: 'Start round with these teams' }).click();
     await expect(cleo.getByText('You are in Red', { exact: false })).toBeVisible();
     for (const page of [host, ada]) expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

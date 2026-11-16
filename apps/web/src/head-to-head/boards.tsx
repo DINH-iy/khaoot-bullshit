@@ -12,8 +12,17 @@ const RPS_ORDER = ['rock', 'paper', 'scissors'] as const;
 function RpsBoard({ view, board, names, canMove, onMove }: BoardProps<'rps'>) {
   const me = view.seat; const mine = me === null ? null : board.picked[me];
   return <div className="h2h-rps">
-    <p className="h2h-score">{names[0]} <strong>{board.wins[0]}</strong> – <strong>{board.wins[1]}</strong> {names[1]} <small>· first to {board.firstTo}</small></p>
-    {board.last && <p className="h2h-last" aria-live="polite">Last round: {RPS_ICONS[board.last.picks[0]]} vs {RPS_ICONS[board.last.picks[1]]} · {board.last.winner === null ? 'a tie, again!' : `${names[board.last.winner]} wins the round`}</p>}
+    {/* The score as a scoreboard, and the last round as two big picks with the winner lit up: readable at a glance. */}
+    <div className="h2h-score" role="group" aria-label={`Score: ${names[0]} ${board.wins[0]}, ${names[1]} ${board.wins[1]}, first to ${board.firstTo}`}>
+      {([0, 1] as const).map(seat => <div key={seat} className={`h2h-side${me === seat ? ' you' : ''}`}><span className="h2h-name">{names[seat]}{me === seat ? ' (you)' : ''}</span><strong>{board.wins[seat]}</strong></div>)}
+      <small>first to {board.firstTo}</small>
+    </div>
+    {board.last && <div className="h2h-last" role="group" aria-live="polite" aria-label={`Last round: ${board.last.picks[0]} against ${board.last.picks[1]}, ${board.last.winner === null ? 'a tie' : `${names[board.last.winner]} wins the round`}`}>
+      <p className="h2h-last-title">Last round</p>
+      <div className="h2h-last-picks">{([0, 1] as const).map(seat => <div key={seat} className={board.last!.winner === seat ? 'won' : board.last!.winner === null ? 'tie' : 'lost'}>
+        <span aria-hidden="true">{RPS_ICONS[board.last!.picks[seat]]}</span><small>{names[seat]}</small></div>)}</div>
+      <p className="h2h-last-result">{board.last.winner === null ? 'A tie, again!' : `${names[board.last.winner]} wins the round`}</p>
+    </div>}
     {me !== null && !view.outcome && <>
       <p>{mine ? `You picked ${RPS_ICONS[board.yourPick!]}. Waiting for ${names[me === 0 ? 1 : 0]}…` : `Round ${board.round}: pick one`}</p>
       <div className="h2h-rps-picks" role="group" aria-label="Your pick">
