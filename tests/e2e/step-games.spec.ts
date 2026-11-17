@@ -29,6 +29,15 @@ test('Bar games: teams drive the bus by voting on each guess, then everyone pick
   await host.getByRole('button', { name: 'Start round with these teams' }).click();
   await host.getByRole('button', { name: 'Next', exact: true }).click();
 
+  // Drive the bus explains itself first: the phones say they are ready, then the host starts the round.
+  for (const phone of phones) {
+    await expect(phone.getByRole('region', { name: 'How it works' })).toContainText(/red or black/);
+    await phone.getByRole('button', { name: 'Got it!' }).click();
+    await expect(phone.getByText('Waiting for the host to start…')).toBeVisible();
+  }
+  await expect(host.getByRole('region', { name: 'How it works' })).toContainText('2 of 2 ready');
+  await host.getByRole('button', { name: 'Start the round' }).click();
+
   // Drive the bus: each team votes on its guess; a vote of everyone in the team decides at once.
   for (const phone of phones) await expect(phone.getByText(/Round 1 of 4 · Red or black\?/)).toBeVisible({ timeout: 15_000 });
   await expect(ada.getByText(/Vote for your team’s choice/)).toBeVisible();

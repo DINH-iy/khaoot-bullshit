@@ -103,6 +103,9 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('teams.assign'), stageRunId: GameIdSchema, playerId: GameIdSchema, teamIndex: z.number().int().min(0).max(11).nullable() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.captain'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.confirm'), stageRunId: GameIdSchema }).strict(),
+  // A scene that explains itself first: the host starts it once everyone has read it (players tap “Got it”).
+  z.object({ ...hostEnvelope, type: z.literal('stage.explained'), stageRunId: GameIdSchema }).strict(),
+  z.object({ ...envelope, type: z.literal('stage.understood'), stageRunId: GameIdSchema }).strict(),
   // The host adds a team (up to 12) or removes one; a removed team's players become unassigned.
   z.object({ ...hostEnvelope, type: z.literal('teams.add'), stageRunId: GameIdSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.remove'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11) }).strict(),
@@ -141,7 +144,7 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
 ]);
 export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Commands a player may send; every other command is the host's. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),
@@ -223,6 +226,9 @@ export const PublicStageSchema = z.object({
   // `placesMilli`: points for 1st, 2nd… when the challenge pays by place (the host picks each player's place).
   challenge: z.object({ maxAwardMilli: AwardMilliSchema, placesMilli: z.array(AwardMilliSchema).nullable(), judgedPlayerIds: z.array(GameIdSchema), judgedTeamIds: z.array(GameIdSchema) }).strict().nullable(),
   teams: StageTeamsSchema.nullable(),
+  // Shown before the round starts, until the host continues: the scene's own text (null: the minigame's standard
+  // “how to play” from the game's texts) and who has tapped “Got it”.
+  explain: z.object({ text: z.string().max(1000).nullable(), readyIds: z.array(GameIdSchema) }).strict().nullable(),
   route: PublicRouteSchema.nullable(),
   // Show-only scenes: an info scene's title, a scoreboard scene's standings selection.
   info: z.object({ title: z.string().min(1).max(120) }).strict().nullable(),

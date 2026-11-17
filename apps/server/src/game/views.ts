@@ -1,3 +1,4 @@
+import { readExplain } from './explain.js';
 import { isStepMinigame, type MinigameSettings, type Presentation, GameIdSchema, SessionViewSchema, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -111,6 +112,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           submittedCount: submissions.length, eligibleCount: choice ? choice.voterCount : eligible?.success ? eligible.data.playerIds.length : 0,
           challenge: entry.stage.kind === 'challenge' ? { maxAwardMilli: entry.stage.maxAwardMilli, placesMilli: stagePlaces(entry.stage), judgedPlayerIds: judged.map(row => row.playerId), judgedTeamIds: [...new Set(judged.map(row => context?.teamOf.get(row.playerId)).filter(id => id !== undefined))] } : null,
           teams, route: choice?.view ?? null,
+          explain: current.status === 'ACTIVE' && readExplain(current.presentation) ? { text: entry.stage.explain?.text ?? null, readyIds: readExplain(current.presentation)!.readyIds } : null,
           info: entry.stage.kind === 'info' ? { title: entry.stage.title } : null, scoreboard: entry.stage.kind === 'scoreboard' ? { show: entry.stage.show } : null,
           ballot, minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
           revealed, reveal: revealed ? { answer: voteAnswer ?? minigameAnswer ?? answer, awards: awards.map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),

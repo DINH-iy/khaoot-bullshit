@@ -77,7 +77,9 @@ function stageFrom(raw: Json, key: string): Json {
   // A scene can have its own look (texts, style, animations); the definition check validates it.
   // `spin`: the name of a wheel of fortune the host spins on this scene.
   const spun = typeof raw['spin'] === 'string' && raw['spin'].trim() ? { spin: { wheel: slug(raw['spin'], 'wheel') } } : isObject(raw['spin']) ? { spin: raw['spin'] } : {};
-  const extras = { ...spun, ...(raw['wheelClear'] === true ? { wheelClear: true } : {}) };
+  // `explain`: true (a minigame's standard “how to play”) or the scene's own explanation, shown before it starts.
+  const explain = raw['explain'] === true ? { explain: {} } : typeof raw['explain'] === 'string' && raw['explain'].trim() ? { explain: { text: raw['explain'].trim().slice(0, 1000) } } : {};
+  const extras = { ...spun, ...explain, ...(raw['wheelClear'] === true ? { wheelClear: true } : {}) };
   return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
 }
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {

@@ -14,6 +14,7 @@ import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute
 import { GameError, requireGame } from './errors.js';
 import { actorKey, EligibilitySchema, requireHost, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
 import { acceptsUntil, closesAt, graceFor, MAX_REMAINING_MS, remainingMs, timerColumns } from './timing.js';
+import { explainsFirst, readExplain, withReady, withoutExplain } from './explain.js';
 import { formingCommand, gameLineupForRound, readForming, route, startForming, teamContext, type Award, type TeamContext } from './teams/teams.js';
 
 export interface Effect {
@@ -63,6 +64,8 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
       eligible = []; timed = false;
     }
   }
+  // A scene that explains itself first waits, untimed (and a minigame unstarted), until the host starts it.
+  if (explainsFirst(entry.stage)) { presentation = { ...presentation, explain: { readyIds: [] } }; timed = false; }
   // A minigame starts (after its countdown) as soon as players can play it.
   if (entry.stage.kind === 'minigame' && timed) presentation = { ...presentation, minigame: startOf(entry.stage, now) };
   const stage = await tx.stageRun.create({ data: { sessionId, number, nodeKey: entry.nodeKey, stageKey: entry.stage.key, openedAt: now, presentation, lineupId,
@@ -268,14 +271,30 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
     const { forming: _done, ...rest } = stage.presentation as Record<string, unknown>;
     if ('lineupId' in result) {
-      // Confirmed: the round starts now, with its timer, for the players in a team.
-      const started = entry.stage.kind === 'minigame' ? { ...rest, minigame: startOf(entry.stage, now) } : rest;
-      await tx.stageRun.update({ where: { id: stage.id }, data: { lineupId: result.lineupId, presentation: started as object, eligibility: { formatVersion: 1, playerIds: result.playerIds }, ...timerColumns(entry.stage.durationMs, false, now) } });
+      // Confirmed: the round starts now, with its timer, for the players in a team (after its explanation, if it has one).
+      const explaining = Boolean(readExplain(rest));
+      const started = entry.stage.kind === 'minigame' && !explaining ? { ...rest, minigame: startOf(entry.stage, now) } : rest;
+      await tx.stageRun.update({ where: { id: stage.id }, data: { lineupId: result.lineupId, presentation: started as object, eligibility: { formatVersion: 1, playerIds: result.playerIds }, ...(explaining ? {} : timerColumns(entry.stage.durationMs, false, now)) } });
     } else await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...rest, forming: result.forming } as object } });
     return { ...empty, stageRunId: stage.id };
   }
+  const explaining = readExplain(stage.presentation);
+  if (command.type === 'stage.understood') {
+    // A player has read the explanation (once; tapping again changes nothing).
+    requireGame(actor.role === 'player' && stage.status === 'ACTIVE' && explaining, 'INVALID_STATE');
+    if (!explaining.readyIds.includes(actor.playerId)) await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: withReady(stage.presentation, actor.playerId) } });
+    return { ...empty, stageRunId: stage.id };
+  }
+  if (command.type === 'stage.explained') {
+    // The host starts the round: its timer runs from now and a minigame starts its countdown. Teams come first.
+    requireGame(stage.status === 'ACTIVE' && explaining && !forming, 'INVALID_STATE');
+    const rest = withoutExplain(stage.presentation);
+    const started = entry.stage.kind === 'minigame' ? { ...rest, minigame: startOf(entry.stage, now) } : rest;
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: started as object, ...timerColumns(entry.stage.durationMs, false, now) } });
+    return { ...empty, stageRunId: stage.id };
+  }
   if (command.type === 'stage.timer') {
-    requireGame(stage.status === 'ACTIVE' && !forming, 'INVALID_STATE');
+    requireGame(stage.status === 'ACTIVE' && !forming && !explaining, 'INVALID_STATE');
     const current = remainingMs(stage, now);
     const change = command.change;
     requireGame(change.kind !== 'add' || current !== null, 'INVALID_STATE');
@@ -366,7 +385,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(actor.role === 'player', 'FORBIDDEN');
     requireGame(stage.status === 'ACTIVE', 'INVALID_STATE');
     requireGame(!stage.deadlineAt || now.getTime() <= acceptsUntil(stage.deadlineAt, graceFor(entry.stage)), 'TOO_LATE');
-    requireGame(!forming, 'INVALID_STATE');
+    requireGame(!forming && !explaining, 'INVALID_STATE');
     requireGame(eligible.data.playerIds.includes(actor.playerId), 'INELIGIBLE');
     const by = answerer(actor, context);
     if (choice) {

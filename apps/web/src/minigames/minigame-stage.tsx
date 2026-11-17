@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import type { Stroke } from '@party/contracts';
 import type { LiveStrokes } from '../drawing/live-strokes.js';
-import { defaultLook, formatMinigameResult, isStepMinigame, MINIGAMES, MinigameValueSchema, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { defaultLook, formatMinigameResult, howToPlayKey, isStepMinigame, MINIGAMES, MinigameValueSchema, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import { useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
 import { formatPoints } from '../room/results.js';
@@ -25,7 +25,7 @@ const CONTROLLERS = { reaction: ReactionPad, 'tap-race': TapRace, 'stop-clock': 
  * the shared screen and host see how to play, the countdown and GO.
  */
 export function MinigameStage({ state, stage, offset, canPlay, disabled, onResult, live, onPart, onMove }: { state: RoomSnapshot; stage: Stage; offset: number; canPlay: boolean; disabled: boolean; onResult: (result: Result) => void; live: MinigameLive; onPart: (turn: number, assetId: string) => void ; onMove: SendMove }) {
-  const t = useText(); const minigame = stage.minigame!; const info = MINIGAMES[minigame.game];
+  const t = useText(); const minigame = stage.minigame!;
   const own = state.view.ownSubmission ? MinigameValueSchema.safeParse(state.view.ownSubmission.value) : null;
   // Stable callbacks: the controllers redraw every frame, and their timers must not restart each time.
   const latest = useRef({ onResult, live }); latest.current = { onResult, live };
@@ -43,10 +43,10 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
   if (state.role === 'player') {
     if (own?.success) return <div className="mg-done" role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : formatMinigameResult(minigame.game, own.data.value, settings)}</p><p>{t('minigame.played')}</p></div>;
     if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('minigame.paused')}</p>;
-    if (!canPlay || !minigame.startsAt) return <p className="wait-note">{info.howToPlay}</p>;
+    if (!canPlay || !minigame.startsAt) return <p className="wait-note">{t(howToPlayKey(minigame.game))}</p>;
     const Controller = CONTROLLERS[minigame.game as keyof typeof CONTROLLERS] as (props: { settings: MinigameSettings; startsAt: string; goAt: string | null; offset: number; disabled: boolean; onResult: (result: Result) => void; onTaps: (count: number) => void }) => React.ReactElement;
     return <div className={`mg-play mg-${minigame.game}`}>
-      <p className="mg-how">{info.howToPlay}</p>
+      <p className="mg-how">{t(howToPlayKey(minigame.game))}</p>
       {/* A new start (after a pause) begins a fresh game on the phone. */}
       <Controller key={minigame.startsAt} settings={settings} startsAt={minigame.startsAt} goAt={goAt} offset={offset} disabled={disabled} onResult={send} onTaps={sendTaps} />
     </div>;
@@ -61,7 +61,7 @@ function ScreenView({ state, minigame, offset, progress }: { state: RoomSnapshot
   const go = minigame.goAt ? now >= Date.parse(minigame.goAt) : false;
   return <div className={`mg-screen mg-${minigame.game}`}>
     <p className="mg-name">{info.name}</p>
-    <p className="mg-how">{info.howToPlay}</p>
+    <p className="mg-how">{t(howToPlayKey(minigame.game))}</p>
     {/* Paused: no countdown or GO; continuing starts a fresh countdown. */}
     {state.view.status === 'PAUSED' ? <p className="mg-big wait" role="status">{t('minigame.paused')}</p>
       : left !== null && left > 0 ? <p className="mg-big" role="timer" aria-label="Starts in">{Math.ceil(left / 1000)}</p>

@@ -12,6 +12,7 @@ import { VoteBallot } from './vote.js';
 import { SeatApprovalSetting, SeatReclaim, SeatRequests } from './seat-reclaim.js';
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
+import { ExplainPanel } from './explain-panel.js';
 import { DuelPanel } from './duel.js';
 import { MinigameStage } from '../minigames/minigame-stage.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
@@ -193,13 +194,17 @@ export function RoomScreen() {
     : state.view.status === 'PAUSED' ? { label: t('host.resume'), run: () => command('session.resume') }
     // While teams are picked, confirming them is the host's next step (possible once anyone is in a team).
     : running && stage?.status === 'ACTIVE' && stage.teams?.forming ? { label: t('host.startTeams'), run: () => command('teams.confirm', { stageRunId: stage.id }), blocked: stage.teams.teams.every(team => team.memberIds.length === 0) }
+    // A scene that explains itself first: the host starts it once everyone has read it.
+    : running && stage?.status === 'ACTIVE' && stage.explain ? { label: t('explain.start'), run: () => command('stage.explained', { stageRunId: stage.id }) }
     : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
     : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
     : running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
     : null;
   // What is happening now, in a word or two, above the round.
   const forming = Boolean(stage?.teams?.forming);
-  const phase = !stage || showOnly ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams')
+  // Teams are made first; then the explanation; then the round itself.
+  const explaining = !forming && Boolean(stage?.explain);
+  const phase = !stage || showOnly ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams') : explaining ? t('explain.title')
     : stage.revealed ? t('phase.results') : stage.kind === 'duel' ? (stage.status === 'CLOSED' ? t('phase.duelOn') : t('phase.duel')) : stage.status === 'CLOSED' ? t('phase.locked')
     : stage.kind === 'challenge' ? t('phase.challenge') : stage.kind === 'minigame' ? t('phase.minigame') : stage.kind === 'route' ? t('phase.route') : stage.kind === 'vote' ? t('phase.vote')
     : stage.eligibleCount > 0 && stage.submittedCount >= stage.eligibleCount ? t('phase.allIn') : t('phase.answer');
@@ -248,7 +253,8 @@ export function RoomScreen() {
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
           <TeamSummary state={state} stage={stage} />
-          {!forming && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
+          {explaining && <ExplainPanel state={state} stage={stage} disabled={disabled} send={command} />}
+          {!forming && !explaining && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
           {stage.kind === 'vote' && !stage.revealed && <VoteBallot state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
             onVote={submissionId => command('submission.submit', { stageRunId: stage.id, value: { kind: 'vote', submissionId } })} />}
           {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}

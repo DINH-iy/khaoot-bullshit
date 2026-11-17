@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { MINIGAMES, isStepMinigame, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { howToPlayKey, isStepMinigame, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import { FaIcon, type IconName } from '../presentation/icons.js';
 import './room-chrome.css';
 import { StageTimer } from './stage-timer.js';
+import { useText } from '../presentation/look.js';
 import { nameList, teamColor } from './teams.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
@@ -53,7 +54,7 @@ const KIND_ICON: Partial<Record<Stage['kind'], IconName>> = { minigame: 'stopwat
 export function RoundBar({ state, stage, phase, remaining, timerRef }: { state: RoomSnapshot; stage: Stage; phase: string | null; remaining: number | null; timerRef: RefObject<HTMLDivElement | null> }) {
   const forming = Boolean(stage.teams?.forming); const teams = stage.teams;
   const mine = state.role === 'player' && teams && !forming ? teams.teams.find(team => team.memberIds.includes(state.selfPlayerId ?? '')) : undefined;
-  const details = roundDetails(stage);
+  const t = useText(); const details = roundDetails(stage, t);
   if (mine) { const mates = mine.memberIds.filter(id => id !== state.selfPlayerId); const captain = teams?.answers === 'captain' && mine.captainId ? ` Captain: ${mine.captainId === state.selfPlayerId ? 'you' : state.players.find(player => player.id === mine.captainId)?.displayName ?? 'someone'}.` : '';
     details.unshift(['flag', `You are in ${mine.name}${mates.length ? ` with ${nameList(state, mates)}` : ''}.${captain}`]); }
   if (!phase && !mine && !details.length && (forming || stage.status !== 'ACTIVE')) return null;
@@ -64,17 +65,17 @@ export function RoundBar({ state, stage, phase, remaining, timerRef }: { state: 
     {stage.input?.kind === 'drawing' && stage.input.blind && <p className="chip chip-warn"><span aria-hidden="true">🙈</span> Blind</p>}
     {details.length > 0 && <Popover label="About this round" icon="circle-info" className="round-about" align="start">
       <ul className="round-details">{details.map(([icon, text]) => <li key={text}><FaIcon name={icon} />{text}</li>)}</ul></Popover>}
-    {!forming && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
+    {!forming && !stage.explain && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
   </div>;
 }
 
 /** What the (i) explains about the round. */
-function roundDetails(stage: Stage): [IconName, string][] {
+function roundDetails(stage: Stage, t: ReturnType<typeof useText>): [IconName, string][] {
   const rows: [IconName, string][] = [];
   if (stage.teams && !stage.teams.forming) rows.push(['users', `Team round · ${stage.teams.answers === 'captain' ? 'the captains answer for their team' : 'everyone answers'}`]);
   const minigame = stage.minigame;
   if (minigame) {
-    const game = minigame.game as MinigameKey; rows.push(['circle-info', MINIGAMES[game].howToPlay]);
+    const game = minigame.game as MinigameKey; rows.push(['circle-info', t(howToPlayKey(game))]);
     if (isStepMinigame(game) && stage.teams && minigame.steps) rows.push(['users', minigame.steps.decides === 'vote' ? 'Your team votes on every choice; who does not vote in time is not counted.' : minigame.steps.decides === 'captain' ? 'The captain makes every choice for the team.' : 'Anyone in the team taps the choice you agree on.']);
     if (game === 'bus') {
       const settings = minigame.settings as MinigameSettings<'bus'>;

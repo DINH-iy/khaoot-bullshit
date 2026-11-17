@@ -104,7 +104,7 @@ const barGames = parseDefinition({
   nodes: [
     { key: 'intro', stages: [{ key: 'cutscene', kind: 'info', title: 'BAR GAMES', prompt: 'Drive the bus in teams, then left or right on your own. Drink responsibly.', durationMs: null }] },
     { key: 'teams', stages: [{ key: 'pick', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'random' }, captains: true }] },
-    { key: 'bus', stages: [{ key: 'play', kind: 'minigame', prompt: 'Drive the bus', game: 'bus', settings: { sips: [1, 2, 3, 4] }, durationMs: 180_000, decide: 'vote', voteSeconds: 20,
+    { key: 'bus', stages: [{ key: 'play', kind: 'minigame', prompt: 'Drive the bus', game: 'bus', settings: { sips: [1, 2, 3, 4] }, explain: {}, durationMs: 180_000, decide: 'vote', voteSeconds: 20,
       places: { kind: 'list', pointsMilli: ['10000'] }, play: { kind: 'teams', lineup: { kind: 'game' }, answers: 'everyone', points: 'members' } }] },
     { key: 'sides', stages: [{ key: 'play', kind: 'minigame', prompt: 'Left or right? No talking!', game: 'majority', durationMs: 20_000, places: { kind: 'list', pointsMilli: ['5000'] } },
       { key: 'scores', kind: 'scoreboard', prompt: 'Final standings', show: 'players', durationMs: null }] },

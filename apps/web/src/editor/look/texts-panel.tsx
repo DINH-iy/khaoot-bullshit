@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TEXT_DEFAULTS, TEXT_GROUPS, TEXT_KEYS, type TextKey } from '@party/contracts';
+import { TEXT_DEFAULTS, TEXT_GROUPS, TEXT_KEYS, TEXT_LABELS, type TextKey } from '@party/contracts';
 import { Section } from '../controls/section.js';
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]!);
@@ -11,7 +11,7 @@ export function TextsPanel({ texts, below, onChange }: { texts: Record<string, s
   const current = texts ?? {};
   const set = (key: TextKey, value: string) => { const next = { ...current }; if (value === '') delete next[key]; else next[key] = value; onChange(next); };
   const query = search.trim().toLowerCase();
-  const matches = (key: TextKey) => !query || TEXT_DEFAULTS[key].toLowerCase().includes(query) || (current[key] ?? '').toLowerCase().includes(query);
+  const matches = (key: TextKey) => !query || TEXT_DEFAULTS[key].toLowerCase().includes(query) || (TEXT_LABELS[key] ?? '').toLowerCase().includes(query) || (current[key] ?? '').toLowerCase().includes(query);
   const changed = Object.keys(current).length;
   return <div className="look-panel">
     <label>Find a text<input type="search" value={search} placeholder="For example: answer is in" onChange={event => setSearch(event.target.value)} /></label>
@@ -25,7 +25,9 @@ export function TextsPanel({ texts, below, onChange }: { texts: Record<string, s
         const fallback = below[key] ?? TEXT_DEFAULTS[key]; const value = current[key] ?? ''; const wanted = placeholders(TEXT_DEFAULTS[key]);
         const missing = value ? wanted.filter(name => !placeholders(value).includes(name)) : [];
         return <div key={key} className="text-field">
-          <label>{TEXT_DEFAULTS[key]}<input value={value} placeholder={fallback} maxLength={400} onChange={event => set(key, event.target.value)} /></label>
+          {/* A long text (a minigame's “how to play”) gets a short name and a bigger box. */}
+          {TEXT_LABELS[key] ? <label>{TEXT_LABELS[key]}<textarea rows={3} value={value} placeholder={fallback} maxLength={400} onChange={event => set(key, event.target.value)} /></label>
+            : <label>{TEXT_DEFAULTS[key]}<input value={value} placeholder={fallback} maxLength={400} onChange={event => set(key, event.target.value)} /></label>}
           {wanted.length > 0 && <p className="hint">{wanted.map(name => `{${name}} is ${PLACEHOLDER_HELP[name] ?? name}`).join(', ')}.</p>}
           {missing.length > 0 && <p className="hint warn">{missing.map(name => `{${name}}`).join(' and ')} {missing.length === 1 ? 'is' : 'are'} not in your text, so it will not be shown.</p>}
           {value && <button className="link-button" onClick={() => set(key, '')}>Use the standard text</button>}

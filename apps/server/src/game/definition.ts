@@ -57,7 +57,9 @@ export const WheelSchema = z.object({
 }).strict();
 // Every scene may carry its own look, a wheel to spin there (`spin`), or hide the last wheel result from here on (`wheelClear`).
 // All optional, so earlier definitions keep their hash.
-const look = { presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional() };
+const look = { presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+  // An explanation shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
+  explain: z.object({ text: z.string().trim().min(1).max(1000).optional() }).strict().optional() };
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
@@ -156,6 +158,8 @@ export const GameDefinitionSchema = z.object({
         const rule = stage.scoring;
         if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) fail('Invalid correct choice');
       }
+      // Only a minigame has a standard explanation (its “how to play”); other scenes need their own text.
+      if (stage.explain && !stage.explain.text && stage.kind !== 'minigame') ctx.addIssue({ code: 'custom', message: 'Write the explanation for this scene, or switch it off', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.spin && !wheels.has(stage.spin.wheel)) ctx.addIssue({ code: 'custom', message: 'This scene spins a wheel that does not exist', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       // Pass the pencil is drawn by teams: it needs team play, from the round or the game.
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });

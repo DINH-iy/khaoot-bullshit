@@ -307,3 +307,15 @@
 /* Icon marks (route arrows, shapes): sized like the text they replace. */
 .mark-icon { width: .9em; height: .9em; display: block; }
 .room .route-arrow .mark-icon { width: .75em; height: .75em; }
+
+/* A scene's explanation before it starts. */
+.explain-panel { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 8px 0; }
+.explain-panel h3 { margin: 0; display: inline-flex; gap: 8px; align-items: center; font-size: 1.1rem; color: var(--r-accent); }
+.explain-text { margin: 0; max-width: 60ch; font-size: 1.15rem; line-height: 1.5; white-space: pre-line; }
+.room-display .explain-text { font-size: 1.6rem; }
+.explain-ok { min-width: 200px; }
+.explain-count { margin: 0; color: var(--r-muted); font-weight: 700; }
+.explain-faces { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.explain-faces li { position: relative; display: grid; justify-items: center; gap: 4px; font-size: .85rem; opacity: .45; transition: opacity .2s; }
+.explain-faces li.ready { opacity: 1; }
+.explain-check { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--r-ok); color: #06301c; font-size: .7rem; }

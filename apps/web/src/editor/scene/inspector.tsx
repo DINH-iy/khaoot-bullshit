@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
 import { Section } from '../controls/section.js';
+import { ExplainFields } from './fields/explain-fields.js';
 import { ActionMenu, type MenuAction } from '../controls/action-menu.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { SavePrefab } from '../flow/save-prefab.js';
@@ -122,6 +123,8 @@ export function StageFields({ definition, node, index, onChange }: { definition:
       {stage.kind === 'minigame' && <MinigameFields part="points" definition={definition} node={node} index={index} onChange={onChange} />}
       {stage.kind === 'duel' && <DuelFields part="points" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
     </Section>}
+
+    {hasPlay && <Section title="Explanation first" summary={stage['explain'] ? 'Shown before the round' : 'Off'}><ExplainFields definition={definition} stage={stage} onChange={(next, field) => edit(() => next, field)} /></Section>}
 
     {hasPlay && <Section title="Who plays" summary={playSummary(stage)}><PlayFields definition={definition} node={node} index={index} onChange={onChange} /></Section>}
   </div>;

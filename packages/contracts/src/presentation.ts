@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MINIGAME_KEYS, MINIGAMES, type MinigameKey } from './minigames.js';
 
 // How a game looks, sounds (later) and moves. Everything players, the shared
 // screen and the host see can be changed per game, and again per scene. These
@@ -6,8 +7,13 @@ import { z } from 'zod';
 // list, numbers within bounds, and texts. Custom styles or scripts are not
 // accepted because they would run on every guest's device.
 
+/** How to play each minigame (shown in its explanation and on the screens): changeable per game like every text. */
+const HOW_TO_PLAY = Object.fromEntries(MINIGAME_KEYS.map(key => [`minigame.how.${key}`, MINIGAMES[key].howToPlay])) as { [K in MinigameKey as `minigame.how.${K}`]: string };
 /** Every text the room screens show, with its default. `{name}` style placeholders are filled in. */
 export const TEXT_DEFAULTS = {
+  ...HOW_TO_PLAY,
+  // The explanation a scene can show before it starts (until the host continues).
+  'explain.title': 'How it works', 'explain.ok': 'Got it!', 'explain.waiting': 'Waiting for the host to start…', 'explain.ready': '{count} of {total} ready', 'explain.start': 'Start the round',
   'join.title': 'Join a game', 'join.code': 'Room code', 'join.name': 'Your name', 'join.button': 'Join room', 'join.joining': 'Joining…',
   'join.reclaim': 'Phone died during a game?', 'join.reclaimButton': 'Take over my seat', 'join.notFound': 'No open room has that code. Check the code on the shared screen.',
   'join.codeMissing': 'Type the 6-character room code from the shared screen.', 'join.nameMissing': 'Type a name so the others know who you are.',
@@ -48,7 +54,12 @@ export const TEXT_GROUPS: { title: string; prefix: string }[] = [
   { title: 'Joining', prefix: 'join.' }, { title: 'Room status', prefix: 'status.' }, { title: 'Lobby', prefix: 'lobby.' }, { title: 'Answering', prefix: 'answer.' },
   { title: 'Voting', prefix: 'vote.' }, { title: 'Timer', prefix: 'timer.' }, { title: 'Waiting', prefix: 'wait.' }, { title: 'Progress', prefix: 'progress.' },
   { title: 'Results', prefix: 'results.' }, { title: 'Scores', prefix: 'scores.' }, { title: 'Party choice', prefix: 'route.' }, { title: 'Players', prefix: 'players.' }, { title: 'Round phases', prefix: 'phase.' }, { title: 'Duels', prefix: 'duel.' }, { title: 'Break', prefix: 'break.' }, { title: 'Wheel of fortune', prefix: 'wheel.' }, { title: 'End-of-game awards', prefix: 'stat.' }, { title: 'Reactions', prefix: 'react.' }, { title: 'Minigames', prefix: 'minigame.' }, { title: 'Drawing', prefix: 'drawing.' }, { title: 'Host buttons', prefix: 'host.' },
+  { title: 'Explanation before a round', prefix: 'explain.' },
 ];
+/** A short name for a text whose standard wording is long (the editor shows it above the box). */
+export const TEXT_LABELS: Partial<Record<TextKey, string>> = Object.fromEntries(MINIGAME_KEYS.map(key => [`minigame.how.${key}`, `${MINIGAMES[key].name}: how to play`]));
+/** The text of a minigame's “how to play”. */
+export const howToPlayKey = (game: MinigameKey) => `minigame.how.${game}` as TextKey;
 export function fillText(template: string, values: Record<string, string | number> = {}): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => name in values ? String(values[name]) : match);
 }

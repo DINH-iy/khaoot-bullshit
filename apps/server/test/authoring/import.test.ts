@@ -45,6 +45,14 @@ describe('importing a game from text', () => {
     expect(check(`Sure! Here is your game:\n\n\`\`\`json\n${example}\n\`\`\`\nHave fun!`).issues).toEqual([]);
   });
 
+  it('takes a scene’s explanation: its own text, or true for a minigame’s standard one', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Explained', scenes: [
+      { type: 'quiz', question: 'Capital?', answers: ['Canberra', 'Sydney'], correct: 'Canberra', explain: 'One try each.' },
+      { type: 'minigame', question: 'Doors', game: 'lucky-doors', explain: true }] }));
+    expect(issues).toEqual([]);
+    expect((definition.nodes as { stages: { explain?: unknown }[] }[]).map(node => node.stages[0]!.explain)).toEqual([{ text: 'One try each.' }, {}]);
+  });
+
   it('takes the host’s quick time button from "quickTime", within 5 to 600 seconds', () => {
     const game = (quickTime: unknown) => check(JSON.stringify({ title: 'Quick', quickTime, scenes: [{ type: 'cutscene', title: 'Hi', text: 'Welcome' }] })).definition;
     expect(game(60).quickTimeSeconds).toBe(60);

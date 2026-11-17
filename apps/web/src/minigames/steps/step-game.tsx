@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { formatMinigameResult, MINIGAMES, type MinigameKey, type MinigameSettings, type RoomSnapshot, type StepSideView, type TeamDecides } from '@party/contracts';
+import { formatMinigameResult, howToPlayKey, MINIGAMES, type MinigameKey, type MinigameSettings, type RoomSnapshot, type StepSideView, type TeamDecides } from '@party/contracts';
 import { useText } from '../../presentation/look.js';
 import { useServerNow } from '../clock.js';
 import { STEP_RENDERERS } from './renderers.js';
@@ -40,12 +40,12 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
   const starts = minigame.startsAt ? Date.parse(minigame.startsAt) : null;
   const now = useServerNow(offset, Boolean(side?.voteEndsAt) || (starts !== null && starts > Date.now() + offset - 1000));
   if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('minigame.paused')}</p>;
-  if (!steps || !side) return <p className="wait-note">{MINIGAMES[game].howToPlay}</p>;
+  if (!steps || !side) return <p className="wait-note">{t(howToPlayKey(game))}</p>;
   const board = renderer.board?.(side, settings, true);
   const head = <>{side.teamId && <p className="step-team-title">{side.name}</p>}{board}</>;
   if (!side.options) return <div className="step-phone">{head}
     <p className="mg-big" role="status">{side.result !== null ? formatMinigameResult(game, side.result, settings) : 'Your choice is in.'}</p><p>{t('minigame.played')}</p></div>;
-  if (!canPlay || !minigame.startsAt) return <div className="step-phone">{head}<p className="wait-note">{MINIGAMES[game].howToPlay}</p></div>;
+  if (!canPlay || !minigame.startsAt) return <div className="step-phone">{head}<p className="wait-note">{t(howToPlayKey(game))}</p></div>;
   // The countdown everyone starts together after (as in every minigame).
   if (starts !== null && now < starts) return <div className="step-phone">{head}<p className="mg-big" role="timer" aria-label="Starts in">{Math.ceil((starts - now) / 1000)}</p></div>;
   const who = canMove(state, stage, side, steps.decides);
@@ -85,7 +85,7 @@ export function StepScreen({ state, stage, offset }: { state: RoomSnapshot; stag
   };
   return <div className={`mg-screen mg-${game}`}>
     <p className="mg-name">{info.name}</p>
-    <p className="mg-how">{info.howToPlay}</p>
+    <p className="mg-how">{t(howToPlayKey(game))}</p>
     {state.view.status === 'PAUSED' ? <p className="mg-big wait" role="status">{t('minigame.paused')}</p>
       : steps && <ol className="step-sides" aria-label="Everyone’s progress">{steps.sides.map(side =>
         <li key={side.teamId ?? side.playerId} className={side.options ? undefined : 'done'}><span className="step-side-name">{side.name}</span>{renderer.board?.(side, settings, false)}<span className="step-status">{status(side)}</span></li>)}</ol>}
