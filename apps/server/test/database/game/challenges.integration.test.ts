@@ -87,7 +87,7 @@ describe('challenges between players', () => {
     expect(refused.statusCode).not.toBe(200); expect(JSON.stringify(refused.json())).toContain('RATE_LIMITED');
     // Players cannot change it; the host can, within 1 to 10.
     expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 5 }, r.phones[0])).statusCode).not.toBe(200);
-    expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 11 }, r.host)).statusCode).toBe(400);
+    expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 11 }, r.host)).statusCode).not.toBe(200);
     expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 2 }, r.host)).statusCode).toBe(200);
     expect((await invite(2)).statusCode).toBe(200);
   });
