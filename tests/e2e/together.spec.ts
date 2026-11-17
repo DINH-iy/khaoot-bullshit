@@ -56,8 +56,8 @@ test('two people edit one game at once: each sees the other’s work, selection 
 
   // Ben adds a scene while Ada moves one: both arrive on both screens.
   await ben.getByRole('button', { name: 'Add a scene', exact: true }).click();
+  await ben.getByRole('tab', { name: 'Between rounds' }).click();
   await ben.getByRole('menu', { name: 'Add a scene' }).getByRole('menuitem', { name: /^Scoreboard/ }).click();
-  await ben.getByRole('menu', { name: 'Add a scene · Scoreboard' }).getByRole('menuitem', { name: /^Players/ }).click();
   await expect(ada.locator('.scene-card')).toHaveCount(6);
   await expect(card(ada, /^Standings$/)).toHaveClass(/peer-selected/);
 
@@ -94,8 +94,8 @@ test('edits made while the live connection is down are merged when saving', asyn
   const { ada, ben } = await twoEditors(browser, baseURL!, 'A blank game', true);
   await expect(peers(ada)).toHaveCount(0);
   await ada.getByRole('button', { name: 'Add a scene', exact: true }).click();
+  await ada.getByRole('tab', { name: 'Rounds', exact: true }).click();
   await ada.getByRole('menu', { name: 'Add a scene' }).getByRole('menuitem', { name: /^Quiz question/ }).click();
-  await ada.getByRole('menu', { name: 'Add a scene · Quiz question' }).getByRole('menuitem', { name: /^Big tiles/ }).click();
   await saved(ada);
   await ben.getByLabel('Game name').fill('Ben kept working');
   await saved(ben);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { randomAssignment, route, type TeamContext } from '../../src/game/teams.js';
+import { randomAssignment, route, type TeamContext } from '../../src/game/teams/teams.js';
 
 const ids = (count: number) => Array.from({ length: count }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`);
 const sizesOf = (assignment: Record<string, number | null>, teams: number) => Array.from({ length: teams }, (_, index) => Object.values(assignment).filter(team => team === index).length);

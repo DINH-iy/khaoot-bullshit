@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { HealthSchema, ProblemSchema } from '@party/contracts';
 import { buildApp } from '../src/app.js';
 import { readConfig } from '../src/config.js';
-import { AuthenticationUnavailable, type TokenVerifier } from '../src/auth.js';
+import { AuthenticationUnavailable, type TokenVerifier } from '../src/auth/auth.js';
 
 const apps: ReturnType<typeof buildApp>[] = [];
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())); });

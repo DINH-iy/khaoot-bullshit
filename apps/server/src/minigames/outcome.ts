@@ -1,5 +1,5 @@
 import { AwardMilliSchema, MinigameValueSchema, SubmissionValueSchema, type MinigameKey, type MinigameSettings } from '@party/contracts';
-import { route, type Award, type TeamContext } from '../game/teams.js';
+import { route, type Award, type TeamContext } from '../game/teams/teams.js';
 import { places, rankValue, teamValue } from './rules.js';
 
 export const DEFAULT_PLACEMENT_MILLI = ['10000', '6000', '3000'];

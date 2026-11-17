@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { GameDefinitionSchema, parseDefinition } from '../../src/game/definition.js';
 import { firstStage, maxPathStages, nextStage } from '../../src/game/graph.js';
-import { resolveTally, type RouteCounts } from '../../src/game/routes.js';
+import { resolveTally, type RouteCounts } from '../../src/game/routes/routes.js';
 import { builtInGames } from '../../src/game/templates.js';
 
 const quiz = (key: string, extra: object = {}) => ({ key, stages: [{ key: 's', kind: 'collect', prompt: key, durationMs: null,

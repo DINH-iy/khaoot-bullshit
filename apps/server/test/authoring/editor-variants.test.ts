@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { inspectDefinition } from '../../src/authoring/drafts.js';
 // The editor's own model: what it adds must be what the server accepts.
-import { addConnectedScene, insertOnEdge, SCENE_TYPES, SCENE_VARIANTS, type Definition } from '../../../web/src/editor/model.js';
+import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS } from '@party/contracts';
+import { addConnectedScene, insertOnEdge, QUIZ_KINDS, SCENE_TYPES, SCENE_VARIANTS, updateStage, withDuelContest, withMinigame, withQuizKind, type Definition } from '../../../web/src/editor/model.js';
 
 const blank = (): Definition => ({ formatVersion: 2, title: 'Variants', startNodeKey: 'welcome',
   nodes: [{ key: 'welcome', stages: [{ key: 'intro', kind: 'info', title: 'Hi', prompt: 'Welcome!', durationMs: null }] }], edges: [] });
@@ -10,14 +11,38 @@ describe('every kind in the add menu', () => {
   const choices = SCENE_TYPES.flatMap(type => (SCENE_VARIANTS[type.type] ?? [{ key: undefined }]).map(variant => ({ type: type.type, variant: variant.key })));
   it.each(choices)('adds a scene the server accepts: $type $variant', ({ type, variant }) => {
     let definition = blank();
-    // A vote needs an open round to vote on; scoreboards per team need a team game.
+    // A vote needs an open round to vote on.
     if (type === 'vote') definition = addConnectedScene(definition, 'writing', 'welcome', undefined).definition;
-    if (type === 'scoreboard' && variant !== 'players') definition = { ...definition, play: { kind: 'teams', lineup: { kind: 'game', form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }, answers: 'everyone', points: 'members' } };
     const from = definition.nodes.at(-1)!.key;
     const added = addConnectedScene(definition, type, from, undefined, variant);
     const issues = inspectDefinition(added.definition).issues.filter(issue => issue.nodeKey === added.key);
     // A new party choice's routes still need somewhere to go: the only thing allowed to be left to do.
     expect(issues.map(issue => issue.message).filter(message => !(type === 'route' && message === 'A route option is not connected to a scene yet.'))).toEqual([]);
+  });
+});
+
+// Kinds that are settings in the scene's panel instead of a second menu.
+describe('kinds chosen in the scene panel', () => {
+  it.each(QUIZ_KINDS.flatMap(from => QUIZ_KINDS.map(to => ({ from: from.value, to: to.value }))))('a quiz question switched from $from to $to stays valid', ({ from, to }) => {
+    const added = addConnectedScene(blank(), 'quiz', 'welcome', undefined);
+    const switched = updateStage(updateStage(added.definition, added.key, 0, stage => withQuizKind(stage, from)), added.key, 0, stage => withQuizKind(stage, to));
+    expect(inspectDefinition(switched).issues).toEqual([]);
+  });
+  it.each(MINIGAME_KEYS.flatMap(from => MINIGAME_KEYS.map(to => ({ from, to }))))('a minigame changed from $from to $to stays valid', ({ from, to }) => {
+    const added = addConnectedScene(blank(), 'minigame', 'welcome', undefined, from);
+    const switched = updateStage(added.definition, added.key, 0, stage => withMinigame(stage, to, added.definition));
+    expect(inspectDefinition(switched).issues).toEqual([]);
+  });
+  it.each(['host', ...HEAD_TO_HEAD_KEYS].flatMap(from => ['host', ...HEAD_TO_HEAD_KEYS].map(to => ({ from, to }))))('a duel changed from $from to $to stays valid', ({ from, to }) => {
+    const added = addConnectedScene(blank(), 'duel', 'welcome', undefined, from);
+    const switched = updateStage(added.definition, added.key, 0, stage => withDuelContest(stage, to));
+    expect(inspectDefinition(switched).issues).toEqual([]);
+  });
+  it.each(['players', 'teams', 'both'])('a scoreboard showing %s is accepted in a game with a Pick teams scene', show => {
+    const teams = addConnectedScene(blank(), 'teams', 'welcome', undefined);
+    const board = addConnectedScene(teams.definition, 'scoreboard', teams.key, undefined);
+    const definition = updateStage(board.definition, board.key, 0, stage => ({ ...stage, show }));
+    expect(inspectDefinition(definition).issues).toEqual([]);
   });
 });
 

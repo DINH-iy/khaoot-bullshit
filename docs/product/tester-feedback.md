@@ -11,7 +11,9 @@ The feedback reports from the test evening of 14–15 November were sorted into 
 | C, room screens | Round strip under the top bar (what to do, timer, team round, blind round). Saving shows a spinner instead of moving the page; messages float and can be closed. Host panel folds "Shared screen & invite" and "Room settings" and scrolls on its own. Phone results fit one screen (own result first, everyone's points folded). One Menu button on phones, and a banner when someone challenges you. Bigger break icon (it was shrunk by a CSS rule), big "BLIND ROUND" banner, readable rock paper scissors, signpost arrows for routes, copy code/link buttons. | `566660b` |
 | Side games | Side games on by default and playable just for fun; chips are an extra (off by default): host switches *Side games* and *Chips*, per game in Game settings, `sideGames`/`chips` in imports. A migration fixes challenge stakes (accepting a staked challenge always failed before). | `566660b` |
 | D, teams | Teams are made in a **Pick teams** scene; rounds after it are played in those teams or solo; a single round can have its own teams (1 against the rest). Team columns in the room: tap a player then a team, or drag; captains; add (up to 12) and remove teams. Older team games are converted when opened in the editor. "Team party" rebuilt. | `566660b` |
-| E, host and players | **Back to lobby** (host panel): the same game again in a fresh room, everyone follows (new room code; the old room's history stays). Looks are used straight away unless the room setting *Players confirm their look* is on; a drawing in progress is used on Done or when the game starts. Awards: swipe or ‹ ›, auto-play is a toggle (on only on the shared screen). When time runs out the phone sends what the player had: choice, text, order, upload, route vote or drawing (a half-drawn line is kept); drawing rounds accept answers 3 seconds after the deadline instead of 1. | this commit |
+| E, host and players | **Back to lobby** (host panel): the same game again in a fresh room, everyone follows (new room code; the old room's history stays). Looks are used straight away unless the room setting *Players confirm their look* is on; a drawing in progress is used on Done or when the game starts. Awards: swipe or ‹ ›, auto-play is a toggle (on only on the shared screen). When time runs out the phone sends what the player had: choice, text, order, upload, route vote or drawing (a half-drawn line is kept); drawing rounds accept answers 3 seconds after the deadline instead of 1. | commit `1c61c7a` |
+| F1, F2, add menu | One entry per kind: quiz, scoreboard, picture/video, drawing and party choice are added straight away. Their kind is a setting in the scene panel: quiz *Kind of question* (Big tiles / A list / True or false) and scoreboard *Show* (Player scores / Team scores / Both) are buttons; upload types, drawing blind and who decides were already there. Writing prompts, minigames and duels keep their second menu (different games or starter text, not settings). | not committed yet |
+| F3, add-menu tabs | The add menu has tabs: **Rounds** (quiz, writing, picture/video, drawing, put in order, challenge, vote), **Games** (minigame, duel, wheel), **Between rounds** (cutscene, scoreboard, party choice, Pick teams) and **Prefabs**. It opens on the tab used last; arrow keys move between tabs. The part menu in the Scene editor shows only the tabs that have parts. | not committed yet |
 
 Also fixed on the way: `MEDIA_DIR` accepts Windows paths (local runs and tests), and two browser tests that still expected old screen text (authoring, wheel/awards).
 
@@ -33,11 +35,23 @@ None of this was tried on an actual phone yet; the browser tests emulate one.
 
 ### F. Editor: add-scene menu and choosing settings
 
-- F1, F2: one entry per kind in the add menu (results/scoreboard, quiz) with the layout as a setting instead of separate tiles.
-- F3: tabs in the add-scene menu when it gets long (do F1/F2 first; Pick teams added one more entry).
-- F4: replace dropdowns with popups (example: "How it is split" in places). You asked what Reddit/UX discussions say first.
-- F5: duel: choose the head-to-head game in a popup with all games (part of F4).
-- F6: the inspector's action buttons (Start here, Duplicate, Save as prefab, Delete) need a layout that takes more buttons.
+- F4: replace dropdowns with popups (example: "How it is split" in places). Researched (see the note below); being done in three steps:
+  1. Short choices (2–3 options, a few up to 5) become buttons in the panel, like the quiz's *Kind of question*. **Done (not committed yet):** scoring, who plays, team split and how teams are made, who answers, points go to, team scores when teams are made again, who decides a party choice / on a tie / when nobody votes / vote counts, who duels, wins needed (rock paper scissors), a team's minigame result, points by place and how a total is split. Long labels are a short list with a hint under each.
+  2. Choices that need a description (which minigame, the duel's game, adding an award) open a popup with cards. **Done (not committed yet):** *Change minigame…* and *Change how it is won…* in the scene panel (a changed game starts from its own settings and timer; a title or question the author wrote is kept), and *Add an award…* in Game settings, each card saying how the award is decided.
+  3. Lists made from the game itself (next scene, start scene, answers to vote on, wheel per scene, "Change the look of") get a custom dropdown in the editor's style instead of the browser's own. **Done (not committed yet):** every dropdown left in the editor (next scene and route leads-to, the start scene, answers to vote on, the wheel per scene, Look & feel's scope, fonts shown in their own font, animations and movement) is the editor's own dropdown, built to the standard pattern: arrows, Home/End, Page Up/Down, Enter/Space, Escape, type to find, Tab chooses; tap and click work; the list floats over the panel and opens upwards near the bottom. The editor has no browser dropdowns left.
+- F5: duel: choose the head-to-head game in a popup with all games. **Done (not committed yet)** with F4 step 2; it can now also be changed after adding the scene.
+
+#### Note: dropdowns, buttons or popups (research, 17 November 2026)
+
+Sources: Nielsen Norman Group ([Dropdowns: when to use them](https://www.nngroup.com/articles/dropdown-list/)), Baymard Institute ([Drop-down usability](https://baymard.com/blog/drop-down-usability), [Custom drop-downs cause issues](https://baymard.com/blog/custom-dropdowns-cause-issues)) and design-system guidance (USWDS, Material, IBM Carbon). Reddit itself could not be read by the research tool.
+
+- **Few options: show them.** Under about 5 options, radio buttons or a row of buttons beat a dropdown: a dropdown hides the choices, and in Baymard's tests 55% of people opened one just to see what was in it. Design systems put the line between 3 (Carbon) and 7 (USWDS).
+- **5 to about 15 options: a dropdown is fine**, and it keeps a long panel compact (NN/g: options laid out inline make a form longer and harder to scan).
+- **Many options, or options that need a description or picture: a picker** (type to search, or a popup with cards).
+- **A popup is no general fix.** Open, pick, close costs as much as a dropdown; it pays off only when each choice needs room.
+- **Custom dropdowns carry a risk.** Baymard found usability problems in 31% of custom-made dropdowns (keyboard, scrolling, closing by accident, phones), problems the browser's own dropdown solved long ago. A custom one must follow the standard listbox pattern: keyboard and type-to-find, the chosen item in view, works with touch and screen readers.
+- **Watch the panel length.** Buttons with short labels take little room; long labels become a short list of choices, one per row.
+- F6: the inspector's action buttons (Start here, Duplicate, Save as prefab, Delete) need a layout that takes more buttons. **Done (not committed yet):** they are in a ☰ *Scene actions* menu next to Close (keyboard: arrows, Escape); *Save as prefab…* opens its name form under the header and *Delete scene…* asks in a popup. The Scene editor still has its own buttons.
 - F7: wheel of fortune styling and a preview / test-spin window.
 - F8: as many routes as wanted in a party choice (default 2); the format allows 2–6 now, the editor needs "add route" and the limit may go up.
 - F9: customizable end-of-game awards: authors pick from 9 fixed stats now; could become entries with their own title and rule.
@@ -63,7 +77,18 @@ None of this was tried on an actual phone yet; the browser tests emulate one.
 ### J. Side games
 
 - J1: pack opening with a real animation (like trading-card packs).
-- J2: "chips cannot be disabled and the minigames take too much space": chips can be switched off now; what "the minigames take too much space" means (the add-scene menu?) is still open.
+- J2: "chips cannot be disabled and the minigames take too much space": chips can be switched off now; what "the minigames take too much space" means is still open; if it was the add-scene menu, the tabs (F3) may have solved it.
+
+### K. Editor structure (UX designer, 17 November 2026)
+
+From a UX designer's review, with your own additions:
+
+- K1: the top bar can be narrower; it shows too much at once. Fold things into menus.
+- K2: remember what is open (folded sections, the selected scene, panels) when coming back. **Partly done (not committed yet):** each settings group (Content, Points, Who plays, Where next, the Game settings groups…) stays open or closed as you left it, from scene to scene and after reloading (kept in this browser only). A group the next scene does not have is simply not shown. The selected scene and open panels are not remembered yet.
+- K3: a read mode and an edit mode (look through a game without changing it by accident).
+- K4: chunking: group the settings into small, named chunks (see also F6 and G3).
+- K5: make the Flow editor only about the flow (scenes and arrows) and the Scene editor only about the scene (its content and settings), instead of both editing everything.
+- K6: custom dropdown menus in the editor's style instead of the browser's own (F4 step 3). **Done (not committed yet).**
 
 ### Open questions
 
@@ -72,7 +97,7 @@ None of this was tried on an actual phone yet; the browser tests emulate one.
 
 ## Known limits and test notes
 
-- Browser test *Look & feel* times out (45 seconds) on this PC, also before these changes. The Android *hosting* test can miss its 20-second question on a slow PC; *routes* on Android was flaky once.
+- Browser test *Look & feel* used to time out: it left the exported text open over the Publish button. Fixed in the test (17 November 2026); it passes on a Mac. The Android *hosting* test can miss its 20-second question on a slow PC; *routes* on Android was flaky once.
 - A drawing sent when time runs out needs two requests within 3 seconds; a very slow connection can still miss it.
 - Back to lobby gives the room a new code (the old room's scores are history and are never rewritten). Guests' chips belong to one room, so they start over; people keep theirs.
 

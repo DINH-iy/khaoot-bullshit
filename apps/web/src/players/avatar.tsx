@@ -1,6 +1,6 @@
 import { LOOK_COLORS, LOOK_PART_NAMES, type PlayerLook } from '@party/contracts';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { assetUrl } from '../network/media-upload.js';
+import { assetUrl } from '../room/media-upload.js';
 import { loadDrawing, StoredDrawing } from '../drawing/drawing-view.js';
 import './players.css';
 

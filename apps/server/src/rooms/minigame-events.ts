@@ -7,7 +7,7 @@ import { locateStage } from '../game/graph.js';
 import { EligibilitySchema } from '../game/model.js';
 import { readMinigameRun } from '../minigames/rules.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay.js';
-import { teamContext } from '../game/teams.js';
+import { teamContext } from '../game/teams/teams.js';
 import type { Transaction } from '../game/model.js';
 import type { Live } from '../minigames/live.js';
 import type { Principal } from './gateway.js';

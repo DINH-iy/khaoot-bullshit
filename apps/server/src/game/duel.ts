@@ -4,7 +4,7 @@ import { placePoints, SubmissionValueSchema, type HeadToHeadMove } from '@party/
 import type { StageRun } from '../generated/prisma/client.js';
 import type { StageDefinition } from './definition.js';
 import { GameError, requireGame } from './errors.js';
-import type { Award } from './teams.js';
+import type { Award } from './teams/teams.js';
 import type { Transaction } from './model.js';
 import { IllegalMove, type Seat } from '../head-to-head/engine.js';
 import { matchOutcome, MatchStateSchema, matchView, playMove, resignMatch, startMatch, type MatchState } from '../head-to-head/match.js';

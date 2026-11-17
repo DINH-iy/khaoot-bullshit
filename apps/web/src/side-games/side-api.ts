@@ -1,5 +1,5 @@
 import type { Challenge } from '@party/contracts';
-import { roomApi } from '../network/api.js';
+import { roomApi } from '../room/api.js';
 
 /** Side-game requests for this room; errors come back as plain sentences. */
 export const sideApi = <T>(sessionId: string, path: string, body?: unknown) => roomApi<T>(`/api/rooms/${sessionId}/side${path}`, body);

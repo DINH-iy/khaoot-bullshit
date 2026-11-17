@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HostMenuSchema, type HostMenu } from '@party/contracts';
-import { newId, roomApi } from '../network/api.js';
+import { newId, roomApi } from '../room/api.js';
 import { MyGames } from './my-games.js';
 import { ImportGame } from './import-game.js';
 import { GamePicker } from './game-picker.js';

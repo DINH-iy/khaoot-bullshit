@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FEEDBACK_DETAILS_MAX, FEEDBACK_TITLE_MAX, type FeedbackKind, type NewFeedback, type PickedElement } from '@party/contracts';
-import { newId, roomApi } from '../network/api.js';
+import { newId, roomApi } from '../room/api.js';
 import { FEEDBACK_UI, pageContext } from './describe-element.js';
 import { ElementPicker } from './element-picker.js';
 

@@ -2,8 +2,8 @@ import type { GameSession } from '../generated/prisma/client.js';
 import type { GameDefinition } from './definition.js';
 import { locateStage } from './graph.js';
 import { EligibilitySchema, type Transaction } from './model.js';
-import { readRoute } from './routes.js';
-import { readForming, teamContext } from './teams.js';
+import { readRoute } from './routes/routes.js';
+import { readForming, teamContext } from './teams/teams.js';
 import { ACCEPTANCE_GRACE_MS, remainingMs, SETTLE_MS, timerColumns } from './timing.js';
 
 /** How long after the last answer the round closes unless the room sets another delay, so everyone sees "all in" before the result. */

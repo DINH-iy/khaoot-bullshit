@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { ANIMATION_PRESETS, DEFAULT_ANIMATIONS, EASINGS, MOMENTS, resolveAnimation, type AnimationChoice, type CustomAnimation, type Moment } from '@party/contracts';
 import { play } from '../../presentation/look.js';
+import { Dropdown } from '../controls/dropdown.js';
 
 type Frame = CustomAnimation['keyframes'][number];
 const EASING_LABELS: Record<keyof typeof EASINGS, string> = { smooth: 'Smooth', linear: 'Steady', 'ease-in': 'Speeds up', 'ease-out': 'Slows down', springy: 'Springy (overshoots)', snappy: 'Snappy' };
@@ -40,11 +41,10 @@ export function AnimationPanel({ animations, below, onChange }: { animations: Re
       return <fieldset key={moment} className="moment"><legend>{MOMENTS[moment]}</legend>
         <div className="moment-row">
           <label className="visually-hidden" htmlFor={`anim-${moment}`}>Animation for: {MOMENTS[moment]}</label>
-          <select id={`anim-${moment}`} value={presetKey ? `preset:${presetKey}` : `own:${own.findIndex(entry => JSON.stringify(entry) === JSON.stringify(choice))}`}
-            onChange={event => { const [kind, value] = event.target.value.split(':') as [string, string]; set(moment, kind === 'preset' ? (value === DEFAULT_ANIMATIONS[moment] && !below[moment] ? null : { preset: value }) : own[Number(value)]!); }}>
-            <optgroup label="Ready-made">{Object.entries(ANIMATION_PRESETS).map(([key, preset]) => <option key={key} value={`preset:${key}`}>{preset.name}{key === DEFAULT_ANIMATIONS[moment] ? ' (standard)' : ''}</option>)}</optgroup>
-            {own.length > 0 && <optgroup label="Built in this game">{own.map((entry, index) => <option key={index} value={`own:${index}`}>{entry.name || `My animation ${index + 1}`}</option>)}</optgroup>}
-          </select>
+          <Dropdown id={`anim-${moment}`} className="moment-pick" value={presetKey ? `preset:${presetKey}` : `own:${own.findIndex(entry => JSON.stringify(entry) === JSON.stringify(choice))}`}
+            onChange={picked => { const [kind, value] = picked.split(':') as [string, string]; set(moment, kind === 'preset' ? (value === DEFAULT_ANIMATIONS[moment] && !below[moment] ? null : { preset: value }) : own[Number(value)]!); }}
+            options={[...Object.entries(ANIMATION_PRESETS).map(([key, preset]) => ({ value: `preset:${key}`, group: 'Ready-made', label: `${preset.name}${key === DEFAULT_ANIMATIONS[moment] ? ' (standard)' : ''}` })),
+              ...own.map((entry, index) => ({ value: `own:${index}`, group: 'Built in this game', label: entry.name || `My animation ${index + 1}` }))]} />
           <Sample animation={resolved} list={list} />
           <button className="small-button" aria-expanded={open === moment} onClick={() => setOpen(open === moment ? null : moment)}>{open === moment ? 'Close the builder' : 'Build your own'}</button>
         </div>
@@ -84,7 +84,7 @@ function Builder({ start, name: startName, list, onSave }: { start: CustomAnimat
     <div className="anim-timing">
       <label>Length · {(draft.durationMs / 1000).toFixed(2)} s<input type="range" min={50} max={3000} step={50} value={draft.durationMs} onChange={event => setDraft({ ...draft, durationMs: Number(event.target.value) })} /></label>
       <label>Wait first · {((draft.delayMs ?? 0) / 1000).toFixed(2)} s<input type="range" min={0} max={2000} step={50} value={draft.delayMs ?? 0} onChange={event => setDraft({ ...draft, delayMs: Number(event.target.value) })} /></label>
-      <label>Movement<select value={draft.easing} onChange={event => setDraft({ ...draft, easing: event.target.value as keyof typeof EASINGS })}>{(Object.keys(EASINGS) as (keyof typeof EASINGS)[]).map(key => <option key={key} value={key}>{EASING_LABELS[key]}</option>)}</select></label>
+      <label>Movement<Dropdown value={draft.easing} onChange={easing => setDraft({ ...draft, easing: easing as keyof typeof EASINGS })} options={(Object.keys(EASINGS) as (keyof typeof EASINGS)[]).map(key => ({ value: key, label: EASING_LABELS[key] }))} /></label>
       <label>Play it · {draft.repeat ?? 1}×<input type="range" min={1} max={10} value={draft.repeat ?? 1} onChange={event => setDraft({ ...draft, repeat: Number(event.target.value) })} /></label>
       {list && <label>Between items · {((draft.staggerMs ?? 0) / 1000).toFixed(2)} s<input type="range" min={0} max={500} step={10} value={draft.staggerMs ?? 0} onChange={event => setDraft({ ...draft, staggerMs: Number(event.target.value) })} /></label>}
       <label>Name<input value={name} maxLength={60} placeholder="My animation" onChange={event => setName(event.target.value)} /></label>

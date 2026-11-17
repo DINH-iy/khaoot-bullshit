@@ -20,17 +20,13 @@
 .color-field input[type=color], .answer-color input[type=color] { width: 40px; height: 32px; padding: 0; border: 1px solid var(--e-border); border-radius: 8px; background: none; flex: none; }
 .answer-colors { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .answer-color { display: inline-flex; gap: 2px; align-items: center; }
-.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
-.segmented button { min-height: 36px; padding: 4px 12px; border-radius: 999px; }
-.segmented button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
-.segmented button[aria-pressed=true] { background: #2a1d5c; color: #fff; border-color: #2a1d5c; }
 .look-warnings { background: light-dark(#fff4e5, #3a2a12); color: light-dark(#6b3a00, #ffd9a8); border-radius: 12px; padding: 10px 14px; }
 .look-warnings h3 { margin: 0 0 4px; font-size: 1rem; } .look-warnings ul { margin: 0; padding-left: 1.2em; }
 .text-field { display: grid; gap: 2px; } .text-field .hint { margin: 0; }
 
 .moment { gap: 8px; }
 .moment-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.moment-row select { flex: 1 1 180px; }
+.moment-row .ed-dropdown { flex: 1 1 180px; width: auto; }
 .anim-sample { display: inline-flex; gap: 8px; align-items: center; }
 .anim-stage { display: flex; gap: 4px; padding: 6px; border-radius: 10px; background: #241a4d; min-width: 56px; justify-content: center; overflow: hidden; }
 .anim-box, .anim-stage .tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: #ffcf4a; color: #2a1d00; font-weight: 800; }
@@ -79,7 +75,7 @@
 .look-controls, .look-panel, .look-panel fieldset, .anim-builder, .frame-list, .frame-block, .frame-props, .look-preview { grid-template-columns: minmax(0, 1fr); }
 .look-controls > *, .look-panel > *, .anim-builder > *, .frame-block > * { min-width: 0; }
 .frame-prop { grid-template-columns: minmax(0, 9rem) minmax(0, 1fr); }
-.moment-row > * { min-width: 0; } .moment-row select { flex: 1 1 140px; max-width: 100%; }
+.moment-row > * { min-width: 0; } .moment-row .ed-dropdown { flex: 1 1 140px; max-width: 100%; }
 .anim-timing { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .color-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .look-controls select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; } .look-controls > label { min-width: 0; }

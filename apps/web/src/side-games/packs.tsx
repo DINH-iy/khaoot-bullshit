@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PACK_ITEMS, PACK_PRICE, PackResultSchema, RARITIES, type PackResult } from '@party/contracts';
-import { newId } from '../network/api.js';
+import { newId } from '../room/api.js';
 import { chips, sideApi, sideProblem } from './side-api.js';
 
 const item = (key: string) => PACK_ITEMS.find(entry => entry.key === key);

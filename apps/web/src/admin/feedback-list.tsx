@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES, FeedbackItemSchema, FeedbackListSchema, type FeedbackItem, type FeedbackUpdate } from '@party/contracts';
-import { roomApi } from '../network/api.js';
+import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import { feedbackText, kindLabel, sourcePath, STATUS } from './feedback-text.js';
 

@@ -1,4 +1,5 @@
 import { contrast, FONTS, resolveTheme, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
+import { Dropdown } from '../controls/dropdown.js';
 
 type Colors = FullTheme['colors'];
 type ColorName = Exclude<keyof Colors, 'answers'>;
@@ -7,6 +8,8 @@ const COLOR_LABELS: Record<ColorName, string> = {
   accent: 'Main buttons', accentText: 'Text on main buttons', success: 'Correct / saved', danger: 'Wrong / warning', answerText: 'Text on answers',
 };
 const FONT_LABELS: Record<FontName, string> = { system: 'Standard', rounded: 'Rounded', serif: 'Classic serif', slab: 'Slab', mono: 'Typewriter', condensed: 'Condensed', playful: 'Playful', elegant: 'Elegant' };
+// Each font listed in itself, so the list shows what it looks like.
+const FONT_OPTIONS = (Object.keys(FONTS) as FontName[]).map(font => ({ value: font, label: FONT_LABELS[font], style: { fontFamily: FONTS[font] } }));
 const BACKGROUNDS = { glow: 'Glow', gradient: 'Gradient', solid: 'Plain', dots: 'Dots', stripes: 'Stripes', grid: 'Grid' } as const;
 const TILES = { filled: 'Filled', flat: 'Flat', outline: 'Outline', glass: 'Glass' } as const;
 
@@ -51,8 +54,8 @@ export function ThemePanel({ theme, below, onChange }: { theme: Theme | undefine
     </fieldset>
 
     <fieldset><legend>Text</legend>
-      <label>Font<select value={full.font} onChange={event => set({ font: event.target.value as FontName })}>{(Object.keys(FONTS) as FontName[]).map(font => <option key={font} value={font}>{FONT_LABELS[font]}</option>)}</select></label>
-      <label>Font for titles<select value={full.headingFont} onChange={event => set({ headingFont: event.target.value as FontName })}>{(Object.keys(FONTS) as FontName[]).map(font => <option key={font} value={font}>{FONT_LABELS[font]}</option>)}</select></label>
+      <label>Font<Dropdown value={full.font} onChange={font => set({ font: font as FontName })} options={FONT_OPTIONS} /></label>
+      <label>Font for titles<Dropdown value={full.headingFont} onChange={font => set({ headingFont: font as FontName })} options={FONT_OPTIONS} /></label>
       <label>Text size · {Math.round(full.textScale * 100)}%<input type="range" min={80} max={160} step={5} value={Math.round(full.textScale * 100)} onChange={event => set({ textScale: Number(event.target.value) / 100 })} /></label>
       <label className="choice"><input type="checkbox" checked={full.uppercaseHeadings} onChange={event => set({ uppercaseHeadings: event.target.checked })} />Titles in capitals</label>
     </fieldset>

@@ -27,7 +27,7 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await expect(page.getByLabel('Entry 1 of Forfeits', { exact: true })).toHaveValue('Sing a song');
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('tab', { name: 'Scene editor' }).click();
-  await expect(page.getByLabel('On this scene')).toHaveValue('forfeits');
+  await expect(page.getByLabel('On this scene')).toHaveText('The host spins “Forfeits”');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Play published version ↗' })).toBeEnabled();

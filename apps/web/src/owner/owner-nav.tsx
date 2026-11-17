@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { HostMenuSchema } from '@party/contracts';
-import { roomApi } from '../network/api.js';
+import { roomApi } from '../room/api.js';
 import { rememberOwner } from './owner-session.js';
 import { openFeedback } from '../feedback/open-feedback.js';
 import { FEEDBACK_UI } from '../feedback/describe-element.js';

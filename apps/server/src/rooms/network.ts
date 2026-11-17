@@ -4,8 +4,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
-import type { TokenVerifier } from '../auth.js';
-import { AuthenticationUnavailable } from '../auth.js';
+import type { TokenVerifier } from '../auth/auth.js';
+import { AuthenticationUnavailable } from '../auth/auth.js';
 import { GameError } from '../game/errors.js';
 import { createGameService } from '../game/service.js';
 import { readSessionView } from '../game/views.js';
@@ -21,7 +21,7 @@ import { registerReactions } from './reactions.js';
 import { breakVotesNeeded, createBreaks } from './breaks.js';
 import { personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
-import { clientAddress } from '../client-address.js';
+import { clientAddress } from '../http/client-address.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
   const gateway = createRoomGateway(client, config); const limiter = new RateLimiter();

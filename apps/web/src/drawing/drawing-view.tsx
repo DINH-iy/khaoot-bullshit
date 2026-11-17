@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DRAWING_COLORS, DRAWING_SIZE, DrawingSchema, strokePath, type Drawing, type Stroke } from '@party/contracts';
-import { roomApi } from '../network/api.js';
-import { assetUrl } from '../network/media-upload.js';
+import { roomApi } from '../room/api.js';
+import { assetUrl } from '../room/media-upload.js';
 import './drawing.css';
 
 /** Strokes as SVG paths: crisp at any size, and plain data (whole-number coordinates, palette colours). */

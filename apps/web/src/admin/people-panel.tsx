@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { PeopleListSchema, PersonKeyViewSchema, type PersonKeyView, type PersonRow } from '@party/contracts';
-import { roomApi } from '../network/api.js';
+import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 
 const problems: Record<string, string> = {

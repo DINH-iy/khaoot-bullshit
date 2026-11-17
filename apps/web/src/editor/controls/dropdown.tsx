@@ -1,0 +1,101 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
+
+export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; style?: CSSProperties }
+
+/**
+ * The editor's own dropdown, in its style instead of the browser's (for lists made
+ * from the game: scenes, wheels, fonts…). It follows the standard "select-only
+ * combobox" pattern so it works like a real one: put it inside a <label> for its
+ * name; arrows, Home/End and Page Up/Down move, Enter/Space choose, Escape closes,
+ * typing jumps to a matching option; Tab chooses the highlighted option and moves on.
+ * The list is drawn over the page (not clipped by a scrolling panel) and opens
+ * upwards when there is no room below.
+ */
+export function Dropdown({ id: buttonId, value, options, onChange, placeholder = 'Choose…', className }: {
+  id?: string; value: string; options: DropdownOption[]; onChange: (value: string) => void; placeholder?: string; className?: string;
+}) {
+  const id = useId(); const button = useRef<HTMLButtonElement>(null); const list = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false); const [active, setActive] = useState(-1);
+  const [place, setPlace] = useState<CSSProperties>({});
+  const typed = useRef({ text: '', at: 0 });
+  const selected = options.findIndex(option => option.value === value);
+  const enabled = (index: number) => index >= 0 && index < options.length && !options[index]!.disabled;
+  const step = (from: number, by: number) => { let index = from; for (let tries = 0; tries < options.length; tries++) { index = Math.max(0, Math.min(options.length - 1, index + by)); if (enabled(index)) return index; if (index === 0 || index === options.length - 1) break; } return from; };
+  const first = () => options.findIndex((_, index) => enabled(index));
+  const last = () => { for (let index = options.length - 1; index >= 0; index--) if (enabled(index)) return index; return -1; };
+
+  const show = (at = selected >= 0 ? selected : first()) => { setActive(at); setOpen(true); };
+  const choose = (index: number) => { if (enabled(index) && options[index]!.value !== value) onChange(options[index]!.value); setOpen(false); };
+
+  // Place the list under the button (or above it when there is no room), and keep it there while scrolling.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      const box = button.current?.getBoundingClientRect(); if (!box) return;
+      const below = window.innerHeight - box.bottom - 8; const above = box.top - 8; const up = below < 220 && above > below;
+      setPlace({ left: Math.max(8, Math.min(box.left, window.innerWidth - Math.max(box.width, 220) - 8)), width: Math.max(box.width, 220), maxHeight: Math.min(320, up ? above : below),
+        ...(up ? { bottom: window.innerHeight - box.top + 4 } : { top: box.bottom + 4 }) });
+    };
+    position();
+    window.addEventListener('resize', position); window.addEventListener('scroll', position, true);
+    return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
+  }, [open]);
+  // The highlighted option stays in view.
+  useEffect(() => { if (open && active >= 0) document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: 'nearest' }); }, [open, active, id]);
+  // A click anywhere else closes the list.
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => { const target = event.target as Node; if (!button.current?.contains(target) && !list.current?.contains(target)) setOpen(false); };
+    document.addEventListener('pointerdown', outside, true);
+    return () => document.removeEventListener('pointerdown', outside, true);
+  }, [open]);
+
+  // Type to find: letters typed quickly after each other build up one search.
+  const find = (key: string) => {
+    const now = Date.now(); typed.current = { text: (now - typed.current.at < 600 ? typed.current.text : '') + key.toLowerCase(), at: now };
+    const start = open ? active : selected; const text = typed.current.text;
+    const order = [...options.keys()].map(offset => (Math.max(0, start) + (text.length === 1 ? 1 : 0) + offset) % options.length);
+    return order.find(index => enabled(index) && options[index]!.label.toLowerCase().startsWith(text)) ?? -1;
+  };
+  const onKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const { key } = event;
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(key)) { event.preventDefault(); show(); }
+      else if (key === 'Home') { event.preventDefault(); show(first()); }
+      else if (key === 'End') { event.preventDefault(); show(last()); }
+      else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) { const found = find(key); if (found >= 0) show(found); }
+      return;
+    }
+    if (key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); }
+    else if (key === 'ArrowDown') { event.preventDefault(); if (event.altKey) choose(active); else setActive(step(active, 1)); }
+    else if (key === 'ArrowUp') { event.preventDefault(); if (event.altKey) choose(active); else setActive(step(active, -1)); }
+    else if (key === 'Home') { event.preventDefault(); setActive(first()); }
+    else if (key === 'End') { event.preventDefault(); setActive(last()); }
+    else if (key === 'PageDown') { event.preventDefault(); setActive(step(active, 10)); }
+    else if (key === 'PageUp') { event.preventDefault(); setActive(step(active, -10)); }
+    else if (key === 'Enter' || key === ' ') { event.preventDefault(); choose(active); }
+    else if (key === 'Tab') choose(active);
+    else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) { const found = find(key); if (found >= 0) setActive(found); }
+  };
+
+  // Options in their groups, in order.
+  const groups: { name: string | undefined; items: number[] }[] = [];
+  options.forEach((option, index) => { const lastGroup = groups.at(-1); if (lastGroup && lastGroup.name === option.group) lastGroup.items.push(index); else groups.push({ name: option.group, items: [index] }); });
+  const optionEl = (index: number) => { const option = options[index]!; return <div key={index} id={`${id}-${index}`} role="option" aria-selected={index === selected} aria-disabled={option.disabled || undefined}
+    className={`ed-dropdown-option${index === active ? ' active' : ''}`} style={option.style}
+    onPointerMove={() => { if (enabled(index) && index !== active) setActive(index); }} onPointerDown={event => event.preventDefault()} onClick={() => choose(index)}>{index === selected && <span className="ed-dropdown-check" aria-hidden="true">✓</span>}{option.label}</div>; };
+  const root = (button.current?.closest('.editor') as HTMLElement | null) ?? document.body;
+
+  return <>
+    <button ref={button} id={buttonId} type="button" role="combobox" className={`ed-dropdown${className ? ` ${className}` : ''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`}
+      aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined} onKeyDown={onKey}
+      onClick={event => { event.preventDefault(); if (open) setOpen(false); else show(); }} onBlur={() => setOpen(false)}>
+      <span className={selected < 0 ? 'ed-dropdown-placeholder' : undefined} style={selected >= 0 ? options[selected]!.style : undefined}>{selected >= 0 ? options[selected]!.label : placeholder}</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    </button>
+    {open && createPortal(<div ref={list} id={`${id}-list`} role="listbox" className="ed-dropdown-list" style={place} tabIndex={-1} onPointerDown={event => event.preventDefault()}>
+      {groups.map((group, position) => group.name ? <div key={position} role="group" aria-label={group.name}><div className="ed-dropdown-group" aria-hidden="true">{group.name}</div>{group.items.map(optionEl)}</div> : group.items.map(optionEl))}
+    </div>, root)}
+  </>;
+}

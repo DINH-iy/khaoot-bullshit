@@ -45,7 +45,7 @@ export function pointOnCurve(from: Point, to: Point, t: number): Point {
 export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel';
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
   { type: 'info', name: 'Cutscene or info', icon: 'info', hint: 'Text on every screen' },
-  { type: 'quiz', name: 'Quiz question', icon: 'quiz', hint: 'Tiles or a list, one correct answer' },
+  { type: 'quiz', name: 'Quiz question', icon: 'quiz', hint: 'One correct answer; tiles, a list or true/false' },
   { type: 'writing', name: 'Writing round', icon: 'writing', hint: 'Jokes, captions, excuses' },
   { type: 'upload', name: 'Picture or video round', icon: 'upload', hint: 'Photos, GIFs, short videos' },
   { type: 'drawing', name: 'Drawing round', icon: 'drawing', hint: 'Draw on the phone, then vote' },
@@ -54,48 +54,33 @@ export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: s
   { type: 'vote', name: 'Vote on answers', icon: 'vote', hint: 'Vote for a writing or upload round' },
   { type: 'route', name: 'Party choice', icon: 'route', hint: 'Branch into routes' },
   { type: 'teams', name: 'Pick teams', icon: 'teams', hint: 'Make the teams; the rounds after it play in them' },
-  { type: 'scoreboard', name: 'Scoreboard', icon: 'scoreboard', hint: 'Show the standings' },
+  { type: 'scoreboard', name: 'Scoreboard', icon: 'scoreboard', hint: 'Standings per player, per team or both' },
   { type: 'minigame', name: 'Minigame', icon: 'minigame', hint: 'Reaction, tap race, circles, Pass the pencil…' },
   { type: 'duel', name: 'Head-to-head duel', icon: 'duel', hint: 'Two players face off, everyone bets on the winner' },
   { type: 'wheel', name: 'Wheel of fortune', icon: 'wheel', hint: 'The host spins; the result stays on screen' },
+];
+/** The add menu's tabs: every scene type is in exactly one group. */
+export const SCENE_GROUPS: { key: string; name: string; types: SceneType[] }[] = [
+  { key: 'rounds', name: 'Rounds', types: ['quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote'] },
+  { key: 'games', name: 'Games', types: ['minigame', 'duel', 'wheel'] },
+  { key: 'between', name: 'Between rounds', types: ['info', 'scoreboard', 'route', 'teams'] },
 ];
 /** A Wheel of fortune scene: a show scene whose purpose is spinning one of the game's wheels. */
 export const isWheelScene = (stage: Stage | undefined) => stage?.kind === 'info' && Boolean((stage['spin'] as { wheel?: string } | undefined)?.wheel);
 const WHEEL_ENTRIES = ['Sing a song', 'Do 10 push-ups', 'Tell a joke', 'Swap seats', 'Everyone drinks', 'Pick someone'];
 /**
- * The kinds within a scene type, offered in a second menu after picking the type.
- * Types without an entry here are added straight away.
+ * The kinds within a scene type, offered in a second menu after picking the type:
+ * only where the kind is a different game or a starting text. Everything that is
+ * a setting (quiz layout, scoreboard, upload types, drawing blind, who decides a
+ * party choice) is added with a default and changed in the scene's own panel.
  */
 export interface SceneVariant { key: string; name: string; hint: string }
 export const SCENE_VARIANTS: Partial<Record<SceneType, SceneVariant[]>> = {
-  quiz: [
-    { key: 'tiles', name: 'Big tiles', hint: 'Coloured answer tiles on the phones' },
-    { key: 'list', name: 'A list', hint: 'Answers as a list, for longer answers' },
-    { key: 'true-false', name: 'True or false', hint: 'Two answers: True and False' },
-  ],
   writing: [
     { key: 'free', name: 'Any question', hint: 'Players write an answer' },
     { key: 'joke', name: 'Finish the joke', hint: 'Players write the punchline' },
     { key: 'caption', name: 'Caption this', hint: 'A title for a situation' },
     { key: 'excuse', name: 'Best excuse', hint: 'Talk your way out of it' },
-  ],
-  upload: [
-    { key: 'pictures', name: 'Pictures and GIFs', hint: 'Photos from the phone or GIFs' },
-    { key: 'videos', name: 'Short videos', hint: 'A short clip from the phone' },
-    { key: 'anything', name: 'Anything', hint: 'Pictures, GIFs or videos' },
-  ],
-  drawing: [
-    { key: 'draw', name: 'Draw it', hint: 'Draw on the phone, then vote' },
-    { key: 'blind', name: 'Draw blind', hint: 'Players see their drawing only when it is sent' },
-  ],
-  route: [
-    { key: 'players', name: 'Everyone votes', hint: 'The players choose the route' },
-    { key: 'host', name: 'The host decides', hint: 'You pick the route during the game' },
-  ],
-  scoreboard: [
-    { key: 'players', name: 'Players', hint: 'Points per player' },
-    { key: 'teams', name: 'Teams', hint: 'For team games: points per team' },
-    { key: 'both', name: 'Teams and players', hint: 'For team games: both' },
   ],
   minigame: MINIGAME_KEYS.map(key => ({ key, name: MINIGAMES[key].name, hint: MINIGAMES[key].description })),
   // How a duel is won: any contest in the room (the host names the winner), or a head-to-head game on the two phones.
@@ -111,22 +96,32 @@ export function minigameStage(game: MinigameKey, definition: Definition): Stage 
   if (TEAM_MINIGAMES.includes(game) && (definition['play'] as { kind?: string } | undefined)?.kind !== 'teams') stage['play'] = structuredClone(ROUND_TEAMS_PLAY);
   return stage;
 }
+/**
+ * Switches a minigame scene to another minigame: its own default settings and timer,
+ * the title updated when it was still the old game's standard one, and round-only
+ * teams for a team minigame in a game that does not play in teams.
+ */
+export function withMinigame(stage: Stage, game: MinigameKey, definition: Definition): Stage {
+  const old = String(stage['game'] ?? '');
+  const copy: Stage = { ...stage, game, durationMs: MINIGAMES[game].defaultSeconds * 1000 }; delete copy['settings'];
+  if (!stage.prompt || (isMinigameKey(old) && stage.prompt === `${MINIGAMES[old].name}!`)) copy.prompt = `${MINIGAMES[game].name}!`;
+  if (TEAM_MINIGAMES.includes(game) && (copy['play'] as { kind?: string } | undefined)?.kind !== 'teams' && (definition['play'] as { kind?: string } | undefined)?.kind !== 'teams') copy['play'] = structuredClone(ROUND_TEAMS_PLAY);
+  return copy;
+}
+const DUEL_HOST_PROMPT = 'Rock, paper, scissors at the table: best of three!';
+const duelPrompt = (contest: { kind?: string; game?: string } | undefined) => contest?.kind === 'game' && isHeadToHeadKey(contest.game) ? `${HEAD_TO_HEAD_GAMES[contest.game].name} duel! Who wins?` : DUEL_HOST_PROMPT;
+/** Switches how a duel is won: 'host' (any contest the host judges) or a head-to-head game; the question follows when it was still the standard one. */
+export function withDuelContest(stage: Stage, choice: string): Stage {
+  const old = stage['contest'] as { kind?: string; game?: string } | undefined;
+  const contest = isHeadToHeadKey(choice) ? { kind: 'game', game: choice } : { kind: 'host' };
+  return { ...stage, contest, ...(!stage.prompt || stage.prompt === duelPrompt(old) ? { prompt: duelPrompt(contest) } : {}) };
+}
 /** A new scene's first part: the type's standard start, adjusted for the chosen kind (variant). */
 export function newStage(type: SceneType, definition: Definition, variant?: string): Stage {
   const stage = baseStage(type, definition);
-  const input = stage['input'] as Record<string, unknown> | undefined;
-  switch (`${type}:${variant ?? ''}`) {
-    case 'quiz:list': return { ...stage, input: { ...input, layout: 'list' } };
-    case 'quiz:true-false': return { ...stage, prompt: 'True or false?', input: { ...input, options: [{ key: 'true', label: 'True' }, { key: 'false', label: 'False' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'true', awardMilli: '10000' } };
-    case 'writing:joke': case 'writing:caption': case 'writing:excuse': return { ...stage, prompt: WRITING_PROMPTS[variant!]! };
-    case 'upload:videos': return { ...stage, prompt: 'Upload a short video.', input: { ...input, accept: ['video'] } };
-    case 'upload:anything': return { ...stage, prompt: 'Upload a picture, GIF or short video.', input: { ...input, accept: ['image', 'gif', 'video'] } };
-    case 'drawing:blind': return { ...stage, input: { ...input, blind: true } };
-    case 'route:host': return { ...stage, durationMs: null, decide: { method: 'host' } };
-    case 'scoreboard:teams': case 'scoreboard:both': return { ...stage, show: variant };
-  }
+  if (type === 'writing' && variant && WRITING_PROMPTS[variant]) return { ...stage, prompt: WRITING_PROMPTS[variant] };
   if (type === 'minigame' && variant && isMinigameKey(variant)) return minigameStage(variant, definition);
-  if (type === 'duel' && variant && isHeadToHeadKey(variant)) return { ...stage, prompt: `${HEAD_TO_HEAD_GAMES[variant].name} duel! Who wins?`, contest: { kind: 'game', game: variant } };
+  if (type === 'duel' && variant && isHeadToHeadKey(variant)) return withDuelContest(stage, variant);
   return stage;
 }
 function baseStage(type: SceneType, definition: Definition): Stage {
@@ -154,8 +149,22 @@ function baseStage(type: SceneType, definition: Definition): Stage {
     // The timer is the betting time.
     // The wheel itself is added to the game by addScene; this is the scene that spins it.
     case 'wheel': return { key: 'main', kind: 'info', title: 'Wheel of fortune', prompt: 'Spin the wheel!', durationMs: null };
-    case 'duel': return { key: 'main', kind: 'duel', prompt: 'Rock, paper, scissors at the table: best of three!', durationMs: 30_000, pick: 'random', places: { kind: 'list', pointsMilli: ['10000'] }, betMilli: '1000' };
+    case 'duel': return { key: 'main', kind: 'duel', prompt: DUEL_HOST_PROMPT, durationMs: 30_000, pick: 'random', places: { kind: 'list', pointsMilli: ['10000'] }, betMilli: '1000' };
   }
+}
+// A quiz question's kind: its layout, or the True/False answers (always shown as tiles).
+type QuizInput = { options?: Option[]; layout?: string };
+export const QUIZ_KINDS = [{ value: 'tiles', label: 'Big tiles' }, { value: 'list', label: 'A list' }, { value: 'true-false', label: 'True or false' }] as const;
+type QuizKind = typeof QUIZ_KINDS[number]['value'];
+const TRUE_FALSE: Option[] = [{ key: 'true', label: 'True' }, { key: 'false', label: 'False' }];
+const isTrueFalse = (input: QuizInput) => input.options?.length === 2 && input.options[0]!.key === 'true' && input.options[1]!.key === 'false';
+export const quizKind = (input: QuizInput): QuizKind => isTrueFalse(input) ? 'true-false' : input.layout === 'tiles' ? 'tiles' : 'list';
+/** Changes a quiz question's kind. Leaving True or false starts again from two empty answers; the question text stays. */
+export function withQuizKind(stage: Stage, kind: QuizKind): Stage {
+  const input = stage['input'] as QuizInput & Record<string, unknown>; const scoring = stage['scoring'] as { kind?: string } & Record<string, unknown> | undefined;
+  const options = kind === 'true-false' ? TRUE_FALSE : isTrueFalse(input) ? [{ key: 'a', label: 'Answer A' }, { key: 'b', label: 'Answer B' }] : input.options;
+  const correct = options !== input.options && scoring?.kind === 'correct-choice' ? { scoring: { ...scoring, correctChoiceKey: options![0]!.key } } : {};
+  return { ...stage, ...correct, input: { ...input, options, layout: kind === 'list' ? 'list' : 'tiles' } };
 }
 export const isVotable = (stage: Stage) => stage.kind === 'collect' && ['text', 'media', 'drawing'].includes((stage['input'] as { kind?: string } | undefined)?.kind ?? '') && (stage['scoring'] as { kind?: string } | undefined)?.kind === 'none';
 export function uniqueKey(prefix: string, taken: Iterable<string>): string {

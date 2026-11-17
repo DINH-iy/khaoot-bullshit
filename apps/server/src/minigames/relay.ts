@@ -1,5 +1,5 @@
 import type { MinigameSettings } from '@party/contracts';
-import type { TeamContext } from '../game/teams.js';
+import type { TeamContext } from '../game/teams/teams.js';
 import type { MinigameRun } from './rules.js';
 
 /** Grace for a turn's strokes to arrive after its time is up (the phone sends them at the end). */

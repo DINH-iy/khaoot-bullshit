@@ -4,7 +4,7 @@ import { circleScore, DrawingSchema, MAX_DRAWING_POINTS } from '@party/contracts
 import { cleanPicture } from '../../src/assets/media.js';
 import { relayPlan } from '../../src/minigames/relay.js';
 import { minigameOutcome } from '../../src/minigames/outcome.js';
-import type { TeamContext } from '../../src/game/teams.js';
+import type { TeamContext } from '../../src/game/teams/teams.js';
 
 const ring = (points: number, radius: (angle: number) => number, turns = 1) => Array.from({ length: points }, (_, index) => {
   const angle = (index / (points - 1)) * 2 * Math.PI * turns; return [Math.round(500 + radius(angle) * Math.cos(angle)), Math.round(500 + radius(angle) * Math.sin(angle))];

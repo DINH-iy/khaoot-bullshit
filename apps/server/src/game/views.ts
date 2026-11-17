@@ -5,14 +5,14 @@ import { isVoteSource, minigameRules, parseDefinition, stagePlaces, type StageDe
 import { duelView } from './duel.js';
 import { readMinigameRun } from '../minigames/rules.js';
 import { relayPlan } from '../minigames/relay.js';
-import { wheelView } from './wheel.js';
-import { finaleSlides } from './finale.js';
+import { wheelView } from './show/wheel.js';
+import { finaleSlides } from './show/finale.js';
 import { minigameOutcome } from '../minigames/outcome.js';
 import { locateStage } from './graph.js';
-import { routeView } from './route-views.js';
+import { routeView } from './routes/route-views.js';
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
-import { answerKeyFor, stageTeams, teamContext, teamStandings } from './team-views.js';
+import { answerKeyFor, stageTeams, teamContext, teamStandings } from './teams/team-views.js';
 import { actorKey, authorize, EligibilitySchema, TrustedActorSchema, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
 
 type Input = Extract<StageDefinition, { kind: 'collect' }>['input'];

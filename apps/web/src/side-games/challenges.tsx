@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { ChallengeListSchema, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, type Challenge, type HeadToHeadKey, type HeadToHeadMove } from '@party/contracts';
-import { newId } from '../network/api.js';
+import { newId } from '../room/api.js';
 import { chips, sideApi, sideProblem, isMyTurn } from './side-api.js';
 import './side-games.css';
 

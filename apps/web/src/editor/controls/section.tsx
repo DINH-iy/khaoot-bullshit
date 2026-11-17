@@ -1,0 +1,30 @@
+import { useState, type ReactNode } from 'react';
+
+// Which groups the person left open or closed, by title, so selecting another scene
+// shows the same groups open ("Who plays" stays open from scene to scene). Kept in this
+// browser only, as a convenience; without storage it still works for this visit.
+const STORE_KEY = 'party-editor-open-sections';
+const remembered: Record<string, boolean> = (() => {
+  try { const saved: unknown = JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}'); return saved && typeof saved === 'object' ? saved as Record<string, boolean> : {}; } catch { return {}; }
+})();
+function remember(title: string, open: boolean) {
+  if (remembered[title] === open) return;
+  remembered[title] = open;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(remembered)); } catch { /* storage blocked: remembered for this visit only */ }
+}
+
+/**
+ * One group of settings in the scene panel: a heading with a one-line summary of
+ * what is set, which opens to show the fields. A group is open or closed as it was
+ * left last time (on any scene); `open` is only the start for a group never touched.
+ */
+export function Section({ title, summary, open = false, children }: { title: string; summary?: string; open?: boolean; children: ReactNode }) {
+  const [isOpen, setOpen] = useState(() => remembered[title] ?? open);
+  // The click is handled here (not in the browser's later toggle event), so it is remembered at once,
+  // even when the panel redraws right after, for example when a save comes back.
+  const set = (now: boolean) => { setOpen(now); remember(title, now); };
+  return <details className="ed-section" open={isOpen} onToggle={event => { if (event.currentTarget.open !== isOpen) set(event.currentTarget.open); }}>
+    <summary onClick={event => { event.preventDefault(); set(!isOpen); }}><svg className="ed-chevron" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="ed-section-title">{title}</span>{summary && <span className="ed-section-summary">{summary}</span>}</summary>
+    <div className="ed-section-body">{children}</div>
+  </details>;
+}

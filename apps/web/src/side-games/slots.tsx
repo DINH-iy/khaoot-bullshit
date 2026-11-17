@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BETS, SLOT_SYMBOLS, SlotResultSchema, TWO_CHERRIES_PAYS, slotMultiplier, type SlotResult } from '@party/contracts';
-import { newId } from '../network/api.js';
+import { newId } from '../room/api.js';
 import { calm, chips, sideApi, sideProblem } from './side-api.js';
 
 const emoji = (key: string) => SLOT_SYMBOLS.find(symbol => symbol.key === key)?.emoji ?? '❔';

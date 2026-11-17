@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { DraftSchema, EDITOR_NAMESPACE, EditorCursorSchema, EditorPeersSchema, type Draft, type EditorPeer, type EditorPresence } from '@party/contracts';
-import { roomApi } from '../../network/api.js';
+import { roomApi } from '../../room/api.js';
 import type { Point } from '../model.js';
 
 const NAME = 'party-editor-name';

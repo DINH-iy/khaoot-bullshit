@@ -1,12 +1,12 @@
 import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { RoomScreen } from './network/room-screen.js';
+import { RoomScreen } from './room/room-screen.js';
 import { HostMenu } from './hosting/host-menu.js';
 import { FeedbackButton } from './feedback/feedback-button.js';
 import './style.css';
 
 // The editor and the admin menu load only when opened, so phones never download them.
-const EditorShell = lazy(() => import('./editor/editor-shell.js').then(module => ({ default: module.EditorShell })));
+const EditorShell = lazy(() => import('./editor/shell/editor-shell.js').then(module => ({ default: module.EditorShell })));
 const AdminPage = lazy(() => import('./admin/admin-page.js').then(module => ({ default: module.AdminPage })));
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing application root');

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MeSchema, type Me } from '@party/contracts';
-import { roomApi } from '../network/api.js';
+import { roomApi } from '../room/api.js';
 
 // A personal link looks like /#person=<key>. The key is taken out of the address
 // at once (never kept in history) and exchanged for this phone's own sign-in.

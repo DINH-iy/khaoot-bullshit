@@ -1,5 +1,5 @@
 import { readConfig } from './config.js';
-import { startTelemetry } from './telemetry.js';
+import { startTelemetry } from './diagnostics/telemetry.js';
 
 const config = readConfig(process.env);
 const telemetry = startTelemetry(config);

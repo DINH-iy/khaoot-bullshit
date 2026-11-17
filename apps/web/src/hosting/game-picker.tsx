@@ -1,5 +1,5 @@
 import type { HostMenu } from '@party/contracts';
-import { Icon } from '../editor/icons.js';
+import { Icon } from '../editor/controls/icons.js';
 
 type Game = HostMenu['games'][number];
 type Feature = Game['features'][number];

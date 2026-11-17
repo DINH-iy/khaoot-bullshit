@@ -4,7 +4,7 @@ import { FASTEST_REACTION_MS, judgeResult, networkAllowance, places, startMiniga
 import { createLiveSignals } from '../../src/minigames/live.js';
 import { minigameOutcome, type MinigameRules } from '../../src/minigames/outcome.js';
 import { GameError } from '../../src/game/errors.js';
-import type { TeamContext } from '../../src/game/teams.js';
+import type { TeamContext } from '../../src/game/teams/teams.js';
 
 const now = new Date('2026-11-13T10:00:00.000Z');
 const at = (ms: number) => new Date(now.getTime() + ms);

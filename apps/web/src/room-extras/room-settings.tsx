@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { REACTIONS, type RoomSnapshot } from '@party/contracts';
-import { roomApi } from '../network/api.js';
+import { roomApi } from '../room/api.js';
 import './room-extras.css';
 
 type Setting = 'showScores' | 'reactions' | 'autoClose' | 'breakVotes' | 'confirmLooks';

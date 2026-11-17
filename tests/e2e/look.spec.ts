@@ -41,26 +41,28 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
 
   // A ready-made animation and one built from blocks.
   await page.getByRole('tab', { name: 'Animations' }).click();
-  await page.getByLabel('Animation for: A player’s answer is saved').selectOption({ label: 'Shake' });
+  await page.getByLabel('Animation for: A player’s answer is saved').click(); await page.getByRole('option', { name: 'Shake' }).click();
   const sceneMoment = page.getByRole('group', { name: 'A new scene or question appears' });
   await sceneMoment.getByRole('button', { name: 'Build your own' }).click();
   await sceneMoment.getByRole('button', { name: 'Add a step in between' }).click();
   await sceneMoment.getByLabel('Name').fill('Wiggle in');
   await sceneMoment.getByRole('button', { name: 'Use this animation' }).click();
-  await expect(sceneMoment.getByLabel('Animation for: A new scene or question appears')).toHaveValue('own:0');
+  await expect(sceneMoment.getByLabel('Animation for: A new scene or question appears')).toHaveText('Wiggle in');
   await settled(page); expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
 
   // Only this scene: a different heading font for the quiz question.
   await page.getByRole('tab', { name: 'Colours & style' }).click();
-  await page.getByLabel('Change the look of').selectOption({ label: 'Capital of France?' });
-  await page.getByLabel('Font for titles').selectOption({ label: 'Elegant' });
+  await page.getByLabel('Change the look of').click(); await page.getByRole('option', { name: 'Capital of France?' }).click();
+  await page.getByLabel('Font for titles').click(); await page.getByRole('option', { name: 'Elegant' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
   const exported = await (async () => { await page.getByRole('button', { name: 'Export as text' }).click(); return JSON.parse(await page.getByLabel('The game as text').inputValue()); })();
   expect(exported.presentation).toMatchObject({ theme: { preset: 'neon', colors: { accentText: '#001417' } }, texts: { 'answer.saved': 'Locked in, good luck!', 'join.title': 'Welcome to quiz night', 'timer.left': 'Hurry! {time}' },
     animations: { answerSaved: { preset: 'shake' }, sceneEnter: { name: 'Wiggle in', custom: { keyframes: expect.any(Array) } } } });
   expect(exported.nodes.find((node: { key: string }) => node.key === 'q1').stages[0].presentation).toEqual({ theme: { headingFont: 'elegant' } });
 
+  // Close the exported text again: it lies over the top bar.
+  await page.getByRole('button', { name: 'Export as text' }).click();
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Play published version ↗' })).toBeEnabled();
   await page.goto(`${baseURL}/?host=1`);

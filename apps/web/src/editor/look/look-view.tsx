@@ -2,14 +2,15 @@ import { useState } from 'react';
 import type { Presentation } from '@party/contracts';
 import { buildLook, LookContext, themeClass, themeStyle } from '../../presentation/look.js';
 import { cardText, type Definition } from '../model.js';
-import type { DraftState } from '../use-draft.js';
+import type { DraftState } from '../shell/use-draft.js';
 import { layerOf, withLayer, type Scope } from './layer.js';
 import { ThemePanel } from './theme-panel.js';
 import { TextsPanel } from './texts-panel.js';
 import { AnimationPanel } from './animation-panel.js';
 import { LookPreview } from './look-preview.js';
-import '../../network/room.css';
+import '../../room/room.css';
 import './look.css';
+import { Dropdown } from '../controls/dropdown.js';
 
 type Section = 'theme' | 'texts' | 'animations';
 const SECTIONS: Record<Section, string> = { theme: 'Colours & style', texts: 'Texts', animations: 'Animations' };
@@ -31,11 +32,9 @@ export function LookView({ d, selected }: { d: DraftState; selected: string[] })
   return <div className="look-editor">
     <aside className="look-controls" aria-labelledby="look-heading">
       <h2 id="look-heading">Look &amp; feel</h2>
-      <label>Change the look of<select value={scopeValue(live)} onChange={event => { const value = event.target.value; if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}>
-        <option value="game">The whole game</option>
-        <optgroup label="Only this scene">{definition.nodes.flatMap(node => node.stages.map((stage, index) => <option key={`${node.key}|${index}`} value={`${node.key}|${index}`}>
-          {short(cardText(definition, node).title || node.key)}{node.stages.length > 1 ? ` · part ${index + 1}` : ''}{stage['presentation'] ? ' ✎' : ''}</option>))}</optgroup>
-      </select></label>
+      <label>Change the look of<Dropdown value={scopeValue(live)} onChange={value => { if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}
+        options={[{ value: 'game', label: 'The whole game' }, ...definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ value: `${node.key}|${index}`, group: 'Only this scene',
+          label: `${short(cardText(definition, node).title || node.key)}${node.stages.length > 1 ? ` · part ${index + 1}` : ''}${stage['presentation'] ? ' ✎' : ''}` })))]} /></label>
       <p className="hint">{live.kind === 'game' ? 'Changes here apply to every scene, unless a scene has its own.' : 'Changes here apply only to this scene; everything else follows the whole game.'}</p>
       {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{changedScenes.length} {changedScenes.length === 1 ? 'scene has' : 'scenes have'} its own look (marked ✎).</p>}
       <div className="tabs" role="tablist" aria-label="Part of the look">{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{SECTIONS[key]}</button>)}</div>

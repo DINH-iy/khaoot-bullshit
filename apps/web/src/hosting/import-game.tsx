@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DraftSchema } from '@party/contracts';
 import guide from '../../../../docs/guides/importing-games.md?raw';
-import { newId, roomApi } from '../network/api.js';
+import { newId, roomApi } from '../room/api.js';
 
 // The instructions an AI needs: the marked section of the guide, so the app and the guide never disagree.
 export const aiInstructions = (() => {

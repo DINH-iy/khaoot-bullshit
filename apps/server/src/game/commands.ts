@@ -2,18 +2,18 @@ import { randomUUID } from 'node:crypto';
 import { PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
-import { earned, revealAwards } from './place-awards.js';
+import { earned, revealAwards } from './scoring/place-awards.js';
 import { checkBet, decideDuel, duelPlay, openDuel, pickDuelists } from './duel.js';
 import { CLOCK_SLACK_MS, judgeResult, NO_FAIRNESS, readMinigameRun, startMinigame } from '../minigames/rules.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay.js';
 import type { LiveSignals } from '../minigames/live.js';
-import { spinWheel } from './wheel.js';
+import { spinWheel } from './show/wheel.js';
 import { firstStage, locateStage, nextStage, type Located } from './graph.js';
-import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes.js';
+import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes/routes.js';
 import { GameError, requireGame } from './errors.js';
 import { actorKey, EligibilitySchema, requireHost, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
 import { acceptsUntil, closesAt, graceFor, MAX_REMAINING_MS, remainingMs, timerColumns } from './timing.js';
-import { formingCommand, gameLineupForRound, readForming, route, startForming, teamContext, type Award, type TeamContext } from './teams.js';
+import { formingCommand, gameLineupForRound, readForming, route, startForming, teamContext, type Award, type TeamContext } from './teams/teams.js';
 
 export interface Effect {
   stageRunId: string | null;

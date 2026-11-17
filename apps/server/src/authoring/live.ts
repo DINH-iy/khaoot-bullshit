@@ -4,7 +4,7 @@ import type { Server, Socket } from 'socket.io';
 import type { FastifyBaseLogger } from 'fastify';
 import { EDITOR_NAMESPACE, EditorJoinSchema, EditorPointSchema, EditorPresenceSchema, GameIdSchema, MAX_EDITORS, type Draft, type EditorPeer, type EditorPresence } from '@party/contracts';
 import { RateLimiter } from '../rooms/security.js';
-import { clientAddress } from '../client-address.js';
+import { clientAddress } from '../http/client-address.js';
 
 // Editing a game together. Saving stays what it was: whole drafts over HTTP,
 // each checked against the revision it was based on. This channel only tells

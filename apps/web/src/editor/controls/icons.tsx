@@ -1,0 +1,34 @@
+// Simple line icons for scene types, drawn for this app (24×24, current colour).
+const paths: Record<string, string> = {
+  info: 'M4 7h16v12H4z M4 7l3-4 M10 7l3-4 M16 7l3-4 M4 11h16',
+  quiz: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7 M12 17h.01',
+  writing: 'M4 20h4L19 9l-4-4L4 16z M14 6l4 4',
+  upload: 'M4 5h16v14H4z M4 15l5-5 4 4 2-2 5 5 M15 9.5a1.5 1.5 0 1 0 0-.01',
+  order: 'M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01',
+  challenge: 'M5 21V4 M5 4h11l-2 4 2 4H5',
+  vote: 'M5 11h14v9H5z M9 15l2 2 4-4 M8 11V5h8v6',
+  route: 'M4 12h6l4-6h6 M10 12l4 6h6 M17 3l3 3-3 3 M17 15l3 3-3 3',
+  teams: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20a6 6 0 0 1 12 0 M17 11a2.5 2.5 0 1 0 0-5 M16 14.5a5 5 0 0 1 5 5.5',
+  scoreboard: 'M8 21h8 M12 17v4 M7 4h10v5a5 5 0 0 1-10 0z M7 6H4v2a3 3 0 0 0 3 3 M17 6h3v2a3 3 0 0 1-3 3',
+  minigame: 'M6 9h12a4 4 0 0 1 4 4v1a3 3 0 0 1-5.5 1.7L15 14H9l-1.5 1.7A3 3 0 0 1 2 14v-1a4 4 0 0 1 4-4z M7 11v3 M5.5 12.5h3 M16 12h.01 M18 14h.01',
+  drawing: 'M3 21c3 0 4-2 4-4a2 2 0 0 1 4 0c0 2-2 4-8 4z M9.5 14.5L20 4 M17 3l4 4',
+  start: 'M5 21V4 M5 4l12 5-12 5',
+  undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
+  redo: 'M15 14l5-5-5-5 M20 9H9a5 5 0 0 0 0 10h3',
+  plus: 'M12 5v14 M5 12h14',
+  // A wheel of fortune: a wheel with spokes and a pointer.
+  wheel: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 3v18 M3 12h18 M5.6 5.6l12.8 12.8 M18.4 5.6L5.6 18.4 M12 1l-2 3h4z',
+  // A duel: two crossed swords.
+  duel: 'M4 4l9 9 M20 4l-9 9 M7 14l3 3 M17 14l-3 3 M5 16l-2 2 2 2 2-2 M19 16l2 2-2 2-2-2',
+  // A menu of more actions: three lines.
+  menu: 'M4 7h16 M4 12h16 M4 17h16',
+  // Prefabs: two stacked cards.
+  prefab: 'M8 8h12v12H8z M4 16V4h12',
+};
+export function Icon({ name, size = 20, label }: { name: string; size?: number; label?: string }) {
+  const d = paths[name] ?? paths['quiz']!;
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+    role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>{d.split(' M').map((part, index) => <path key={index} d={index ? `M${part}` : part} />)}</svg>;
+}
+/** The icon for a scene card, from its first part. */
+export const sceneIcon = (kind: string, input: string | null) => kind === 'collect' ? ({ choice: 'quiz', text: 'writing', media: 'upload', order: 'order', drawing: 'drawing' } as Record<string, string>)[input ?? ''] ?? 'quiz' : kind;

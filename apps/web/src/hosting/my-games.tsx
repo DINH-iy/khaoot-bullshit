@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
-import { newId, roomApi } from '../network/api.js';
+import { newId, roomApi } from '../room/api.js';
 
 const failures: Record<string, string> = {
   REVISION_CONFLICT: 'This game was changed elsewhere. The list is up to date again; try once more.',
