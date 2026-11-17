@@ -32,9 +32,10 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 .inline-form input { width: 7rem; }
 .game-choice { align-items: flex-start; } .game-choice input { flex: none; margin-top: 4px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 12px; }
+/* Side by side only when the longest word fits (--longest-word, set per question); otherwise one below the other. */
+.tiles { --char: .8rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(9rem, calc(var(--longest-word, 0) * var(--char) + 5rem))), 1fr)); gap: 12px; }
 .tiles legend { margin-bottom: 4px; }
-.tile { position: relative; display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 14px; border: 2px solid light-dark(#767676, #999); border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; }
+.tile { position: relative; display: flex; align-items: center; gap: 12px; overflow-wrap: break-word; hyphens: manual; min-height: 84px; padding: 14px; border: 2px solid light-dark(#767676, #999); border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; }
 .tile input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .tile:has(input:checked) { background: light-dark(#222, #eee); color: light-dark(#fff, #161616); border-color: light-dark(#222, #eee); }
 .tile:has(input:focus-visible) { outline: 3px solid light-dark(#195fc0, #82b5ff); outline-offset: 3px; }

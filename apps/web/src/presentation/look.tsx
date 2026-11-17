@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { EASINGS, FONTS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type Theme } from '@party/contracts';
+import { contrast, EASINGS, FONTS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type Theme } from '@party/contracts';
 
 export interface LookInput { texts?: Record<string, string>; animations?: Record<string, unknown>; themes?: unknown[] }
 export interface Look { text: (key: TextKey, values?: Record<string, string | number>) => string; animation: (moment: Moment) => CustomAnimation | null; theme: ReturnType<typeof resolveTheme> }
@@ -9,18 +9,21 @@ export const useLook = () => useContext(LookContext);
 /** The game's text for this key (or the default), with `{placeholders}` filled in. */
 export const useText = () => useContext(LookContext).text;
 
+const shine = (text: string) => contrast(text, '#ffffff') > contrast(text, '#000000') ? '#ffffff' : '#000000';
 /** CSS variables and classes for a resolved theme; the room styles read only these. */
 export function themeStyle(theme: ReturnType<typeof resolveTheme>): CSSProperties {
   const colors = theme.colors; const vars: Record<string, string> = {
     '--r-bg1': colors.background, '--r-bg2': colors.background2, '--r-surface': colors.surface, '--r-text': colors.text, '--r-muted': colors.muted,
     '--r-accent': colors.accent, '--r-accent-ink': colors.accentText, '--r-ok': colors.success, '--r-bad': colors.danger, '--a-text': colors.answerText,
+    // For gradient tiles and buttons: the shine goes towards white under dark text and towards black under light text, so text stays readable.
+    '--a-shine': shine(colors.answerText), '--r-accent-shine': shine(colors.accentText),
     '--r-radius': `${theme.radius}px`, '--r-font': FONTS[theme.font], '--r-heading-font': FONTS[theme.headingFont], '--r-scale': String(theme.textScale),
   };
   colors.answers.forEach((color, index) => { vars[`--a${index + 1}`] = color; });
   for (let index = colors.answers.length; index < 8; index++) vars[`--a${index + 1}`] = colors.answers[index % colors.answers.length]!;
   return vars as CSSProperties;
 }
-export const themeClass = (theme: ReturnType<typeof resolveTheme>) => `bg-${theme.background} tiles-${theme.tiles}${theme.uppercaseHeadings ? ' caps' : ''}`;
+export const themeClass = (theme: ReturnType<typeof resolveTheme>) => `bg-${theme.background} tiles-${theme.tiles}${theme.uppercaseHeadings ? ' caps' : ''}${theme.gradients ? ' gradients' : ''} marks-${theme.markerShape} marks-${theme.markerPlace}`;
 
 export function buildLook(look: LookInput | undefined): Look {
   const texts = look?.texts ?? {}; const animations = (look?.animations ?? {}) as Record<string, AnimationChoice>;

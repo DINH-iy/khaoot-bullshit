@@ -112,13 +112,13 @@
 @media (prefers-reduced-motion: reduce) { .room * { transition: none !important; } }
 
 /* Answers on the host and shared screens, matching the phone tile colours */
-.options-board { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 12px; }
-.options-board li { display: flex; gap: 12px; align-items: center; margin: 0; padding: 16px 18px; border-radius: calc(var(--r-radius) * .66); color: var(--a-text); font-weight: 700; font-size: clamp(1rem, 2vw, 1.5rem); box-shadow: inset 0 -4px 0 rgb(0 0 0 / .25); }
+.options-board { --char: 1.1rem; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(16rem, calc(var(--longest-word, 0) * var(--char) + 5rem))), 1fr)); gap: 12px; }
+.options-board li { overflow-wrap: break-word; display: flex; gap: 12px; align-items: center; margin: 0; padding: 16px 18px; border-radius: calc(var(--r-radius) * .66); color: var(--a-text); font-weight: 700; font-size: clamp(1rem, 2vw, 1.5rem); box-shadow: inset 0 -4px 0 rgb(0 0 0 / .25); }
 .options-board span { display: grid; place-items: center; width: 2em; height: 2em; border-radius: 50%; border: 2px solid currentColor; flex: none; font-size: .8em; }
 .options-board li:nth-child(8n+1) { background: var(--a1); } .options-board li:nth-child(8n+2) { background: var(--a2); } .options-board li:nth-child(8n+3) { background: var(--a3); }
 .options-board li:nth-child(8n+4) { background: var(--a4); } .options-board li:nth-child(8n+5) { background: var(--a5); } .options-board li:nth-child(8n+6) { background: var(--a6); }
 .options-board.order li { background: var(--r-card-strong); color: var(--r-text); }
-.room-display .options-board li { font-size: clamp(1.4rem, 2.6vw, 2.2rem); padding: 22px 24px; }
+.room-display .options-board { --char: clamp(1rem, 1.9vw, 1.6rem); } .room-display .options-board li { font-size: clamp(1.4rem, 2.6vw, 2.2rem); padding: 22px 24px; }
 /* The shared screen only needs a small connection dot */
 .room-display .room-connection button, .room-display .conn-details { display: none; }
 
@@ -142,6 +142,9 @@
 .room.tiles-outline .tile:nth-of-type(8n+3), .room.tiles-outline .options-board li:nth-child(8n+3) { border-color: var(--a3); } .room.tiles-outline .tile:nth-of-type(8n+4), .room.tiles-outline .options-board li:nth-child(8n+4) { border-color: var(--a4); }
 .room.tiles-outline .tile:nth-of-type(8n+5), .room.tiles-outline .options-board li:nth-child(8n+5) { border-color: var(--a5); } .room.tiles-outline .tile:nth-of-type(8n+6), .room.tiles-outline .options-board li:nth-child(8n+6) { border-color: var(--a6); }
 .room.tiles-glass .tile, .room.tiles-glass .options-board li { backdrop-filter: blur(8px); box-shadow: inset 0 0 0 1px color-mix(in srgb, white 25%, transparent); }
+/* The gradient effect (a setting, off unless chosen): tiles and main buttons get a soft shine from one corner and a glow; the shine never lowers the text's contrast. */
+.room.gradients .tile, .room.gradients .options-board li { background-image: linear-gradient(150deg, color-mix(in srgb, var(--a-shine) 38%, transparent), transparent 72%); box-shadow: 0 6px 18px rgb(0 0 0 / .22); }
+.room.gradients button.primary { background-image: linear-gradient(150deg, color-mix(in srgb, var(--r-accent-shine) 45%, transparent), transparent 75%); box-shadow: 0 6px 20px color-mix(in srgb, var(--r-accent) 45%, transparent); }
 
 /* A phone signed in as a person joins under that name. */
 .person-badge { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--r-card-strong); }
@@ -290,3 +293,14 @@
 .reset-confirm { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--r-bad); background: color-mix(in srgb, var(--r-bad) 12%, transparent); }
 .reset-confirm p { margin: 0; }
 .room .reset-confirm button.danger { background: var(--r-bad); color: #fff; border: 0; }
+/* Answer marks (letters, numbers, shapes, the author's own or arrows): their shape and place are part of the look.
+   A minimum size, not a fixed one, so an own mark like "Nee" makes the circle a pill instead of spilling out. */
+.room .answer-mark:not(.route-arrow) { width: auto; min-width: 2em; padding-inline: .3em; box-sizing: border-box; white-space: nowrap; }
+.room.marks-square .answer-mark { border-radius: 0; }
+.room.marks-rounded .answer-mark { border-radius: 28%; }
+.room.marks-plain .answer-mark { border: 0; background: none; width: auto; height: auto; min-width: 1.2em; font-size: 1.2em; font-weight: 900; }
+.room.marks-end .tile > .answer-mark, .room.marks-end .options-board li > .answer-mark { order: 2; margin-left: auto; }
+.room.marks-end .route-tiles .tile { grid-template-columns: 1fr auto; }
+.room.marks-end .route-tiles .tile > .answer-mark { order: 2; }
+.room.marks-top .tile, .room.marks-top .options-board li { flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; }
+.room.marks-top .route-tiles .tile { grid-template-columns: 1fr; justify-items: start; }

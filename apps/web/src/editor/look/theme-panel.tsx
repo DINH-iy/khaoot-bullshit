@@ -1,5 +1,7 @@
 import { contrast, FONTS, resolveTheme, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
 import { Dropdown } from '../controls/dropdown.js';
+import { useState } from 'react';
+import { ExportPalette, ImportPalette } from './palette-dialog.js';
 
 type Colors = FullTheme['colors'];
 type ColorName = Exclude<keyof Colors, 'answers'>;
@@ -13,6 +15,24 @@ const FONT_OPTIONS = (Object.keys(FONTS) as FontName[]).map(font => ({ value: fo
 const BACKGROUNDS = { glow: 'Glow', gradient: 'Gradient', solid: 'Plain', dots: 'Dots', stripes: 'Stripes', grid: 'Grid' } as const;
 const TILES = { filled: 'Filled', flat: 'Flat', outline: 'Outline', glass: 'Glass' } as const;
 
+// The marks before each answer: what they are, their shape and place, and what party choices use.
+const MARK_CHOICES = [
+  { key: 'markers', label: 'Marks', options: { letters: 'A B C', numbers: '1 2 3', shapes: '★ ● ▲', custom: 'Your own', none: 'None' } },
+  { key: 'markerShape', label: 'Mark shape', options: { circle: 'Circle', square: 'Square', rounded: 'Rounded square', plain: 'Just the mark' } },
+  { key: 'markerPlace', label: 'Mark place', options: { start: 'Before the answer', end: 'After the answer', top: 'Above the answer' } },
+  { key: 'routeMarkers', label: 'On party choices', options: { arrows: 'Arrows', answers: 'The same marks' } },
+] as const;
+
+/** The author's own marks: typed with spaces between them (emoji, letters, short words), up to 8 of up to 12 characters. */
+function CustomMarks({ marks, onChange }: { marks: string[]; onChange: (marks: string[]) => void }) {
+  const [text, setText] = useState(marks.join(' '));
+  // At most 12 characters each, cut between whole characters (never half an emoji).
+  const cut = (mark: string) => Array.from(mark).reduce((kept, char) => (kept + char).length <= 12 ? kept + char : kept, '');
+  const parse = (value: string) => value.split(/[\s,]+/).filter(Boolean).map(cut).filter(Boolean).slice(0, 8);
+  return <label>Your marks, with spaces between them<input value={text} maxLength={120} placeholder="🎄 🎁 ⭐ 🔔" onChange={event => { setText(event.target.value); onChange(parse(event.target.value)); }} />
+    <span className="hint">Up to 8 marks (emoji, letters or a short word). With more answers than marks, they repeat. Without any, the answers get A B C.</span></label>;
+}
+
 /** Readability problems with the current colours, in plain language. */
 export function contrastWarnings(theme: FullTheme): string[] {
   const c = theme.colors; const warnings: string[] = [];
@@ -24,7 +44,8 @@ export function contrastWarnings(theme: FullTheme): string[] {
 }
 
 /** Colours, fonts, shapes and backgrounds. Every change is a block of choices, never code. */
-export function ThemePanel({ theme, below, onChange }: { theme: Theme | undefined; below: (Theme | undefined)[]; onChange: (theme: Theme | undefined) => void }) {
+export function ThemePanel({ theme, below, title = '', onChange }: { theme: Theme | undefined; below: (Theme | undefined)[]; title?: string; onChange: (theme: Theme | undefined) => void }) {
+  const [palette, setPalette] = useState<'import' | 'export' | null>(null);
   const layer = theme ?? {}; const full = resolveTheme(...below, theme);
   const set = (patch: Partial<Theme>) => onChange({ ...layer, ...patch });
   const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...(layer.colors ?? {}), [name]: value } });
@@ -43,6 +64,12 @@ export function ThemePanel({ theme, below, onChange }: { theme: Theme | undefine
     {warnings.length > 0 && <div className="look-warnings" role="status"><h3>Readability</h3><ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
 
     <fieldset><legend>Colours</legend>
+      <div className="palette-actions">
+        <button type="button" className="small-button" onClick={() => setPalette('import')}>Import colours…</button>
+        <button type="button" className="small-button" onClick={() => setPalette('export')}>Export colours…</button>
+      </div>
+      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...(layer.colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
+      {palette === 'export' && <ExportPalette colors={full.colors} title={title} onClose={() => setPalette(null)} />}
       <div className="color-grid">{(Object.keys(COLOR_LABELS) as ColorName[]).map(name => <label key={name} className="color-field">
         <input type="color" value={full.colors[name]} onChange={event => setColor(name, event.target.value)} />{COLOR_LABELS[name]}</label>)}</div>
       <p className="field-title">Answer colours, in order</p>
@@ -66,6 +93,16 @@ export function ThemePanel({ theme, below, onChange }: { theme: Theme | undefine
       <div className="segmented" role="group" aria-label="Background">{(Object.keys(BACKGROUNDS) as (keyof typeof BACKGROUNDS)[]).map(key => <button key={key} aria-pressed={full.background === key} onClick={() => set({ background: key })}>{BACKGROUNDS[key]}</button>)}</div>
       <p className="field-title">Answer tiles</p>
       <div className="segmented" role="group" aria-label="Answer tiles">{(Object.keys(TILES) as (keyof typeof TILES)[]).map(key => <button key={key} aria-pressed={full.tiles === key} onClick={() => set({ tiles: key })}>{TILES[key]}</button>)}</div>
+      <label className="choice"><input type="checkbox" checked={full.gradients} onChange={event => set({ gradients: event.target.checked })} />Gradient effect on answer tiles and main buttons</label>
+    </fieldset>
+
+    <fieldset><legend>Answer marks</legend>
+      {MARK_CHOICES.map(({ key, label, options }) => <div key={key}>
+        <p className="field-title">{label}</p>
+        <div className="segmented" role="group" aria-label={label}>{Object.entries(options).map(([value, name]) => <button key={value} aria-pressed={full[key] === value} onClick={() => set({ [key]: value })}>{name}</button>)}</div>
+        {key === 'markers' && full.markers === 'custom' && <CustomMarks marks={full.customMarks} onChange={customMarks => set({ customMarks })} />}
+      </div>)}
+      <p className="hint">The marks show before (or after, or above) each answer on the phones and the shared screen.</p>
     </fieldset>
     {theme && <button className="small-button" onClick={() => onChange(undefined)}>Remove all look changes here</button>}
   </div>;

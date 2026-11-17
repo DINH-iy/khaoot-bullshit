@@ -31,11 +31,11 @@ The host menu, Feedback and People now say: "This browser is not signed in as th
 
 Behind a cloudflared tunnel on the same machine every request comes from `127.0.0.1`, so all per-address rate limits (join, feedback, owner sign-in, people, socket connects) were shared by every visitor.
 
-- Setting: `TRUST_CLOUDFLARE_LOCAL` in `apps/server/src/config.ts`, default `false`. Logic in `apps/server/src/client-address.ts`.
+- Setting: `TRUST_CLOUDFLARE_LOCAL` in `apps/server/src/config.ts`, default `false`. Logic in `apps/server/src/http/client-address.ts`.
 - When `true` and the TCP peer is `127.0.0.1`, `::1` or `::ffff:127.0.0.1`, a single valid IP in `CF-Connecting-IP` becomes `request.ip`. The room and editor Socket.IO connect limits use the same rule.
 - The header is ignored when the setting is off, when the peer is not loopback, and when it is missing, repeated, comma-joined, over-long or not a plain IP address.
 - Fastify's `trustProxy` stays off: it reads `X-Forwarded-For` and also changes how host and protocol are read.
-- Tests: `apps/server/test/client-address.test.ts` (header ignored when off, used for a loopback peer when on, ignored for other peers, invalid values ignored, different visitors get different addresses, config validation).
+- Tests: `apps/server/test/http/client-address.test.ts` (header ignored when off, used for a loopback peer when on, ignored for other peers, invalid values ignored, different visitors get different addresses, config validation).
 - Documented in `.env.example`; to use it, see [the Pi deployment notes](../deployment/raspberry-pi.md#cloudflare-tunnel-and-visitor-addresses).
 
 ## Not verified

@@ -87,3 +87,71 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
     await settled(phone); expect((await new AxeBuilder({ page: phone }).analyze()).violations).toEqual([]);
   } finally { await phoneContext.close(); }
 });
+
+test('a colour palette from Canva, Figma or Coolors is imported, and the colours export for design tools', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${process.env['LOCAL_OWNER_TOKEN']}`);
+  const mine = page.getByRole('region', { name: 'Your games' });
+  const name = `Palette test ${Date.now()}`;
+  await mine.getByLabel('Name of your new game').fill(name);
+  await mine.getByRole('button', { name: 'Create game' }).click();
+  await mine.getByRole('link', { name: `Edit ${name}` }).click();
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  // The MBO Utrecht style is one of the starting points.
+  await page.getByRole('button', { name: /MBO Utrecht/ }).click();
+  await expect(page.getByLabel('Answer A colour')).toHaveValue('#f39200');
+
+  await page.getByRole('button', { name: 'Import colours…' }).click();
+  const importing = page.getByRole('dialog', { name: 'Import colours' });
+  await importing.getByLabel('Colours').fill('https://coolors.co/264653-2a9d8f-e9c46a-f4a261-e76f51');
+  await expect(importing.getByRole('status')).toContainText('Found 5 colours');
+  expect((await new AxeBuilder({ page }).include('.palette-dialog').analyze()).violations).toEqual([]);
+  await importing.getByRole('button', { name: 'Use these colours' }).click();
+  await expect(page.getByLabel('Answer A colour')).toHaveValue('#264653');
+  await expect(page.getByLabel('Answer E colour')).toHaveValue('#e76f51');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
+
+  await page.getByRole('button', { name: 'Export colours…' }).click();
+  const exporting = page.getByRole('dialog', { name: 'Export colours' });
+  await expect(exporting.getByLabel('The hex codes')).toHaveValue(/^#264653\n#2a9d8f/);
+  const [download] = await Promise.all([page.waitForEvent('download'), exporting.getByRole('button', { name: /Swatch file \(\.ase\)/ }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^palette-test-\d+-colours\.ase$/);
+  await page.keyboard.press('Escape');
+  await expect(exporting).toHaveCount(0);
+});
+
+test('answer marks can be numbers, square and after the answer, and answers never stick out of their tiles', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${process.env['LOCAL_OWNER_TOKEN']}`);
+  const mine = page.getByRole('region', { name: 'Your games' });
+  const name = `Marks test ${Date.now()}`;
+  await mine.getByLabel('Name of your new game').fill(name);
+  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await mine.getByRole('button', { name: 'Create game' }).click();
+  await mine.getByRole('link', { name: `Edit ${name}` }).click();
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  await page.getByRole('button', { name: 'Question', exact: true }).click();
+  const phoneTiles = page.locator('.look-phone .tile');
+  await expect(phoneTiles.first().locator('.answer-mark')).toHaveText('A');
+  await page.getByRole('group', { name: 'Marks', exact: true }).getByRole('button', { name: '1 2 3' }).click();
+  await page.getByRole('group', { name: 'Mark shape' }).getByRole('button', { name: 'Square', exact: true }).click();
+  await page.getByRole('group', { name: 'Mark place' }).getByRole('button', { name: 'After the answer' }).click();
+  await expect(phoneTiles.first().locator('.answer-mark')).toHaveText('1');
+  await expect(page.locator('.look-tv .options-board li').nth(1).locator('.answer-mark')).toHaveText('2');
+  await expect(page.locator('.look-phone .room')).toHaveClass(/marks-square/);
+  await expect(page.locator('.look-phone .room')).toHaveClass(/marks-end/);
+  await expect(phoneTiles.first().locator('.answer-mark')).toHaveCSS('border-radius', '0px');
+  // Answers fit their tiles: side by side only when every word fits, never sticking out.
+  expect(await phoneTiles.evaluateAll(tiles => tiles.filter(tile => tile.scrollWidth > tile.clientWidth + 1).length)).toBe(0);
+  // Your own marks: typed in a field, repeating when there are more answers.
+  await page.getByRole('group', { name: 'Marks', exact: true }).getByRole('button', { name: 'Your own' }).click();
+  await page.getByLabel('Your marks, with spaces between them').fill('🎄 Nee');
+  await expect(phoneTiles.nth(0).locator('.answer-mark')).toHaveText('🎄');
+  await expect(phoneTiles.nth(1).locator('.answer-mark')).toHaveText('Nee');
+  expect(await phoneTiles.evaluateAll(tiles => tiles.filter(tile => tile.scrollWidth > tile.clientWidth + 1).length)).toBe(0);
+  await page.getByRole('group', { name: 'Marks', exact: true }).getByRole('button', { name: 'None' }).click();
+  await expect(phoneTiles.first().locator('.answer-mark')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
+});

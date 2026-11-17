@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANIMATION_PRESETS, contrast, DEFAULT_ANIMATIONS, fillText, MOMENTS, PresentationSchema, resolveAnimation, resolveTheme, TEXT_DEFAULTS, THEME_PRESETS } from '../src/index.js';
+import { ANIMATION_PRESETS, answerMark, contrast, DEFAULT_ANIMATIONS, fillText, MOMENTS, PresentationSchema, resolveAnimation, resolveTheme, TEXT_DEFAULTS, THEME_PRESETS } from '../src/index.js';
 
 describe('game look', () => {
   it.each(Object.entries(THEME_PRESETS))('keeps every text readable in the “%s” theme', (_key, { theme }) => {
@@ -28,5 +28,27 @@ describe('game look', () => {
     expect(fillText('Hi {name}, {unknown}', { name: 'Ada' })).toBe('Hi Ada, {unknown}');
     for (const moment of Object.keys(MOMENTS) as (keyof typeof MOMENTS)[]) { expect(ANIMATION_PRESETS[DEFAULT_ANIMATIONS[moment]]).toBeDefined(); expect(resolveAnimation({ preset: 'nonsense' }, moment)).not.toBeUndefined(); }
     expect(resolveAnimation({ preset: 'none' }, 'reveal')).toBeNull();
+  });
+});
+
+describe('answer marks', () => {
+  const theme = (markers: 'letters' | 'numbers' | 'shapes' | 'none', routeMarkers: 'arrows' | 'answers' = 'arrows') => ({ markers, routeMarkers });
+  it('are letters by default and numbers, shapes or nothing when chosen', () => {
+    expect([0, 1, 2].map(index => answerMark(resolveTheme(), index, 3))).toEqual(['A', 'B', 'C']);
+    expect([0, 1, 2].map(index => answerMark(theme('numbers'), index, 3))).toEqual(['1', '2', '3']);
+    expect(new Set([0, 1, 2, 3].map(index => answerMark(theme('shapes'), index, 4))).size).toBe(4);
+    expect(answerMark(theme('none'), 0, 2)).toBeNull();
+  });
+  it('can be the author’s own, repeating when there are more answers, and fall back to letters without any', () => {
+    const own = { markers: 'custom' as const, routeMarkers: 'arrows' as const, customMarks: ['🎄', 'Ja'] };
+    expect([0, 1, 2].map(index => answerMark(own, index, 3))).toEqual(['🎄', 'Ja', '🎄']);
+    expect(answerMark({ ...own, customMarks: [] }, 1, 3)).toBe('B');
+    expect(PresentationSchema.safeParse({ theme: { markers: 'custom', customMarks: ['🎄', 'Ja'] } }).success).toBe(true);
+    expect(PresentationSchema.safeParse({ theme: { customMarks: ['x'.repeat(13)] } }).success).toBe(false);
+    expect(PresentationSchema.safeParse({ theme: { customMarks: Array.from({ length: 9 }, () => 'x') } }).success).toBe(false);
+  });
+  it('give party choices signpost arrows unless they follow the answers', () => {
+    expect([0, 1].map(index => answerMark(theme('numbers'), index, 2, true))).toEqual(['←', '→']);
+    expect([0, 1].map(index => answerMark(theme('numbers', 'answers'), index, 2, true))).toEqual(['1', '2']);
   });
 });

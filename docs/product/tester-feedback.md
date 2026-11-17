@@ -90,6 +90,14 @@ From a UX designer's review, with your own additions:
 - K5: make the Flow editor only about the flow (scenes and arrows) and the Scene editor only about the scene (its content and settings), instead of both editing everything.
 - K6: custom dropdown menus in the editor's style instead of the browser's own (F4 step 3). **Done (not committed yet).**
 
+### L. Look & feel additions (17 November 2026, not committed yet)
+
+- L1: new styles: **MBO Utrecht** (the colours of mboutrecht.nl: deep brand blue, yellow buttons with black text as on the site, orange, mint and light-blue answer tiles, near-square corners, condensed titles; the site's DIN 2014 font is not bundled), **Christmas** (deep green with snow dots, gold buttons, red, green and blue tiles) and **Birthday** (light pink and yellow with confetti dots, pink button, bright tiles, playful titles).
+- L2: a **gradient effect** setting under Shapes and background (off unless chosen, in every style): answer tiles and main buttons get a shine and a soft glow; the shine goes towards white under dark text and towards black under light text, so readability never drops. The background has its own *Gradient* choice.
+- L4: **answers no longer break in the middle of a word.** Answer tiles (phone) and the answer board (shared screen) sit side by side only when the longest word fits, and go one below the other otherwise; a word only breaks if it is longer than a whole row.
+- L5: **answer marks** are part of the look (Look & feel → Answer marks): letters (A B C), numbers (1 2 3), shapes (★ ● ▲…), your own (typed in a field: emoji, letters or short words, up to 8) or none; a circle, square, rounded square or just the mark; before, after or above the answer; and party choices keep their arrows or use the same marks. The phones, the shared screen, the host's route buttons and the preview all follow it.
+- L3: **Import colours… / Export colours…** under Colours. Import: paste hex codes (Canva brand kit, Figma), a Coolors link, CSS, design tokens or SVG, or choose an .ase (Adobe, Procreate, Affinity), .gpl, .json, .css, .txt or .svg file; the colours found are shown first, then become the answer tiles and main buttons with readable text on them (the background stays). Export: copy the hex codes, download design tokens (.json, Figma Tokens Studio) or an .ase swatch file.
+
 ### Open questions
 
 - "You're far away" (host screen on an iPhone): that text is not in this app; what was on screen?

@@ -54,14 +54,15 @@
 .room-preview .preview-body { display: grid; gap: 12px; }
 .room-preview .lobby, .room-preview .stage-card, .room-preview .join-card { padding: 16px !important; display: grid; gap: 10px; }
 .room-preview .preview-players { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.room-preview .tiles { display: grid; grid-template-columns: 1fr 1fr; }
+/* The small preview phone: the same rule as a real phone (side by side only when the longest word fits), at preview size. */
+.room-preview .tiles { --char: .62em; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(5rem, calc(var(--longest-word, 0) * var(--char) + 5rem))), 1fr)); }
 .room-preview .tile { min-height: 64px; display: flex; gap: 8px; align-items: center; padding: 8px 10px; }
 .room-preview .big-code { font-size: 2.4rem; margin: 0; }
 @media (max-width: 900px) { .look-editor { grid-template-columns: 1fr; } .look-devices { grid-template-columns: 1fr; } .look-controls { border-right: 0; } }
 .room.room-preview .stage-card h2, .room.room-preview .lobby h2 { font-size: 1.7em; }
 .look-phone .room.room-preview .stage-card h2 { font-size: 1.3em; }
 .room.room-preview .stage-card, .room.room-preview .tiles { min-width: 0; }
-.room.room-preview .tile { font-size: 1em; min-width: 0; overflow-wrap: anywhere; }
+.room.room-preview .tile { font-size: 1em; min-width: 0; overflow-wrap: break-word; }
 .look-panel .frame-prop label { min-height: 0; }
 
 /* Never wider than the panel: form groups may shrink (a fieldset normally refuses), and long rows wrap. */
@@ -79,3 +80,16 @@
 .anim-timing { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .color-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .look-controls select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; } .look-controls > label { min-width: 0; }
+/* Importing and exporting a colour palette. */
+.palette-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.ed-dialog.palette-dialog { width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; }
+.palette-dialog label { display: grid; gap: 6px; font-weight: 600; }
+.palette-dialog textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--e-border); background: var(--e-bg); color: var(--e-text); }
+.palette-dialog .palette-file input { font-weight: 400; }
+.palette-found { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--e-text) !important; }
+.palette-swatches { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.palette-swatches i { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgb(0 0 0 / .15); }
+.palette-exports { display: grid; gap: 6px; }
+.palette-dialog .palette-exports button { display: grid; gap: 2px; justify-items: start; text-align: left; padding: 10px 12px; border-radius: 10px; }
+.palette-exports small { color: var(--e-muted); font-weight: 400; }
+.look-panel label .hint { font-weight: 400; }

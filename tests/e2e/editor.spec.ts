@@ -208,6 +208,40 @@ test('choices that need a description open a popup with cards: a duel’s game a
   await saved(page);
 });
 
+test('open sections follow you from scene to scene, also past a scene that does not have them', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  const mine = page.getByRole('region', { name: 'Your games' });
+  const name = `Sections test ${Date.now()}`;
+  await mine.getByLabel('Name of your new game').fill(name);
+  await mine.getByRole('button', { name: 'Create game' }).click();
+  await mine.getByRole('link', { name: `Edit ${name}` }).click();
+  const inspector = page.getByRole('complementary');
+  const section = (title: string) => inspector.locator('details', { has: page.locator('summary', { hasText: title }) });
+  const add = async (tab: string, item: RegExp, kind?: RegExp) => {
+    await page.getByRole('button', { name: 'Add a scene', exact: true }).click();
+    await page.getByRole('tab', { name: tab, exact: true }).click();
+    await page.getByRole('menuitem', { name: item }).click();
+    if (kind) await page.getByRole('menuitem', { name: kind }).click();
+  };
+  // A quiz (Content, Points, Who plays, Where next): open Points and Who plays, close Content.
+  await add('Rounds', /^Quiz question/);
+  await inspector.locator('summary', { hasText: 'Points' }).click();
+  await inspector.locator('summary', { hasText: 'Who plays' }).click();
+  await inspector.locator('summary', { hasText: 'Content' }).click();
+  // A cutscene has only Content and Where next: both stay closed; Points and Who plays are not there.
+  await add('Between rounds', /^Cutscene or info/);
+  await expect(section('Content')).not.toHaveAttribute('open', '');
+  await expect(section('Where next')).not.toHaveAttribute('open', '');
+  await expect(section('Points')).toHaveCount(0);
+  // A minigame has them again: Points and Who plays are open, Content still closed.
+  await add('Games', /^Minigame/, /^Tap race/);
+  await expect(section('Points')).toHaveAttribute('open', '');
+  await expect(section('Who plays')).toHaveAttribute('open', '');
+  await expect(section('Content')).not.toHaveAttribute('open', '');
+});
+
 test('an arrow can be picked up by its end and moved to another scene; several scenes move together and undo restores them', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
   await openCopy(page, baseURL!, `Arrows ${Date.now()}`);

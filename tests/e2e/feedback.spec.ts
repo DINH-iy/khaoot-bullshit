@@ -22,7 +22,7 @@ test('a tester points at a button and reports it; the owner finds it with its fi
   await page.getByRole('button', { name: 'Join room', exact: true }).click();
   await expect(panel).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(panel.getByRole('listitem')).toContainText('JoinScreen@network/room-screen.tsx');
+  await expect(panel.getByRole('listitem')).toContainText('JoinScreen@room/room-screen.tsx');
   await panel.getByLabel(/Your name/).fill('Tester Tess');
   await panel.getByRole('button', { name: 'Send' }).click();
   await expect(panel.getByRole('status')).toContainText('Thank you');
@@ -38,7 +38,7 @@ test('a tester points at a button and reports it; the owner finds it with its fi
     const item = owner.getByRole('listitem').filter({ has: owner.getByRole('heading', { name: title }) });
     await expect(item).toContainText('Tester Tess');
     await expect(item).toContainText('join screen');
-    await expect(item).toContainText(/JoinScreen in apps\/web\/src\/network\/room-screen\.tsx:\d+/);
+    await expect(item).toContainText(/JoinScreen in apps\/web\/src\/room\/room-screen\.tsx:\d+/);
     expect((await new AxeBuilder({ page: owner }).analyze()).violations).toEqual([]);
     await item.getByLabel(`Status of ${title}`).selectOption('planned');
     await owner.reload();

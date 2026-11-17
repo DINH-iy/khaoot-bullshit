@@ -38,7 +38,7 @@ export function LookView({ d, selected }: { d: DraftState; selected: string[] })
       <p className="hint">{live.kind === 'game' ? 'Changes here apply to every scene, unless a scene has its own.' : 'Changes here apply only to this scene; everything else follows the whole game.'}</p>
       {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{changedScenes.length} {changedScenes.length === 1 ? 'scene has' : 'scenes have'} its own look (marked ✎).</p>}
       <div className="tabs" role="tablist" aria-label="Part of the look">{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{SECTIONS[key]}</button>)}</div>
-      {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} onChange={theme => update({ theme }, 'theme')} />}
+      {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} title={definition.title} onChange={theme => update({ theme }, 'theme')} />}
       {section === 'texts' && <TextsPanel texts={layer.texts} below={below.texts ?? {}} onChange={texts => update({ texts }, 'texts')} />}
       {section === 'animations' && <AnimationPanel animations={layer.animations} below={below.animations ?? {}} onChange={animations => update({ animations }, 'animations')} />}
     </aside>

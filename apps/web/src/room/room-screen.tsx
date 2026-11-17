@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
+import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { JoinQr } from './join-qr.js';
 import { useRemaining } from './stage-timer.js';
 import { RoundInfo } from './round-info.js';
-import { AnswerInput, draftValue, emptyDraft, routeArrow } from './answer-input.js';
+import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
 import { JudgePanel, Scoreboard, StageResults } from './results.js';
 import { VoteBallot } from './vote.js';
 import { SeatReclaim, SeatRequests } from './seat-reclaim.js';
@@ -26,7 +26,8 @@ import { useMe, type Person } from '../people/use-me.js';
 import { wasOwner } from '../owner/owner-session.js';
 import { KeySignIn } from '../people/key-sign-in.js';
 import './room.css';
-import { LookContext, themeClass, themeStyle, useBuiltLook, useMoment, useText, type LookInput } from '../presentation/look.js';
+import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
+import { answerFit } from './answer-fit.js';
 
 const initial = new URL(location.href);
 const access = new URLSearchParams(initial.hash.slice(1)).get('access');
@@ -351,8 +352,9 @@ export function RoomScreen() {
 type StageInput = NonNullable<NonNullable<ReturnType<typeof useRoom>['snapshot']>['view']['stage']>['input'];
 /** The answers as the shared screen and host see them: the same colours as the phone tiles, not clickable. */
 function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>; route?: boolean }) {
+  const { theme } = useLook();
   const entries = input.kind === 'choice' ? input.options : input.kind === 'order' ? input.items : [];
   if (!entries.length) return null;
-  return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
-    {entries.map((entry, index) => <li key={entry.key}><span aria-hidden="true">{input.kind === 'order' ? '•' : route ? routeArrow(index, entries.length) : String.fromCharCode(65 + index)}</span>{entry.label}</li>)}</ol>;
+  return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} style={answerFit(entries.map(entry => entry.label))} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
+    {entries.map((entry, index) => { const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route); return <li key={entry.key}>{mark !== null && <span className="answer-mark" aria-hidden="true">{mark}</span>}{entry.label}</li>; })}</ol>;
 }
