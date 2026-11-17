@@ -1,17 +1,25 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from './icons.js';
 
 export interface CardChoice { value: string; label: string; description: string; icon?: string }
+/** A tab of choices in the popup; choices in no group are under "Other". */
+export interface ChoiceGroup { key: string; name: string; values: readonly string[] }
 
 /**
  * A popup with one card per choice (name and a line on what it is), for choices
  * that need more than a word: which minigame, how a duel is won, which award to
  * add. The current choice is marked; Escape, Cancel or a click outside keeps it.
+ * With `groups`, tabs (All first) narrow the cards down when there are many.
  */
-export function ChoiceDialog({ title, intro, choices, value, onPick, onClose }: {
-  title: string; intro?: string; choices: CardChoice[]; value?: string | undefined; onPick: (value: string) => void; onClose: () => void;
+export function ChoiceDialog({ title, intro, choices, value, groups, onPick, onClose }: {
+  title: string; intro?: string; choices: CardChoice[]; value?: string | undefined; groups?: ChoiceGroup[]; onPick: (value: string) => void; onClose: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null); const id = useId();
+  const grouped = new Set(groups?.flatMap(group => group.values));
+  const tabs = groups ? [{ key: 'all', name: 'All', values: choices.map(choice => choice.value) }, ...groups.filter(group => group.values.some(entry => choices.some(choice => choice.value === entry))),
+    ...(choices.some(choice => !grouped.has(choice.value)) ? [{ key: 'other', name: 'Other', values: choices.filter(choice => !grouped.has(choice.value)).map(choice => choice.value) }] : [])] : [];
+  const [tab, setTab] = useState('all');
+  const shown = tabs.length ? choices.filter(choice => tabs.find(entry => entry.key === tab)?.values.includes(choice.value)) : choices;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     (box.current?.querySelector<HTMLElement>('[aria-pressed=true]') ?? box.current?.querySelector<HTMLElement>('.choice-card'))?.focus();
@@ -29,8 +37,10 @@ export function ChoiceDialog({ title, intro, choices, value, onPick, onClose }: 
     <div ref={box} className="ed-dialog choice-dialog" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={onKey}>
       <h2 id={`${id}-title`}>{title}</h2>
       {intro && <p>{intro}</p>}
+      {tabs.length > 2 && <div className="choice-tabs" role="tablist" aria-label="Sorts">{tabs.map(entry =>
+        <button key={entry.key} type="button" role="tab" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)}>{entry.name}<small>{entry.values.length}</small></button>)}</div>}
       <div className="choice-cards">
-        {choices.map(choice => <button key={choice.value} type="button" className="choice-card" aria-pressed={value !== undefined ? choice.value === value : undefined} onClick={() => onPick(choice.value)}>
+        {shown.map(choice => <button key={choice.value} type="button" className="choice-card" aria-pressed={value !== undefined ? choice.value === value : undefined} onClick={() => onPick(choice.value)}>
           {choice.icon && <Icon name={choice.icon} />}<span><strong>{choice.label}</strong><small>{choice.description}</small></span>
           {choice.value === value && <span className="choice-current">Chosen</span>}
         </button>)}

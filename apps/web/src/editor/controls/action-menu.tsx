@@ -1,14 +1,17 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from './icons.js';
 
-export interface MenuAction { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean }
+/** One item: `icon` before it, `shortcut` (as the Help panel writes it, "Ctrl + Shift + L") after it. */
+export interface MenuAction { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; icon?: string; shortcut?: string }
 
 /**
  * A ☰ button that opens a short menu of actions (a scene's Start here, Duplicate,
  * Save as prefab, Delete…), so they sit in the panel's header instead of a row of
  * buttons. Escape or a click outside closes it; arrow keys move through the items.
+ * With `text` the button is labelled ("Play & publish ▾"), with `icon` too; `align`
+ * says which edge of the button the list lines up with (the end by default).
  */
-export function ActionMenu({ label, actions, text, intro }: { label: string; actions: MenuAction[]; text?: string; intro?: string }) {
+export function ActionMenu({ label, actions, text, icon, intro, align = 'end' }: { label: string; actions: MenuAction[]; text?: string; icon?: string; intro?: string | undefined; align?: 'start' | 'end' }) {
   const [open, setOpen] = useState(false); const id = useId();
   const box = useRef<HTMLDivElement>(null); const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -27,13 +30,20 @@ export function ActionMenu({ label, actions, text, intro }: { label: string; act
     const at = items.indexOf(document.activeElement as HTMLElement);
     items[(at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
   };
-  return <div ref={box} className={`action-menu${text ? ' has-text' : ''}`} onKeyDown={onKey}>
+  const withIcons = actions.some(action => action.icon);
+  return <div ref={box} className={`action-menu${text ? ' has-text' : ''}${align === 'start' ? ' align-start' : ''}`} onKeyDown={onKey}>
     {/* With `text`, a labelled button ("Play & publish ▾"); without, the ☰ icon. */}
-    <button ref={button} type="button" className={text ? 'action-menu-text' : 'small-button icon-only'} aria-label={text ? undefined : label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>{text ? `${text} ▾` : <Icon name="menu" size={18} />}</button>
-    {open && <div id={id} className="action-menu-list" role="menu" aria-label={label}>
+    <button ref={button} type="button" className={text ? `action-menu-text${icon ? ' with-icon' : ''}` : 'small-button icon-only'} aria-label={text ? undefined : label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
+      {text ? <>{icon && <Icon name={icon} size={18} />}{text}<span className="action-menu-caret" aria-hidden="true">▾</span></> : <Icon name="menu" size={18} />}</button>
+    {open && <div id={id} className={`action-menu-list${withIcons ? ' with-icons' : ''}`} role="menu" aria-label={label}>
       {intro && <p className="action-menu-intro">{intro}</p>}
       {actions.map(action => <button key={action.label} type="button" role="menuitem" disabled={action.disabled} className={action.danger ? 'danger-item' : undefined}
-        onClick={() => { setOpen(false); action.onSelect(); }}>{action.label}</button>)}
+        aria-keyshortcuts={action.shortcut ? action.shortcut.replace(/ \+ /g, '+').replace('⌘', 'Meta') : undefined}
+        onClick={() => { setOpen(false); action.onSelect(); }}>
+        {withIcons && <span className="action-menu-icon">{action.icon && <Icon name={action.icon} size={18} />}</span>}
+        <span className="action-menu-label">{action.label}</span>
+        {action.shortcut && <kbd className="action-menu-keys">{action.shortcut.replace(/ \+ /g, '+')}</kbd>}
+      </button>)}
     </div>}
   </div>;
 }

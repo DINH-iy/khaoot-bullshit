@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { ANIMATION_PRESETS, DEFAULT_ANIMATIONS, EASINGS, MOMENTS, resolveAnimation, type AnimationChoice, type CustomAnimation, type Moment } from '@party/contracts';
 import { play } from '../../presentation/look.js';
 import { Dropdown } from '../controls/dropdown.js';
+import { Icon } from '../controls/icons.js';
+import { describeAnimation, Timeline } from './timeline.js';
 
 type Frame = CustomAnimation['keyframes'][number];
 const EASING_LABELS: Record<keyof typeof EASINGS, string> = { smooth: 'Smooth', linear: 'Steady', 'ease-in': 'Speeds up', 'ease-out': 'Slows down', springy: 'Springy (overshoots)', snappy: 'Snappy' };
@@ -16,12 +18,21 @@ const PROPERTIES: { key: Exclude<keyof Frame, 'at'>; label: string; min: number;
   { key: 'blur', label: 'Blur', min: 0, max: 30, step: 1, rest: 0, unit: 'px' },
 ];
 
-/** A box (or a row of boxes, for lists) that plays an animation on request. */
+/**
+ * A box (or a column of answer tiles, for lists) that plays the animation, next to its
+ * timeline; ▶ Play plays both. The words say what it does.
+ */
 function Sample({ animation, list }: { animation: CustomAnimation | null; list: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null); const [run, setRun] = useState(0);
   return <div className="anim-sample">
-    <div ref={ref} className={`anim-stage${list ? ' list' : ''}`} aria-hidden="true">{list ? [1, 2, 3, 4].map(index => <span key={index} className="tile">{String.fromCharCode(64 + index)}</span>) : <span className="anim-box">Aa</span>}</div>
-    <button className="small-button" disabled={!animation} onClick={() => play(ref.current, animation, { staggerChildren: list })}>▶ Play</button>
+    <div className="anim-show">
+      <div ref={ref} className={`anim-stage${list ? ' list' : ''}`} aria-hidden="true">{list ? [1, 2, 3, 4].map(index => <span key={index} className="tile">{String.fromCharCode(64 + index)}</span>) : <span className="anim-box">Aa</span>}</div>
+      {animation && <Timeline animation={animation} rows={list ? 4 : 1} run={run} />}
+    </div>
+    <div className="anim-sample-foot">
+      <button className="small-button with-icon" disabled={!animation} onClick={() => { play(ref.current, animation, { staggerChildren: list }); setRun(run + 1); }}><Icon name="play" size={14} />Play</button>
+      {animation && <span className="anim-what">{describeAnimation(animation, list)}</span>}
+    </div>
   </div>;
 }
 
@@ -38,16 +49,15 @@ export function AnimationPanel({ animations, below, onChange }: { animations: Re
       const choice = current[moment] ?? below[moment]; const resolved = resolveAnimation(choice, moment);
       const presetKey = choice && 'preset' in choice ? choice.preset : choice ? null : DEFAULT_ANIMATIONS[moment];
       const list = LISTS.includes(moment);
+      // A card per moment: its name, the animation chosen, and below it the sample to play and the builder's button.
       return <fieldset key={moment} className="moment"><legend>{MOMENTS[moment]}</legend>
-        <div className="moment-row">
-          <label className="visually-hidden" htmlFor={`anim-${moment}`}>Animation for: {MOMENTS[moment]}</label>
-          <Dropdown id={`anim-${moment}`} className="moment-pick" value={presetKey ? `preset:${presetKey}` : `own:${own.findIndex(entry => JSON.stringify(entry) === JSON.stringify(choice))}`}
-            onChange={picked => { const [kind, value] = picked.split(':') as [string, string]; set(moment, kind === 'preset' ? (value === DEFAULT_ANIMATIONS[moment] && !below[moment] ? null : { preset: value }) : own[Number(value)]!); }}
-            options={[...Object.entries(ANIMATION_PRESETS).map(([key, preset]) => ({ value: `preset:${key}`, group: 'Ready-made', label: `${preset.name}${key === DEFAULT_ANIMATIONS[moment] ? ' (standard)' : ''}` })),
-              ...own.map((entry, index) => ({ value: `own:${index}`, group: 'Built in this game', label: entry.name || `My animation ${index + 1}` }))]} />
-          <Sample animation={resolved} list={list} />
-          <button className="small-button" aria-expanded={open === moment} onClick={() => setOpen(open === moment ? null : moment)}>{open === moment ? 'Close the builder' : 'Build your own'}</button>
-        </div>
+        <label className="visually-hidden" htmlFor={`anim-${moment}`}>Animation for: {MOMENTS[moment]}</label>
+        <Dropdown id={`anim-${moment}`} className="moment-pick" value={presetKey ? `preset:${presetKey}` : `own:${own.findIndex(entry => JSON.stringify(entry) === JSON.stringify(choice))}`}
+          onChange={picked => { const [kind, value] = picked.split(':') as [string, string]; set(moment, kind === 'preset' ? (value === DEFAULT_ANIMATIONS[moment] && !below[moment] ? null : { preset: value }) : own[Number(value)]!); }}
+          options={[...Object.entries(ANIMATION_PRESETS).map(([key, preset]) => ({ value: `preset:${key}`, group: 'Ready-made', label: `${preset.name}${key === DEFAULT_ANIMATIONS[moment] ? ' (standard)' : ''}` })),
+            ...own.map((entry, index) => ({ value: `own:${index}`, group: 'Built in this game', label: entry.name || `My animation ${index + 1}` }))]} />
+        <Sample animation={resolved} list={list} />
+        <button className="link-button moment-build" aria-expanded={open === moment} onClick={() => setOpen(open === moment ? null : moment)}>{open === moment ? 'Close the builder' : 'Build your own'}</button>
         {open === moment && <Builder start={resolved ?? ANIMATION_PRESETS['fade']!.animation!} name={choice && 'custom' in choice ? choice.name ?? '' : ''} list={list}
           onSave={(custom, name) => set(moment, { custom, ...(name ? { name } : {}) })} />}
       </fieldset>;

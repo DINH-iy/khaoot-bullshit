@@ -32,6 +32,13 @@ export function FeedbackList() {
     try { await roomApi(`/api/host/feedback/${item.id}/delete`, {}); setItems(list => list?.filter(entry => entry.id !== item.id)); }
     catch (cause) { setError(explain(cause)); }
   };
+  // Marks what the filters show (kind, status and search) as Done; the list then reloads.
+  const notDone = shown.filter(item => item.status !== 'done');
+  const markAllDone = async () => {
+    if (!confirm(`Mark ${notDone.length} ${notDone.length === 1 ? 'report' : 'reports'} shown here as Done?`)) return;
+    try { await roomApi('/api/host/feedback/mark-done', { ids: notDone.map(item => item.id) }); await load(); }
+    catch (cause) { setError(explain(cause)); }
+  };
   const copied1 = async (key: string, text: string) => { setCopied(await copy(text) ? key : 'failed'); setTimeout(() => setCopied(''), 2000); };
   const counts = (key: FeedbackItem['kind']) => (items ?? []).filter(item => item.kind === key && OPEN.includes(item.status)).length;
 
@@ -50,6 +57,7 @@ export function FeedbackList() {
           {FEEDBACK_STATUSES.map(key => <option key={key} value={key}>{STATUS[key]}</option>)}</select></label>
         <label>Search<input type="search" value={search} onChange={event => setSearch(event.target.value)} /></label>
         <button type="button" className="quiet" disabled={!shown.length} onClick={() => void copied1('all', shown.map(feedbackText).join('\n\n'))}>{copied === 'all' ? 'Copied' : `Copy ${shown.length} as text`}</button>
+        <button type="button" className="quiet" disabled={!notDone.length} onClick={() => void markAllDone()}>{`Mark ${notDone.length} as done`}</button>
         <button type="button" className="quiet" onClick={() => void load()}>Refresh</button>
       </div>
       {copied === 'failed' && <p role="alert" className="error">Copying is blocked in this browser. Select the text instead.</p>}

@@ -63,6 +63,26 @@ describe('feedback from testers', () => {
     expect((await call('POST', `/api/host/feedback/${body.id}/delete`, {}, { cookie })).statusCode).toBe(404);
   });
 
+  it('marks exactly the listed reports as done, for the owner only', async () => {
+    const bug = report(); const idea = report({ kind: 'minigame', title: 'Galgje' }); const done = report();
+    for (const body of [bug, idea, done]) await call('POST', '/api/feedback', body);
+    expect((await call('POST', '/api/host/feedback/mark-done', { ids: [bug.id] })).statusCode).toBe(401);
+
+    const { cookie } = await owner();
+    await call('PUT', `/api/host/feedback/${done.id}`, { status: 'done', ownerNote: 'Fixed' }, { cookie });
+    // A report that is already done and an id that does not exist are skipped, not errors.
+    const marked = await call('POST', '/api/host/feedback/mark-done', { ids: [bug.id, done.id, randomUUID()] }, { cookie });
+    expect(marked.json().data).toEqual({ changed: 1 });
+    const rows = await prisma.feedbackItem.findMany({ where: { id: { in: [bug.id, idea.id, done.id] } } });
+    const statusOf = (id: string) => rows.find(row => row.id === id)?.status;
+    expect([statusOf(bug.id), statusOf(idea.id), statusOf(done.id)]).toEqual(['DONE', 'NEW', 'DONE']);
+    expect(rows.find(row => row.id === done.id)?.ownerNote).toBe('Fixed');
+
+    expect((await call('POST', '/api/host/feedback/mark-done', { ids: [] }, { cookie })).statusCode).toBe(400);
+    expect((await call('POST', '/api/host/feedback/mark-done', { ids: ['not-an-id'] }, { cookie })).statusCode).toBe(400);
+    expect((await call('POST', '/api/host/feedback/mark-done', { ids: [bug.id], status: 'declined' }, { cookie })).statusCode).toBe(400);
+  });
+
   it('limits how many reports one address can send', async () => {
     const fresh = buildApp(config, { database: { ...db, close: async () => {} } }); await fresh.ready();
     try {

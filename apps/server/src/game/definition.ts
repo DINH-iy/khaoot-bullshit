@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -132,6 +132,8 @@ export const GameDefinitionSchema = z.object({
   // What a room of this game starts with on the phones: side games (challenges between players; left out: on) and
   // chips (slot machine, blackjack, packs and stakes; left out: off). The host can switch both in the room.
   sideGames: z.boolean().optional(), chips: z.boolean().optional(),
+  // Challenges a player may have waiting for an answer at once (left out: 3). The host can change it in the room.
+  openInvites: z.number().int().min(1).max(MAX_OPEN_INVITES).optional(),
   // The host's quick time button (+30 s by default): how many seconds it adds to a round.
   quickTimeSeconds: z.number().int().min(5).max(600).optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),

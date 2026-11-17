@@ -165,7 +165,8 @@ export function createAuthoring(client: PrismaClient) {
         const start = parsed.data.startNodeKey ?? (typeof raw.startNodeKey === 'string' ? raw.startNodeKey : '');
         requireGame(nodes.some(node => node.key === start), parsed.data.startNodeKey ? 'NOT_FOUND' : 'INVALID_DEFINITION');
         const reached = new Set<string>(); const queue = [start];
-        while (queue.length) { const key = queue.shift()!; if (reached.has(key)) continue; reached.add(key); for (const edge of edges) if (edge.from === key) queue.push(edge.to); }
+        // Only this scene (trying one minigame or round): nothing after it is reached, so the game ends there.
+        while (queue.length) { const key = queue.shift()!; if (reached.has(key)) continue; reached.add(key); if (!parsed.data.only) for (const edge of edges) if (edge.from === key) queue.push(edge.to); }
         raw = { ...raw, startNodeKey: start, nodes: nodes.filter(node => reached.has(node.key)), edges: edges.filter(edge => reached.has(edge.from) && reached.has(edge.to)) };
       }
       const { definition } = inspectDefinition(raw);

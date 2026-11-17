@@ -53,6 +53,13 @@ describe('importing a game from text', () => {
     expect((definition.nodes as { stages: { explain?: unknown }[] }[]).map(node => node.stages[0]!.explain)).toEqual([{ text: 'One try each.' }, {}]);
   });
 
+  it('takes the open challenge invites per player from "openInvites", within 1 to 10', () => {
+    const game = (openInvites: unknown) => check(JSON.stringify({ title: 'Invites', openInvites, scenes: [{ type: 'cutscene', title: 'Hi', text: 'Welcome' }] })).definition;
+    expect(game(5).openInvites).toBe(5);
+    expect(game(50).openInvites).toBe(10);
+    expect(game(0).openInvites).toBe(1);
+    expect(game(undefined).openInvites).toBeUndefined();
+  });
   it('takes the host’s quick time button from "quickTime", within 5 to 600 seconds', () => {
     const game = (quickTime: unknown) => check(JSON.stringify({ title: 'Quick', quickTime, scenes: [{ type: 'cutscene', title: 'Hi', text: 'Welcome' }] })).definition;
     expect(game(60).quickTimeSeconds).toBe(60);

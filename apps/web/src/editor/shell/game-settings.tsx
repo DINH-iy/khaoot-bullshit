@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT } from '@party/contracts';
 import { sceneName } from '../scene/inspector.js';
 import { Section } from '../controls/section.js';
 import { FinaleSettings, WheelSettings } from './show-settings.js';
@@ -44,7 +45,10 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
       <label className="choice"><input type="checkbox" checked={definition['sideGames'] !== false && definition['chips'] === true} disabled={definition['sideGames'] === false}
         onChange={event => { const next = { ...definition }; if (event.target.checked) next['chips'] = true; else delete next['chips']; onChange(next); }} />
         Play them with chips</label>
-      <p className="hint">Side games: slot machine, blackjack, packs and challenges between players, on by default. Chips (play money only) add bets, stakes and a leaderboard; off by default, so the games are just for fun. The host can still switch both in the room.</p>
+      {/* Stored only when it differs from the standard 3. */}
+      {definition['sideGames'] !== false && <label className="ed-inline">Challenges a player can have waiting at once<span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={MAX_OPEN_INVITES} value={Number(definition['openInvites'] ?? OPEN_INVITES_DEFAULT)}
+        onChange={event => { const value = Math.round(Number(event.target.value)); if (!(value >= 1 && value <= MAX_OPEN_INVITES)) return; const next = { ...definition }; if (value === OPEN_INVITES_DEFAULT) delete next['openInvites']; else next['openInvites'] = value; onChange(next); }} /></span></label>}
+      <p className="hint">Side games: slot machine, blackjack, packs and challenges between players, on by default. Chips (play money only) add bets, stakes and a leaderboard; off by default, so the games are just for fun. A player can invite up to {Number(definition['openInvites'] ?? OPEN_INVITES_DEFAULT)} others to a challenge before one answers. The host can still change all of this in the room, also before the game starts.</p>
     </Section>
     {/* Stored only when it differs from 30 seconds. */}
     <Section title="Host tools" summary={`Quick time button: +${Number(definition['quickTimeSeconds'] ?? 30)} s`}>

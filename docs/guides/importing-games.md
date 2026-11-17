@@ -45,6 +45,7 @@ Top level:
 | `sideGames` | `false` to leave out the side games on the phones (slot machine, blackjack, packs, challenges). Default: on, just for fun. |
 | `quickTime` | Seconds the host's quick time button adds to a running round. Default: 30. The host can change it in the room. |
 | `chips` | `true` to play the side games with chips (play money): bets, stakes in challenges and a leaderboard. Default: off. The host can still switch both in the room. |
+| `openInvites` | How many challenges a player can have waiting for an answer at once (1 to 10). Default: 3. The host can change it in the room. |
 
 Every scene can have:
 
@@ -159,7 +160,7 @@ If the user says "just make it" or has already answered, do not ask; choose sens
 - Teams are optional; most games are everyone-for-themselves. Only for a team game: add a scene `{ "type": "pick-teams", "title": "Pick your teams", "teams": 2, "how": "random" | "host" | "players", "captains": true }` where the teams are made, and `"inTeams": true` (plus `"captain": true` if only captains answer) on the rounds after it that are played in those teams. Quiz, writing, upload, drawing, order, challenge, vote and minigame rounds can be played in teams; duels, party choices, cutscenes and scoreboards cannot.
 - Optional wheels of fortune, at top level: `"wheels": [{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke", "Swap seats"], "removePicked": true, "spinSeconds": 5 }]`, optionally with their own slice colours `"colors": ["#f39200", "#7ac6b6"]`. A scene with `"spin": "Forfeits"` (usually a cutscene) lets the host spin that wheel there; `"wheelClear": true` on a later scene stops showing the last result.
 - Optional end-of-game awards, at top level, in order: `"awards"`: names from `"winner"`, `"mostCorrect"`, `"mostWrong"`, `"fastest"`, `"slowest"`, `"mostVotes"`, `"minigameChamp"`, `"luckiest"`, `"mostReactions"`, `"fewest"` (the wooden spoon), or objects with their own title; `"scene"` (most points in one scene) needs the scene's id: `{ "award": "scene", "scene": "karaoke", "title": "Karaoke champion" }`. Leave out for the standard awards; `[]` for none.
-- Side games on the phones while players wait are on; `"sideGames": false` switches them off, `"chips": true` plays them with chips.
+- Side games on the phones while players wait are on; `"sideGames": false` switches them off, `"chips": true` plays them with chips. A player can have 3 challenge invites waiting at once; `"openInvites": 5` allows 5 (1 to 10).
 - Any round people play (not a cutscene, scoreboard, party choice, duel or Pick teams) can explain itself first: `"explain": "Each team gets one guess per card…"` shows that text before the round starts, players tap Got it and the host starts the round; on a minigame `"explain": true` uses its standard "how to play". Use it for minigames and unusual rounds.
 - The host's quick time button adds 30 seconds to a running round; `"quickTime": 60` makes it a minute (5 to 600 seconds).
 - Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Only add a look if the user asks for a style or colours.

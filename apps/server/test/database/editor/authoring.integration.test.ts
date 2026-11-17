@@ -106,6 +106,9 @@ describe('authoring drafts and publishing', () => {
     const fromMusic = await prisma.gameVersion.findUniqueOrThrow({ where: { id: await authoring.rehearsalVersion(author.id, draft.gameId, { expectedRevision: 0, startNodeKey: 'music', ...ids() }) }, include: { game: true } });
     expect((fromMusic.definition as { startNodeKey: string; nodes: { key: string }[] }).nodes.map(node => node.key).sort()).toEqual(['finale', 'music']);
     expect(fromMusic.game).toMatchObject({ title: 'Rehearsal · Practice', archivedAt: null });
+    // Trying one scene on its own: only that scene, so the game ends after it.
+    const onlyMusic = await prisma.gameVersion.findUniqueOrThrow({ where: { id: await authoring.rehearsalVersion(author.id, draft.gameId, { expectedRevision: 0, startNodeKey: 'music', only: true, ...ids() }) } });
+    expect(onlyMusic.definition as { startNodeKey: string; nodes: { key: string }[]; edges: unknown[] }).toMatchObject({ startNodeKey: 'music', nodes: [{ key: 'music' }], edges: [] });
     // Nothing was published, and rehearsal games never appear in the list.
     expect((await authoring.get(author.id, draft.gameId)).published).toBeNull();
     expect((await authoring.list(author.id)).map(game => game.title)).toEqual(['Practice']);

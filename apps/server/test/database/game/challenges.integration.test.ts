@@ -29,7 +29,7 @@ async function room() {
   const players = await prisma.sessionPlayer.findMany({ where: { sessionId: body.sessionId }, orderBy: { joinedAt: 'asc' } });
   const base = `/api/rooms/${body.sessionId}/side/challenges`;
   const balance = async (phone: string) => (await call('GET', base, undefined, phone)).json().data.balance as number;
-  return { sessionId: body.sessionId, phones, ids: players.map(player => player.id), base, balance };
+  return { sessionId: body.sessionId, host: cookieOf(opened), phones, ids: players.map(player => player.id), base, balance };
 }
 const move = (r: Awaited<ReturnType<typeof room>>, phone: number, id: string, cell: number) => call('POST', `${r.base}/${id}/move`, { move: { game: 'tictactoe', cell } }, r.phones[phone]);
 
@@ -76,6 +76,20 @@ describe('challenges between players', () => {
     expect((await call('POST', `${r.base}/${playing}/move`, { move: { game: 'chess', from: 'e2', to: 'e4' } }, r.phones[0])).statusCode).toBe(200);
     expect((await call('POST', `${r.base}/${playing}/resign`, {}, r.phones[1])).json().data).toMatchObject({ status: 'FINISHED', view: { outcome: { kind: 'win', seat: 0, reason: 'resigned' } } });
     expect(await r.balance(r.phones[0]!)).toBe(START_CHIPS + 10);
+  });
+
+  it('wait for an answer only as many at once as the host allows (3 unless changed)', async () => {
+    const r = await room();
+    const invite = (to: number) => call('POST', r.base, { challengeId: randomUUID(), opponentId: r.ids[to], game: 'rps', stake: 0 }, r.phones[0]);
+    expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 1 }, r.host)).statusCode).toBe(200);
+    expect((await invite(1)).statusCode).toBe(200);
+    const refused = await invite(2);
+    expect(refused.statusCode).not.toBe(200); expect(JSON.stringify(refused.json())).toContain('RATE_LIMITED');
+    // Players cannot change it; the host can, within 1 to 10.
+    expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 5 }, r.phones[0])).statusCode).not.toBe(200);
+    expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 11 }, r.host)).statusCode).toBe(400);
+    expect((await call('POST', `/api/rooms/${r.sessionId}/settings`, { openInvites: 2 }, r.host)).statusCode).toBe(200);
+    expect((await invite(2)).statusCode).toBe(200);
   });
 
   it('are deleted with the room once it is over, returning any stake still in a game', async () => {

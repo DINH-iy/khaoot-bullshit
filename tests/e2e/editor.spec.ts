@@ -10,6 +10,11 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
 }
 const card = (page: Page, title: RegExp) => page.locator('.scene-card').filter({ has: page.locator('.card-title', { hasText: title }) });
 const saved = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
+/** Shows the whole game, from the zoom menu (its button shows the zoom, such as "100%"). */
+async function fit(page: Page) {
+  await page.getByRole('button', { name: /^\d+%$/ }).click();
+  await page.getByRole('menu', { name: 'Zoom' }).getByRole('menuitem', { name: 'Show the whole game' }).click();
+}
 
 test('the Flow editor moves, connects, adds and edits scenes, snapping everything into place, and saves', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'The Flow editor is desktop first; phones are checked for not breaking only.');
@@ -39,7 +44,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await saved(page);
 
   // Dragging a connection from an output port snaps onto a scene card when released near it.
-  await page.getByRole('button', { name: 'Fit' }).click();
+  await fit(page);
   await page.getByRole('button', { name: 'Add a scene', exact: true }).click();
   // The add menu has tabs; arrow keys move between them. A scoreboard is under Between rounds.
   const tabs = page.getByRole('tablist', { name: 'Sorts of scenes' });
@@ -58,7 +63,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await expect(page.getByRole('complementary').getByRole('button', { name: 'Edit this scene →' })).toBeVisible();
   await expect(page.getByRole('complementary').getByRole('group', { name: 'Show' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Fit' }).click();
+  await fit(page);
   const board = card(page, /^Standings$/);
   await expect(board).toBeVisible();
   await expect(board.locator('.card-problems')).toContainText('1 problem');
@@ -71,7 +76,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await expect(board.locator('.card-problems')).toHaveCount(0);
 
   // A connection dropped on empty canvas offers to add a connected scene right there.
-  await page.getByRole('button', { name: 'Fit' }).click();
+  await fit(page);
   const boardOut = await center(board.locator('.port-out'));
   // The bottom-left corner of the canvas is empty: cards are centred by Fit.
   const area = (await page.locator('.flow-canvas').boundingBox())!;
@@ -94,7 +99,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
 
   // Tap-to-connect without dragging, and a circle is refused.
   await page.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Fit' }).click();
+  await fit(page);
   const thanks = card(page, /Thanks for playing!/);
   await thanks.locator('.port-out').click();
   await expect(page.getByText('Now tap the scene to connect to.')).toBeVisible();
@@ -129,8 +134,14 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await decides.getByRole('button', { name: 'The host' }).click();
   await expect(decides.getByRole('button', { name: 'The host' })).toHaveAttribute('aria-pressed', 'true');
   await expect(props.getByRole('group', { name: 'On a tie' })).toHaveCount(0);
-  // Where it leads is shown here and changed in the Flow editor, which opens on the same scene.
-  await props.getByRole('button', { name: 'Change in the Flow editor' }).click();
+  // Where it leads: a button per route goes to that scene; changing it is in the ☰ menu, which opens the Flow editor on the same scene.
+  const leads = props.getByRole('group', { name: 'Next' });
+  await expect(leads.getByRole('button')).toHaveText([/Music.*Music Mayhem/, /Physical.*Living Sculpture/]);
+  await leads.getByRole('button', { name: /Music Mayhem/ }).click();
+  await expect(props.getByRole('heading', { name: 'Music route' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Scenes in play order' }).getByRole('button', { name: /Choose your challenge/ }).click();
+  await props.getByRole('button', { name: 'Scene actions' }).click();
+  await page.getByRole('menuitem', { name: 'Change where it leads (Flow editor)' }).click();
   await expect(page.getByRole('tab', { name: 'Flow editor' })).toHaveAttribute('aria-selected', 'true');
   await expect(card(page, /Choose your challenge/)).toContainText('Host decides');
   await expect(inspector.getByRole('heading', { name: 'Party choice' })).toBeVisible();
@@ -147,10 +158,18 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await page.getByRole('alertdialog').getByRole('button', { name: 'Keep' }).click();
   await expect(card(page, /^Standings$/)).toBeVisible();
 
-  // Tidy up, publish, and the published game matches the draft.
+  // Tidy up (from its menu, then with its shortcut), publish, and the published game matches the draft.
   await page.getByRole('button', { name: 'Tidy up' }).click();
+  await page.getByRole('menu', { name: 'Tidy up' }).getByRole('menuitem', { name: /Tidy up into rows/ }).click();
+  const layout = () => page.locator('.scene-card').evaluateAll(cards => cards.map(element => `${(element as HTMLElement).style.left},${(element as HTMLElement).style.top}`).join(' '));
+  const tidy = await layout();
+  // Moved out of place with the keyboard, then Ctrl+Shift+L tidies it back.
+  await card(page, /^Standings$/).focus(); await page.keyboard.press('Shift+ArrowDown');
+  await expect.poll(layout).not.toBe(tidy);
+  await page.keyboard.press('Control+Shift+L');
+  await expect.poll(layout).toBe(tidy);
   await saved(page);
-  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
   await expect(page.getByText('Published as version 1.')).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
@@ -264,9 +283,9 @@ test('View mode: look through a game without changing it by accident; Edit chang
   await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
-  const mode = page.getByRole('group', { name: 'Mode' });
-  await mode.getByRole('button', { name: 'View' }).click();
-  await expect(mode.getByRole('button', { name: 'View' })).toHaveAttribute('aria-pressed', 'true');
+  // One button switches between Editing and Viewing.
+  await page.getByRole('button', { name: /^Editing/ }).click();
+  await expect(page.getByRole('button', { name: /^Viewing/ })).toBeVisible();
   // On the map: a card can be selected but not moved, deleted or connected; nothing can be added.
   const finale = card(page, /Shared finale/);
   const before = await finale.evaluate(element => (element as HTMLElement).style.cssText);
@@ -287,19 +306,19 @@ test('View mode: look through a game without changing it by accident; Edit chang
   await expect(page.getByLabel('Game name')).toHaveAttribute('readonly', '');
   // Remembered on this browser after a reload.
   await page.reload();
-  await expect(page.getByRole('group', { name: 'Mode' }).getByRole('button', { name: 'View' })).toHaveAttribute('aria-pressed', 'true');
-  // Back to Edit: the same fields can be changed again.
-  await page.getByRole('group', { name: 'Mode' }).getByRole('button', { name: 'Edit' }).click();
+  await expect(page.getByRole('button', { name: /^Viewing/ })).toBeVisible();
+  // Back to Editing: the same fields can be changed again.
+  await page.getByRole('button', { name: /^Viewing/ }).click();
   await page.getByRole('tab', { name: 'Flow editor' }).click();
-  await expect(mode.getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Fit' }).click();
+  await expect(page.getByRole('button', { name: /^Editing/ })).toBeVisible();
+  await fit(page);
   const again = await center(card(page, /Shared finale/).locator('.card-title'));
   await drag(page, again, { x: again.x - 150, y: again.y + 150 });
   expect(await card(page, /Shared finale/).evaluate(element => (element as HTMLElement).style.cssText)).not.toBe(before);
   await saved(page);
 });
 
-test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens with ? or its button', async ({ page, baseURL }) => {
+test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens with ?, the ☰ menu or the map’s Tips', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
   await openCopy(page, baseURL!, `Zoom ${Date.now()}`);
   const surface = page.locator('.flow-surface');
@@ -313,15 +332,34 @@ test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens 
   await page.keyboard.down('Shift'); await page.mouse.wheel(0, 200); await page.keyboard.up('Shift');
   await expect.poll(async () => (await surface.getAttribute('style'))!).not.toBe(moved);
   expect(await zoom()).toBe(zoomed);
-  // Help & shortcuts: the ? key, and the ? button.
+  // The zoom menu shows the zoom and changes it.
+  const level = page.getByRole('button', { name: /^\d+%$/ });
+  await expect(level).toHaveText(new RegExp(`^${Math.round(zoomed * 100)}%`));
+  await level.click(); await page.getByRole('menuitem', { name: 'Zoom to 100%' }).click();
+  await expect.poll(zoom).toBe(1);
+  // Help & shortcuts: the ? key, the ☰ menu, and the map's Tips (which list the gestures).
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
   await expect(help.getByRole('row').filter({ hasText: 'Undo' })).toBeVisible();
   expect((await new AxeBuilder({ page }).include('.help-panel').analyze()).violations).toEqual([]);
   await page.keyboard.press('Escape');
   await expect(help).toHaveCount(0);
-  await page.getByRole('button', { name: 'Help & shortcuts' }).click();
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: /Help & shortcuts/ }).click();
   await expect(help).toBeVisible();
+  await help.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Tips' }).click();
+  await expect(page.getByText('Right-click the background to add a scene there.')).toBeVisible();
+  await page.getByRole('button', { name: 'All shortcuts (?)' }).click();
+  await expect(help).toBeVisible();
+  await help.getByRole('button', { name: 'Close' }).click();
+  // Light or dark, from the ☰ menu, remembered in this browser.
+  const scheme = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Dark mode' }).click();
+  await expect.poll(scheme).toBe('dark');
+  await page.reload();
+  await expect.poll(scheme).toBe('dark');
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Light mode' }).click();
+  await expect.poll(scheme).toBe('light');
 });
 
 test('the editor works on a phone: compact top bar, the scene panel and menus as sheets on screen', async ({ page, baseURL }) => {
@@ -335,7 +373,7 @@ test('the editor works on a phone: compact top bar, the scene panel and menus as
   const inView = async (locator: Locator) => { const box = (await locator.boundingBox())!; return box.y >= 0 && box.y + 40 <= 844 && box.x >= 0 && box.x + box.width <= 391; };
   expect(await inView(panel.getByRole('button', { name: 'Edit this scene →' }))).toBe(true);
   await panel.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Play & publish ▾' }).click();
+  await page.getByRole('button', { name: 'Play & publish' }).click();
   expect(await inView(page.getByRole('menuitem', { name: 'Publish', exact: true }))).toBe(true);
 });
 
@@ -449,6 +487,21 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   const list = page.getByRole('navigation', { name: 'Scenes in play order' });
   await expect(list.locator('.scene-row')).toContainText(['FRIDAY NIGHT.', 'Choose your challenge!', /Music Mayhem/, /Living Sculpture/, /Shared finale/]);
   await expect(list.getByRole('button', { name: /Music route/ })).toBeVisible();
+  // A party choice's routes fold: closing one hides its scenes, the other route stays; selecting a scene on it opens it again.
+  const musicRoute = list.getByRole('button', { name: /^Route: Music/ });
+  await expect(musicRoute).toHaveAttribute('aria-expanded', 'true');
+  await musicRoute.click();
+  await expect(musicRoute).toHaveAttribute('aria-expanded', 'false');
+  await expect(list.getByRole('button', { name: /Music Mayhem/ })).toHaveCount(0);
+  await expect(list.getByRole('button', { name: /Living Sculpture/ })).toBeVisible();
+  await musicRoute.click();
+  await expect(list.getByRole('button', { name: /Music Mayhem/ })).toBeVisible();
+  // All routes fold and unfold at once.
+  await list.getByRole('button', { name: 'Fold all routes' }).click();
+  await expect(list.getByRole('button', { name: /^Route:/ })).toHaveCount(2);
+  await expect(list.locator('.scene-row')).toHaveCount(3);
+  await list.getByRole('button', { name: 'Unfold all routes' }).click();
+  await expect(list.locator('.scene-row')).toHaveCount(5);
   // The opening scene has two parts: a cutscene and a warm-up question.
   await list.getByRole('button', { name: /FRIDAY NIGHT/ }).click();
   const props = page.getByRole('complementary', { name: 'Cutscene' });
@@ -465,9 +518,14 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   await expect(page.locator('.tv-scores')).toBeVisible();
   // Insert a quiz question right after the party choice's Music route scene.
   await list.getByRole('button', { name: /Music Mayhem/ }).click();
+  // Its menu floats over the preview, on top of everything.
   await list.getByRole('button', { name: 'Add after this' }).click();
-  await list.getByRole('tab', { name: 'Rounds', exact: true }).click();
-  await list.getByRole('menuitem', { name: /^Quiz question/ }).click();
+  const adding = page.locator('.floating-menu');
+  await adding.getByRole('tab', { name: 'Rounds', exact: true }).click();
+  const quiz = adding.getByRole('menuitem', { name: /^Quiz question/ });
+  const spot = await center(quiz);
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('.floating-menu') !== null, spot)).toBe(true);
+  await quiz.click();
   await expect(list.locator('.scene-row')).toHaveCount(6);
   // A solo game: its rounds offer no team play, and Game settings says how to make it a team game.
   await expect(page.getByLabel('Players')).not.toContainText('In the teams');
@@ -508,7 +566,7 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   expect(await surface.evaluate(element => (element as HTMLElement).style.transform)).not.toBe(before);
 
   // Rehearse from the start: a practice room opens in a new tab, and nothing is published.
-  const [practice] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the start' }).click(); })()]);
+  const [practice] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the start' }).click(); })()]);
   await expect(practice.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await expect(practice.getByText(/^Copy source \d+ · waiting to start$/)).toBeVisible();
   await practice.close();
@@ -517,11 +575,19 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   await card(page, /Shared finale/).locator('.card-title').click();
   await page.getByRole('button', { name: 'Close' }).click().catch(() => undefined);
   await card(page, /Shared finale/).locator('.card-title').click();
-  const [fromFinale] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the selected scene' }).click(); })()]);
+  const [fromFinale] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the selected scene' }).click(); })()]);
   await expect(fromFinale.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await fromFinale.getByRole('button', { name: 'Start the game' }).click();
   await expect(fromFinale.getByRole('heading', { name: /^Shared finale/ })).toBeVisible();
   await fromFinale.close();
+  // Try this scene (Scene editor): a practice room with only this scene, to try a minigame or round without the rest.
+  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  await page.getByRole('navigation', { name: 'Scenes in play order' }).getByRole('button', { name: /Music Mayhem/ }).first().click();
+  const [tryIt] = await Promise.all([context.waitForEvent('page'), page.getByRole('complementary').getByRole('button', { name: 'Try this scene' }).click()]);
+  await tryIt.getByRole('button', { name: 'Start the game' }).click();
+  await expect(tryIt.getByRole('heading', { name: /^Music Mayhem/ })).toBeVisible();
+  await tryIt.close();
+  await page.getByRole('tab', { name: 'Flow editor' }).click();
 
   // Paste the copied scenes into another game.
   await openCopy(page, baseURL!, `Paste target ${stamp}`);

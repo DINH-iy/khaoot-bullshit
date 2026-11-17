@@ -31,6 +31,15 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await expect(spinTest.locator('.wheel-label')).toHaveCount(3);
   await spinTest.getByRole('button', { name: 'Spin' }).click();
   await expect(spinTest.getByRole('status')).toHaveText(/^(Sing a song|Tell a joke|Do a dance)$/, { timeout: 8000 });
+  // Clicking the wheel turns it; clicking again while it turns gives it a boost; it still lands on an entry.
+  // (With motion allowed: for less motion the wheel stops at once, as above.)
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await spinTest.locator('.wheel-hit').click();
+  await expect(spinTest.getByRole('button', { name: 'Boost' })).toBeVisible();
+  await spinTest.locator('.wheel-hit').click();
+  await expect(spinTest.getByRole('status')).toHaveText('Boost!');
+  await expect(spinTest.getByRole('status')).toHaveText(/^(Sing a song|Tell a joke|Do a dance)$/, { timeout: 15000 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   expect((await new AxeBuilder({ page }).include('.wheel-test').analyze()).violations).toEqual([]);
   await spinTest.getByRole('button', { name: 'Close' }).click();
   // Its own slice colours instead of the game's answer colours.
@@ -40,8 +49,8 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await page.getByRole('tab', { name: 'Scene editor' }).click();
   await expect(page.getByLabel('On this scene')).toHaveText('The host spins “Forfeits”');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
-  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await expect(page.getByRole('menuitem', { name: 'Play the published version ↗' })).toBeEnabled(); await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & publish' }).click(); await expect(page.getByRole('menuitem', { name: 'Play the published version ↗' })).toBeEnabled(); await page.keyboard.press('Escape');
   await page.goto(`${baseURL}/?host=1`);
   await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: `Open room for ${name}` }).click();
   const roomCode = (await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);

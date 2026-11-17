@@ -1,6 +1,7 @@
 import { contrast, FONTS, resolveTheme, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
 import { Dropdown } from '../controls/dropdown.js';
 import { Section } from '../controls/section.js';
+import { Swatches } from '../controls/swatches.js';
 import { useState } from 'react';
 import { ExportPalette, ImportPalette } from './palette-dialog.js';
 
@@ -69,20 +70,19 @@ export function ThemePanel({ theme, below, title = '', onChange }: { theme: Them
     {warnings.length > 0 && <div className="look-warnings" role="status"><h3>Readability</h3><ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
 
     <Section title="Colours" memory="look:colours" summary={`${answers.length} answer colours`}>
-      <div className="palette-actions">
-        <button type="button" className="small-button" onClick={() => setPalette('import')}>Import colours…</button>
-        <button type="button" className="small-button" onClick={() => setPalette('export')}>Export colours…</button>
-      </div>
-      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...(layer.colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
-      {palette === 'export' && <ExportPalette colors={full.colors} title={title} onClose={() => setPalette(null)} />}
       <div className="color-grid">{(Object.keys(COLOR_LABELS) as ColorName[]).map(name => <label key={name} className="color-field">
         <input type="color" value={full.colors[name]} onChange={event => setColor(name, event.target.value)} />{COLOR_LABELS[name]}</label>)}</div>
       <p className="field-title">Answer colours, in order</p>
-      <div className="answer-colors">{answers.map((color, index) => <span key={index} className="answer-color">
-        <input type="color" aria-label={`Answer ${String.fromCharCode(65 + index)} colour`} value={color} onChange={event => setColor('answers', answers.map((entry, at) => at === index ? event.target.value : entry))} />
-        <button className="small-button" aria-label={`Remove answer colour ${String.fromCharCode(65 + index)}`} disabled={answers.length <= 2} onClick={() => setColor('answers', answers.filter((_, at) => at !== index))}>×</button></span>)}
-        <button className="small-button" disabled={answers.length >= 8} onClick={() => setColor('answers', [...answers, answers[answers.length % 2]!])}>Add a colour</button></div>
+      <Swatches colors={answers} name={index => `Answer ${String.fromCharCode(65 + index)} colour`} removeName={index => `Remove answer colour ${String.fromCharCode(65 + index)}`}
+        onChange={next => setColor('answers', next)} />
       <p className="hint">With more answers than colours, the colours repeat.</p>
+      {/* Bringing colours in from a brand kit, or taking them out: below the colours they change. */}
+      <div className="palette-actions">
+        <button type="button" className="link-button" onClick={() => setPalette('import')}>Import colours…</button>
+        <button type="button" className="link-button" onClick={() => setPalette('export')}>Export colours…</button>
+      </div>
+      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...(layer.colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
+      {palette === 'export' && <ExportPalette colors={full.colors} title={title} onClose={() => setPalette(null)} />}
     </Section>
 
     <Section title="Text" memory="look:text" summary={`${fonts} · ${Math.round(full.textScale * 100)}%`}>

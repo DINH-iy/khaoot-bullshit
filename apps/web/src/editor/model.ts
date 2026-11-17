@@ -273,8 +273,8 @@ export function cardText(definition: Definition, node: Node) {
 }
 
 // ---------- layout and snapping ----------
-/** Columns by depth from the start, rows in definition order: a tidy first layout for games without one. */
-export function autoLayout(definition: Definition): Positions {
+/** Columns by depth from the start, rows in definition order: a tidy first layout for games without one. `oneRow`: never wrap. */
+export function autoLayout(definition: Definition, { oneRow = false }: { oneRow?: boolean } = {}): Positions {
   const depth = new Map<string, number>([[definition.startNodeKey, 0]]);
   for (let pass = 0; pass < definition.nodes.length; pass++) {
     for (const edge of definition.edges) {
@@ -289,7 +289,7 @@ export function autoLayout(definition: Definition): Positions {
   // A long game wraps into rows of columns, as many per row as keeps the whole game about screen-shaped (16:10);
   // a short one stays on one row. The arrow from the end of a row runs back to the start of the next (see `curve`).
   const count = Math.max(...columns.keys()) + 1; const step = CARD_WIDTH + GRID * 6; const rowHeight = tallest + GRID * 8;
-  const perRow = count <= 6 ? count : [...Array(count).keys()].map(index => index + 1).filter(size => size >= 4)
+  const perRow = oneRow || count <= 6 ? count : [...Array(count).keys()].map(index => index + 1).filter(size => size >= 4)
     .reduce((best, size) => Math.abs((size * step) / (Math.ceil(count / size) * rowHeight) - 1.6) < Math.abs((best * step) / (Math.ceil(count / best) * rowHeight) - 1.6) ? size : best, count);
   const positions: Positions = {};
   for (const [column, nodes] of columns) {
@@ -299,6 +299,25 @@ export function autoLayout(definition: Definition): Positions {
   }
   return positions;
 }
+/**
+ * Lines up scenes (at least two) in a row: level with the leftmost, in their left-to-right
+ * order and spaced as Tidy up spaces them; or in a column: under the top one, left edges
+ * level, in their top-to-bottom order. Other scenes and bend points stay where they are.
+ */
+export function lineUp(definition: Definition, positions: Positions, keys: string[], direction: 'row' | 'column'): Positions {
+  const axis = direction === 'row' ? 'x' : 'y';
+  const placed = keys.filter(key => positions[key] && !isBendKey(key)).sort((a, b) => positions[a]![axis] - positions[b]![axis]);
+  if (placed.length < 2) return positions;
+  const first = positions[placed[0]!]!; const next = { ...positions }; let cursor = first[axis];
+  for (const key of placed) {
+    next[key] = direction === 'row' ? { x: cursor, y: first.y } : { x: first.x, y: cursor };
+    const node = definition.nodes.find(entry => entry.key === key);
+    cursor += direction === 'row' ? CARD_WIDTH + GRID * 6 : snap((node ? cardHeight(node) : 192) + GRID * 2);
+  }
+  return next;
+}
+/** The positions without any bend points: every arrow a plain curve again. */
+export const straightenAll = (positions: Positions): Positions => Object.fromEntries(Object.entries(positions).filter(([key]) => !isBendKey(key)));
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 export interface Guides { x: number | null; y: number | null }
 /**

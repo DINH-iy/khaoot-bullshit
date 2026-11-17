@@ -156,6 +156,9 @@ describe('side games and chips', () => {
     // The host's quick time button comes from the game too (30 seconds unless it says otherwise).
     expect(await opened({})).toMatchObject({ quickTimeSeconds: 30 });
     expect(await opened({ quickTimeSeconds: 90 })).toMatchObject({ quickTimeSeconds: 90 });
+    // So do the challenge invites a player can have waiting at once (3 unless it says otherwise).
+    expect(await opened({})).toMatchObject({ openInvites: 3 });
+    expect(await opened({ openInvites: 6 })).toMatchObject({ openInvites: 6 });
   });
 
   it('plays every side game just for fun without chips: no bets, free packs, the wallet untouched', async () => {

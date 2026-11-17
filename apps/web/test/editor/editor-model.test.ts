@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { bendKey, bendsOf, isBendKey, pointOnRoute, routedPath, withBends, duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routedPath, withBends, duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
 import { toDoc } from '../../src/editor/live/document.js';
 
 const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] });
@@ -169,6 +169,28 @@ describe('tidying a long game', () => {
   });
   it('keeps a short game on one row', () => {
     expect(box(line(5)).rows).toBe(1);
+  });
+  it('can lay a long game out in one line instead', () => {
+    const positions = autoLayout(line(24), { oneRow: true });
+    expect(new Set(Object.values(positions).map(point => point.y)).size).toBe(1);
+    expect(new Set(Object.values(positions).map(point => point.x)).size).toBe(24);
+  });
+  it('lines up selected scenes in their order, evenly spaced, leaving the rest and the bend points alone', () => {
+    const definition = line(4);
+    const positions = withBends({ s0: { x: 480, y: 96 }, s1: { x: 0, y: 240 }, s2: { x: 960, y: 0 }, s3: { x: 24, y: 24 } }, 'e0', [{ x: 5, y: 5 }]);
+    const row = lineUp(definition, positions, ['s0', 's1', 's2'], 'row');
+    // Left to right as they were (s1, s0, s2), starting where the leftmost was, level with it.
+    expect([row['s1'], row['s0'], row['s2']]).toEqual([{ x: 0, y: 240 }, { x: CARD_WIDTH + GRID * 6, y: 240 }, { x: 2 * (CARD_WIDTH + GRID * 6), y: 240 }]);
+    expect(row['s3']).toEqual({ x: 24, y: 24 }); expect(bendsOf(row, 'e0')).toEqual([{ x: 5, y: 5 }]);
+    const column = lineUp(definition, positions, ['s0', 's1', 's2'], 'column');
+    expect([column['s2'], column['s0'], column['s1']].map(point => point!.x)).toEqual([960, 960, 960]);
+    expect(column['s0']!.y - column['s2']!.y).toBe(cardHeight(definition.nodes[0]!) + GRID * 2);
+    // One scene is nothing to line up.
+    expect(lineUp(definition, positions, ['s0'], 'row')).toBe(positions);
+  });
+  it('straightens every arrow at once and keeps the scenes', () => {
+    const positions = withBends(withBends({ a: { x: 0, y: 0 } }, 'ab', [{ x: 10, y: 20 }]), 'bc', [{ x: 1, y: 2 }, { x: 3, y: 4 }]);
+    expect(straightenAll(positions)).toEqual({ a: { x: 0, y: 0 } });
   });
   it('runs an arrow into the next row along the gap between the rows', () => {
     expect(curve({ x: 1500, y: 100 }, { x: 0, y: 600 })).toContain('L 0 350');

@@ -13,11 +13,14 @@ import { FieldLimit } from '../controls/field-limit.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { readMemory, rememberPlace } from './editor-memory.js';
 import { HelpPanel } from './help-panel.js';
+import { Icon } from '../controls/icons.js';
 import { pendingClaim } from '../../people/use-me.js';
+import { chooseTheme, currentTheme } from '../../theme.js';
 import '../editor.css';
 
 const saveText: Record<SaveState, string> = { saved: 'All changes saved', pending: 'Saving soon…', saving: 'Saving…', error: 'Not saved: the server could not be reached. Retrying…' };
 type View = 'flow' | 'scene' | 'look';
+const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const VIEW_NAMES: Record<View, string> = { flow: 'Flow editor', scene: 'Scene editor', look: 'Look & feel' };
 
 /**
@@ -39,7 +42,7 @@ function EditorPage({ gameId }: { gameId: string }) {
 function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
   const d = useDraft(gameId);
   // Coming back opens the same place (K2): the link's view wins, then what was open last time in this browser.
-  const [memory] = useState(() => readMemory(gameId)); const [helping, setHelping] = useState(false);
+  const [memory] = useState(() => readMemory(gameId)); const [helping, setHelping] = useState(false); const [theme, setTheme] = useState(currentTheme);
   const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'flow' || wanted === 'scene' || wanted === 'look' ? wanted : memory.view ?? 'flow'; });
   const [selected, setSelected] = useState<string[]>(memory.selected ?? []);
   const [exporting, setExporting] = useState(memory.panel === 'export'); const [settings, setSettings] = useState(memory.panel === 'settings'); const [inviting, setInviting] = useState(memory.panel === 'invite');
@@ -77,11 +80,15 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           <p className="crumb" title={overview}><a href="/?host=1">Your games</a> / Draft{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : ' + changes'}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{saveText[d.save]}</span> · <span className="game-overview">{overview}</span></p></div></div>
       <div className="tabs editor-tabs" role="tablist" aria-label="Editor view">
         {(Object.keys(VIEW_NAMES) as View[]).map(key => <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}>{VIEW_NAMES[key]}</button>)}</div>
-      {/* View mode: look through the game without changing anything by accident. */}
-      <div className="segmented mode-switch" role="group" aria-label="Mode" title={d.readOnly ? 'Viewing: nothing can be changed' : 'Editing'}>
-        <button aria-pressed={!d.readOnly} onClick={() => d.setReadOnly(false)}>Edit</button><button aria-pressed={d.readOnly} onClick={() => d.setReadOnly(true)}>View</button></div>
       <div className="editor-actions">
-        <PeerBar live={live} />
+        {/* Undo and Redo up here, so they are in reach in every editor, however long the scene list. */}
+        <div className="history-buttons">
+          <button type="button" className="icon-only" aria-label="Undo" title={`Undo (${MOD} + Z)`} disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" size={18} /></button>
+          <button type="button" className="icon-only" aria-label="Redo" title={`Redo (${MOD} + Shift + Z)`} disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" size={18} /></button></div>
+        {/* View mode: look through the game without changing anything by accident. One button switches. */}
+        <button type="button" className={`mode-toggle${d.readOnly ? ' viewing' : ''}`} aria-label={d.readOnly ? 'Viewing: switch to editing' : 'Editing: switch to view only'}
+          title={d.readOnly ? 'Viewing: nothing can be changed. Click to edit.' : 'Editing. Click to only view (nothing can be changed by accident).'} onClick={() => d.setReadOnly(!d.readOnly)}>
+          <Icon name={d.readOnly ? 'eye' : 'edit'} size={18} /><span>{d.readOnly ? 'Viewing' : 'Editing'}</span></button>
         {/* Trying out, publishing and playing: one menu. Each item says why when it cannot be used yet. */}
         <ActionMenu label="Play and publish" text="Play & publish" intro="Rehearse plays the draft in a practice room, without publishing it." actions={[
           { label: 'Rehearse from the start', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(null) },
@@ -91,8 +98,10 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
           ...(role === 'owner' ? [{ label: draft.published ? 'Play the published version ↗' : 'Play (publish first)', disabled: d.busy || !draft.published, onSelect: d.play }] : []),
         ]} />
-        <button type="button" className="small-button icon-only help-button" aria-label="Help & shortcuts" title="Help & shortcuts (?)" onClick={() => setHelping(true)}>?</button>
-        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', onSelect: () => openPanel('settings') }, { label: 'Invite people', onSelect: () => openPanel('invite') }, { label: 'Export as text', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', onSelect: () => setHelping(true) }]} />
+        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', onSelect: () => openPanel('settings') }, { label: 'Invite people', onSelect: () => openPanel('invite') }, { label: 'Export as text', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
+          { label: theme === 'dark' ? 'Light mode' : 'Dark mode', icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
+        {/* Who is here, you last: at the far right, as in most editors. */}
+        <PeerBar live={live} />
       </div>
     </header>
     {helping && <HelpPanel onClose={() => setHelping(false)} />}
@@ -100,7 +109,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}
     <main className="editor-main">
-      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} live={live} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
+      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
         : view === 'scene' ? <SceneView d={d} selected={selected} setSelected={setSelected} peers={live.peers} onOpenFlow={key => { setSelected([key]); setView('flow'); }} /> : <LookView d={d} selected={selected} gameId={gameId} />}
       {d.issues.some(issue => !issue.nodeKey) && <div className="general-problems" role="region" aria-label="Problems in the whole game"><h2>Problems in the whole game</h2><ul>{d.issues.filter(issue => !issue.nodeKey).map((issue, index) => <li key={index}>{issue.message}</li>)}</ul></div>}
     </main>

@@ -7,7 +7,7 @@ const Row = ({ keys, children }: { keys: string; children: ReactNode }) => <tr><
 
 /**
  * Help & shortcuts: how the editor works and every key and gesture, in one place.
- * Opened from the ? button, the ☰ menu or the ? key. Keep it in step with the editor:
+ * Opened from the ☰ menu, the map's Tips or the ? key. Keep it in step with the editor:
  * a new shortcut or gesture belongs here too.
  */
 export function HelpPanel({ onClose }: { onClose: () => void }) {
@@ -22,8 +22,9 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
           <li><strong>Flow editor</strong> is the map: add, connect, move and delete scenes, and choose where each leads.</li>
           <li><strong>Scene editor</strong> is the content: questions, answers, parts, points and who plays. Double-click a card (or <em>Edit this scene →</em>) to open it there.</li>
           <li><strong>Look &amp; feel</strong>: colours, fonts, answer marks, every text and the animations, for the whole game or one scene.</li>
-          <li><strong>Edit / View</strong>: in View nothing can be changed by accident.</li>
-          <li><strong>Play &amp; publish ▾</strong>: rehearse in a practice room, publish, and play the published version. <strong>☰</strong>: Game settings, Invite people, Export as text.</li>
+          <li><strong>Editing / Viewing</strong> (top right): one button switches; while viewing nothing can be changed by accident. Undo and Redo are next to it.</li>
+          <li><strong>Play &amp; publish ▾</strong>: rehearse in a practice room, publish, and play the published version. <strong>Try this scene</strong> (Scene editor) plays just one scene, such as a minigame. <strong>☰</strong>: Game settings, Invite people, Export as text, this help.</li>
+          <li>Options with an <strong>ⓘ</strong> explain themselves when you point at or tap the ⓘ. The map's <strong>Tips</strong> button lists its gestures.</li>
           <li>Everything is saved by itself. Others editing show as coloured initials; their selected scenes have their colour.</li>
         </ul>
       </section>
@@ -31,7 +32,7 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
       <section aria-labelledby={`${id}-map`}><h3 id={`${id}-map`}>On the map (mouse and touch)</h3>
         <table className="help-table"><tbody>
           <Row keys="Scroll">Zoom in and out around the pointer (pinch on a trackpad or phone).</Row>
-          <Row keys="Shift + Scroll">Move the map. Dragging an empty spot moves it too; <em>Fit</em> shows the whole game.</Row>
+          <Row keys="Shift + Scroll">Move the map. Dragging an empty spot moves it too. The zoom menu (showing the zoom, such as 100%) zooms and shows the whole game.</Row>
           <Row keys="Click">Select a scene. Click an empty spot to deselect.</Row>
           <Row keys="Shift + Click">Add a scene to the selection (or {mod} + Click).</Row>
           <Row keys="Shift + Drag">Draw a box to select several scenes.</Row>
@@ -56,6 +57,11 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
           <Row keys={`${mod} + D`}>Duplicate the selected scenes.</Row>
           <Row keys="Delete">Delete the selected scenes (asks first) or the selected connection (or Backspace).</Row>
           <Row keys="Arrow keys">Move the selected scenes a little; with Shift, further.</Row>
+          <Row keys={`${mod} + Shift + L`}>Tidy up into rows (a long game wraps, about screen-shaped). The <em>Tidy up</em> menu in the Flow toolbar has the rest.</Row>
+          <Row keys="Alt + Shift + H">Line up the selected scenes in a row, evenly spaced (Option on a Mac).</Row>
+          <Row keys="Alt + Shift + V">Line up the selected scenes in a column.</Row>
+          <Row keys="Shift + 1">Show the whole game.</Row>
+          <Row keys="Shift + 2">Zoom to the selected scenes.</Row>
           <Row keys="Tab">Go from scene to scene; Enter or Space selects (Shift + Enter adds to the selection).</Row>
           <Row keys="Esc">Cancel connecting, close a menu or popup.</Row>
           <Row keys="?">Open this help.</Row>

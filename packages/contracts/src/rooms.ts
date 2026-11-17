@@ -25,7 +25,7 @@ export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
@@ -40,6 +40,8 @@ export const SeatListSchema = z.object({ approval: z.boolean(), seats: z.array(z
 export const SeatDecisionSchema = z.object({ requestId: GameIdSchema, approve: z.boolean() }).strict();
 /** Emoji and stickers players can send to the shared screen. A reaction is its position in this list. */
 export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤️', '🎉', '🤔', '💀', '🙈', '🍻', 'GG', 'LOL', 'NOOO', 'YES!', 'WOW', 'BOO'] as const;
+/** Challenges one player may have waiting for an answer at once: the standard, and the most a game or host may allow. */
+export const OPEN_INVITES_DEFAULT = 3; export const MAX_OPEN_INVITES = 10;
 // Host settings for the room; send only what changes.
 // `showScores`: players and the shared screen see the scoreboard during the game (else only at scoreboard scenes and the end).
 // `reactions`: players may send emoji and stickers to the shared screen. `autoClose`: a round closes 3 seconds after everyone answered.
@@ -50,6 +52,8 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   // `sideGames`: games on the phones while waiting (challenges between players). `chips`: the games played with chips
   // (slot machine, blackjack, packs) and stakes in challenges; only with `sideGames` on.
   sideGames: z.boolean(), chips: z.boolean(),
+  // `openInvites`: challenges a player may have waiting for an answer at once (1 to 10; standard 3).
+  openInvites: z.number().int().min(1).max(MAX_OPEN_INVITES),
   // `confirmLooks`: players confirm a new look before it is used (off: used as soon as it is chosen).
   confirmLooks: z.boolean(),
   // `quickTimeSeconds`: what the host's quick time button adds to a round.

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { FeedbackListSchema, FeedbackUpdateSchema, GameIdSchema, NewFeedbackSchema, type FeedbackItem } from '@party/contracts';
+import { FeedbackListSchema, FeedbackMarkDoneSchema, FeedbackUpdateSchema, GameIdSchema, NewFeedbackSchema, type FeedbackItem } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { FeedbackItem as FeedbackRow } from '../generated/prisma/client.js';
@@ -54,6 +54,15 @@ export function registerFeedbackRoutes(app: FastifyInstance, client: PrismaClien
       } });
       roomAssert(changed.count === 1, 'NOT_FOUND');
       return { ok: true, data: toItem(await client.feedbackItem.findUniqueOrThrow({ where: { id } })) };
+    } catch (error) { return owner.fail(reply, error); }
+  });
+  // Everything the owner's filters show becomes Done in one statement; ids that are gone or already done are skipped.
+  app.post('/api/host/feedback/mark-done', async (request, reply) => {
+    try {
+      owner.requireOwner(request);
+      const parsed = FeedbackMarkDoneSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+      const changed = await client.feedbackItem.updateMany({ where: { id: { in: parsed.data.ids }, status: { not: 'DONE' } }, data: { status: 'DONE' } });
+      return { ok: true, data: { changed: changed.count } };
     } catch (error) { return owner.fail(reply, error); }
   });
   app.post('/api/host/feedback/:id/delete', async (request, reply) => {

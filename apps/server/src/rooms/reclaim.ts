@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GameIdSchema, ReclaimSeatSchema, REACTIONS } from '@party/contracts';
+import { GameIdSchema, MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT, ReclaimSeatSchema, REACTIONS } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { authorize, type Transaction } from '../game/model.js';
@@ -24,6 +24,8 @@ export const RoomStateSchema = z.object({
   // New rooms store both (games on, chips off, unless the game says otherwise); the defaults only cover rooms opened
   // before that, which keep both on as they had.
   sideGames: z.boolean().default(true), chips: z.boolean().default(true),
+  // Challenges one player may have waiting for an answer at once (from the game, 3 unless it says otherwise).
+  openInvites: z.number().int().min(1).max(MAX_OPEN_INVITES).default(OPEN_INVITES_DEFAULT),
   // Players confirm a new look (picture, drawing, character) before it is used; off: every choice is used at once.
   confirmLooks: z.boolean().default(false),
   // The host's quick time button: seconds it adds (from the game, 30 unless it says otherwise).
@@ -111,7 +113,7 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'confirmLooks' | 'quickTimeSeconds'>>) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds'>>) {
       roomAssert(principal.role === 'host', 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);

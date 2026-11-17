@@ -34,4 +34,5 @@ export const ImportGameSchema = z.object({ gameId: GameIdSchema, text: z.string(
 export const SaveDraftSchema = z.object({ expectedRevision: RevisionSchema, definition: z.unknown() }).strict();
 export const PublishSchema = z.object({ expectedRevision: RevisionSchema }).strict();
 // Practise the current draft without publishing it, from the start or from one scene.
-export const RehearseSchema = z.object({ expectedRevision: RevisionSchema, startNodeKey: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/).nullable(), sessionId: GameIdSchema, commandId: GameIdSchema }).strict();
+/** `only`: play just the start scene (to try one minigame or round), then the game ends. */
+export const RehearseSchema = z.object({ expectedRevision: RevisionSchema, startNodeKey: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/).nullable(), only: z.boolean().optional(), sessionId: GameIdSchema, commandId: GameIdSchema }).strict();

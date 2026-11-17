@@ -1,4 +1,4 @@
-import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MINIGAME_KEYS, MINIGAMES } from '@party/contracts';
+import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -220,6 +220,8 @@ export function importDefinition(input: string): Json | null {
     ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
     // The host's quick time button in seconds (default 30).
     ...(Number.isFinite(Number(raw['quickTime'])) && raw['quickTime'] !== undefined ? { quickTimeSeconds: Math.max(5, Math.min(600, Math.round(Number(raw['quickTime'])))) } : {}),
+    // Open challenge invites per player at once (default 3).
+    ...(Number.isFinite(Number(raw['openInvites'])) && raw['openInvites'] !== undefined ? { openInvites: Math.max(1, Math.min(MAX_OPEN_INVITES, Math.round(Number(raw['openInvites'])))) } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;

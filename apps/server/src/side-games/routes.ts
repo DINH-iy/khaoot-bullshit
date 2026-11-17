@@ -53,7 +53,7 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
     ]);
     const room = readRoomState(session.state);
     // Chips need side games: switching side games off stops everything.
-    return { seat: player as Seat, enabled: room.sideGames, chips: room.sideGames && room.chips, paused: playerNeeded(view, principal.actor.playerId) };
+    return { seat: player as Seat, enabled: room.sideGames, chips: room.sideGames && room.chips, openInvites: room.openInvites, paused: playerNeeded(view, principal.actor.playerId) };
   }
   /**
    * Runs one go of a side game: side games on, not paused, wallet locked. With chips on the wallet is started and

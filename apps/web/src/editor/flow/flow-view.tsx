@@ -5,8 +5,10 @@ import { Inspector } from '../scene/inspector.js';
 import { Minimap } from './minimap.js';
 import {
   addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, curve, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  bendsOf, insertOnEdge, insertPrefab, isRoute, prefabFrom, optionsOf, outputPort, pointOnRoute, routedPath, snap, snapCard, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  bendsOf, insertOnEdge, insertPrefab, isBendKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
+import { ActionMenu } from '../controls/action-menu.js';
+import { InfoTip } from '../controls/info-tip.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SavePrefab } from './save-prefab.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
@@ -23,9 +25,11 @@ interface Clip { keys: string[]; from: Definition; positions: Positions; game: s
 const CLIP = 'party-editor-clipboard';
 function writeClip(clip: Clip) { try { localStorage.setItem(CLIP, JSON.stringify(clip)); return true; } catch { return false; } }
 function readClip(): Clip | null { try { const value = JSON.parse(localStorage.getItem(CLIP) ?? 'null') as Clip | null; return value && Array.isArray(value.keys) && value.from && Array.isArray(value.from.nodes) ? value : null; } catch { return null; } }
+// ⌘ on a Mac, Ctrl elsewhere: how shortcuts are written in the menus.
+const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const blockedText: Record<string, string> = { self: 'A scene cannot lead to itself.', circle: 'That would make the game go round in a circle.', 'same-scene': 'Another option of this choice already leads there.' };
 
-export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState; onOpenScene: (key: string) => void }) {
+export function FlowView({ d, selected, setSelected, live, onOpenScene, onHelp }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
   const readOnly = d.readOnly;
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -182,13 +186,23 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
     const rect = canvas.current?.getBoundingClientRect(); const anchor = around ?? { x: (rect?.width ?? 800) / 2, y: (rect?.height ?? 600) / 2 };
     return { zoom, x: anchor.x - (anchor.x - current.x) * (zoom / current.zoom), y: anchor.y - (anchor.y - current.y) * (zoom / current.zoom) };
   });
-  const fit = useCallback(() => {
-    const rect = canvas.current?.getBoundingClientRect(); const all = Object.values(positions); if (!rect || !all.length) return;
+  /** Shows these scenes (all of them when none are given) as large as fits, up to full size. */
+  const fitTo = useCallback((keys?: string[]) => {
+    const rect = canvas.current?.getBoundingClientRect(); const all = keys?.length ? keys.map(key => positions[key]).filter((point): point is Point => Boolean(point)) : Object.values(positions);
+    if (!rect || !all.length) return;
     const minX = Math.min(...all.map(point => point.x)); const minY = Math.min(...all.map(point => point.y));
     const maxX = Math.max(...all.map(point => point.x)) + CARD_WIDTH + 64; const maxY = Math.max(...all.map(point => point.y)) + 320;
     const zoom = Math.min(1, Math.max(0.25, Math.min((rect.width - 64) / (maxX - minX), (rect.height - 64) / (maxY - minY))));
     setView({ zoom, x: 32 - minX * zoom, y: 32 - minY * zoom });
   }, [positions]);
+  const fit = useCallback(() => fitTo(), [fitTo]);
+  // Tidying the map (the Tidy up menu and its shortcuts). Each is one change, so Undo takes it back.
+  const tidy = {
+    rows: () => { change(definition, autoLayout(definition)); setNotice('Tidied up into rows.'); },
+    line: () => { change(definition, autoLayout(definition, { oneRow: true })); setNotice('Tidied up in one line.'); },
+    lineUp: (direction: 'row' | 'column') => { if (selected.length > 1) change(definition, lineUp(definition, positions, selected, direction)); },
+    straighten: () => change(definition, straightenAll(positions)),
+  };
   const fitted = useRef(false);
   useEffect(() => { if (!fitted.current) { fitted.current = true; requestAnimationFrame(fit); } }, [fit]);
   useEffect(() => {
@@ -276,8 +290,18 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).closest('input, textarea, select')) return;
-      if (askDelete || readOnly) return;
+      if ((event.target as HTMLElement).closest('input, textarea, select, [contenteditable=true]')) return;
+      if (askDelete) return;
+      // Looking around works in View too: Shift + 1 shows the whole game, Shift + 2 the selected scenes (as in design tools).
+      if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (event.code === 'Digit1' || event.code === 'Digit2')) {
+        event.preventDefault(); if (event.code === 'Digit1') fit(); else if (selected.length) fitTo(selected); return;
+      }
+      if (readOnly) return;
+      // Tidying: Ctrl/⌘ + Shift + L tidies into rows; Alt + Shift + H / V lines up the selected scenes (by key position, so any layout and a Mac's Option work).
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.code === 'KeyL') { event.preventDefault(); tidy.rows(); return; }
+      if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && (event.code === 'KeyH' || event.code === 'KeyV')) {
+        event.preventDefault(); if (selected.length > 1) tidy.lineUp(event.code === 'KeyH' ? 'row' : 'column'); else setNotice('Select two or more scenes to line them up (Shift-click or Shift-drag).'); return;
+      }
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
       else if ((event.key === 'Delete' || event.key === 'Backspace') && selected.length) { event.preventDefault(); setAskDelete(true); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
@@ -308,13 +332,36 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
   return <div className={`editor-body${selected.length ? ' with-inspector' : ''}${readOnly ? ' viewing' : ''}`}>
     <div className="flow-tools" role="toolbar" aria-label="Flow tools">
       <button className="with-icon" aria-label="Add a scene" disabled={readOnly} onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" /><span className="tool-label">Add a scene</span></button>
-      <button className="with-icon" aria-label="Undo" disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" /><span className="tool-label">Undo</span></button>
-      <button className="with-icon" aria-label="Redo" disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" /><span className="tool-label">Redo</span></button>
-      <span className="tool-gap" />
-      <button disabled={readOnly} onClick={() => change(definition, autoLayout(definition))}>Tidy up</button>
-      <button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>−</button><button aria-label="Zoom in" onClick={() => zoomBy(1.2)}>+</button><button onClick={fit}>Fit</button>
-      {/* A selected arrow's actions are on the arrow itself (+ Add a scene here, Remove), so the toolbar never jumps. */}
-      <span className="flow-hint">{readOnly ? 'Viewing: nothing can be changed. Choose Edit at the top to make changes.' : `Scroll to zoom · right-click to add a scene · click an arrow to bend it or add a scene on it · drag from ○ to connect · Shift-drag to select several · ? for help`}</span>
+      {/* Everything that tidies the map, in one menu; each item says its shortcut (also in Help & shortcuts). */}
+      <ActionMenu label="Tidy up" text="Tidy up" icon="tidy" align="start" actions={[
+        { label: 'Tidy up into rows', icon: 'rows', shortcut: `${MOD} + Shift + L`, disabled: readOnly, onSelect: () => tidy.rows() },
+        { label: 'Tidy up in one line', icon: 'line', disabled: readOnly, onSelect: () => tidy.line() },
+        // Shown greyed out until two or more scenes are selected (the intro says how).
+        { label: 'Line up selected in a row', icon: 'align-row', shortcut: 'Alt + Shift + H', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('row') },
+        { label: 'Line up selected in a column', icon: 'align-column', shortcut: 'Alt + Shift + V', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('column') },
+        { label: 'Straighten all arrows', icon: 'straighten', disabled: readOnly || !Object.keys(positions).some(isBendKey), onSelect: () => tidy.straighten() },
+      ]} intro={selected.length > 1 ? undefined : 'Select scenes (Shift-click or Shift-drag) to line them up.'} />
+      {/* Zooming, as in design tools: the zoom level opens the menu. */}
+      <ActionMenu label="Zoom" text={`${Math.round(view.zoom * 100)}%`} icon="zoom" align="start" actions={[
+        { label: 'Zoom in', icon: 'zoom-in', onSelect: () => zoomBy(1.2) },
+        { label: 'Zoom out', icon: 'zoom-out', onSelect: () => zoomBy(1 / 1.2) },
+        { label: 'Zoom to 100%', icon: 'actual-size', onSelect: () => zoomBy(1 / view.zoom) },
+        { label: 'Show the whole game', icon: 'fit', shortcut: 'Shift + 1', onSelect: fit },
+        { label: 'Zoom to selected', icon: 'zoom', shortcut: 'Shift + 2', disabled: !selected.length, onSelect: () => fitTo(selected) },
+      ]} />
+      {/* The ways to work the map, behind one ⓘ instead of a line of text (A selected arrow's actions are on the arrow itself). */}
+      <InfoTip label="Tips for the map" icon="tips" text="Tips" align="start">
+        <span className="tip-list">
+          {readOnly && <strong>Viewing: nothing can be changed. Switch to Editing at the top to make changes.</strong>}
+          <span><b>Scroll</b> to zoom; <b>Shift + scroll</b> or drag the background to move around.</span>
+          <span><b>Right-click</b> the background to add a scene there.</span>
+          <span><b>Drag from ○</b> to connect scenes; drop on empty space to add a connected scene.</span>
+          <span><b>Click an arrow</b> to bend it or add a scene on it.</span>
+          <span><b>Shift-drag</b> or <b>Shift-click</b> to select several scenes.</span>
+          <button type="button" className="link-button" onClick={onHelp}>All shortcuts (?)</button>
+        </span>
+      </InfoTip>
+      {readOnly && <span className="flow-hint">Viewing: nothing can be changed.</span>}
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">

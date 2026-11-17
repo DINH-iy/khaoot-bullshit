@@ -7,6 +7,8 @@ import { uniqueKey, updateStage, type Definition, type Node, type Stage } from '
 import { Section } from '../controls/section.js';
 import { ChoiceDialog } from '../controls/choice-dialog.js';
 import { Dropdown } from '../controls/dropdown.js';
+import { Swatches } from '../controls/swatches.js';
+import { Icon } from '../controls/icons.js';
 
 type Change = (next: Definition, group?: string) => void;
 interface Wheel { key: string; title: string; entries: { key: string; label: string }[]; removePicked: boolean; spinSeconds: number; colors?: string[] }
@@ -23,8 +25,7 @@ export function WheelSettings({ definition, onChange }: { definition: Definition
   return <Section title="Wheels of fortune" summary={wheels.length ? wheels.map(wheel => wheel.title).join(', ') : 'None'}>
     <p className="hint">Add a Wheel of fortune scene to spin one during the game. All the game’s wheels are here; the result stays in a corner of the shared screen until the next spin.</p>
     {wheels.map(wheel => <fieldset key={wheel.key} className="wheel-fields"><legend>{wheel.title}</legend>
-      <WheelFields definition={definition} wheel={wheel} set={(change, field) => set(wheel.key, change, field)} />
-      <button className="small-button danger-outline" onClick={() => remove(wheel.key)}>Remove this wheel</button>
+      <WheelFields definition={definition} wheel={wheel} set={(change, field) => set(wheel.key, change, field)} onRemove={() => remove(wheel.key)} />
     </fieldset>)}
     <button className="small-button" disabled={wheels.length >= 10} onClick={() => onChange(withWheels(definition, [...wheels, { key: uniqueKey('wheel', wheels.map(wheel => wheel.key)), title: `Wheel ${wheels.length + 1}`, removePicked: true, spinSeconds: 5,
       entries: [{ key: 'entry-1', label: 'Sing a song' }, { key: 'entry-2', label: 'Do 10 push-ups' }, { key: 'entry-3', label: 'Tell a joke' }] }]))}>+ Wheel</button>
@@ -32,7 +33,7 @@ export function WheelSettings({ definition, onChange }: { definition: Definition
 }
 
 /** One wheel's name, entries, whether a picked entry leaves the wheel, its spin time, its colours, and a test spin. */
-function WheelFields({ definition, wheel, set }: { definition: Definition; wheel: Wheel; set: (change: (wheel: Wheel) => Wheel, field: string) => void }) {
+function WheelFields({ definition, wheel, set, onRemove }: { definition: Definition; wheel: Wheel; set: (change: (wheel: Wheel) => Wheel, field: string) => void; onRemove?: () => void }) {
   const [testing, setTesting] = useState(false);
   // Without its own colours a wheel uses the game's answer colours (the look's), which are also where own colours start.
   const gameColors = resolveTheme(layerOf(definition, { kind: 'game' }).theme).colors.answers;
@@ -49,11 +50,12 @@ function WheelFields({ definition, wheel, set }: { definition: Definition; wheel
     <label className="ed-inline">Spin time<span className="ed-unit"><input type="number" min={2} max={15} value={wheel.spinSeconds} onChange={event => set(current => ({ ...current, spinSeconds: Math.round(Math.min(15, Math.max(2, Number(event.target.value) || 2))) }), 'seconds')} />sec</span></label>
     <Segmented label="Slice colours" value={colors ? 'own' : 'game'} choices={[{ value: 'game', label: 'The game’s answer colours' }, { value: 'own', label: 'Its own colours' }]}
       onChange={value => setColors(value === 'own' ? gameColors.slice(0, Math.max(2, Math.min(8, gameColors.length))) : undefined)} />
-    {colors && <div className="wheel-colors">{colors.map((color, position) => <span key={position} className="answer-color">
-      <input type="color" aria-label={`Slice colour ${position + 1} of ${wheel.title}`} value={color} onChange={event => setColors(colors.map((entry, at) => at === position ? event.target.value : entry))} />
-      <button className="icon-button" aria-label={`Remove slice colour ${position + 1}`} disabled={colors.length <= 2} onClick={() => setColors(colors.filter((_, at) => at !== position))}>×</button></span>)}
-      <button className="small-button" disabled={colors.length >= 8} onClick={() => setColors([...colors, colors[colors.length % 2]!])}>+ Colour</button></div>}
-    <button type="button" className="small-button" onClick={() => setTesting(true)}>Test spin…</button>
+    {colors && <Swatches colors={colors} name={position => `Slice colour ${position + 1} of ${wheel.title}`} removeName={position => `Remove slice colour ${position + 1}`} addName="Add a slice colour" onChange={setColors} />}
+    {/* The wheel's actions side by side: try it, and (in Game settings) remove it. */}
+    <div className="wheel-actions">
+      <button type="button" className="small-button with-icon" onClick={() => setTesting(true)}><Icon name="play" size={14} />Test spin…</button>
+      {onRemove && <button type="button" className="small-button icon-only danger-icon" aria-label={`Remove ${wheel.title || 'this wheel'}`} title="Remove this wheel" onClick={onRemove}><Icon name="trash" size={18} /></button>}
+    </div>
     {testing && <WheelTest definition={definition} wheel={wheel} onClose={() => setTesting(false)} />}
   </>;
 }

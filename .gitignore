@@ -12,3 +12,6 @@ playwright-report/
 
 # Generated server-only Prisma client
 apps/server/src/generated/
+
+# Screenshots taken while checking UI work (local review only)
+screenshots/

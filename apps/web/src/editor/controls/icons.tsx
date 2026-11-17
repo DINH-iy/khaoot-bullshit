@@ -24,6 +24,45 @@ const paths: Record<string, string> = {
   menu: 'M4 7h16 M4 12h16 M4 17h16',
   // Prefabs: two stacked cards.
   prefab: 'M8 8h12v12H8z M4 16V4h12',
+  // Help: a question mark in a circle.
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.4 M12 16.8h.01',
+  // Tidying the map: a magic wand with sparkles.
+  tidy: 'M4 20L15 9 M13 7l4 4 M18 3v3 M16.5 4.5h3 M20 9v2 M19 10h2 M8 3v2 M7 4h2',
+  // Tidy into rows: cards in two rows.
+  rows: 'M3 5h5v4H3z M10 5h5v4h-5z M17 5h4v4h-4z M3 15h5v4H3z M10 15h5v4h-5z',
+  // One long line of cards.
+  line: 'M2 9h5v6H2z M9.5 9h5v6h-5z M17 9h5v6h-5z',
+  // Line up in a row / in a column.
+  'align-row': 'M3 3v18 M7 8h4v8H7z M14 8h4v8h-4z M7 12h-4',
+  'align-column': 'M3 3h18 M8 7h8v4H8z M8 14h8v4H8z M12 7V3',
+  // Straighten arrows: a straight arrow.
+  straighten: 'M4 12h15 M15 8l4 4-4 4',
+  // Show the whole map: four corners.
+  fit: 'M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5',
+  // Zoom to the selection: a magnifier.
+  zoom: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M20 20l-4-4',
+  'zoom-in': 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M20 20l-4-4 M8 11h6 M11 8v6',
+  'zoom-out': 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M20 20l-4-4 M8 11h6',
+  // Actual size: 1:1.
+  'actual-size': 'M5 9l2-1v8 M17 9l2-1v8 M12 10h.01 M12 14h.01',
+  // Editing (a pencil) and viewing (an eye).
+  edit: 'M4 20h4L19 9l-4-4L4 16z M14 6l4 4',
+  eye: 'M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7s-7.5-2.5-10-7z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  trash: 'M4 7h16 M10 11v6 M14 11v6 M6 7l1 13h10l1-13 M9 7V4h6v3',
+  // More about something: an i in a circle.
+  about: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 11v6 M12 7.5h.01',
+  // Tips: a light bulb.
+  tips: 'M9 18h6 M10 21h4 M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
+  next: 'M5 12h14 M13 6l6 6-6 6',
+  play: 'M7 4l13 8-13 8z',
+  // Fold everything closed / open.
+  'fold-all': 'M7 4l5 5 5-5 M7 20l5-5 5 5',
+  'unfold-all': 'M7 9l5-5 5 5 M7 15l5 5 5-5',
+  // Light and dark mode.
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  // Try it out: a flask.
+  try: 'M9 3h6 M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3 M7 15h10',
 };
 export function Icon({ name, size = 20, label }: { name: string; size?: number; label?: string }) {
   const d = paths[name] ?? paths['quiz']!;

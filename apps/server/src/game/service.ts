@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { CommandReceiptSchema, GameCommandSchema, PLAYER_COMMANDS, SessionChangedSchema, type CommandReceipt, type GameErrorCode } from '@party/contracts';
+import { CommandReceiptSchema, GameCommandSchema, OPEN_INVITES_DEFAULT, PLAYER_COMMANDS, SessionChangedSchema, type CommandReceipt, type GameErrorCode } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { applyCommand } from './commands.js';
 import { closeSoonWhenAllIn } from './auto-close.js';
@@ -47,7 +47,7 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
             requireGame(version.definitionFormat === definition.formatVersion && contentHash(definition) === version.contentHash, 'INVALID_DEFINITION');
             assertExecutable(definition);
             // A new room starts with side games on and chips off unless the game says otherwise; the host can switch both.
-            session = await tx.gameSession.create({ data: { id: command.sessionId, gameVersionId: version.id, hostId: actor.data.creatorId, mode: command.mode, state: { sideGames: definition.sideGames ?? true, chips: definition.chips ?? false, quickTimeSeconds: definition.quickTimeSeconds ?? 30 } }, include: { gameVersion: true } });
+            session = await tx.gameSession.create({ data: { id: command.sessionId, gameVersionId: version.id, hostId: actor.data.creatorId, mode: command.mode, state: { sideGames: definition.sideGames ?? true, chips: definition.chips ?? false, openInvites: definition.openInvites ?? OPEN_INVITES_DEFAULT, quickTimeSeconds: definition.quickTimeSeconds ?? 30 } }, include: { gameVersion: true } });
           }
           await authorize(tx, session, actor.data);
           if (!PLAYER_COMMANDS.includes(command.type)) requireHost(actor.data);

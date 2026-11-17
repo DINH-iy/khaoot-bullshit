@@ -4,10 +4,11 @@ The feedback reports from the test evening of 14–15 November were sorted into 
 
 ## Where we are (17 November 2026)
 
-- Committed: groups A–E (commits `566660b`, `1c61c7a`) and earlier UI work (`1873dd3`, `74abe87`).
-- Built but **not committed yet**: F (all), G1–G5, K, L, M, N, O (step games, Drive the bus, Left or right, rainbow), P (room screen with icons) and Q (explanation before a round). Checks: unit 379, database 155, desktop browser tests 34, all passing; the phone-profile browser tests were not rerun for P and Q.
+- Committed: groups A–Q, except H, I and J (A–E in `566660b` and `1c61c7a`; F, G, K–Q in `2b08e6a` and `92a567a`). Checks at the last run: unit 379, database 155, desktop browser tests 34, all passing; the phone-profile browser tests were not rerun for P and Q.
+- Built but **not committed yet**: R (editor polish from the reports of 17 November evening, with a *Tidy up* menu and shortcuts) and *Mark N as done* in Admin → Feedback. Checks: unit 382, database 156, the browser tests for the editor, Look & feel and wheels (desktop and phone profiles), all passing. Screenshots before and after are in the ignored folder `screenshots/r-polish/` (taken in Chrome; the reports were made in Firefox).
 - Next: H (host menu and admin), then I (testing and feedback tool) and J (side games pack animation).
 - Still to check on a real phone: the list below, plus the new room chips, the (i) panel and the explanation screen.
+- The reports in the admin Feedback list still say *New* for everything fixed in A–G and P; they are updated by hand.
 
 ## Done
 
@@ -142,6 +143,38 @@ From a UX designer's review, with your own additions:
 - Q1: every round people play (quiz, poll, order, writing, upload, drawing, challenge, vote, minigame) can switch on **Explanation first** (scene panel). The round opens untimed and closed to answers (a minigame does not start its countdown); everyone sees the text, players tap **Got it!**, the host and shared screen see who is ready (faces light up, "2 of 3 ready"), and the host's big button **Start the round** starts the timer. In a team round the teams are made first.
 - Q2: a minigame may leave the text empty: it then shows its standard "how to play". Those texts are per game in Look & feel → Texts → **Minigames** (one box per minigame), and the screens use them everywhere (phone, shared screen, the (i)). The words of the explanation screen itself (How it works, Got it!, …) are in the group *Explanation before a round*. Other scenes need their own text (the editor and the publish check say so).
 - Q3: text import: `"explain": "text"` on a scene, or `"explain": true` on a minigame; texts `minigame.how.<game>`. The AI instructions mention it. Bar games now explains Drive the bus first.
+
+### R. Editor polish (tester reports, 17 November 2026, evening)
+
+Reported on the Windows desktop (Firefox, 1741×1320) after F, G, K and N were built. **All done (not committed yet)**; still to look at in Firefox, where R7 and R12 were seen.
+
+Flow editor and top bar:
+
+- R1: the top bar's controls have uneven spacing and the ? looks bad. **Done:** one height (40 px) and one gap for Edit/View, your initials, *Play & publish*, help and ☰; help is an icon button (a question mark in a circle) like ☰.
+- R2: *Tidy up* is hard to find. **Done:** a **Tidy up ▾** menu with a wand icon in the Flow toolbar: *Tidy up into rows* (⌘/Ctrl + Shift + L), *Tidy up in one line*, *Line up selected in a row* (Alt + Shift + H) or *in a column* (Alt + Shift + V), *Straighten all arrows*, *Show the whole game* (Shift + 1) and *Zoom to selected* (Shift + 2). Each item shows its shortcut; Help & shortcuts lists them; each is one change that Undo takes back.
+
+Scene editor:
+
+- R3: a party choice's routes fold. **Done:** each route has a heading (*Route: Music · 1 scene*) that folds its scenes away; a folded route shows its problem count; selecting a scene on a folded route opens it.
+- R4: *Add a scene after this one* is clipped. **Done:** it opens inside the scene list, as wide as the list.
+- R5: the add menu's tabs are not centred. **Done:** one height, text centred; in a narrow menu the tabs share the row equally.
+- R6: the *Scene actions* menu's items are not full width. **Done:** items fill the menu (all ☰ menus), and a menu is as wide as its items.
+- R7: a scrollbar appearing in the scene panel makes it jump. **Done:** the panels keep room for their scrollbar (`scrollbar-gutter`); the page itself does not scroll.
+- R8: no space above *Seconds per vote*. **Done.**
+- R9: the minigame cards have different shapes. **Done:** one even grid (all popups with cards): equal widths, equal heights per row. The cause: the panel's "buttons as wide as their text" rule also reached the cards (and menu items, R6).
+
+Game settings, wheel:
+
+- R10: the slice colours' × overlap *+ Colour*. **Done:** colours are swatches with a small × on the corner (on hover or focus; always on touch screens) and a dashed + tile, the same as the answer colours (R14).
+- R11: **Done:** *Test spin…* and *Remove this wheel* side by side.
+- R12: broken scrollbars in the Test spin window. **Done:** the window never scrolls sideways (the turning wheel's corners stay inside) and the wheel fits the window's height.
+
+Look & feel:
+
+- R13: *Import colours… / Export colours…* **Done:** quiet links under the colours they change.
+- R14: the answer colours' × and *Add a colour*. **Done:** swatches as in R10. The look panel's buttons now have the editor's style (they had the page's black default), and the colour pickers match the swatches.
+- R15: checkboxes on two lines. **Done:** box and words on one line.
+- R16: the Animations page. **Done:** a card per moment: its name, the animation chosen, then the sample with *Play* and *Build your own*.
 
 ### Open questions
 

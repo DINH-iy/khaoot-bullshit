@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { REACTIONS, type RoomSnapshot } from '@party/contracts';
+import { MAX_OPEN_INVITES, REACTIONS, type RoomSnapshot } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import './room-extras.css';
 
@@ -63,9 +63,9 @@ function Switch({ label, on, disabled = false, onToggle, hint }: { label: string
  * top, off unless the game says otherwise: without them every game is played just for fun.
  */
 export function SideGamesSwitch({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
-  const [pending, setPending] = useState<{ sideGames?: boolean; chips?: boolean }>({});
-  const games = pending.sideGames ?? state.settings.sideGames; const chips = pending.chips ?? state.settings.chips;
-  const change = (setting: 'sideGames' | 'chips', value: boolean) => {
+  const [pending, setPending] = useState<{ sideGames?: boolean; chips?: boolean; openInvites?: number }>({});
+  const games = pending.sideGames ?? state.settings.sideGames; const chips = pending.chips ?? state.settings.chips; const invites = pending.openInvites ?? state.settings.openInvites;
+  const change = (setting: 'sideGames' | 'chips' | 'openInvites', value: boolean | number) => {
     setPending(current => ({ ...current, [setting]: value }));
     void roomApi(`/api/rooms/${sessionId}/settings`, { [setting]: value }).catch(() => onError('That could not be switched. Try again.'))
       .finally(() => setTimeout(() => setPending(current => { const { [setting]: _done, ...rest } = current; return rest; }), 1500));
@@ -75,5 +75,7 @@ export function SideGamesSwitch({ state, sessionId, onError }: { state: RoomSnap
       hint={games ? 'On: slot machine, blackjack, packs and challenges on the phones while players wait.' : 'Off: nothing to play on the phones between rounds.'} />
     <Switch label="Chips" on={games && chips} disabled={!games} onToggle={() => change('chips', !chips)}
       hint={!games ? 'Needs side games.' : chips ? 'On: players bet chips (play money), stake them in challenges and see a leaderboard.' : 'Off: every side game is just for fun, no bets.'} />
+    {games && <label className="inline-setting">Challenges a player can have waiting at once
+      <input type="number" inputMode="numeric" min={1} max={MAX_OPEN_INVITES} value={invites} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 1 && value <= MAX_OPEN_INVITES) change('openInvites', value); }} /></label>}
   </div>;
 }

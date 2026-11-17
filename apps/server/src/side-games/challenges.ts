@@ -15,11 +15,10 @@ import { balanceOf, entryFor, lockWallet, startWallet, type Seat } from './walle
 // refused while the game needs the player. Rows only live as long as the room
 // (see cleanUpChallenges): the game and its replay go with it.
 interface Access {
-  seatOf(request: FastifyRequest): Promise<{ seat: Seat; enabled: boolean; chips: boolean; paused: boolean }>;
+  seatOf(request: FastifyRequest): Promise<{ seat: Seat; enabled: boolean; chips: boolean; openInvites: number; paused: boolean }>;
   fail(reply: FastifyReply, error: unknown): unknown;
 }
 const OPEN = ['INVITED', 'PLAYING'];
-const MAX_OPEN_INVITES = 3;
 
 export function registerChallenges(app: FastifyInstance, client: PrismaClient, access: Access, io: Server | undefined) {
   const base = '/api/rooms/:sessionId/side/challenges';
@@ -69,7 +68,7 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
     try {
       const parsed = NewChallengeSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const { challengeId, opponentId, game, stake, settings } = parsed.data;
-      const { seat, enabled, chips, paused } = await access.seatOf(request);
+      const { seat, enabled, chips, openInvites, paused } = await access.seatOf(request);
       // Without chips a challenge is for fun only: no stake.
       roomAssert(enabled, 'SIDE_GAMES_OFF'); roomAssert(chips || stake === 0, 'CHIPS_OFF'); roomAssert(!paused, 'SIDE_GAMES_PAUSED');
       const match = startMatch(game as HeadToHeadKey, settings); roomAssert(match, 'INVALID_COMMAND');
@@ -80,7 +79,7 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
         roomAssert(opponentId !== seat.id, 'INVALID_COMMAND');
         roomAssert(await tx.sessionPlayer.count({ where: { id: opponentId, sessionId: seat.sessionId, leftAt: null } }) === 1, 'NOT_FOUND');
         roomAssert(await tx.sideChallenge.count({ where: { sessionId: seat.sessionId, status: { in: OPEN }, OR: [{ challengerId: seat.id, opponentId }, { challengerId: opponentId, opponentId: seat.id }] } }) === 0, 'ALREADY_SUBMITTED');
-        roomAssert(await tx.sideChallenge.count({ where: { sessionId: seat.sessionId, challengerId: seat.id, status: 'INVITED' } }) < MAX_OPEN_INVITES, 'RATE_LIMITED');
+        roomAssert(await tx.sideChallenge.count({ where: { sessionId: seat.sessionId, challengerId: seat.id, status: 'INVITED' } }) < openInvites, 'RATE_LIMITED');
         // Only a stake touches the wallet; a challenge for fun needs no chips at all.
         if (stake > 0) { await lockWallet(tx, seat); await startWallet(tx, seat); roomAssert((await balanceOf(tx, seat)).balance >= stake, 'NOT_ENOUGH_CHIPS'); }
         return tx.sideChallenge.create({ data: { id: challengeId, sessionId: seat.sessionId, challengerId: seat.id, opponentId, game, stake, status: 'INVITED', state: match as object } });

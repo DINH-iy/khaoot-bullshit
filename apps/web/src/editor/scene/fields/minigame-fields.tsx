@@ -4,6 +4,16 @@ import { useState } from 'react';
 import { ChoiceDialog } from '../../controls/choice-dialog.js';
 import { updateStage, withMinigame, type Definition, type Node, type Stage } from '../../model.js';
 import { Segmented } from '../../controls/segmented.js';
+import { InfoTip } from '../../controls/info-tip.js';
+
+const RAINBOW = 'A team whose four cards are four different suits makes the other teams drink the last round’s sips.';
+/** The minigame picker's tabs: what kind of game it is. */
+const MINIGAME_GROUPS: { key: string; name: string; games: MinigameKey[] }[] = [
+  { key: 'speed', name: 'Speed', games: ['reaction', 'tap-race', 'stop-clock'] },
+  { key: 'skill', name: 'Drawing', games: ['perfect-circle', 'relay-drawing'] },
+  { key: 'luck', name: 'Luck & choices', games: ['lucky-doors', 'majority'] },
+  { key: 'drinking', name: 'Drinking', games: ['bus'] },
+];
 
 type Change = (next: Definition, group?: string) => void;
 const toPoints = (milli: string) => String(Number(milli) / 1000);
@@ -40,6 +50,7 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
     {/* A new minigame starts from its own defaults and a fitting timer; a team minigame gets round-only teams of two, which the host can change. */}
     {picking && <ChoiceDialog title="Choose the minigame" intro="Its settings start from that minigame’s standard ones." value={known ? game : undefined}
       choices={MINIGAME_KEYS.map(key => ({ value: key, label: MINIGAMES[key].name, description: MINIGAMES[key].description, icon: 'minigame' }))}
+      groups={MINIGAME_GROUPS.map(group => ({ key: group.key, name: group.name, values: group.games }))}
       onPick={next => { setPicking(false); if (next !== game) edit(current => withMinigame(current, next as MinigameKey, definition), 'game'); }} onClose={() => setPicking(false)} />}
     {known && !settings && <p className="hint warn" role="alert">These settings do not fit together. <button className="link-button" onClick={() => edit(current => { const copy = { ...current }; delete copy['settings']; return copy; }, 'reset')}>Use the standard settings</button></p>}
 
@@ -74,8 +85,8 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
       <p className="field-title">Sips for everyone in the team when wrong</p>
       <div className="field-pair">{['Red or black', 'Higher or lower', 'Inside or outside', 'Which suit'].map((round, position) => <label key={round}>{round}<input type="number" min={0} max={20} value={sips[position]}
         onChange={event => setSettings({ sips: sips.map((entry, at) => at === position ? Math.round(Math.min(20, Math.max(0, Number(event.target.value) || 0))) : entry) }, `sips-${position}`)} /></label>)}</div>
-      <label className="choice"><input type="checkbox" checked={(settings as MinigameSettings<'bus'>).rainbow !== false} onChange={event => setSettings({ ...(settings as MinigameSettings<'bus'>), rainbow: event.target.checked }, 'rainbow')} />
-        Rainbow: a team whose four cards are four different suits makes the other teams drink the last round’s sips</label>
+      <div className="check-row"><label className="choice"><input type="checkbox" aria-describedby="bus-rainbow-hint" checked={(settings as MinigameSettings<'bus'>).rainbow !== false} onChange={event => setSettings({ ...(settings as MinigameSettings<'bus'>), rainbow: event.target.checked }, 'rainbow')} />
+        Rainbow rule</label><span id="bus-rainbow-hint" hidden>{RAINBOW}</span><InfoTip label="About the rainbow rule">{RAINBOW}</InfoTip></div>
       <p className="hint">Played in teams: the fewest sips wins. The final bus is not played.</p>
     </div>; })()}
     {game === 'majority' && <p className="hint">Everyone picks left or right in secret; whoever picked what most picked gets the 1st-place points (a tie: nobody). In a team round each team decides one choice.</p>}

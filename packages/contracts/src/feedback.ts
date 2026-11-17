@@ -76,3 +76,8 @@ export const FeedbackUpdateSchema = z.object({
   ownerNote: text(2000).pipe(z.string().trim()).nullable().optional(),
 }).strict().refine(update => Object.keys(update).length > 0, 'Nothing to change');
 export type FeedbackUpdate = z.input<typeof FeedbackUpdateSchema>;
+
+/** Marks many reports Done at once: the ones the owner's filters show (at most a list's length). */
+export const FEEDBACK_BULK_MAX = 500;
+export const FeedbackMarkDoneSchema = z.object({ ids: z.array(z.uuid()).min(1).max(FEEDBACK_BULK_MAX) }).strict();
+export type FeedbackMarkDone = z.input<typeof FeedbackMarkDoneSchema>;
