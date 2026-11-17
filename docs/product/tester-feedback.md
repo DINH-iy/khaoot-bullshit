@@ -2,6 +2,13 @@
 
 The feedback reports from the test evening of 14–15 November were sorted into groups A–J. This page tracks what is done, what still needs a real phone, and what is left, so work can continue from here. The product plan stays in [APP_PLAN.md](../../APP_PLAN.md); what is built is in the [README](../../README.md).
 
+## Where we are (17 November 2026)
+
+- Committed: groups A–E (commits `566660b`, `1c61c7a`) and earlier UI work (`1873dd3`, `74abe87`).
+- Built but **not committed yet**: F (all), G1–G5, K, L, M, N, O (step games, Drive the bus, Left or right, rainbow), P (room screen with icons) and Q (explanation before a round). Checks: unit 379, database 155, desktop browser tests 34, all passing; the phone-profile browser tests were not rerun for P and Q.
+- Next: H (host menu and admin), then I (testing and feedback tool) and J (side games pack animation).
+- Still to check on a real phone: the list below, plus the new room chips, the (i) panel and the explanation screen.
+
 ## Done
 
 | Group | What | Where |
@@ -128,7 +135,13 @@ From a UX designer's review, with your own additions:
 - P3: host panel: the big buttons, then one row of icon tools (pause, smoke break, a quick time button, the stopwatch with +1 min, no limit and set time, reopen), then four icons that open one sheet at a time: Room settings, Shared screen & invite, Players (with a count), Back to lobby.
 - P4: the scores are a small foldable card: at the bottom of the host panel, floating in a corner of the shared screen; big only at a scoreboard scene and the end.
 - P5: the quick time button adds 30 seconds unless the game says otherwise (Game settings → Host tools, `"quickTime"` in the text import); the host can change it in the room's settings.
-- Next (asked): an optional explanation per scene, shown before the round starts until the host continues; filled with the game's standard explanation, and the standard texts editable.
+- P6: the smoke break button is a cigarette icon.
+
+### Q. Explanation before a round (17 November 2026, not committed yet)
+
+- Q1: every round people play (quiz, poll, order, writing, upload, drawing, challenge, vote, minigame) can switch on **Explanation first** (scene panel). The round opens untimed and closed to answers (a minigame does not start its countdown); everyone sees the text, players tap **Got it!**, the host and shared screen see who is ready (faces light up, "2 of 3 ready"), and the host's big button **Start the round** starts the timer. In a team round the teams are made first.
+- Q2: a minigame may leave the text empty: it then shows its standard "how to play". Those texts are per game in Look & feel → Texts → **Minigames** (one box per minigame), and the screens use them everywhere (phone, shared screen, the (i)). The words of the explanation screen itself (How it works, Got it!, …) are in the group *Explanation before a round*. Other scenes need their own text (the editor and the publish check say so).
+- Q3: text import: `"explain": "text"` on a scene, or `"explain": true` on a minigame; texts `minigame.how.<game>`. The AI instructions mention it. Bar games now explains Drive the bus first.
 
 ### Open questions
 

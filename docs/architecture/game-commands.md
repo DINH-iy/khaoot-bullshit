@@ -54,6 +54,8 @@ Lucky doors, Drive the bus and Left or right run on one engine (`apps/server/src
 
 ## Timed stages and host control
 
+**Explanation first.** A collect, challenge, vote or minigame stage with `explain` opens with `presentation.explain = { readyIds }` (`apps/server/src/game/explain.ts`): no clock, no minigame run, answers, timer changes and minigame moves refused. `stage.understood` (player) adds the player to `readyIds` once; `stage.explained` (host) removes the explanation and starts the timer and the minigame's countdown. A team round forms its teams first: `teams.confirm` does not start the clock while the explanation is pending, and `stage.explained` is refused until the teams are confirmed. The view exposes the scene's own text (or null: the minigame's `minigame.how.<game>` text from the game's look) and `readyIds`.
+
 A stage with a duration gets a `deadlineAt` on the server clock when it opens. Policy, implemented in `apps/server/src/game/timing.ts`:
 
 - Devices show the nominal deadline. Each view carries `serverTime`, so the countdown follows the server clock, not the phone's.
