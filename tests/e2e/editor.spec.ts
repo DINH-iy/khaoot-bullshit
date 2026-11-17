@@ -54,7 +54,9 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   // A scoreboard is added straight away (no second menu); what it shows is a setting in its panel.
   await tabs.getByRole('tab', { name: 'Between rounds' }).click();
   await page.getByRole('menu', { name: 'Add a scene' }).getByRole('menuitem', { name: /^Scoreboard/ }).click();
-  await expect(page.getByRole('group', { name: 'Show' }).getByRole('button', { name: 'Player scores' })).toHaveAttribute('aria-pressed', 'true');
+  // The Flow editor's panel is about the flow: a summary and a way into the Scene editor, not the scene's settings.
+  await expect(page.getByRole('complementary').getByRole('button', { name: 'Edit this scene →' })).toBeVisible();
+  await expect(page.getByRole('complementary').getByRole('group', { name: 'Show' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Fit' }).click();
   const board = card(page, /^Standings$/);
@@ -81,7 +83,12 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await menu.getByRole('menuitem', { name: /^Cutscene or info/ }).click();
   await expect(page.locator('.edge-line')).toHaveCount(7);
   const inspector = page.getByRole('complementary');
-  await inspector.getByLabel('Text on every screen').fill('Thanks for playing!');
+  // Its text is content: written in the Scene editor (opened from the panel), then back to the map.
+  await inspector.getByRole('button', { name: 'Edit this scene →' }).click();
+  await expect(page.getByRole('tab', { name: 'Scene editor' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByLabel('Text on every screen').fill('Thanks for playing!');
+  await saved(page);
+  await page.getByRole('tab', { name: 'Flow editor' }).click();
   await expect(card(page, /Thanks for playing!/)).toBeVisible();
   await saved(page);
 
@@ -100,7 +107,6 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await page.getByRole('button', { name: 'Remove connection' }).click();
   await expect(page.locator('.edge-line')).toHaveCount(6);
   await card(page, /^Standings$/).focus(); await page.keyboard.press('Enter');
-  await inspector.getByText('Where next').click();
   // The editor's own dropdown works with the keyboard: open it, type to find, Enter chooses.
   const next = inspector.getByRole('combobox', { name: 'Next scene' });
   await next.focus(); await page.keyboard.press('ArrowDown');
@@ -114,25 +120,22 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await expect(page.locator('.edge-line')).toHaveCount(7);
   await saved(page);
 
-  // Short choices are buttons, not dropdowns: the host deciding a party choice hides the vote settings, and it is saved.
-  await card(page, /Choose your challenge/).focus(); await page.keyboard.press('Enter');
-  const decides = inspector.getByRole('group', { name: 'Who decides' });
-  await expect(inspector.getByRole('group', { name: 'On a tie' })).toBeVisible();
+  // Double-clicking a card opens it in the Scene editor, where its settings are; the host deciding hides the vote settings.
+  await card(page, /Choose your challenge/).locator('.card-title').dblclick();
+  await expect(page.getByRole('tab', { name: 'Scene editor' })).toHaveAttribute('aria-selected', 'true');
+  const props = page.getByRole('complementary');
+  const decides = props.getByRole('group', { name: 'Who decides' });
+  await expect(props.getByRole('group', { name: 'On a tie' })).toBeVisible();
   await decides.getByRole('button', { name: 'The host' }).click();
   await expect(decides.getByRole('button', { name: 'The host' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(inspector.getByRole('group', { name: 'On a tie' })).toHaveCount(0);
+  await expect(props.getByRole('group', { name: 'On a tie' })).toHaveCount(0);
+  // Where it leads is shown here and changed in the Flow editor, which opens on the same scene.
+  await props.getByRole('button', { name: 'Change in the Flow editor' }).click();
+  await expect(page.getByRole('tab', { name: 'Flow editor' })).toHaveAttribute('aria-selected', 'true');
   await expect(card(page, /Choose your challenge/)).toContainText('Host decides');
+  await expect(inspector.getByRole('heading', { name: 'Party choice' })).toBeVisible();
   await saved(page);
-
-  // An open group stays open from scene to scene: "Where next" was opened on the scoreboard above.
-  await expect(inspector.locator('details', { has: page.locator('summary', { hasText: 'Where next' }) })).toHaveAttribute('open', '');
-  await expect(inspector.locator('details', { has: page.locator('summary', { hasText: 'Content' }) })).toHaveAttribute('open', '');
-  await inspector.locator('summary', { hasText: 'Content' }).click();
-  await expect(inspector.locator('details', { has: page.locator('summary', { hasText: 'Content' }) })).not.toHaveAttribute('open', '');
   await card(page, /^Standings$/).focus(); await page.keyboard.press('Enter');
-  await expect(inspector.getByLabel('Heading')).toHaveValue('Standings');
-  await expect(inspector.locator('details', { has: page.locator('summary', { hasText: 'Content' }) })).not.toHaveAttribute('open', '');
-  await inspector.locator('summary', { hasText: 'Content' }).click();
 
   // The scene's actions are in the ☰ menu next to Close; deleting asks first.
   await inspector.getByRole('button', { name: 'Scene actions' }).click();
@@ -147,7 +150,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   // Tidy up, publish, and the published game matches the draft.
   await page.getByRole('button', { name: 'Tidy up' }).click();
   await saved(page);
-  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
   await expect(page.getByText('Published as version 1.')).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
@@ -182,6 +185,7 @@ test('choices that need a description open a popup with cards: a duel’s game a
   await page.getByRole('menuitem', { name: /^Head-to-head duel/ }).click();
   await page.getByRole('menuitem', { name: /^Any contest/ }).click();
   const inspector = page.getByRole('complementary');
+  await inspector.getByRole('button', { name: 'Edit this scene →' }).click();
   await expect(inspector.getByText('Any contest in the room')).toBeVisible();
   await inspector.getByRole('button', { name: 'Change how it is won…' }).click();
   const dialog = page.getByRole('dialog', { name: 'How is the duel won?' });
@@ -196,15 +200,22 @@ test('choices that need a description open a popup with cards: a duel’s game a
   await expect(inspector.getByLabel('Question or instruction')).toHaveValue('Chess duel! Who wins?');
   await saved(page);
   // An award is added from cards that say how it is decided.
-  await page.getByRole('button', { name: 'Game settings' }).click();
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Game settings' }).click();
   const settings = page.locator('.game-settings-panel');
   await settings.locator('summary', { hasText: 'End-of-game awards' }).click();
   await settings.getByRole('button', { name: 'Remove Luckiest' }).click();
   await settings.getByRole('button', { name: 'Add an award…' }).click();
   const awards = page.getByRole('dialog', { name: 'Add an award' });
-  await expect(awards.getByRole('button')).toHaveText([/^Luckiest.*Lucky doors/, 'Cancel']);
+  // Each statistic once; "best in one scene" can be added more than once; the wooden spoon is new.
+  await expect(awards.getByRole('button')).toHaveText([/^Luckiest.*Lucky doors/, /^Best in one scene/, /^Wooden spoon.*fewest points/, 'Cancel']);
   await awards.getByRole('button', { name: /^Luckiest/ }).click();
-  await expect(settings.locator('.part-list li').last()).toContainText('Luckiest');
+  await expect(settings.getByLabel('Title of award 9')).toHaveAttribute('placeholder', 'Luckiest');
+  // An award can have its own title; "best in one scene" asks which scene.
+  await settings.getByLabel('Title of award 1').fill('Champion of the night');
+  await settings.getByRole('button', { name: 'Add an award…' }).click();
+  await page.getByRole('dialog', { name: 'Add an award' }).getByRole('button', { name: /^Best in one scene/ }).click();
+  await expect(settings.getByRole('combobox', { name: 'Scene of award 10' })).toBeVisible();
+  await expect(settings.getByRole('button', { name: 'Remove Champion of the night' })).toBeVisible();
   await saved(page);
 });
 
@@ -225,21 +236,67 @@ test('open sections follow you from scene to scene, also past a scene that does 
     await page.getByRole('menuitem', { name: item }).click();
     if (kind) await page.getByRole('menuitem', { name: kind }).click();
   };
-  // A quiz (Content, Points, Who plays, Where next): open Points and Who plays, close Content.
-  await add('Rounds', /^Quiz question/);
+  const open = async () => { await inspector.getByRole('button', { name: 'Edit this scene →' }).click(); await expect(page.getByRole('tab', { name: 'Scene editor' })).toHaveAttribute('aria-selected', 'true'); };
+  const back = () => page.getByRole('tab', { name: 'Flow editor' }).click();
+  // A quiz (Content, Points, Who plays): open Points and Who plays, close Content.
+  await add('Rounds', /^Quiz question/); await open();
   await inspector.locator('summary', { hasText: 'Points' }).click();
   await inspector.locator('summary', { hasText: 'Who plays' }).click();
   await inspector.locator('summary', { hasText: 'Content' }).click();
-  // A cutscene has only Content and Where next: both stay closed; Points and Who plays are not there.
-  await add('Between rounds', /^Cutscene or info/);
+  // A cutscene has only Content: it stays closed; Points and Who plays are not there.
+  await back(); await add('Between rounds', /^Cutscene or info/); await open();
   await expect(section('Content')).not.toHaveAttribute('open', '');
-  await expect(section('Where next')).not.toHaveAttribute('open', '');
   await expect(section('Points')).toHaveCount(0);
   // A minigame has them again: Points and Who plays are open, Content still closed.
-  await add('Games', /^Minigame/, /^Tap race/);
+  await back(); await add('Games', /^Minigame/, /^Tap race/); await open();
   await expect(section('Points')).toHaveAttribute('open', '');
   await expect(section('Who plays')).toHaveAttribute('open', '');
   await expect(section('Content')).not.toHaveAttribute('open', '');
+});
+
+test('View mode: look through a game without changing it by accident; Edit changes it again', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  const mine = page.getByRole('region', { name: 'Your games' });
+  const name = `View test ${Date.now()}`;
+  await mine.getByLabel('Name of your new game').fill(name);
+  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await mine.getByRole('button', { name: 'Create game' }).click();
+  await mine.getByRole('link', { name: `Edit ${name}` }).click();
+  const mode = page.getByRole('group', { name: 'Mode' });
+  await mode.getByRole('button', { name: 'View' }).click();
+  await expect(mode.getByRole('button', { name: 'View' })).toHaveAttribute('aria-pressed', 'true');
+  // On the map: a card can be selected but not moved, deleted or connected; nothing can be added.
+  const finale = card(page, /Shared finale/);
+  const before = await finale.evaluate(element => (element as HTMLElement).style.cssText);
+  const start = await center(finale.locator('.card-title'));
+  await drag(page, start, { x: start.x + 120, y: start.y + 80 });
+  expect(await finale.evaluate(element => (element as HTMLElement).style.cssText)).toBe(before);
+  await expect(finale).toHaveClass(/selected/);
+  await page.keyboard.press('Delete');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add a scene', exact: true })).toBeDisabled();
+  await expect(finale.locator('.port-out')).toBeHidden();
+  const inspector = page.getByRole('complementary');
+  await expect(inspector.getByRole('button', { name: 'Scene actions' })).toHaveCount(0);
+  await expect(inspector.getByRole('combobox', { name: 'Next scene' })).toBeDisabled();
+  // Opening the scene still works; its fields are locked.
+  await inspector.getByRole('button', { name: 'Open this scene →' }).click();
+  await expect(page.getByLabel('Question or instruction')).toBeDisabled();
+  await expect(page.getByLabel('Game name')).toHaveAttribute('readonly', '');
+  // Remembered on this browser after a reload.
+  await page.reload();
+  await expect(page.getByRole('group', { name: 'Mode' }).getByRole('button', { name: 'View' })).toHaveAttribute('aria-pressed', 'true');
+  // Back to Edit: the same fields can be changed again.
+  await page.getByRole('group', { name: 'Mode' }).getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('tab', { name: 'Flow editor' }).click();
+  await expect(mode.getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Fit' }).click();
+  const again = await center(card(page, /Shared finale/).locator('.card-title'));
+  await drag(page, again, { x: again.x - 150, y: again.y + 150 });
+  expect(await card(page, /Shared finale/).evaluate(element => (element as HTMLElement).style.cssText)).not.toBe(before);
+  await saved(page);
 });
 
 test('an arrow can be picked up by its end and moved to another scene; several scenes move together and undo restores them', async ({ page, baseURL }) => {
@@ -296,6 +353,29 @@ test('an arrow can be picked up by its end and moved to another scene; several s
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
+test('coming back to a game opens the same place: editor, scene, panel and part of Look & feel', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await openCopy(page, baseURL!, `Memory ${Date.now()}`);
+  // The plain link to this game, without the view in it.
+  const plain = () => { const url = new URL(page.url()); url.searchParams.delete('view'); return url.toString(); };
+  await card(page, /Music Mayhem/).locator('.card-title').dblclick();
+  await expect(page.getByRole('complementary', { name: 'Music route' })).toBeVisible();
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Game settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Game settings' })).toBeVisible();
+  await page.goto(plain());
+  await expect(page.getByRole('tab', { name: 'Scene editor' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('complementary', { name: 'Music route' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Game settings' })).toBeVisible();
+  await page.locator('.game-settings-panel').getByRole('button', { name: 'Close' }).click();
+  // Look & feel opens on the part last used.
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  await page.getByRole('tab', { name: 'Texts' }).click();
+  await page.goto(plain());
+  await expect(page.getByRole('tab', { name: 'Look & feel' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Texts' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Game settings' })).toHaveCount(0);
+});
+
 test('the Scene editor lists scenes in play order, previews them, and edits parts and game settings on the same draft', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
   await openCopy(page, baseURL!, `Scenes ${Date.now()}`);
@@ -309,7 +389,9 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   await expect(page.getByRole('tab', { name: /Part 2 · Quiz/ })).toBeVisible();
   await props.getByLabel('Title').fill('FRIDAY NIGHT LIVE');
   await expect(page.locator('.tv-banner')).toHaveText('FRIDAY NIGHT LIVE');
-  // Add a scoreboard part, which becomes part 3, and see its preview.
+  // Add a scoreboard part, which becomes part 3, and see its preview. Parts are a small group, closed until opened.
+  await expect(props.locator('summary', { hasText: 'Parts' })).toContainText('2 parts');
+  await props.locator('summary', { hasText: 'Parts' }).click();
   await props.getByRole('button', { name: 'Add a part' }).click();
   await props.getByRole('tab', { name: 'Between rounds' }).click();
   await props.getByRole('menuitem', { name: /^Scoreboard/ }).click();
@@ -323,7 +405,7 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   await expect(list.locator('.scene-row')).toHaveCount(6);
   // A solo game: its rounds offer no team play, and Game settings says how to make it a team game.
   await expect(page.getByLabel('Players')).not.toContainText('In the teams');
-  await page.getByRole('button', { name: 'Game settings' }).click();
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Game settings' }).click();
   await page.getByText('Teams', { exact: true }).click();
   await expect(page.getByText('Everyone plays for themselves. For a team game, add a Pick teams scene', { exact: false })).toBeVisible();
   await saved(page);
@@ -360,7 +442,7 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   expect(await surface.evaluate(element => (element as HTMLElement).style.transform)).not.toBe(before);
 
   // Rehearse from the start: a practice room opens in a new tab, and nothing is published.
-  const [practice] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Rehearse ▾' }).click(); await page.getByRole('menuitem', { name: 'From the start' }).click(); })()]);
+  const [practice] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the start' }).click(); })()]);
   await expect(practice.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await expect(practice.getByText(/^Copy source \d+ · waiting to start$/)).toBeVisible();
   await practice.close();
@@ -369,7 +451,7 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   await card(page, /Shared finale/).locator('.card-title').click();
   await page.getByRole('button', { name: 'Close' }).click().catch(() => undefined);
   await card(page, /Shared finale/).locator('.card-title').click();
-  const [fromFinale] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Rehearse ▾' }).click(); await page.getByRole('menuitem', { name: 'From the selected scene' }).click(); })()]);
+  const [fromFinale] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the selected scene' }).click(); })()]);
   await expect(fromFinale.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await fromFinale.getByRole('button', { name: 'Start the game' }).click();
   await expect(fromFinale.getByRole('heading', { name: /^Shared finale/ })).toBeVisible();
@@ -394,7 +476,9 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   await section.getByRole('button', { name: 'Copy instructions for an AI' }).click();
   await expect(section.getByRole('button', { name: 'Instructions copied ✓' })).toBeVisible();
   const instructions = await page.evaluate(() => navigator.clipboard.readText());
-  expect(instructions).toContain('Reply with ONLY one JSON object');
+  // The AI asks its questions first, then answers with only the game.
+  expect(instructions).toContain('First, ask before you write.');
+  expect(instructions).toContain('reply with ONLY one JSON object');
   expect(instructions).not.toContain('ai-instructions');
   // What an AI might answer: chatter around a fenced JSON block.
   const answer = 'Here is your game!\n```json\n' + JSON.stringify({ title: `AI quiz ${Date.now()}`, scenes: [
@@ -412,7 +496,7 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   await expect(page.locator('.scene-card')).toHaveCount(5);
   await expect(page.getByText('no problems')).toBeVisible();
   await expect(card(page, /^Funniest\?$/)).toContainText('Vote');
-  await page.getByRole('button', { name: 'Export as text' }).click();
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Export as text' }).click();
   const exported = await page.getByLabel('The game as text').inputValue();
   expect(JSON.parse(exported)).toMatchObject({ formatVersion: 2, nodes: expect.any(Array), edges: expect.any(Array), editor: { positions: expect.any(Object) } });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

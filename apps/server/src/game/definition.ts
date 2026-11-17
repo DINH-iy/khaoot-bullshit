@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -46,12 +46,14 @@ export type Play = z.infer<typeof PlaySchema>;
 const RoutePolicySchema = z.enum(['host', 'default', 'random']);
 const RouteCountsSchema = z.enum(['live', 'reveal', 'never']);
 // `presentation`: this scene's own texts, look and animations on top of the game's.
-// A wheel of fortune: its entries, whether a picked entry leaves the wheel, and how long it spins.
+// A wheel of fortune: its entries, whether a picked entry leaves the wheel, how long it spins, and optionally
+// its own slice colours (otherwise the game's answer colours).
 export const WheelSchema = z.object({
   key: GameKeySchema, title: z.string().trim().min(1).max(80),
   entries: z.array(z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(80) }).strict()).min(2).max(40)
     .refine(entries => new Set(entries.map(entry => entry.key)).size === entries.length, 'Wheel entries must be unique'),
   removePicked: z.boolean(), spinSeconds: z.number().int().min(2).max(15),
+  colors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).min(2).max(8).optional(),
 }).strict();
 // Every scene may carry its own look, a wheel to spin there (`spin`), or hide the last wheel result from here on (`wheelClear`).
 // All optional, so earlier definitions keep their hash.
@@ -96,7 +98,7 @@ const stageSchema = z.discriminatedUnion('kind', [
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.
   z.object({ ...look, key: GameKeySchema, kind: z.literal('route'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
-    options: z.array(ChoiceOptionSchema).min(2).max(6)
+    options: z.array(ChoiceOptionSchema).min(2).max(8)
       .refine(options => new Set(options.map(option => option.key)).size === options.length && new Set(options.map(option => option.label.trim().toLowerCase())).size === options.length, 'Route options must be unique'),
     decide: z.discriminatedUnion('method', [
       z.object({ method: z.literal('host') }).strict(),
@@ -118,7 +120,11 @@ export const GameDefinitionSchema = z.object({
   // The game's texts, look and animations; defaults fill in anything left out.
   presentation: PresentationSchema.optional(),
   // Wheels of fortune that scenes can spin, and the statistics of the end-of-game show (left out: the standard set; empty: no show).
-  wheels: z.array(WheelSchema).max(10).optional(), finale: z.object({ stats: z.array(z.enum(FINALE_STATS)).max(FINALE_STATS.length) }).strict().optional(),
+  wheels: z.array(WheelSchema).max(10).optional(), finale: z.object({
+    stats: z.array(z.enum(FINALE_STATS)).max(FINALE_STATS.length).optional(),
+    // The author's own list (used instead of `stats`): each award a rule, an optional own title, and for "scene" the scene it is about.
+    awards: z.array(z.object({ rule: z.enum(AWARD_RULES), title: z.string().trim().min(1).max(60).optional(), nodeKey: GameKeySchema.optional() }).strict()).max(16).optional(),
+  }).strict().optional(),
   // What a room of this game starts with on the phones: side games (challenges between players; left out: on) and
   // chips (slot machine, blackjack, packs and stakes; left out: off). The host can switch both in the room.
   sideGames: z.boolean().optional(), chips: z.boolean().optional(),
@@ -135,6 +141,9 @@ export const GameDefinitionSchema = z.object({
   if (wheels.size !== (definition.wheels ?? []).length) fail('Duplicate wheel');
   for (const edge of definition.edges) if (!keys.has(edge.from) || !keys.has(edge.to)) fail('Missing edge endpoint');
   let count = 0;
+  for (const award of definition.finale?.awards ?? []) {
+    if (award.rule === 'scene' && !definition.nodes.some(node => node.key === award.nodeKey)) ctx.addIssue({ code: 'custom', message: 'An award is about a scene that does not exist', path: ['finale'] });
+  }
   for (const node of definition.nodes) {
     count += node.stages.length;
     if (new Set(node.stages.map(stage => stage.key)).size !== node.stages.length) fail('Duplicate stage key');

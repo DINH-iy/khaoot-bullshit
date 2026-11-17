@@ -8,7 +8,7 @@ export interface MenuAction { label: string; onSelect: () => void; danger?: bool
  * Save as prefab, Delete…), so they sit in the panel's header instead of a row of
  * buttons. Escape or a click outside closes it; arrow keys move through the items.
  */
-export function ActionMenu({ label, actions }: { label: string; actions: MenuAction[] }) {
+export function ActionMenu({ label, actions, text, intro }: { label: string; actions: MenuAction[]; text?: string; intro?: string }) {
   const [open, setOpen] = useState(false); const id = useId();
   const box = useRef<HTMLDivElement>(null); const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -27,9 +27,11 @@ export function ActionMenu({ label, actions }: { label: string; actions: MenuAct
     const at = items.indexOf(document.activeElement as HTMLElement);
     items[(at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
   };
-  return <div ref={box} className="action-menu" onKeyDown={onKey}>
-    <button ref={button} type="button" className="small-button icon-only" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}><Icon name="menu" size={18} /></button>
+  return <div ref={box} className={`action-menu${text ? ' has-text' : ''}`} onKeyDown={onKey}>
+    {/* With `text`, a labelled button ("Play & publish ▾"); without, the ☰ icon. */}
+    <button ref={button} type="button" className={text ? 'action-menu-text' : 'small-button icon-only'} aria-label={text ? undefined : label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>{text ? `${text} ▾` : <Icon name="menu" size={18} />}</button>
     {open && <div id={id} className="action-menu-list" role="menu" aria-label={label}>
+      {intro && <p className="action-menu-intro">{intro}</p>}
       {actions.map(action => <button key={action.label} type="button" role="menuitem" disabled={action.disabled} className={action.danger ? 'danger-item' : undefined}
         onClick={() => { setOpen(false); action.onSelect(); }}>{action.label}</button>)}
     </div>}

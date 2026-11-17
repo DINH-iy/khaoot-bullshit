@@ -53,7 +53,7 @@ export async function wheelView(tx: Transaction, sessionId: string, definition: 
   const here = stage?.spin ? wheelOf(definition, stage.spin.wheel) : null; const spin = current ? readSpin(current.presentation) : null;
   return {
     canSpin: Boolean(host && here),
-    spin: here && spin && spin.wheel === here.key ? { title: here.title, entries: here.entries.map(entry => entry.label), index: spin.index, label: here.entries[spin.index]?.label ?? '', spunAt: spin.spunAt, seconds: here.spinSeconds } : null,
+    spin: here && spin && spin.wheel === here.key ? { title: here.title, entries: here.entries.map(entry => entry.label), index: spin.index, label: here.entries[spin.index]?.label ?? '', spunAt: spin.spunAt, seconds: here.spinSeconds, ...(here.colors ? { colors: here.colors } : {}) } : null,
     current: last,
   };
 }

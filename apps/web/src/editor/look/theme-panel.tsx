@@ -1,5 +1,6 @@
 import { contrast, FONTS, resolveTheme, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
 import { Dropdown } from '../controls/dropdown.js';
+import { Section } from '../controls/section.js';
 import { useState } from 'react';
 import { ExportPalette, ImportPalette } from './palette-dialog.js';
 
@@ -51,19 +52,23 @@ export function ThemePanel({ theme, below, title = '', onChange }: { theme: Them
   const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...(layer.colors ?? {}), [name]: value } });
   const answers = full.colors.answers;
   const warnings = contrastWarnings(full);
+  // Small named groups (K4): only the style starts open; each group shows what is set when closed, and stays as it was left.
+  const presetName = layer.preset && THEME_PRESETS[layer.preset] ? THEME_PRESETS[layer.preset]!.name : 'Your own';
+  const fonts = full.headingFont === full.font ? FONT_LABELS[full.font] : `${FONT_LABELS[full.font]}, titles ${FONT_LABELS[full.headingFont]}`;
+  const markName = { letters: 'A B C', numbers: '1 2 3', shapes: 'Shapes', custom: 'Your own', none: 'None' }[full.markers];
   return <div className="look-panel">
-    <fieldset><legend>Start from a style</legend>
+    <Section title="Style" memory="look:style" open summary={presetName}>
       <div className="preset-grid">{Object.entries(THEME_PRESETS).map(([key, preset]) => <button key={key} className={`preset-card${layer.preset === key ? ' on' : ''}`} aria-pressed={layer.preset === key}
         onClick={() => onChange({ preset: key })} style={{ background: `linear-gradient(160deg, ${preset.theme.colors.background}, ${preset.theme.colors.background2})`, color: preset.theme.colors.text, fontFamily: FONTS[preset.theme.headingFont] }}>
         <strong>{preset.name}</strong>
         <span className="swatches" aria-hidden="true">{preset.theme.colors.answers.slice(0, 4).map(color => <i key={color} style={{ background: color }} />)}<i style={{ background: preset.theme.colors.accent }} /></span>
       </button>)}</div>
       <p className="hint">Choosing a style replaces the changes below. Undo brings them back.</p>
-    </fieldset>
+    </Section>
 
     {warnings.length > 0 && <div className="look-warnings" role="status"><h3>Readability</h3><ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
 
-    <fieldset><legend>Colours</legend>
+    <Section title="Colours" memory="look:colours" summary={`${answers.length} answer colours`}>
       <div className="palette-actions">
         <button type="button" className="small-button" onClick={() => setPalette('import')}>Import colours…</button>
         <button type="button" className="small-button" onClick={() => setPalette('export')}>Export colours…</button>
@@ -78,32 +83,32 @@ export function ThemePanel({ theme, below, title = '', onChange }: { theme: Them
         <button className="small-button" aria-label={`Remove answer colour ${String.fromCharCode(65 + index)}`} disabled={answers.length <= 2} onClick={() => setColor('answers', answers.filter((_, at) => at !== index))}>×</button></span>)}
         <button className="small-button" disabled={answers.length >= 8} onClick={() => setColor('answers', [...answers, answers[answers.length % 2]!])}>Add a colour</button></div>
       <p className="hint">With more answers than colours, the colours repeat.</p>
-    </fieldset>
+    </Section>
 
-    <fieldset><legend>Text</legend>
+    <Section title="Text" memory="look:text" summary={`${fonts} · ${Math.round(full.textScale * 100)}%`}>
       <label>Font<Dropdown value={full.font} onChange={font => set({ font: font as FontName })} options={FONT_OPTIONS} /></label>
       <label>Font for titles<Dropdown value={full.headingFont} onChange={font => set({ headingFont: font as FontName })} options={FONT_OPTIONS} /></label>
       <label>Text size · {Math.round(full.textScale * 100)}%<input type="range" min={80} max={160} step={5} value={Math.round(full.textScale * 100)} onChange={event => set({ textScale: Number(event.target.value) / 100 })} /></label>
       <label className="choice"><input type="checkbox" checked={full.uppercaseHeadings} onChange={event => set({ uppercaseHeadings: event.target.checked })} />Titles in capitals</label>
-    </fieldset>
+    </Section>
 
-    <fieldset><legend>Shapes and background</legend>
+    <Section title="Shapes and background" memory="look:shapes" summary={`${BACKGROUNDS[full.background]} · ${TILES[full.tiles]}${full.gradients ? ' · gradient' : ''}`}>
       <label>Corner roundness · {full.radius}px<input type="range" min={0} max={40} value={full.radius} onChange={event => set({ radius: Number(event.target.value) })} /></label>
       <p className="field-title">Background</p>
       <div className="segmented" role="group" aria-label="Background">{(Object.keys(BACKGROUNDS) as (keyof typeof BACKGROUNDS)[]).map(key => <button key={key} aria-pressed={full.background === key} onClick={() => set({ background: key })}>{BACKGROUNDS[key]}</button>)}</div>
       <p className="field-title">Answer tiles</p>
       <div className="segmented" role="group" aria-label="Answer tiles">{(Object.keys(TILES) as (keyof typeof TILES)[]).map(key => <button key={key} aria-pressed={full.tiles === key} onClick={() => set({ tiles: key })}>{TILES[key]}</button>)}</div>
       <label className="choice"><input type="checkbox" checked={full.gradients} onChange={event => set({ gradients: event.target.checked })} />Gradient effect on answer tiles and main buttons</label>
-    </fieldset>
+    </Section>
 
-    <fieldset><legend>Answer marks</legend>
+    <Section title="Answer marks" memory="look:marks" summary={markName}>
       {MARK_CHOICES.map(({ key, label, options }) => <div key={key}>
         <p className="field-title">{label}</p>
         <div className="segmented" role="group" aria-label={label}>{Object.entries(options).map(([value, name]) => <button key={value} aria-pressed={full[key] === value} onClick={() => set({ [key]: value })}>{name}</button>)}</div>
         {key === 'markers' && full.markers === 'custom' && <CustomMarks marks={full.customMarks} onChange={customMarks => set({ customMarks })} />}
       </div>)}
       <p className="hint">The marks show before (or after, or above) each answer on the phones and the shared screen.</p>
-    </fieldset>
+    </Section>
     {theme && <button className="small-button" onClick={() => onChange(undefined)}>Remove all look changes here</button>}
   </div>;
 }

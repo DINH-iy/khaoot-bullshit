@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { FINALE_STATS, TEXT_DEFAULTS, type FinaleStat, type TextKey } from '@party/contracts';
+import { AWARD_RULES as RULES, FINALE_STATS, resolveTheme, TEXT_DEFAULTS, type AwardRule, type FinaleStat, type TextKey } from '@party/contracts';
+import { Segmented } from '../controls/segmented.js';
+import { layerOf } from '../look/layer.js';
+import { WheelTest } from './wheel-test.js';
 import { uniqueKey, updateStage, type Definition, type Node, type Stage } from '../model.js';
 import { Section } from '../controls/section.js';
 import { ChoiceDialog } from '../controls/choice-dialog.js';
 import { Dropdown } from '../controls/dropdown.js';
 
 type Change = (next: Definition, group?: string) => void;
-interface Wheel { key: string; title: string; entries: { key: string; label: string }[]; removePicked: boolean; spinSeconds: number }
+interface Wheel { key: string; title: string; entries: { key: string; label: string }[]; removePicked: boolean; spinSeconds: number; colors?: string[] }
 const wheelsOf = (definition: Definition) => (definition['wheels'] as Wheel[] | undefined) ?? [];
 const withWheels = (definition: Definition, wheels: Wheel[]): Definition => { const next = { ...definition }; if (wheels.length) next['wheels'] = wheels; else delete next['wheels']; return next; };
 
@@ -20,7 +23,7 @@ export function WheelSettings({ definition, onChange }: { definition: Definition
   return <Section title="Wheels of fortune" summary={wheels.length ? wheels.map(wheel => wheel.title).join(', ') : 'None'}>
     <p className="hint">Add a Wheel of fortune scene to spin one during the game. All the game’s wheels are here; the result stays in a corner of the shared screen until the next spin.</p>
     {wheels.map(wheel => <fieldset key={wheel.key} className="wheel-fields"><legend>{wheel.title}</legend>
-      <WheelFields wheel={wheel} set={(change, field) => set(wheel.key, change, field)} />
+      <WheelFields definition={definition} wheel={wheel} set={(change, field) => set(wheel.key, change, field)} />
       <button className="small-button danger-outline" onClick={() => remove(wheel.key)}>Remove this wheel</button>
     </fieldset>)}
     <button className="small-button" disabled={wheels.length >= 10} onClick={() => onChange(withWheels(definition, [...wheels, { key: uniqueKey('wheel', wheels.map(wheel => wheel.key)), title: `Wheel ${wheels.length + 1}`, removePicked: true, spinSeconds: 5,
@@ -28,8 +31,13 @@ export function WheelSettings({ definition, onChange }: { definition: Definition
   </Section>;
 }
 
-/** One wheel's name, entries, whether a picked entry leaves the wheel, and its spin time. */
-function WheelFields({ wheel, set }: { wheel: Wheel; set: (change: (wheel: Wheel) => Wheel, field: string) => void }) {
+/** One wheel's name, entries, whether a picked entry leaves the wheel, its spin time, its colours, and a test spin. */
+function WheelFields({ definition, wheel, set }: { definition: Definition; wheel: Wheel; set: (change: (wheel: Wheel) => Wheel, field: string) => void }) {
+  const [testing, setTesting] = useState(false);
+  // Without its own colours a wheel uses the game's answer colours (the look's), which are also where own colours start.
+  const gameColors = resolveTheme(layerOf(definition, { kind: 'game' }).theme).colors.answers;
+  const colors = wheel.colors;
+  const setColors = (next: string[] | undefined) => set(current => { const copy = { ...current }; if (next) copy.colors = next; else delete copy.colors; return copy; }, 'colors');
   return <>
     <label>Name<input value={wheel.title} maxLength={80} onChange={event => set(current => ({ ...current, title: event.target.value }), 'title')} /></label>
     <p className="field-title">Entries</p>
@@ -39,6 +47,14 @@ function WheelFields({ wheel, set }: { wheel: Wheel; set: (change: (wheel: Wheel
     <button className="small-button" disabled={wheel.entries.length >= 40} onClick={() => set(current => ({ ...current, entries: [...current.entries, { key: uniqueKey('entry', current.entries.map(item => item.key)), label: 'New entry' }] }), 'entries')}>+ Entry</button>
     <label className="choice"><input type="checkbox" checked={wheel.removePicked} onChange={event => set(current => ({ ...current, removePicked: event.target.checked }), 'remove')} />Take a picked entry off the wheel</label>
     <label className="ed-inline">Spin time<span className="ed-unit"><input type="number" min={2} max={15} value={wheel.spinSeconds} onChange={event => set(current => ({ ...current, spinSeconds: Math.round(Math.min(15, Math.max(2, Number(event.target.value) || 2))) }), 'seconds')} />sec</span></label>
+    <Segmented label="Slice colours" value={colors ? 'own' : 'game'} choices={[{ value: 'game', label: 'The game’s answer colours' }, { value: 'own', label: 'Its own colours' }]}
+      onChange={value => setColors(value === 'own' ? gameColors.slice(0, Math.max(2, Math.min(8, gameColors.length))) : undefined)} />
+    {colors && <div className="wheel-colors">{colors.map((color, position) => <span key={position} className="answer-color">
+      <input type="color" aria-label={`Slice colour ${position + 1} of ${wheel.title}`} value={color} onChange={event => setColors(colors.map((entry, at) => at === position ? event.target.value : entry))} />
+      <button className="icon-button" aria-label={`Remove slice colour ${position + 1}`} disabled={colors.length <= 2} onClick={() => setColors(colors.filter((_, at) => at !== position))}>×</button></span>)}
+      <button className="small-button" disabled={colors.length >= 8} onClick={() => setColors([...colors, colors[colors.length % 2]!])}>+ Colour</button></div>}
+    <button type="button" className="small-button" onClick={() => setTesting(true)}>Test spin…</button>
+    {testing && <WheelTest definition={definition} wheel={wheel} onClose={() => setTesting(false)} />}
   </>;
 }
 
@@ -48,7 +64,7 @@ export function WheelOfScene({ definition, stage, onChange }: { definition: Defi
   const wheel = wheels.find(entry => entry.key === key);
   if (!wheel) return <p className="hint warn">This scene’s wheel is missing. Add one under Game settings → Wheels of fortune.</p>;
   return <fieldset className="wheel-fields"><legend>The wheel</legend>
-    <WheelFields wheel={wheel} set={(change, field) => onChange(withWheels(definition, wheels.map(entry => entry.key === wheel.key ? change(entry) : entry)), `wheel:${wheel.key}:${field}`)} />
+    <WheelFields definition={definition} wheel={wheel} set={(change, field) => onChange(withWheels(definition, wheels.map(entry => entry.key === wheel.key ? change(entry) : entry)), `wheel:${wheel.key}:${field}`)} />
     <p className="hint">The host spins it on this scene; the result stays in a corner of the shared screen until the next spin.</p>
   </fieldset>;
 }
@@ -67,7 +83,7 @@ export function SpinFields({ definition, node, index, onChange }: { definition: 
 }
 
 // How each award is decided (as the server works it out), for the add-an-award popup.
-const AWARD_RULES: Record<FinaleStat, string> = {
+const AWARD_RULES: Record<AwardRule, string> = {
   winner: 'The most points at the end.',
   mostCorrect: 'The most right answers in quiz and ordering rounds.',
   mostWrong: 'The most wrong answers in quiz and ordering rounds.',
@@ -77,21 +93,43 @@ const AWARD_RULES: Record<FinaleStat, string> = {
   minigameChamp: 'Won the most minigames played solo.',
   luckiest: 'The most points from Lucky doors.',
   mostReactions: 'Sent the most reactions during the game.',
+  scene: 'The most points in one scene you choose (can be added more than once).',
+  fewest: 'The wooden spoon: the fewest points at the end.',
 };
-/** The end-of-game show: which awards appear, and in which order. Awards without anything to show are skipped by themselves. */
+interface Award { rule: AwardRule; title?: string; nodeKey?: string }
+/**
+ * The end-of-game show: which awards appear, in which order, each with its own title if
+ * wanted; "best in one scene" names its scene. Awards without anything to show are skipped
+ * by themselves. Older games keep a plain list of rules; it becomes this list when edited.
+ */
 export function FinaleSettings({ definition, onChange }: { definition: Definition; onChange: Change }) {
-  const chosen = ((definition['finale'] as { stats?: FinaleStat[] } | undefined)?.stats) ?? [...FINALE_STATS];
-  const set = (stats: FinaleStat[]) => onChange({ ...definition, finale: { stats } }, 'finale');
-  const name = (stat: FinaleStat) => TEXT_DEFAULTS[`stat.${stat}` as TextKey];
-  const available = FINALE_STATS.filter(stat => !chosen.includes(stat)); const [picking, setPicking] = useState(false);
+  const finale = definition['finale'] as { stats?: FinaleStat[]; awards?: Award[] } | undefined;
+  const chosen: Award[] = finale?.awards ?? (finale?.stats ?? [...FINALE_STATS]).map(rule => ({ rule }));
+  const set = (awards: Award[], field = 'finale') => onChange({ ...definition, finale: { awards } }, field);
+  const standard = (rule: AwardRule) => TEXT_DEFAULTS[`stat.${rule}` as TextKey];
+  const shown = (award: Award) => award.title || standard(award.rule);
+  const update = (position: number, change: Partial<Award>) => set(chosen.map((award, at) => { if (at !== position) return award; const next = { ...award, ...change }; if (!next.title) delete next.title; return next; }), `finale:${position}`);
+  // Each statistic once; "best in one scene" as often as wanted.
+  const available = RULES.filter(rule => rule === 'scene' || !chosen.some(award => award.rule === rule)); const [picking, setPicking] = useState(false);
+  const scenes = definition.nodes.map(node => ({ value: node.key, label: sceneLabel(definition, node.key) }));
   return <Section title="End-of-game awards" summary={chosen.length ? `${chosen.length} awards` : 'None'}>
-    <p className="hint">After the last scene, the screens show these awards one by one. Pick the ones you want and put them in order. Their titles can be changed under Look &amp; feel → Texts.</p>
-    <ol className="part-list">{chosen.map((stat, position) => <li key={stat}><span>{name(stat)}</span>
-      <button className="icon-button" aria-label={`Move ${name(stat)} up`} disabled={position === 0} onClick={() => { const next = [...chosen]; [next[position - 1], next[position]] = [next[position]!, next[position - 1]!]; set(next); }}>↑</button>
-      <button className="icon-button" aria-label={`Remove ${name(stat)}`} onClick={() => set(chosen.filter(entry => entry !== stat))}>×</button></li>)}</ol>
+    <p className="hint">After the last scene, the screens show these awards one by one. Pick the ones you want, put them in order, and give them your own title if you like.</p>
+    <ol className="award-list">{chosen.map((award, position) => <li key={position}>
+      <div className="award-main">
+        <input aria-label={`Title of award ${position + 1}`} value={award.title ?? ''} placeholder={standard(award.rule)} maxLength={60} onChange={event => update(position, { title: event.target.value })} />
+        <small>{award.rule === 'scene' ? 'Most points in:' : AWARD_RULES[award.rule]}</small>
+        {award.rule === 'scene' && <label className="visually-hidden-label"><span className="visually-hidden">Scene of award {position + 1}</span><Dropdown value={award.nodeKey ?? ''} placeholder="Choose a scene" options={scenes} onChange={nodeKey => update(position, { nodeKey })} /></label>}
+      </div>
+      <button className="icon-button" aria-label={`Move ${shown(award)} up`} disabled={position === 0} onClick={() => { const next = [...chosen]; [next[position - 1], next[position]] = [next[position]!, next[position - 1]!]; set(next); }}>↑</button>
+      <button className="icon-button" aria-label={`Remove ${shown(award)}`} onClick={() => set(chosen.filter((_, at) => at !== position))}>×</button></li>)}</ol>
     {chosen.length === 0 && <p className="hint">No awards: the game ends with the final scores only.</p>}
-    {available.length > 0 && <button type="button" className="small-button" onClick={() => setPicking(true)}>Add an award…</button>}
-    {picking && <ChoiceDialog title="Add an award" intro="It is added at the end of the list; move it up to show it earlier." choices={available.map(stat => ({ value: stat, label: name(stat), description: AWARD_RULES[stat], icon: 'scoreboard' }))}
-      onPick={stat => { setPicking(false); set([...chosen, stat as FinaleStat]); }} onClose={() => setPicking(false)} />}
+    {available.length > 0 && chosen.length < 16 && <button type="button" className="small-button" onClick={() => setPicking(true)}>Add an award…</button>}
+    {picking && <ChoiceDialog title="Add an award" intro="It is added at the end of the list; move it up to show it earlier." choices={available.map(rule => ({ value: rule, label: standard(rule), description: AWARD_RULES[rule], icon: 'scoreboard' }))}
+      onPick={rule => { setPicking(false); const first = definition.nodes[0]?.key; set([...chosen, rule === 'scene' && first ? { rule: 'scene', nodeKey: first } : { rule: rule as AwardRule }]); }} onClose={() => setPicking(false)} />}
   </Section>;
+}
+// A scene's name for the award's scene list.
+function sceneLabel(definition: Definition, key: string) {
+  const node = definition.nodes.find(entry => entry.key === key); const stage = node?.stages[0];
+  const text = String(stage?.title ?? stage?.prompt ?? key); return text.length > 50 ? `${text.slice(0, 48)}…` : text;
 }

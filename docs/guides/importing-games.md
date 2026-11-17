@@ -5,7 +5,7 @@ You can create a whole game by pasting text into **Your games → Import a game 
 ## How it works
 
 1. In the host menu, open **Import a game from text** and press **Copy instructions for an AI**. This copies the section "Instructions for the AI" below.
-2. Paste them into an AI chat, and below them describe the game you want, for example: *"A 20-minute pub quiz about the 90s for 12 friends: a welcome screen, five timed questions, a caption contest with voting, and the party chooses between a music round and a movie round before the final scoreboard."*
+2. Paste them into an AI chat, and below them describe the game you want. The AI first asks a few short questions (who plays, how long, teams or not, which kinds of rounds, a style) and waits for your answers; say "just make it" to skip them. For example: *"A 20-minute pub quiz about the 90s for 12 friends: a welcome screen, five timed questions, a caption contest with voting, and the party chooses between a music round and a movie round before the final scoreboard."*
 3. Copy the AI's answer and paste it into the import box. Code fences (```` ```json ````) and a sentence before or after the JSON are fine.
 4. Press **Import**. The game is created as a draft and the editor opens.
 5. Check the scenes. Any problem is shown in plain language on the scene it concerns. Fix it in the editor, or ask the AI to fix it and import again.
@@ -19,7 +19,7 @@ To change an existing game with an AI, use **Export as text** in the editor, giv
 
 - **JSON**, with a `title` and a list of `scenes`.
 - Each scene needs a `type` and its text. Everything else has a sensible default.
-- Limits: up to 100 scenes and 256 KB of text, 2–12 answers per question, 2–8 items to order, 2–6 routes per party choice, timers from 1 second to 1 hour.
+- Limits: up to 100 scenes and 256 KB of text, 2–12 answers per question, 2–8 items to order, 2–8 routes per party choice, timers from 1 second to 1 hour.
 
 Defaults when something is left out:
 
@@ -40,8 +40,8 @@ Top level:
 | `scenes` | The scenes, in play order (required). |
 | `start` | `id` of the first scene. Default: the first scene. |
 | `look` | Optional texts, style and animations, see "Look & feel". |
-| `wheels` | Optional wheels of fortune: `[{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke"], "removePicked": true, "spinSeconds": 5 }]`. A scene with `"spin": "Forfeits"` lets the host spin it there; `"wheelClear": true` stops showing the last result. |
-| `awards` | The end-of-game awards in order, from `winner`, `mostCorrect`, `mostWrong`, `fastest`, `slowest`, `mostVotes`, `minigameChamp`, `luckiest`, `mostReactions`. Leave out for all of them; `[]` for none. |
+| `wheels` | Optional wheels of fortune: `[{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke"], "removePicked": true, "spinSeconds": 5 }]`, optionally with its own slice colours, `"colors": ["#f39200", "#7ac6b6"]` (2–8; otherwise the game's answer colours). A scene with `"spin": "Forfeits"` lets the host spin it there; `"wheelClear": true` stops showing the last result. |
+| `awards` | The end-of-game awards in order, from `winner`, `mostCorrect`, `mostWrong`, `fastest`, `slowest`, `mostVotes`, `minigameChamp`, `luckiest`, `mostReactions`, `fewest` (the wooden spoon: fewest points) and `scene` (most points in one scene). Leave out for all of them; `[]` for none. An entry can also be an object with its own title, and `scene` needs one: `{ "award": "scene", "scene": "karaoke", "title": "Karaoke champion" }` (`"scene"` is a scene's `id`). |
 | `sideGames` | `false` to leave out the side games on the phones (slot machine, blackjack, packs, challenges). Default: on, just for fun. |
 | `chips` | `true` to play the side games with chips (play money): bets, stakes in challenges and a leaderboard. Default: off. The host can still switch both in the room. |
 
@@ -120,7 +120,20 @@ Unknown names, wrong colours and anything that looks like code are listed as pro
 <!-- ai-instructions:start -->
 ## Instructions for the AI
 
-You are writing a party game for a web app where people play on their phones while a shared screen shows the game and a host runs it. Reply with ONLY one JSON object (no explanation), in this format:
+You are writing a party game for a web app where people play on their phones while a shared screen shows the game and a host runs it.
+
+**First, ask before you write.** Unless the user already told you, ask these questions in ONE short, numbered message, then wait for their answers before writing anything:
+
+1. Who is playing: how many people, roughly what age, and what is the occasion (a birthday, Christmas, a work outing, a pub quiz…)?
+2. How long should it last (for example 15, 30 or 60 minutes)?
+3. Everyone for themselves, or in teams?
+4. Which kinds of rounds do they like: quiz questions, writing jokes or captions, drawing, photos, challenges in the room, minigames on the phones, duels, the party choosing a route, a wheel of fortune, awards at the end?
+5. Language, topics, names or inside jokes to use, and anything to avoid?
+6. A style: a ready-made one (for example party, Christmas or birthday) or their own colours (hex codes welcome)?
+
+If the user says "just make it" or has already answered, do not ask; choose sensible defaults. Ask at most one follow-up question, only if something important is unclear.
+
+**Then reply with ONLY one JSON object (no explanation),** in this format:
 
 - Top level: `"title"` (string) and `"scenes"` (array, in play order). Optional: `"start"` (id of the first scene).
 - Every scene: `"id"` (short lowercase name with dashes, unique), `"type"`, its texts, optional `"seconds"` (timer), optional `"next"` (id of the following scene, or `"end"`; default is the next scene in the list).
@@ -135,13 +148,22 @@ You are writing a party game for a web app where people play on their phones whi
   - `"challenge"`: `"question"` (something people do in the room), `"maxPoints"`. The host judges.
   - `"duel"`: `"question"` (what the two do), optional `"pick"`: `"random"` or `"host"`, optional `"game"`: `"rps"`, `"tictactoe"` or `"chess"` (played on the two phones; leave out for any contest the host judges), `"points"` (for the winner), `"betPoints"` (for each right bet), `"seconds"` (betting time). Everyone else bets on the winner.
   - Optional on quiz, order, vote, challenge, minigame and duel: `"places"`: a list like `[10, 6, 3]` (points for 1st, 2nd, 3rd: the fastest correct answers, the most-voted answers, the host's places, the minigame's places, the duel's winner and runner-up), or `{ "total": 30, "places": 3, "curve": "even" }` to split a total (`curve`: `"even"`, `"steep"` or `"equal"`).
-  - `"party-choice"`: `"question"`, `"options"`: 2–6 objects `{ "label": "Music", "to": "id-of-first-scene-of-that-route" }`, optional `"decidedBy"`: `"players"`, `"captains"` or `"host"`. Each option must go to a DIFFERENT scene. Give the last scene of each route `"next"` set to the scene where the routes come back together.
+  - `"party-choice"`: `"question"`, `"options"`: 2–8 objects `{ "label": "Music", "to": "id-of-first-scene-of-that-route" }`, optional `"decidedBy"`: `"players"`, `"captains"` or `"host"`. Each option must go to a DIFFERENT scene. Give the last scene of each route `"next"` set to the scene where the routes come back together.
   - `"scoreboard"`: `"title"`, `"show"`: `"players"`, `"teams"` or `"both"`.
   - `"drawing"`: `"question"` (what to draw), optional `"blind": true`. Can be voted on with a `"vote"` scene.
   - `"minigame"`: `"question"` (a short title), `"game"`: `"reaction"` (tap at GO), `"tap-race"` (tap fast), `"stop-clock"` (stop a vanishing clock at a target), `"lucky-doors"` (pick a door with hidden points), `"perfect-circle"` (draw the roundest circle) or `"relay-drawing"` (teams take turns drawing one picture, then vote; add team `"play"`); optional `"points"`: list of points for 1st, 2nd, 3rd place. Use `"seconds"` of 20–30.
 - Rules: no loops (never lead back to an earlier scene); every scene must be reachable; a `"vote"` must come after the scene it votes on, on every route, and every route through that scene must reach the vote; only a party-choice may lead to more than one scene.
 - Teams are optional; most games are everyone-for-themselves. Only for a team game: add a scene `{ "type": "pick-teams", "title": "Pick your teams", "teams": 2, "how": "random" | "host" | "players", "captains": true }` where the teams are made, and `"inTeams": true` (plus `"captain": true` if only captains answer) on the rounds after it that are played in those teams. Quiz, writing, upload, drawing, order, challenge, vote and minigame rounds can be played in teams; duels, party choices, cutscenes and scoreboards cannot.
-- Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Presets: `party`, `neon`, `pub`, `clean`, `retro`, `kids`, `elegant`, `ocean`. Animation presets: `fade`, `rise`, `drop`, `zoom`, `pop`, `flip`, `spin`, `bounce`, `shake`, `pulse`. Only add a look if the user asks for a style.
+- Optional wheels of fortune, at top level: `"wheels": [{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke", "Swap seats"], "removePicked": true, "spinSeconds": 5 }]`, optionally with their own slice colours `"colors": ["#f39200", "#7ac6b6"]`. A scene with `"spin": "Forfeits"` (usually a cutscene) lets the host spin that wheel there; `"wheelClear": true` on a later scene stops showing the last result.
+- Optional end-of-game awards, at top level, in order: `"awards"`: names from `"winner"`, `"mostCorrect"`, `"mostWrong"`, `"fastest"`, `"slowest"`, `"mostVotes"`, `"minigameChamp"`, `"luckiest"`, `"mostReactions"`, `"fewest"` (the wooden spoon), or objects with their own title; `"scene"` (most points in one scene) needs the scene's id: `{ "award": "scene", "scene": "karaoke", "title": "Karaoke champion" }`. Leave out for the standard awards; `[]` for none.
+- Side games on the phones while players wait are on; `"sideGames": false` switches them off, `"chips": true` plays them with chips.
+- Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Only add a look if the user asks for a style or colours.
+  - Theme presets: `"party"`, `"neon"`, `"pub"`, `"clean"`, `"retro"`, `"kids"`, `"elegant"`, `"ocean"`, `"christmas"`, `"birthday"`, `"mbou"` (MBO Utrecht's colours). Anything in `"theme"` changes the preset:
+  - `"colors"`: `"background"`, `"background2"`, `"surface"` (cards), `"text"`, `"muted"`, `"accent"` (main buttons), `"accentText"`, `"success"`, `"danger"`, `"answerText"` as `"#rrggbb"`, and `"answers"`: 2–8 answer colours. Keep text readable: strong contrast between each text colour and what it sits on.
+  - `"font"` and `"headingFont"`: `"system"`, `"rounded"`, `"serif"`, `"slab"`, `"mono"`, `"condensed"`, `"playful"`, `"elegant"`; `"radius"` (corner roundness 0–40); `"textScale"` (0.8–1.6); `"uppercaseHeadings"` (true/false).
+  - `"background"`: `"gradient"`, `"solid"`, `"dots"`, `"stripes"`, `"glow"`, `"grid"`; `"tiles"` (answer tiles): `"filled"`, `"outline"`, `"glass"`, `"flat"`; `"gradients": true` adds a gradient effect to answer tiles and main buttons.
+  - Answer marks: `"markers"`: `"letters"`, `"numbers"`, `"shapes"`, `"custom"` (then `"customMarks"`: up to 8 short marks such as emoji) or `"none"`; `"markerShape"`: `"circle"`, `"square"`, `"rounded"`, `"plain"`; `"markerPlace"`: `"start"`, `"end"`, `"top"`; `"routeMarkers"`: `"arrows"` or `"answers"` (party choices).
+  - Animation presets: `"none"`, `"fade"`, `"rise"`, `"drop"`, `"zoom"`, `"pop"`, `"slideLeft"`, `"slideRight"`, `"flip"`, `"spin"`, `"blur"`, `"bounce"`, `"wobble"`, `"shake"`, `"pulse"`, `"cascade"`.
 - Use timers on quiz questions (15–30 seconds), writing (45–90 seconds) and votes (30–45 seconds). Keep phone texts short; answers fit on a small screen.
 
 Example:

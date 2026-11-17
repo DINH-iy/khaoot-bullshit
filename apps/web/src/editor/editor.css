@@ -7,20 +7,18 @@
   --e-danger: light-dark(#a3122a, #ff9aa8); --e-dot: light-dark(#cfd0d8, #343744);
   display: grid; grid-template-rows: auto 1fr; height: 100dvh; background: var(--e-bg); color: var(--e-text);
 }
-.editor-main { display: grid; grid-template-rows: auto 1fr; min-height: 0; max-width: none; margin: 0; padding: 0; }
+.editor-main { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; max-width: none; margin: 0; padding: 0; }
 .editor-message { max-width: 640px; margin: 64px auto; padding: 0 16px; }
-.editor-header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--e-border); background: var(--e-panel); }
+.editor-header { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--e-border); background: var(--e-panel); }
 .editor-title { display: flex; gap: 14px; align-items: center; min-width: 0; }
-.editor-logo { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: light-dark(#1d1d22, #f2f2f5); color: light-dark(#fff, #1d1d22); font: 700 1.4rem Georgia, serif; flex: none; }
-.editor .title-input { font: 600 1.25rem/1.2 inherit; border: 1px solid transparent; background: transparent; color: inherit; padding: 4px 6px; border-radius: 8px; width: min(28rem, 60vw); min-height: 0; }
+.editor-logo { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: light-dark(#1d1d22, #f2f2f5); color: light-dark(#fff, #1d1d22); font: 700 1.4rem Georgia, serif; flex: none; }
+.editor .title-input { font: 600 1.1rem/1.2 inherit; border: 1px solid transparent; background: transparent; color: inherit; padding: 4px 6px; border-radius: 8px; width: min(28rem, 60vw); min-height: 0; }
 .editor .title-input:hover, .editor .title-input:focus { border-color: var(--e-border); background: var(--e-bg); }
-.crumb { margin: 2px 6px 0; color: var(--e-muted); font-size: .9rem; } .crumb a { color: inherit; }
+.crumb { margin: 0 6px; color: var(--e-muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: min(36rem, 60vw); } .crumb a { color: inherit; }
 .editor-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .editor .editor-actions button, .flow-tools button, .inspector button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
 .editor button.accent { background: var(--e-accent); color: light-dark(#fff, #1d1730); border-color: var(--e-accent); }
-.save-state { margin: 0; font-size: .9rem; color: var(--e-muted); } .save-error { color: var(--e-danger); }
-.editor-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--e-border); }
-.editor-bar p { margin: 0; color: var(--e-muted); }
+.save-state { margin: 0; color: var(--e-muted); } .save-error { color: var(--e-danger); }
 .tabs { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; background: light-dark(#e8e8ee, #16171b); }
 .tabs button { background: transparent; color: var(--e-muted); border: 0; min-height: 40px; }
 .tabs button[aria-selected="true"] { background: var(--e-panel); color: var(--e-text); }
@@ -199,11 +197,6 @@
 .tv-options span { width: 4cqw; height: 4cqw; font-size: 2.2cqw; } .tv-scores { font-size: 3cqw; } .tv-timer { font-size: 2.4cqw; }
 .tv-screen > * { min-height: 0; }
 
-.rehearse { position: relative; }
-.rehearse-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; width: 280px; display: grid; gap: 4px; padding: 10px; border-radius: 14px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
-.rehearse-menu p { margin: 0 4px 6px; color: var(--e-muted); font-size: .85rem; }
-.editor .rehearse-menu button { justify-content: start; text-align: left; border: 0; background: transparent; }
-.editor .rehearse-menu button:hover:not(:disabled) { background: var(--e-accent-soft); }
 .minimap { position: absolute; right: 16px; bottom: 16px; border-radius: 10px; border: 1px solid var(--e-border); background: color-mix(in srgb, var(--e-panel) 92%, transparent); cursor: pointer; touch-action: none; }
 .mini-card { fill: var(--e-line); opacity: .55; } .mini-card.on { fill: var(--e-accent); opacity: 1; }
 .mini-frame { fill: color-mix(in srgb, var(--e-accent) 10%, transparent); stroke: var(--e-accent); stroke-width: 1.5; }
@@ -389,7 +382,7 @@
 .action-menu { position: relative; margin-left: auto; }
 .action-menu + .small-button { margin-left: 0 !important; }
 .editor .small-button.icon-only { display: inline-grid; place-items: center; padding: 0; width: 40px; min-height: 40px; }
-.action-menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 12; min-width: 200px; display: grid; gap: 2px; padding: 6px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
+.action-menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 12; min-width: 17rem; display: grid; gap: 2px; padding: 6px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
 .editor .action-menu-list button { justify-content: start; text-align: left; border: 0; background: transparent; min-height: 40px; padding: 8px 12px; border-radius: 8px; color: var(--e-text); }
 .editor .action-menu-list button:hover:not(:disabled), .editor .action-menu-list button:focus-visible { background: var(--e-accent-soft); }
 .editor .action-menu-list .danger-item { color: var(--e-danger); }
@@ -418,3 +411,65 @@
 .ed-dropdown-option[aria-disabled=true] { color: var(--e-muted); cursor: default; }
 .ed-dropdown-group { padding: 8px 12px 4px; font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--e-muted); }
 @media (pointer: coarse) { .ed-dropdown-option { padding-top: 12px; padding-bottom: 12px; } }
+/* The Flow editor's panel shows what a scene is, not its settings: a summary and a way into the Scene editor. */
+.flow-summary { display: grid; gap: 4px; padding: 12px; border-radius: 12px; background: var(--e-accent-soft); }
+.flow-summary p { margin: 0; } .flow-summary-banner { font-size: .75rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--e-muted); }
+.flow-summary-title { font-weight: 700; overflow-wrap: anywhere; } .flow-summary-line { font-size: .85rem; color: var(--e-muted); }
+.flow-summary button { justify-self: start; margin-top: 6px; }
+/* The Scene editor shows where a scene leads; it is changed in the Flow editor. */
+.scene-next { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 4px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--e-border); font-size: .9rem; }
+.scene-props .inspector-head { display: flex; align-items: center; gap: 10px; } .scene-props .inspector-head h2 { margin: 0; }
+
+/* The compact top bar: the editors' tabs in the middle; the title takes what is left. */
+.editor-title { flex: 1 1 18rem; } .editor-title > div { min-width: 0; }
+.editor-tabs { flex: none; }
+.editor-actions { flex: 0 1 auto; justify-content: flex-end; }
+.editor-actions .action-menu { margin-left: 0; }
+/* View mode: panels are locked (a disabled fieldset around their fields), the map shows no handles to drag. */
+.view-lock { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }
+.view-lock:disabled :is(input, textarea, button, .ed-dropdown) { cursor: not-allowed; }
+.view-lock:disabled :is(input, textarea, .ed-dropdown, .segmented button, .small-button, .icon-button) { opacity: .6; }
+.editor-body.viewing .port, .editor-body.viewing .port-plus, .editor-body.viewing .edge-end { display: none; }
+.editor-body.viewing .scene-card { cursor: pointer; }
+.mode-switch { flex: none; }
+.editor .action-menu-text { white-space: nowrap; }
+.action-menu-intro { margin: 2px 8px 6px; font-size: .82rem; color: var(--e-muted); max-width: 16rem; }
+/* A wheel's test spin: the real wheel in the game's look, in a popup. */
+.ed-dialog.wheel-test { width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow: auto; }
+.wheel-test-stage { display: grid; justify-items: center; gap: 14px; padding: 28px 16px 18px; border-radius: 14px; background: linear-gradient(160deg, var(--r-bg1), var(--r-bg2)); color: var(--r-text); font-family: var(--r-font); }
+.wheel-test-stage .wheel-frame { width: min(70vw, 48vh, 380px); }
+.wheel-test-stage .wheel-result:not(.shown) { color: var(--r-text); }
+.wheel-colors { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.wheel-colors input[type=color] { width: 40px; height: 32px; padding: 0; border: 1px solid var(--e-border); border-radius: 8px; background: none; }
+/* End-of-game awards: each with its own title (placeholder: the standard one), its rule, and for a scene award the scene. */
+.award-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.award-list li { display: flex; gap: 6px; align-items: start; padding: 8px; border-radius: 10px; border: 1px solid var(--e-border); }
+.award-main { flex: 1; min-width: 0; display: grid; gap: 4px; } .award-main small { color: var(--e-muted); font-size: .78rem; }
+.award-main input { width: 100%; min-height: 36px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--e-border); background: var(--e-bg); color: var(--e-text); font: inherit; font-weight: 600; box-sizing: border-box; }
+
+/* ---------- The editor on phones (G4, G5) ---------- */
+@media (max-width: 700px) {
+  /* The page scrolls as a whole instead of squeezing everything into one screen. */
+  .editor-page { height: auto; min-height: 100dvh; } .editor-page > .editor { flex: none; height: auto; min-height: 100dvh; }
+  /* Top bar in three short rows: name and ☰; the editor tabs; Edit/View, people and Play & publish. */
+  .editor-header { gap: 8px; padding: 8px 12px; }
+  .editor-logo, .game-overview { display: none; }
+  .editor-actions { display: contents; }
+  .editor-title { order: 1; flex: 1 1 0; min-width: 0; } .editor .title-input { width: 100%; }
+  .editor-actions .action-menu:not(.has-text) { order: 2; }
+  .editor-tabs { order: 3; flex: 1 1 100%; } .editor-tabs button { flex: 1; padding-inline: 6px; }
+  .mode-switch { order: 4; } .peer-bar { order: 5; } .editor-actions .action-menu.has-text { order: 6; margin-left: auto; }
+  .crumb { max-width: 100%; }
+  /* Menus and popovers open as a sheet at the bottom, so they always fit. */
+  .action-menu-list, .peer-me-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; min-width: 0; width: auto; max-height: 70dvh; overflow: auto; z-index: 70; }
+  /* The map: one row of tools (scrolls sideways if needed), a canvas that fills the screen, the scene panel as a bottom sheet. */
+  .flow-tools { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 8px 12px; }
+  .flow-tools .tool-label { display: none; } .flow-tools button { flex: none; }
+  .flow-canvas { height: calc(100dvh - 190px); min-height: 320px; }
+  .inspector { position: fixed; z-index: 30; max-height: 65dvh; border-radius: 16px 16px 0 0; }
+  .add-menu-anchor { position: fixed; left: 8px !important; right: 8px; top: auto !important; bottom: 8px; z-index: 40; } .add-menu-anchor .add-menu { width: auto; max-height: 75dvh; overflow: auto; }
+  /* The Scene editor: scenes (scrolling list), then the preview, then the scene's settings. */
+  .scene-list { max-height: 34dvh; } .scene-stage { padding: 12px; }
+  /* The rough phone preview: as wide as half the screen and not taller than its content needs. */
+  .phone { flex: 1 1 160px; } .phone-screen { width: 100%; aspect-ratio: auto; min-height: 200px; }
+}

@@ -25,7 +25,8 @@ function writeClip(clip: Clip) { try { localStorage.setItem(CLIP, JSON.stringify
 function readClip(): Clip | null { try { const value = JSON.parse(localStorage.getItem(CLIP) ?? 'null') as Clip | null; return value && Array.isArray(value.keys) && value.from && Array.isArray(value.from.nodes) ? value : null; } catch { return null; } }
 const blockedText: Record<string, string> = { self: 'A scene cannot lead to itself.', circle: 'That would make the game go round in a circle.', 'same-scene': 'Another option of this choice already leads there.' };
 
-export function FlowView({ d, selected, setSelected, live }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState }) {
+export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState; onOpenScene: (key: string) => void }) {
+  const readOnly = d.readOnly;
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [view, setView] = useState({ x: 48, y: 48, zoom: 1 }); const [guides, setGuides] = useState<Guides>({ x: null, y: null });
@@ -78,6 +79,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
     let moved = false; let latest = positions; const element = event.currentTarget;
     const move = (moveEvent: PointerEvent) => {
       const at = toCanvas(moveEvent.clientX, moveEvent.clientY);
+      if (readOnly) return; // viewing: a press only selects
       if (!moved && Math.hypot(at.x - origin.x, at.y - origin.y) < 4 / view.zoom) return;
       moved = true;
       // The grabbed card snaps; the rest of the selection keeps its distance to it.
@@ -121,7 +123,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
     return { target: best.key, blocked: connectProblem(base, from, option, best.key) };
   }, [definition, positions, view.zoom]);
   const startConnect = (event: ReactPointerEvent<Element>, from: string, option: string | undefined, rewire: string | null = null) => {
-    event.stopPropagation(); if (event.button !== 0) return;
+    event.stopPropagation(); if (event.button !== 0 || readOnly) return;
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
     const element = event.currentTarget as Element; const origin = toCanvas(event.clientX, event.clientY);
     let state: Connecting = { from, option, pointer: origin, target: null, blocked: null, rewire }; let dragged = false;
@@ -176,7 +178,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
     element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
   };
   const zoomBy = (factor: number, around?: Point) => setView(current => {
-    const zoom = Math.min(1.75, Math.max(0.4, current.zoom * factor));
+    const zoom = Math.min(1.75, Math.max(0.25, current.zoom * factor));
     const rect = canvas.current?.getBoundingClientRect(); const anchor = around ?? { x: (rect?.width ?? 800) / 2, y: (rect?.height ?? 600) / 2 };
     return { zoom, x: anchor.x - (anchor.x - current.x) * (zoom / current.zoom), y: anchor.y - (anchor.y - current.y) * (zoom / current.zoom) };
   });
@@ -184,14 +186,23 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
     const rect = canvas.current?.getBoundingClientRect(); const all = Object.values(positions); if (!rect || !all.length) return;
     const minX = Math.min(...all.map(point => point.x)); const minY = Math.min(...all.map(point => point.y));
     const maxX = Math.max(...all.map(point => point.x)) + CARD_WIDTH + 64; const maxY = Math.max(...all.map(point => point.y)) + 320;
-    const zoom = Math.min(1, Math.max(0.4, Math.min((rect.width - 64) / (maxX - minX), (rect.height - 64) / (maxY - minY))));
+    const zoom = Math.min(1, Math.max(0.25, Math.min((rect.width - 64) / (maxX - minX), (rect.height - 64) / (maxY - minY))));
     setView({ zoom, x: 32 - minX * zoom, y: 32 - minY * zoom });
   }, [positions]);
   const fitted = useRef(false);
   useEffect(() => { if (!fitted.current) { fitted.current = true; requestAnimationFrame(fit); } }, [fit]);
   useEffect(() => {
     const element = canvas.current; if (!element) return;
-    const wheel = (event: WheelEvent) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); const rect = element.getBoundingClientRect(); zoomBy(event.deltaY < 0 ? 1.1 : 1 / 1.1, { x: event.clientX - rect.left, y: event.clientY - rect.top }); };
+    // The scroll wheel zooms around the pointer (no key needed; a trackpad pinch too); Shift + scroll moves the map.
+    // Menus and panels on the map keep their own scrolling.
+    const wheel = (event: WheelEvent) => {
+      if ((event.target as Element).closest('.add-menu, .edge-actions')) return;
+      event.preventDefault();
+      const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+      if (event.shiftKey && !event.ctrlKey && !event.metaKey) { const dx = (event.deltaX || event.deltaY) * lines; const dy = event.deltaX ? event.deltaY * lines : 0; setView(current => ({ ...current, x: current.x - dx, y: current.y - dy })); return; }
+      const rect = element.getBoundingClientRect();
+      zoomBy(Math.min(1.25, Math.max(0.8, Math.exp(-event.deltaY * lines * 0.002))), { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    };
     element.addEventListener('wheel', wheel, { passive: false }); return () => element.removeEventListener('wheel', wheel);
   });
 
@@ -223,7 +234,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
   const contextMenu = (event: React.MouseEvent) => {
     if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button, input, textarea, select')) return;
-    event.preventDefault(); setPending(null); setConnecting(null);
+    event.preventDefault(); if (readOnly) return; setPending(null); setConnecting(null);
     const rect = canvas.current?.getBoundingClientRect();
     // From the keyboard there is no pointer position: use the same spot as the toolbar button.
     const fromKeyboard = event.clientX === 0 && event.clientY === 0;
@@ -251,7 +262,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement).closest('input, textarea, select')) return;
-      if (askDelete) return;
+      if (askDelete || readOnly) return;
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
       else if ((event.key === 'Delete' || event.key === 'Backspace') && selected.length) { event.preventDefault(); setAskDelete(true); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
@@ -279,16 +290,16 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
   const nodes = definition.nodes; const single = selected.length === 1 ? nodes.find(node => node.key === selected[0]) : undefined;
   const sceneTitle = (key: string) => { const node = definition.nodes.find(entry => entry.key === key); if (!node) return key; const text = cardText(definition, node); return text.banner || text.title; };
   const deleteSelected = () => { let next = definition; for (const key of selected) next = deleteScene(next, key); const kept = { ...positions }; for (const key of selected) delete kept[key]; change(next, kept); select([]); };
-  return <div className={`editor-body${selected.length ? ' with-inspector' : ''}`}>
+  return <div className={`editor-body${selected.length ? ' with-inspector' : ''}${readOnly ? ' viewing' : ''}`}>
     <div className="flow-tools" role="toolbar" aria-label="Flow tools">
-      <button className="with-icon" onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" />Add a scene</button>
-      <button className="with-icon" aria-label="Undo" disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" />Undo</button>
-      <button className="with-icon" aria-label="Redo" disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" />Redo</button>
+      <button className="with-icon" aria-label="Add a scene" disabled={readOnly} onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" /><span className="tool-label">Add a scene</span></button>
+      <button className="with-icon" aria-label="Undo" disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" /><span className="tool-label">Undo</span></button>
+      <button className="with-icon" aria-label="Redo" disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" /><span className="tool-label">Redo</span></button>
       <span className="tool-gap" />
-      <button onClick={() => change(definition, autoLayout(definition))}>Tidy up</button>
+      <button disabled={readOnly} onClick={() => change(definition, autoLayout(definition))}>Tidy up</button>
       <button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>−</button><button aria-label="Zoom in" onClick={() => zoomBy(1.2)}>+</button><button onClick={fit}>Fit</button>
-      {selectedEdge && <button onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove connection</button>}
-      <span className="flow-hint">Right-click to add a scene · click an arrow to add a scene on it · drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several</span>
+      {selectedEdge && !readOnly && <button onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove connection</button>}
+      <span className="flow-hint">{readOnly ? 'Viewing: nothing can be changed. Choose Edit at the top to make changes.' : `Right-click to add a scene · click an arrow to add a scene on it · drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several`}</span>
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
@@ -325,7 +336,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
           return <div key={node.key} className={`scene-card kind-${text.kind}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
             style={{ ...peerOutline(others), left: position.x, top: position.y, width: CARD_WIDTH, height: cardHeight(node) }} tabIndex={0} role="group" aria-roledescription="scene card"
             aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? ' Start scene.' : ''}${on ? ' Selected.' : ''}${others.length ? ` ${others.map(peer => peer.name).join(', ')} working here.` : ''}${problems.length ? ` ${problems.length} problems.` : ''}`}
-            onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)}>
+            onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)} onDoubleClick={() => onOpenScene(node.key)}>
             <PeerTags peers={others} />
             <p className="card-label">{definition.startNodeKey === node.key && <span className="start-flag">Start · </span>}{text.label}</p>
             <div className={`card-thumb thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true">{text.banner ?? <Icon name={sceneIcon(text.kind, text.input)} size={26} />}</div>
@@ -342,7 +353,7 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {selectedEdge && !adding && edgeMid && <div className="edge-actions" style={{ left: edgeMid.x, top: edgeMid.y, transform: `translate(-50%, -50%) scale(${1 / view.zoom})` }} onPointerDown={event => event.stopPropagation()}>
+        {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" style={{ left: edgeMid.x, top: edgeMid.y, transform: `translate(-50%, -50%) scale(${1 / view.zoom})` }} onPointerDown={event => event.stopPropagation()}>
           <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>
           <button type="button" className="danger-outline" aria-label="Remove this connection" onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove</button>
         </div>}
@@ -351,9 +362,9 @@ export function FlowView({ d, selected, setSelected, live }: { d: DraftState; se
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
     </div>
-    {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)}
+    {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)} onOpen={() => onOpenScene(single.key)}
       onDelete={next => { const kept = { ...positions }; delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
-      prefab={{ content: () => prefabFrom(definition, positions, [single.key]), defaultName: cardText(definition, single).banner || cardText(definition, single).title }} />}
+      readOnly={readOnly} prefab={{ content: () => prefabFrom(definition, positions, [single.key]), defaultName: cardText(definition, single).banner || cardText(definition, single).title }} />}
     {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? `Delete “${sceneTitle(selected[0]!)}”?` : `Delete ${selected.length} scenes?`}
       text={`${selected.length === 1 ? 'The scene and its connections go' : 'The scenes and their connections go'}. Undo (Ctrl/Cmd+Z) brings ${selected.length === 1 ? 'it' : 'them'} back.`}
       confirm={selected.length === 1 ? 'Delete scene' : `Delete ${selected.length} scenes`} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}

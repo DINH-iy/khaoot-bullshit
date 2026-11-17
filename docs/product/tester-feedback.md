@@ -52,15 +52,15 @@ Sources: Nielsen Norman Group ([Dropdowns: when to use them](https://www.nngroup
 - **Custom dropdowns carry a risk.** Baymard found usability problems in 31% of custom-made dropdowns (keyboard, scrolling, closing by accident, phones), problems the browser's own dropdown solved long ago. A custom one must follow the standard listbox pattern: keyboard and type-to-find, the chosen item in view, works with touch and screen readers.
 - **Watch the panel length.** Buttons with short labels take little room; long labels become a short list of choices, one per row.
 - F6: the inspector's action buttons (Start here, Duplicate, Save as prefab, Delete) need a layout that takes more buttons. **Done (not committed yet):** they are in a ☰ *Scene actions* menu next to Close (keyboard: arrows, Escape); *Save as prefab…* opens its name form under the header and *Delete scene…* asks in a popup. The Scene editor still has its own buttons.
-- F7: wheel of fortune styling and a preview / test-spin window.
-- F8: as many routes as wanted in a party choice (default 2); the format allows 2–6 now, the editor needs "add route" and the limit may go up.
-- F9: customizable end-of-game awards: authors pick from 9 fixed stats now; could become entries with their own title and rule.
+- F7: wheel of fortune styling and a preview / test-spin window. **Done (not committed yet):** a wheel uses the game's answer colours or its own (2–8, in the wheel's settings), each label black or white, whichever reads better; **Test spin…** opens the real wheel in the game's look and lands on a random entry (nothing saved).
+- F8: as many routes as wanted in a party choice (default 2); the format allows 2–6 now, the editor needs "add route" and the limit may go up. **Done (not committed yet):** up to 8 routes (was 6), in the editor, the server and the text import; arrows for 7 and 8 routes.
+- F9: customizable end-of-game awards: authors pick from 9 fixed stats now; could become entries with their own title and rule. **Done (not committed yet):** each award can have its own title (in Game settings → End-of-game awards); new rules *Best in one scene* (most points in a chosen scene, can be added more than once) and *Wooden spoon* (fewest points, 0 counts); older games keep their list and become the new list when edited.
 
 ### G. Editor: canvas, layout, mobile
 
 - G1: zoom the Flow canvas with the mouse wheel.
 - G2: a long game zooms far out; wrap scenes into rows.
-- G3: the Look & feel page is very long.
+- G3: the Look & feel page is very long. **Done (not committed yet)** with K4: its style page and texts are small groups that open and close.
 - G4, G5: the editor on phones (the rehearse menu does not fit).
 
 ### H. Host menu and admin
@@ -83,11 +83,11 @@ Sources: Nielsen Norman Group ([Dropdowns: when to use them](https://www.nngroup
 
 From a UX designer's review, with your own additions:
 
-- K1: the top bar can be narrower; it shows too much at once. Fold things into menus.
-- K2: remember what is open (folded sections, the selected scene, panels) when coming back. **Partly done (not committed yet):** each settings group (Content, Points, Who plays, Where next, the Game settings groups…) stays open or closed as you left it, from scene to scene and after reloading (kept in this browser only). A group the next scene does not have is simply not shown. The selected scene and open panels are not remembered yet.
-- K3: a read mode and an edit mode (look through a game without changing it by accident).
-- K4: chunking: group the settings into small, named chunks (see also F6 and G3).
-- K5: make the Flow editor only about the flow (scenes and arrows) and the Scene editor only about the scene (its content and settings), instead of both editing everything.
+- K1: the top bar can be narrower; it shows too much at once. Fold things into menus. **Done (not committed yet):** one compact row instead of two: game name with a small line (draft, version, save state, length, problems), the editor tabs moved up, the Edit / View switch, who else is editing as coloured initials (your own opens the name field), a *Play & publish ▾* menu (rehearse from the start or a scene, publish, play the published version; each item says why when it cannot be used yet), and a ☰ *Game menu* with Game settings, Invite people and Export as text.
+- K2: remember what is open (folded sections, the selected scene, panels) when coming back. **Done (not committed yet):** per game, this browser remembers the editor tab, the selected scenes (dropped if deleted meanwhile), the open panel (Game settings, Invite people or Export as text) and the part of Look & feel, and opens them again; a link with `?view=` still wins. Each settings group (Content, Points, Who plays, Where next, the Game settings groups…) stays open or closed as you left it, from scene to scene and after reloading (kept in this browser only). A group the next scene does not have is simply not shown, and is open again on the next scene that has it (only clicking a group changes what is remembered, not passing through scenes).
+- K3: a read mode and an edit mode (look through a game without changing it by accident). **Done (not committed yet):** an *Edit / View* switch in the top bar, remembered in this browser. In View every edit is refused at one place (the draft's change, undo and redo), the panels' fields are locked (greyed out), and on the map cards can be selected and opened but not moved, connected, added, pasted or deleted.
+- K4: chunking: group the settings into small, named chunks (see also F6 and G3). **Done (not committed yet):** the long pages are now small named groups that open and close (and stay as left): Look & feel's style page (Style, Colours, Text, Shapes and background, Answer marks; only Style starts open; each shows what is set when closed), the texts (one group per subject with the number changed; a search opens the groups with a match) and the Scene editor's Parts. With the scene panel (Content, Points, Who plays) and Game settings this covers the editor. G3 (the long Look & feel page) is covered by this too.
+- K5: make the Flow editor only about the flow (scenes and arrows) and the Scene editor only about the scene (its content and settings), instead of both editing everything. **Done (not committed yet):** the Flow editor's panel shows a summary, problems, a party choice's routes and *Where next*, with **Edit this scene →** (double-clicking a card does the same); the Scene editor has the content and settings, shows the next scene with *Change in the Flow editor*, and its actions (start here, show in the Flow editor, delete) are in its ☰ menu. *Tidy the flow* is only in the Flow editor.
 - K6: custom dropdown menus in the editor's style instead of the browser's own (F4 step 3). **Done (not committed yet).**
 
 ### L. Look & feel additions (17 November 2026, not committed yet)
@@ -97,6 +97,11 @@ From a UX designer's review, with your own additions:
 - L4: **answers no longer break in the middle of a word.** Answer tiles (phone) and the answer board (shared screen) sit side by side only when the longest word fits, and go one below the other otherwise; a word only breaks if it is longer than a whole row.
 - L5: **answer marks** are part of the look (Look & feel → Answer marks): letters (A B C), numbers (1 2 3), shapes (★ ● ▲…), your own (typed in a field: emoji, letters or short words, up to 8) or none; a circle, square, rounded square or just the mark; before, after or above the answer; and party choices keep their arrows or use the same marks. The phones, the shared screen, the host's route buttons and the preview all follow it.
 - L3: **Import colours… / Export colours…** under Colours. Import: paste hex codes (Canva brand kit, Figma), a Coolors link, CSS, design tokens or SVG, or choose an .ase (Adobe, Procreate, Affinity), .gpl, .json, .css, .txt or .svg file; the colours found are shown first, then become the answer tiles and main buttons with readable text on them (the background stays). Export: copy the hex codes, download design tokens (.json, Figma Tokens Studio) or an .ase swatch file.
+
+### M. Instructions for an AI (17 November 2026, not committed yet)
+
+- M1: the instructions the app copies for an AI now cover every feature: wheels (with colours), awards (with titles, scene awards and the wooden spoon), side games and chips, all styles and every look setting (colours, fonts, backgrounds, tiles, gradient, answer marks, animations). A test (`apps/server/test/authoring/ai-instructions.test.ts`) fails and names what is missing when a feature is added without updating them; AGENTS.md says so too.
+- M2: the AI first asks the user a few short questions (who plays and the occasion, how long, teams or not, which rounds, language and topics, a style) in one message and waits for the answers before writing the game; "just make it" skips them. The import screen and the guide say so.
 
 ### Open questions
 

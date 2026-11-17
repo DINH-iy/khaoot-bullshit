@@ -16,11 +16,17 @@ const HISTORY = 100;
  * publishing and playing. Several people can edit at once: a save by someone
  * else is merged into this copy (see live/document.ts), never overwritten.
  */
+const MODE_KEY = 'party-editor-mode';
 export function useDraft(gameId: string) {
   const [draft, setDraft] = useState<Draft>(); const [loadError, setLoadError] = useState('');
   const [definition, setDefinition] = useState<Definition>(); const [positions, setPositions] = useState<Positions>({});
   const [issues, setIssues] = useState<DefinitionIssue[]>([]); const [save, setSave] = useState<SaveState>('saved');
   const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
+  // View mode: look through the game without changing it by accident. Every edit passes `change` (and undo/redo),
+  // so this one switch is what makes viewing safe; the screens also lock their controls. Remembered in this browser.
+  const [readOnly, setReadOnlyState] = useState(() => { try { return localStorage.getItem(MODE_KEY) === 'view'; } catch { return false; } });
+  const viewing = useRef(readOnly); viewing.current = readOnly;
+  const setReadOnly = (next: boolean) => { setReadOnlyState(next); try { localStorage.setItem(MODE_KEY, next ? 'view' : 'edit'); } catch { /* storage blocked: this visit only */ } };
   const [history, setHistory] = useState<{ undo: Step[]; redo: Step[] }>({ undo: [], redo: [] });
   const revision = useRef(0); const dirty = useRef(false); const saving = useRef(false); const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // The last version known to be saved on the server: what our unsaved edits are measured against.
@@ -104,7 +110,7 @@ export function useDraft(gameId: string) {
    * edits in the same `group` (typing in one field) are merged.
    */
   const change = useCallback((next: Definition, nextPositions?: Positions, group = '', before?: Positions) => {
-    const current = latest.current; const now = Date.now(); if (!current.definition) return;
+    const current = latest.current; const now = Date.now(); if (!current.definition || viewing.current) return;
     // `before`: card positions from before a drag, since the screen already shows the dragged ones.
     const from = { definition: current.definition, positions: before ?? current.positions }; const to = { definition: next, positions: nextPositions ?? current.positions };
     const grouped = Boolean(group) && group === lastRecord.current.group && now - lastRecord.current.at < 1200;
@@ -119,6 +125,7 @@ export function useDraft(gameId: string) {
    * people did since stays, also where they changed the very same field.
    */
   const restore = (kind: 'undo' | 'redo') => {
+    if (viewing.current) return;
     const current = latest.current; const step = history[kind].at(-1);
     if (!current.definition || !step) return;
     const [from, to] = kind === 'undo' ? [step.after, step.before] : [step.before, step.after];
@@ -146,7 +153,7 @@ export function useDraft(gameId: string) {
     code => code === 'INVALID_DEFINITION' ? (startNodeKey ? 'This scene cannot be rehearsed on its own: it needs something earlier in the game, such as the round it votes on or the teams it uses. Try an earlier scene.' : 'Fix the problems listed before rehearsing.')
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.');
 
-  return { draft, loadError, definition, positions, setPositions, issues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh,
-    undo: () => restore('undo'), redo: () => restore('redo'), canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 };
+  return { draft, loadError, definition, positions, setPositions, issues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
+    undo: () => restore('undo'), redo: () => restore('redo'), canUndo: !readOnly && history.undo.length > 0, canRedo: !readOnly && history.redo.length > 0 };
 }
 export type DraftState = ReturnType<typeof useDraft>;

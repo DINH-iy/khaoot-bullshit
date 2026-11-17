@@ -1,10 +1,10 @@
-import { FINALE_STATS, SubmissionValueSchema, type FinaleStat } from '@party/contracts';
+import { FINALE_STATS, SubmissionValueSchema, type AwardRule, type FinaleStat } from '@party/contracts';
 import { minigameRules, type GameDefinition } from '../definition.js';
 import { locateStage } from '../graph.js';
 import type { Transaction } from '../model.js';
 import { minigameOutcome } from '../../minigames/outcome.js';
 
-export interface FinaleSlide { stat: FinaleStat; playerIds: string[]; value: string }
+export interface FinaleSlide { stat: AwardRule; title?: string; playerIds: string[]; value: string }
 /** The statistics shown unless the author chooses: everything that has something to show. */
 export const DEFAULT_FINALE: readonly FinaleStat[] = FINALE_STATS;
 const points = (milli: bigint) => { const whole = milli / 1000n; const rest = milli % 1000n; return rest === 0n ? `${whole}` : `${whole}.${String(rest).padStart(3, '0').replace(/0+$/, '')}`; };
@@ -23,10 +23,12 @@ const bump = (map: Map<string, number>, key: string, by = 1) => map.set(key, (ma
  * counts reactions while the server runs.)
  */
 export async function finaleSlides(tx: Transaction, sessionId: string, definition: GameDefinition): Promise<FinaleSlide[]> {
-  const wanted = definition.finale?.stats ?? DEFAULT_FINALE; if (!wanted.length) return [];
+  // The author's own awards (each with a rule, maybe an own title and a scene), or else the chosen statistics.
+  const wanted = definition.finale?.awards ?? (definition.finale?.stats ?? DEFAULT_FINALE).map(rule => ({ rule, title: undefined, nodeKey: undefined }));
+  if (!wanted.length) return [];
   const runs = await tx.stageRun.findMany({ where: { sessionId }, select: { id: true, nodeKey: true, stageKey: true, openedAt: true, lineupId: true, presentation: true } });
   const submissions = await tx.submission.findMany({ where: { sessionId, slotKey: 'answer' }, select: { id: true, stageRunId: true, playerId: true, teamId: true, value: true, receivedAt: true } });
-  const scores = await tx.scoreEntry.findMany({ where: { sessionId, recipientPlayerId: { not: null } }, select: { recipientPlayerId: true, amountMilli: true, reason: true } });
+  const scores = await tx.scoreEntry.findMany({ where: { sessionId, recipientPlayerId: { not: null } }, select: { recipientPlayerId: true, amountMilli: true, reason: true, stageRunId: true } });
   const stageOf = new Map(runs.map(run => [run.id, { run, stage: locateStage(definition, run.nodeKey, run.stageKey)?.stage }]));
   const author = new Map(submissions.map(submission => [submission.id, submission.playerId]));
 
@@ -65,5 +67,25 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
     slowest: (() => { const best = average.size >= 2 ? top(average) : null; return best ? { playerIds: best.playerIds, value: seconds(best.value) } : null; })(),
     mostVotes: count(votes, ['vote', 'votes']), minigameChamp: count(firsts, ['minigame won', 'minigames won']), luckiest: bigTop(lucky), mostReactions: null,
   };
-  return wanted.flatMap(stat => { const slide = slides[stat]; return slide ? [{ stat, ...slide }] : stat === 'mostReactions' ? [{ stat, playerIds: [], value: '' }] : []; });
+  // Most points in one scene: what each player earned in that scene's rounds.
+  const sceneTotals = new Map<string, Map<string, bigint>>();
+  for (const score of scores) {
+    const nodeKey = score.stageRunId ? stageOf.get(score.stageRunId)?.run.nodeKey : undefined; if (!nodeKey) continue;
+    const per = sceneTotals.get(nodeKey) ?? new Map<string, bigint>(); sceneTotals.set(nodeKey, per);
+    per.set(score.recipientPlayerId!, (per.get(score.recipientPlayerId!) ?? 0n) + score.amountMilli);
+  }
+  // The wooden spoon: the fewest points of everyone who played (0 counts), when at least two played.
+  const wantsFewest = wanted.some(award => award.rule === 'fewest');
+  const everyone = wantsFewest ? await tx.sessionPlayer.findMany({ where: { sessionId }, select: { id: true } }) : [];
+  const fewest = (() => {
+    if (everyone.length < 2) return null;
+    const scored = everyone.map(player => ({ id: player.id, total: totals.get(player.id) ?? 0n }));
+    const low = scored.reduce((result, entry) => entry.total < result ? entry.total : result, scored[0]!.total);
+    return { playerIds: scored.filter(entry => entry.total === low).map(entry => entry.id), value: `${points(low)} points` };
+  })();
+  return wanted.flatMap(award => {
+    const slide = award.rule === 'scene' ? bigTop(sceneTotals.get(award.nodeKey ?? '') ?? new Map()) : award.rule === 'fewest' ? fewest : slides[award.rule];
+    const title = award.title ? { title: award.title } : {};
+    return slide ? [{ stat: award.rule, ...title, ...slide }] : award.rule === 'mostReactions' ? [{ stat: award.rule, ...title, playerIds: [], value: '' }] : [];
+  });
 }

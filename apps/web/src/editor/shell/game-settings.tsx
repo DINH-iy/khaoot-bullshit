@@ -20,13 +20,14 @@ function TeamsNote({ definition }: { definition: Definition }) {
  * name and start, teams and default play, wheels of fortune, the end-of-game
  * awards, and the way to its look. A scene's own settings stay in the scene panel.
  */
-export function GameSettingsPanel({ definition, onChange, onLook, onClose }: { definition: Definition; onChange: Change; onLook: () => void; onClose: () => void }) {
+export function GameSettingsPanel({ definition, onChange, onLook, onClose, readOnly = false }: { definition: Definition; onChange: Change; onLook: () => void; onClose: () => void; readOnly?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
   const teamGame = definition.nodes.some(node => node.stages.some(stage => stage.kind === 'teams'));
   return <section className="game-settings-panel" aria-labelledby="game-settings-heading" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
     <div className="inspector-head"><h2 id="game-settings-heading" ref={heading} tabIndex={-1}>Game settings</h2><button className="small-button" onClick={onClose}>Close</button></div>
     <p className="hint">These apply to the whole game. A scene’s own settings are in the panel that opens when you select it.</p>
+    <fieldset className="view-lock" disabled={readOnly}>
     <Section title="General" summary={`About ${estimateMinutes(definition)} min`} open>
       <label>Name of the game<input value={definition.title} maxLength={160} onChange={event => onChange({ ...definition, title: event.target.value }, 'title')} /></label>
       <label>The game starts with<Dropdown value={definition.startNodeKey} onChange={startNodeKey => onChange({ ...definition, startNodeKey })}
@@ -47,6 +48,7 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose }: { d
     </Section>
     <WheelSettings definition={definition} onChange={onChange} />
     <FinaleSettings definition={definition} onChange={onChange} />
+    </fieldset>
     <Section title="Look & feel" summary="Style, texts, animations">
       <p className="hint">Colours, fonts, every text players see and the animations, for the whole game or one scene.</p>
       <button className="small-button" onClick={() => { onClose(); onLook(); }}>Open Look & feel</button>

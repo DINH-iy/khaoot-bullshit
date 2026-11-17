@@ -30,12 +30,23 @@ export function outputPort(node: Node, position: Point, option?: string): Point 
 }
 /** A smooth curve from an output port to an input port, as in the reference. */
 export function curve(from: Point, to: Point): string {
+  if (wrapsBack(from, to)) {
+    // To a scene further left (the next row of a wrapped game): out to the right, along the gap between the rows, in from the left.
+    const mid = returnY(from, to); const r = 72;
+    return `M ${from.x} ${from.y} C ${from.x + r} ${from.y}, ${from.x + r} ${mid}, ${from.x} ${mid} L ${to.x} ${mid} C ${to.x - r} ${mid}, ${to.x - r} ${to.y}, ${to.x} ${to.y}`;
+  }
   const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
   return `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
 }
+// An arrow wraps back when it goes clearly to the left (into the next row, or to a scene placed to the left).
+const wrapsBack = (from: Point, to: Point) => to.x < from.x - CARD_WIDTH / 2;
+// The height of the run between the rows: halfway, or just below the start when going up.
+const returnY = (from: Point, to: Point) => to.y > from.y ? (from.y + to.y) / 2 : Math.max(from.y, to.y) + GRID * 4;
 
 /** A point a fraction `t` along the curve: where an arrow's grab handle sits, so arrows into the same scene get separate handles. */
 export function pointOnCurve(from: Point, to: Point, t: number): Point {
+  // On a wrapped arrow the handles sit on its long straight run.
+  if (wrapsBack(from, to)) return { x: from.x + (to.x - from.x) * t, y: returnY(from, to) };
   const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
   const p1 = { x: from.x + bend, y: from.y }; const p2 = { x: to.x - bend, y: to.y }; const u = 1 - t;
   return { x: u ** 3 * from.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t ** 3 * to.x, y: u ** 3 * from.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t ** 3 * to.y };
@@ -228,12 +239,18 @@ export function autoLayout(definition: Definition): Positions {
   }
   const columns = new Map<number, Node[]>();
   for (const node of definition.nodes) { const column = depth.get(node.key) ?? 0; columns.set(column, [...(columns.get(column) ?? []), node]); }
-  const tallest = Math.max(...[...columns.values()].map(nodes => nodes.reduce((sum, node) => sum + cardHeight(node) + GRID * 2, 0)));
+  const heightOf = (nodes: Node[]) => nodes.reduce((sum, node) => sum + cardHeight(node) + GRID * 2, 0);
+  const tallest = Math.max(...[...columns.values()].map(heightOf));
+  // A long game wraps into rows of columns, as many per row as keeps the whole game about screen-shaped (16:10);
+  // a short one stays on one row. The arrow from the end of a row runs back to the start of the next (see `curve`).
+  const count = Math.max(...columns.keys()) + 1; const step = CARD_WIDTH + GRID * 6; const rowHeight = tallest + GRID * 8;
+  const perRow = count <= 6 ? count : [...Array(count).keys()].map(index => index + 1).filter(size => size >= 4)
+    .reduce((best, size) => Math.abs((size * step) / (Math.ceil(count / size) * rowHeight) - 1.6) < Math.abs((best * step) / (Math.ceil(count / best) * rowHeight) - 1.6) ? size : best, count);
   const positions: Positions = {};
   for (const [column, nodes] of columns) {
-    const height = nodes.reduce((sum, node) => sum + cardHeight(node) + GRID * 2, 0);
-    let y = snap((tallest - height) / 2);
-    for (const node of nodes) { positions[node.key] = { x: column * (CARD_WIDTH + GRID * 6), y }; y += snap(cardHeight(node) + GRID * 2); }
+    const row = Math.floor(column / perRow); const place = column % perRow;
+    let y = snap(row * rowHeight + (tallest - heightOf(nodes)) / 2);
+    for (const node of nodes) { positions[node.key] = { x: place * step, y }; y += snap(cardHeight(node) + GRID * 2); }
   }
   return positions;
 }

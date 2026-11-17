@@ -189,7 +189,7 @@ export const StageTeamsSchema = z.object({
 // scenes or the tie rules. Players see counts only as the game allows, and the
 // decision only once the host announces it; the host sees everything at once.
 export const PublicRouteSchema = z.object({
-  method: z.enum(['players', 'captains', 'host']), options: z.array(ChoiceOptionSchema).min(2).max(6), canVote: z.boolean(),
+  method: z.enum(['players', 'captains', 'host']), options: z.array(ChoiceOptionSchema).min(2).max(8), canVote: z.boolean(),
   counts: z.array(z.object({ optionKey: GameKeySchema, count: z.number().int().min(0) }).strict()).nullable(),
   pending: z.enum(['tie', 'no-votes', 'host']).nullable(), leaders: z.array(GameKeySchema).nullable(),
   decision: z.object({ optionKey: GameKeySchema, reason: z.enum(['vote', 'host', 'tie-break', 'fallback']), resolution: z.enum(['majority', 'host', 'default', 'random']) }).strict().nullable(),
@@ -232,12 +232,17 @@ export const PublicStageSchema = z.object({
 /** Statistics for the end-of-game show; the author picks which ones appear and in which order. */
 export const FINALE_STATS = ['winner', 'mostCorrect', 'mostWrong', 'fastest', 'slowest', 'mostVotes', 'minigameChamp', 'luckiest', 'mostReactions'] as const;
 export type FinaleStat = typeof FINALE_STATS[number];
-export const FinaleSlideSchema = z.object({ stat: z.enum(FINALE_STATS), playerIds: z.array(GameIdSchema), value: z.string().max(60) }).strict();
+// Every rule an award can follow: the statistics above, the most points in one chosen scene, and the fewest points.
+export const AWARD_RULES = [...FINALE_STATS, 'scene', 'fewest'] as const;
+export type AwardRule = typeof AWARD_RULES[number];
+// One award as the screens show it: its rule, the author's own title when given, the winners and their score.
+export const FinaleSlideSchema = z.object({ stat: z.enum(AWARD_RULES), title: z.string().max(60).optional(), playerIds: z.array(GameIdSchema), value: z.string().max(60) }).strict();
 // The wheel of fortune as screens see it: a spin on the current scene (with every entry, to draw the wheel),
 // and the last result, which stays in a corner until the next spin or until a scene clears it.
 export const WheelViewSchema = z.object({
   canSpin: z.boolean(),
-  spin: z.object({ title: z.string(), entries: z.array(z.string()), index: z.number().int().min(0), label: z.string(), spunAt: z.string().datetime(), seconds: z.number().int() }).strict().nullable(),
+  spin: z.object({ title: z.string(), entries: z.array(z.string()), index: z.number().int().min(0), label: z.string(), spunAt: z.string().datetime(), seconds: z.number().int(),
+    colors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).max(8).optional() }).strict().nullable(),
   current: z.object({ title: z.string(), label: z.string() }).strict().nullable(),
 }).strict();
 export const SessionViewSchema = z.object({

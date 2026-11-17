@@ -208,18 +208,19 @@ export function NextFields({ definition, node, onChange }: { definition: Definit
 }
 
 /** Where the scene's output (or each route option) leads, for the closed Where next group. */
-function nextSummary(definition: Definition, node: Node): string {
+export function nextSummary(definition: Definition, node: Node): string {
   if (isRoute(node)) { const options = optionsOf(node); const linked = options.filter(option => definition.edges.some(edge => edge.from === node.key && edge.option === option.key)).length; return `${linked} of ${options.length} routes connected`; }
   const next = definition.edges.find(edge => edge.from === node.key);
   return next ? `→ ${sceneName(definition, next.to)}` : 'The game ends here';
 }
 
 /**
- * The Flow editor's side panel for one selected scene: what kind of scene it is,
- * its problems, its settings in groups and where it leads. The scene's actions
- * (start here, duplicate, save as prefab, delete) are in the ☰ menu next to Close.
+ * The Flow editor's side panel for one selected scene: only what belongs to the flow.
+ * What the scene is (a summary), its problems, its routes (a party choice's outputs)
+ * and where it leads; its content and settings are edited in the Scene editor
+ * ("Edit this scene"). The scene's actions are in the ☰ menu next to Close.
  */
-export function Inspector({ definition, node, problems, onChange, onDelete, onClose, onDuplicate, prefab }: { definition: Definition; node: Node; problems: DefinitionIssue[]; onChange: Change; onDelete: (next: Definition) => void; onClose: () => void; onDuplicate?: () => void; prefab?: { content: () => PrefabContent; defaultName: string } }) {
+export function Inspector({ definition, node, problems, onChange, onDelete, onClose, onOpen, onDuplicate, prefab, readOnly = false }: { definition: Definition; node: Node; problems: DefinitionIssue[]; onChange: Change; onDelete: (next: Definition) => void; onClose: () => void; onOpen: () => void; onDuplicate?: () => void; readOnly?: boolean; prefab?: { content: () => PrefabContent; defaultName: string } }) {
   const [confirming, setConfirming] = useState(false); const [saving, setSaving] = useState(false);
   useEffect(() => { setConfirming(false); setSaving(false); }, [node.key]);
   const text = cardText(definition, node); const start = definition.startNodeKey === node.key;
@@ -232,36 +233,51 @@ export function Inspector({ definition, node, problems, onChange, onDelete, onCl
     <div className="inspector-head">
       <span className={`ed-kind thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true"><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
       <div className="ed-kind-text"><h2 id="inspector-heading">{text.label}</h2>{start && <small>The game starts here</small>}</div>
-      <ActionMenu label="Scene actions" actions={actions} />
+      {!readOnly && <ActionMenu label="Scene actions" actions={actions} />}
       <button className="small-button" onClick={onClose}>Close</button></div>
     {saving && prefab && <SavePrefab key={node.key} content={prefab.content} defaultName={prefab.defaultName} onClose={() => setSaving(false)} />}
-    {node.stages.length > 1 && <p className="hint">This scene has {node.stages.length} parts. This panel edits the first; the Scene editor edits them all.</p>}
+    <div className="flow-summary">
+      {text.banner && <p className="flow-summary-banner">{text.banner}</p>}
+      <p className="flow-summary-title">{text.title}</p>
+      <p className="flow-summary-line">{text.line}{node.stages.length > 1 ? ` · ${node.stages.length} parts` : ''}</p>
+      <button className="accent" onClick={onOpen}>{readOnly ? 'Open this scene →' : 'Edit this scene →'}</button>
+    </div>
     {problems.length > 0 && <div role="alert" className="inspector-problems"><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && node.stages.length > 1 ? `Part ${issue.stageIndex + 1}: ` : ''}{issue.message}</li>)}</ul></div>}
-    <StageFields key={node.key} definition={definition} node={node} index={0} onChange={onChange} />
-    <Section key={`next-${node.key}`} title="Where next" summary={nextSummary(definition, node)}><NextFields definition={definition} node={node} onChange={onChange} /></Section>
+    <fieldset className="view-lock" disabled={readOnly}>
+    {isRoute(node) && <RouteNames definition={definition} node={node} onChange={onChange} />}
+    <Section key={`next-${node.key}`} title="Where next" open summary={nextSummary(definition, node)}><NextFields definition={definition} node={node} onChange={onChange} /></Section>
+    </fieldset>
     {confirming && <ConfirmDialog title={`Delete “${text.title}”?`} text="The scene and its connections go. Undo (Ctrl/Cmd+Z) brings it back." confirm="Delete scene"
       onConfirm={() => { setConfirming(false); onDelete(deleteScene(definition, node.key)); }} onCancel={() => setConfirming(false)} />}
   </aside>;
 }
 
 function RouteFields({ definition, node, stage, onChange }: { definition: Definition; node: Node; stage: Stage; onChange: Change }) {
-  const options = optionsOf(node); const decide = stage['decide'] as { method: string; tie?: string; noVotes?: string; counts?: string };
+  const decide = stage['decide'] as { method: string; tie?: string; noVotes?: string; counts?: string };
   const setDecide = (change: Partial<typeof decide>) => onChange(updateStage(definition, node.key, 0, current => {
     const merged = { ...decide, ...change };
     const next: Stage = { ...current, decide: merged.method === 'host' ? { method: 'host' } : { method: merged.method, tie: merged.tie ?? 'random', noVotes: merged.noVotes ?? 'random', counts: merged.counts ?? 'reveal' } };
     if (merged.method === 'host') { next.durationMs = null; delete next['defaultOptionKey']; }
     return next;
   }));
-  return <fieldset><legend>Routes</legend>
-    {options.map((option, position) => <div key={option.key} className="option-row">
-      <input aria-label={`Route ${position + 1} name`} value={option.label} maxLength={240} onChange={event => onChange(setRouteOptions(definition, node.key, options.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry)), `${node.key}:route-${option.key}`)} />
-      <button className="icon-button" disabled={options.length <= 2} aria-label={`Remove route ${position + 1}`} onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}>×</button></div>)}
-    <button className="small-button" disabled={options.length >= 6} onClick={() => onChange(setRouteOptions(definition, node.key, [...options, { key: uniqueKey('route', options.map(entry => entry.key)), label: `Route ${options.length + 1}` }]))}>+ Route</button>
+  return <>
+    <RouteNames definition={definition} node={node} onChange={onChange} />
     <Segmented label="Who decides" value={decide.method} choices={[{ value: 'players', label: 'Everyone votes' }, { value: 'captains', label: 'Captains vote' }, { value: 'host', label: 'The host' }]} onChange={method => setDecide({ method })} />
     {decide.method !== 'host' && <>
       <Segmented label="On a tie" value={decide.tie ?? 'random'} choices={[{ value: 'random', label: 'A random tied route' }, { value: 'host', label: 'The host decides' }]} onChange={tie => setDecide({ tie })} />
       <Segmented label="When nobody votes" value={decide.noVotes ?? 'random'} choices={[{ value: 'random', label: 'A random route' }, { value: 'host', label: 'The host decides' }]} onChange={noVotes => setDecide({ noVotes })} />
       <Segmented label="Players see the vote counts" value={decide.counts ?? 'reveal'} choices={[{ value: 'reveal', label: 'When announced' }, { value: 'live', label: 'Live' }, { value: 'never', label: 'Never' }]} onChange={counts => setDecide({ counts })} />
     </>}
+  </>;
+}
+
+/** A party choice's routes (its outputs): their names, and adding or removing one. In both editors. */
+function RouteNames({ definition, node, onChange }: { definition: Definition; node: Node; onChange: Change }) {
+  const options = optionsOf(node);
+  return <fieldset><legend>Routes</legend>
+    {options.map((option, position) => <div key={option.key} className="option-row">
+      <input aria-label={`Route ${position + 1} name`} value={option.label} maxLength={240} onChange={event => onChange(setRouteOptions(definition, node.key, options.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry)), `${node.key}:route-${option.key}`)} />
+      <button className="icon-button" disabled={options.length <= 2} aria-label={`Remove route ${position + 1}`} onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}>×</button></div>)}
+    <button className="small-button" disabled={options.length >= 8} onClick={() => onChange(setRouteOptions(definition, node.key, [...options, { key: uniqueKey('route', options.map(entry => entry.key)), label: `Route ${options.length + 1}` }]))}>+ Route</button>
   </fieldset>;
 }

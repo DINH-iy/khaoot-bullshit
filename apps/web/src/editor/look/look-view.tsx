@@ -11,6 +11,7 @@ import { LookPreview } from './look-preview.js';
 import '../../room/room.css';
 import './look.css';
 import { Dropdown } from '../controls/dropdown.js';
+import { readMemory, rememberPlace } from '../shell/editor-memory.js';
 
 type Section = 'theme' | 'texts' | 'animations';
 const SECTIONS: Record<Section, string> = { theme: 'Colours & style', texts: 'Texts', animations: 'Animations' };
@@ -18,10 +19,12 @@ const short = (text: string) => text.length > 48 ? `${text.slice(0, 46)}…` : t
 const scopeValue = (scope: Scope) => scope.kind === 'game' ? 'game' : `${scope.nodeKey}|${scope.stageIndex}`;
 
 /** The look of the game: style, every text and every animation, for the whole game or for a single scene. */
-export function LookView({ d, selected }: { d: DraftState; selected: string[] }) {
+export function LookView({ d, selected, gameId }: { d: DraftState; selected: string[]; gameId: string }) {
   const definition = d.definition!;
   const [scope, setScope] = useState<Scope>(() => { const node = definition.nodes.find(entry => entry.key === selected[0]); return node && selected.length === 1 ? { kind: 'scene', nodeKey: node.key, stageIndex: 0 } : { kind: 'game' }; });
-  const [section, setSection] = useState<Section>('theme');
+  // The part of Look & feel last open for this game (K2).
+  const [section, setSectionState] = useState<Section>(() => { const saved = readMemory(gameId).lookSection; return saved && saved in SECTIONS ? saved as Section : 'theme'; });
+  const setSection = (next: Section) => { setSectionState(next); rememberPlace(gameId, { lookSection: next }); };
   const live = scope.kind === 'scene' && !definition.nodes.some(node => node.key === scope.nodeKey) ? { kind: 'game' } as Scope : scope;
   const game = layerOf(definition, { kind: 'game' }); const layer = layerOf(definition, live);
   const below: Presentation = live.kind === 'game' ? {} : game;
@@ -38,9 +41,11 @@ export function LookView({ d, selected }: { d: DraftState; selected: string[] })
       <p className="hint">{live.kind === 'game' ? 'Changes here apply to every scene, unless a scene has its own.' : 'Changes here apply only to this scene; everything else follows the whole game.'}</p>
       {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{changedScenes.length} {changedScenes.length === 1 ? 'scene has' : 'scenes have'} its own look (marked ✎).</p>}
       <div className="tabs" role="tablist" aria-label="Part of the look">{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{SECTIONS[key]}</button>)}</div>
+      <fieldset className="view-lock" disabled={d.readOnly}>
       {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} title={definition.title} onChange={theme => update({ theme }, 'theme')} />}
       {section === 'texts' && <TextsPanel texts={layer.texts} below={below.texts ?? {}} onChange={texts => update({ texts }, 'texts')} />}
       {section === 'animations' && <AnimationPanel animations={layer.animations} below={below.animations ?? {}} onChange={animations => update({ animations }, 'animations')} />}
+      </fieldset>
     </aside>
     <section className="look-preview-area" aria-label="Preview of the look">
       <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={themeStyle(look.theme)} className={themeClass(look.theme)} /></LookContext.Provider>

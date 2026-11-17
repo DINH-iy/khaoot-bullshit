@@ -1,10 +1,14 @@
 /* Editing together: who else is here, what they have selected, and their pointers. */
 .peer-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 .peer-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.peer-chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px 3px 3px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-bg); font-size: .9rem; }
+.peer-list { gap: 0; } .peer-chip { display: inline-flex; margin-left: -6px; border-radius: 50%; box-shadow: 0 0 0 2px var(--e-panel); } .peer-list .peer-chip:first-child { margin-left: 0; }
 .peer-dot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--peer); color: #fff; font-weight: 700; font-size: .8rem; }
-.peer-me { display: inline-flex; gap: 6px; align-items: center; margin: 0; font-size: .9rem; color: var(--e-muted); }
-.editor .peer-me input { width: 8.5rem; min-height: 0; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--e-border); border-left: 4px solid var(--peer, var(--e-border)); background: var(--e-bg); color: var(--e-text); font: inherit; }
+.peer-me { position: relative; }
+.editor .peer-me-button { display: grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--peer, var(--e-border)); background: var(--e-panel); }
+.peer-me-button .peer-dot { width: 28px; height: 28px; background: var(--peer, var(--e-muted)); }
+.peer-me-popover { position: absolute; right: 0; top: calc(100% + 6px); z-index: 12; width: 15rem; padding: 10px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
+.peer-me-popover label { display: grid; gap: 6px; font-size: .85rem; color: var(--e-muted); }
+.editor .peer-me-popover input { min-height: 36px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--e-border); border-left: 4px solid var(--peer, var(--e-border)); background: var(--e-bg); color: var(--e-text); font: inherit; }
 
 .scene-card.peer-selected { outline: 3px solid var(--peer); outline-offset: 4px; }
 .peer-tags { position: absolute; right: 8px; top: -14px; display: flex; gap: 4px; pointer-events: none; }

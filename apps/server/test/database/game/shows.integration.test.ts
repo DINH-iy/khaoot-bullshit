@@ -54,6 +54,33 @@ describe('wheel of fortune, awards, breaks and auto-close', () => {
       { stat: 'mostCorrect', playerIds: [f.players[0]!.id], value: '1 correct answer' }]);
   });
 
+  it('shows the author’s own awards: own titles, the best in one scene and the wooden spoon', async () => {
+    const game = parseDefinition({ formatVersion: 2, title: 'Own awards', startNodeKey: 'a', nodes: [quiz('a'), quiz('b')], edges: [{ key: 'ab', from: 'a', to: 'b' }],
+      finale: { awards: [{ rule: 'scene', nodeKey: 'b', title: 'Best in round two' }, { rule: 'fewest' }, { rule: 'winner', title: 'Champion' }] } });
+    const f = await fixture(3, game);
+    const first = (await hostCommand(f, 'session.start')).stageRunId!;
+    await service.execute(as(f.players[0]!.id), answer(f.sessionId, first, 'canberra'));
+    await hostCommand(f, 'stage.close', { stageRunId: first });
+    const second = (await hostCommand(f, 'stage.advance', { stageRunId: first })).stageRunId!;
+    await service.execute(as(f.players[1]!.id), answer(f.sessionId, second, 'canberra'));
+    await hostCommand(f, 'stage.close', { stageRunId: second }); await hostCommand(f, 'stage.advance', { stageRunId: second });
+    expect((await readSessionView(prisma, f.host, f.sessionId)).awards).toEqual([
+      { stat: 'scene', title: 'Best in round two', playerIds: [f.players[1]!.id], value: '10 points' },
+      { stat: 'fewest', playerIds: [f.players[2]!.id], value: '0 points' },
+      { stat: 'winner', title: 'Champion', playerIds: expect.arrayContaining([f.players[0]!.id, f.players[1]!.id]), value: '10 points' }]);
+    // An award about a scene that does not exist is refused.
+    expect(() => parseDefinition({ ...game, finale: { awards: [{ rule: 'scene', nodeKey: 'missing' }] } })).toThrow();
+  });
+
+  it('sends a wheel’s own slice colours with its spin', async () => {
+    const game = parseDefinition({ formatVersion: 2, title: 'Coloured wheel', startNodeKey: 'a',
+      wheels: [{ key: 'w', title: 'Prizes', removePicked: false, spinSeconds: 2, colors: ['#f39200', '#7ac6b6'], entries: [{ key: 'x', label: 'X' }, { key: 'y', label: 'Y' }] }],
+      nodes: [quiz('a', { spin: { wheel: 'w' } })], edges: [] });
+    const f = await fixture(1, game); const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
+    await hostCommand(f, 'wheel.spin', { stageRunId });
+    expect((await readSessionView(prisma, f.host, f.sessionId)).wheel.spin).toMatchObject({ colors: ['#f39200', '#7ac6b6'] });
+  });
+
   it('closes a round a few seconds after everyone answered, unless the room switches that off', async () => {
     const game = parseDefinition({ formatVersion: 2, title: 'All in', startNodeKey: 'a', nodes: [quiz('a'), quiz('b')], edges: [{ key: 'ab', from: 'a', to: 'b' }] });
     const f = await fixture(2, game); const first = (await hostCommand(f, 'session.start')).stageRunId!;

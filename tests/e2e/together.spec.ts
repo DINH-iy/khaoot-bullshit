@@ -44,9 +44,12 @@ test('two people edit one game at once: each sees the other’s work, selection 
 
   // Both change something different at the same time; nobody reloads, nobody loses anything.
   await card(ben, /Shared finale/).locator('.card-title').click();
-  await ada.locator('.inspector textarea').first().fill('Ada wrote this');
-  await ben.locator('.inspector textarea').first().fill('Ben wrote this');
+  // Each opens their scene in the Scene editor and writes in it, then goes back to the map.
+  for (const page of [ada, ben]) await page.getByRole('button', { name: 'Edit this scene →' }).click();
+  await ada.locator('.scene-props textarea').first().fill('Ada wrote this');
+  await ben.locator('.scene-props textarea').first().fill('Ben wrote this');
   await ben.getByLabel('Game name').fill('Named by Ben');
+  for (const page of [ada, ben]) await page.getByRole('tab', { name: 'Flow editor' }).click();
   for (const page of [ada, ben]) {
     await expect(page.locator('.card-title', { hasText: 'Ada wrote this' })).toBeVisible();
     await expect(page.locator('.card-title', { hasText: 'Ben wrote this' })).toBeVisible();
@@ -83,7 +86,7 @@ test('two people edit one game at once: each sees the other’s work, selection 
   await ben.getByRole('tab', { name: 'Scene editor' }).click();
   await ada.getByRole('tab', { name: 'Scene editor' }).click();
   await expect(ada.getByRole('navigation', { name: 'Scenes in play order' }).locator('.scene-row', { hasText: 'Standings' }).locator('.peer-tag')).toHaveText('Ben');
-  await nameField(ben).fill('Benjamin'); await expect(peers(ada)).toContainText('Benjamin');
+  await ben.getByRole('button', { name: /^You are .*change your name/ }).click(); await nameField(ben).fill('Benjamin'); await expect(peers(ada)).toContainText('Benjamin');
   await ben.context().close();
   await expect(peers(ada)).toHaveCount(0);
   await ada.context().close();

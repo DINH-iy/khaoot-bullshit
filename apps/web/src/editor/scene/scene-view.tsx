@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DefinitionIssue, EditorPeer } from '@party/contracts';
 import { peersOn, PeerTags } from '../live/presence.js';
 import { Icon, sceneIcon } from '../controls/icons.js';
-import { NextFields, StageFields } from './inspector.js';
+import { nextSummary, StageFields } from './inspector.js';
+import { ActionMenu } from '../controls/action-menu.js';
+import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
 import { Section } from '../controls/section.js';
-import { isWheelScene, addScene, autoLayout, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from '../model.js';
+import { isWheelScene, addScene, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from '../model.js';
 import type { DraftState } from '../shell/use-draft.js';
 
 // What a part is, without the scene's own route or rejoin label.
@@ -40,8 +42,8 @@ export function sceneOrder(definition: Definition): { rows: Row[]; loose: Node[]
   return { rows, loose: definition.nodes.filter(node => !placed.has(node.key)) };
 }
 
-export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; peers: EditorPeer[] }) {
-  const definition = d.definition!; const { change, positions } = d;
+export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; peers: EditorPeer[]; onOpenFlow: (key: string) => void }) {
+  const definition = d.definition!; const { change, positions } = d; const readOnly = d.readOnly;
   const { rows, loose } = useMemo(() => sceneOrder(definition), [definition]);
   const current = definition.nodes.find(node => node.key === selected[0]) ?? rows[0]?.node ?? definition.nodes[0]!;
   const [part, setPart] = useState(0); const [adding, setAdding] = useState<'scene' | 'part' | null>(null); const [confirming, setConfirming] = useState(false);
@@ -86,12 +88,11 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
   };
   return <div className="scene-editor">
     <nav className="scene-list" aria-label="Scenes in play order">
-      <div className="scene-list-head"><h2>Scenes</h2><button className="with-icon small-button" onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} />Add after this</button></div>
+      <div className="scene-list-head"><h2>Scenes</h2><button className="with-icon small-button" disabled={readOnly} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} />Add after this</button></div>
       {adding === 'scene' && <ScenePalette label="Add a scene after this one" onPick={insertAfter} onCancel={() => setAdding(null)} />}
       <ol>{rows.map(entry => row(entry.node, entry.depth, entry.via))}</ol>
       {loose.length > 0 && <><h3>Not connected</h3><ol>{loose.map(node => row(node, 0, null))}</ol></>}
-      <div className="actions"><button className="small-button" onClick={d.undo} disabled={!d.canUndo}>Undo</button><button className="small-button" onClick={d.redo} disabled={!d.canRedo}>Redo</button>
-        <button className="small-button" onClick={() => change(definition, autoLayout(definition))}>Tidy the flow</button></div>
+      <div className="actions"><button className="small-button" onClick={d.undo} disabled={!d.canUndo}>Undo</button><button className="small-button" onClick={d.redo} disabled={!d.canRedo}>Redo</button></div>
     </nav>
     <section className="scene-stage" aria-label="Preview">
       {current.stages.length > 1 && <div className="part-tabs" role="tablist" aria-label="Parts of this scene">{current.stages.map((stage, position) =>
@@ -100,24 +101,28 @@ export function SceneView({ d, selected, setSelected, peers }: { d: DraftState; 
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>
     <aside className="scene-props" aria-labelledby="scene-props-heading">
-      <h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
+      <div className="inspector-head"><h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
+        <ActionMenu label="Scene actions" actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: 'Start the game here', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
+          { label: 'Show in the Flow editor', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: 'Delete scene…', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
+      {definition.startNodeKey === current.key && <p className="start-note">The game starts here.</p>}
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
-      {definition.startNodeKey === current.key ? <p className="start-note">The game starts here.</p> : <button onClick={() => change({ ...definition, startNodeKey: current.key })}>Start the game here</button>}
-      {!isRoute(current) && <fieldset className="parts-box"><legend>Parts of this scene</legend>
+      {/* A small named group (K4), like the scene's settings: open as left last time. */}
+      {!isRoute(current) && <Section title="Parts" memory="scene:parts" summary={current.stages.length === 1 ? '1 part' : `${current.stages.length} parts`}>
         <ol className="part-list">{current.stages.map((stage, position) => <li key={stage.key} className={position === index ? 'current' : undefined}>
           <button className="link-button" onClick={() => setPart(position)}>Part {position + 1}: {partLabel(definition, stage)}</button>
-          <button className="icon-button" aria-label={`Move part ${position + 1} up`} disabled={position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
-          <button className="icon-button" aria-label={`Remove part ${position + 1}`} disabled={current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
-        <button className="small-button with-icon" onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />Add a part</button>
+          <button className="icon-button" aria-label={`Move part ${position + 1} up`} disabled={readOnly || position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
+          <button className="icon-button" aria-label={`Remove part ${position + 1}`} disabled={readOnly || current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
+        <button className="small-button with-icon" disabled={readOnly} onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />Add a part</button>
         {adding === 'part' && <div className="part-palette"><ScenePalette label="Add a part" only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
         <p className="hint">Parts play one after another inside this scene, for example a question and then its scoreboard.</p>
-      </fieldset>}
-      <h3>Part {index + 1}</h3>
-      <StageFields definition={definition} node={current} index={index} onChange={onChange} />
-      <Section key={'next-' + current.key} title="Where next"><NextFields definition={definition} node={current} onChange={onChange} /></Section>
-      {!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title="Wheel of fortune" summary={(current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'Spun here' : 'Not on this scene'}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}
-      {confirming ? <div className="actions"><button className="danger" onClick={() => { const kept = { ...positions }; delete kept[current.key]; change(deleteScene(definition, current.key), kept); setSelected([]); }}>Yes, delete this scene</button><button onClick={() => setConfirming(false)}>Keep it</button></div>
-        : <button className="danger-outline" onClick={() => setConfirming(true)}>Delete scene</button>}
+      </Section>}
+      {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
+      <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} /></fieldset>
+      {/* Where it leads is the flow's business: shown here, changed in the Flow editor. */}
+      <p className="scene-next"><span>Next: {nextSummary(definition, current).replace(/^→ /, '')}</span> <button className="link-button" onClick={() => onOpenFlow(current.key)}>Change in the Flow editor</button></p>
+      <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title="Wheel of fortune" summary={(current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'Spun here' : 'Not on this scene'}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
+      {confirming && <ConfirmDialog title={`Delete “${cardText(definition, current).title}”?`} text="The scene and its connections go. Undo (Ctrl/Cmd+Z) brings it back." confirm="Delete scene"
+        onConfirm={() => { const kept = { ...positions }; delete kept[current.key]; setConfirming(false); change(deleteScene(definition, current.key), kept); setSelected([]); }} onCancel={() => setConfirming(false)} />}
     </aside>
   </div>;
 }

@@ -24,6 +24,9 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   // A style, a colour and a readability warning.
   await page.getByRole('button', { name: /Neon night/ }).click();
   await expect(page.locator('.room-preview').first()).toHaveCSS('font-family', /Arial Narrow/);
+  // The style page is in small groups; only Style starts open.
+  await expect(page.getByLabel('Text on main buttons')).toBeHidden();
+  await page.locator('summary', { hasText: /^Colours/ }).click();
   await page.getByLabel('Text on main buttons').fill('#00f0ff');
   await expect(page.getByText('Text on main buttons is hard to read')).toBeVisible();
   await page.getByLabel('Text on main buttons').fill('#001417');
@@ -33,9 +36,14 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   await page.getByRole('tab', { name: 'Texts' }).click();
   await page.getByLabel('Find a text').fill('answer is in');
   await page.getByLabel('Your answer is in!', { exact: true }).fill('Locked in, good luck!');
+  // Without a search the texts are in closed groups; a search opens the groups with a match.
   await page.getByLabel('Find a text').fill('');
+  await expect(page.getByLabel('Join a game', { exact: true })).toBeHidden();
+  await page.locator('summary', { hasText: /^Joining/ }).click();
   await page.getByLabel('Join a game', { exact: true }).fill('Welcome to quiz night');
+  await page.getByLabel('Find a text').fill('time} left');
   await page.getByLabel('{time} left', { exact: true }).fill('Hurry! {time}');
+  await page.getByLabel('Find a text').fill('');
   await page.getByRole('button', { name: 'Answer saved', exact: true }).click();
   await expect(page.locator('.look-phone')).toContainText('Locked in, good luck!');
 
@@ -54,17 +62,18 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   // Only this scene: a different heading font for the quiz question.
   await page.getByRole('tab', { name: 'Colours & style' }).click();
   await page.getByLabel('Change the look of').click(); await page.getByRole('option', { name: 'Capital of France?' }).click();
+  await page.locator('summary', { hasText: /^Text/ }).click();
   await page.getByLabel('Font for titles').click(); await page.getByRole('option', { name: 'Elegant' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
-  const exported = await (async () => { await page.getByRole('button', { name: 'Export as text' }).click(); return JSON.parse(await page.getByLabel('The game as text').inputValue()); })();
+  const exported = await (async () => { await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Export as text' }).click(); return JSON.parse(await page.getByLabel('The game as text').inputValue()); })();
   expect(exported.presentation).toMatchObject({ theme: { preset: 'neon', colors: { accentText: '#001417' } }, texts: { 'answer.saved': 'Locked in, good luck!', 'join.title': 'Welcome to quiz night', 'timer.left': 'Hurry! {time}' },
     animations: { answerSaved: { preset: 'shake' }, sceneEnter: { name: 'Wiggle in', custom: { keyframes: expect.any(Array) } } } });
   expect(exported.nodes.find((node: { key: string }) => node.key === 'q1').stages[0].presentation).toEqual({ theme: { headingFont: 'elegant' } });
 
   // Close the exported text again: it lies over the top bar.
-  await page.getByRole('button', { name: 'Export as text' }).click();
-  await page.getByRole('button', { name: 'Publish', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Play published version ↗' })).toBeEnabled();
+  await page.locator('.export-panel').getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await expect(page.getByRole('menuitem', { name: 'Play the published version ↗' })).toBeEnabled(); await page.keyboard.press('Escape');
   await page.goto(`${baseURL}/?host=1`);
   await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: `Open room for ${name}` }).click();
   const roomCode = (await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
@@ -100,6 +109,7 @@ test('a colour palette from Canva, Figma or Coolors is imported, and the colours
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   // The MBO Utrecht style is one of the starting points.
   await page.getByRole('button', { name: /MBO Utrecht/ }).click();
+  await page.locator('summary', { hasText: /^Colours/ }).click();
   await expect(page.getByLabel('Answer A colour')).toHaveValue('#f39200');
 
   await page.getByRole('button', { name: 'Import colours…' }).click();
@@ -135,6 +145,7 @@ test('answer marks can be numbers, square and after the answer, and answers neve
   await page.getByRole('button', { name: 'Question', exact: true }).click();
   const phoneTiles = page.locator('.look-phone .tile');
   await expect(phoneTiles.first().locator('.answer-mark')).toHaveText('A');
+  await page.locator('summary', { hasText: /^Answer marks/ }).click();
   await page.getByRole('group', { name: 'Marks', exact: true }).getByRole('button', { name: '1 2 3' }).click();
   await page.getByRole('group', { name: 'Mark shape' }).getByRole('button', { name: 'Square', exact: true }).click();
   await page.getByRole('group', { name: 'Mark place' }).getByRole('button', { name: 'After the answer' }).click();

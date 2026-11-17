@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { inspectDefinition } from '../../src/authoring/drafts.js';
 // The editor's own model: what it adds must be what the server accepts.
 import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS } from '@party/contracts';
-import { addConnectedScene, insertOnEdge, QUIZ_KINDS, SCENE_TYPES, SCENE_VARIANTS, updateStage, withDuelContest, withMinigame, withQuizKind, type Definition } from '../../../web/src/editor/model.js';
+import { addConnectedScene, insertOnEdge, setRouteOptions, QUIZ_KINDS, SCENE_TYPES, SCENE_VARIANTS, updateStage, withDuelContest, withMinigame, withQuizKind, type Definition } from '../../../web/src/editor/model.js';
 
 const blank = (): Definition => ({ formatVersion: 2, title: 'Variants', startNodeKey: 'welcome',
   nodes: [{ key: 'welcome', stages: [{ key: 'intro', kind: 'info', title: 'Hi', prompt: 'Welcome!', durationMs: null }] }], edges: [] });
@@ -62,5 +62,18 @@ describe('adding a scene on an arrow', () => {
     const wheels = added.definition['wheels'] as { key: string; entries: unknown[] }[];
     expect(wheels).toHaveLength(1); expect(wheels[0]!.entries.length).toBeGreaterThanOrEqual(2);
     expect(added.definition.nodes.find(node => node.key === added.key)!.stages[0]).toMatchObject({ kind: 'info', spin: { wheel: wheels[0]!.key } });
+  });
+});
+
+describe('a party choice with many routes', () => {
+  const withRoutes = (count: number) => {
+    const added = addConnectedScene(blank(), 'route', 'welcome', undefined);
+    return setRouteOptions(added.definition, added.key, Array.from({ length: count }, (_, index) => ({ key: `r${index}`, label: `Route ${index + 1}` })));
+  };
+  it('accepts up to 8 routes', () => {
+    expect(inspectDefinition(withRoutes(8)).issues.filter(issue => issue.message !== 'A route option is not connected to a scene yet.')).toEqual([]);
+  });
+  it('refuses a 9th', () => {
+    expect(inspectDefinition(withRoutes(9)).issues.filter(issue => issue.message !== 'A route option is not connected to a scene yet.').length).toBeGreaterThan(0);
   });
 });

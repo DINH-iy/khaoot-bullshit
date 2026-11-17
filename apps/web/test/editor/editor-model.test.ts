@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
 
 const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] });
 const choice = (key: string) => ({ key, stages: [{ key: 'main', kind: 'route', prompt: 'Which way?', durationMs: null, options: [{ key: 'left', label: 'Left' }, { key: 'right', label: 'Right' }], decide: { method: 'host' } }] });
@@ -153,5 +153,24 @@ describe('changing the game of a minigame or duel', () => {
     expect(chess['contest']).toEqual({ kind: 'game', game: 'chess' }); expect(chess.prompt).toBe('Chess duel! Who wins?');
     expect(withDuelContest(chess, 'host')['contest']).toEqual({ kind: 'host' });
     expect(withDuelContest({ ...chess, prompt: 'Loser buys the next round' }, 'tictactoe').prompt).toBe('Loser buys the next round');
+  });
+});
+
+describe('tidying a long game', () => {
+  const line = (count: number): Definition => ({ formatVersion: 2, title: 'Long', startNodeKey: 's0',
+    nodes: Array.from({ length: count }, (_, index) => scene(`s${index}`)), edges: Array.from({ length: count - 1 }, (_, index) => ({ key: `e${index}`, from: `s${index}`, to: `s${index + 1}` })) });
+  const box = (definition: Definition) => { const all = Object.values(autoLayout(definition)); return { width: Math.max(...all.map(point => point.x)) + CARD_WIDTH, height: Math.max(...all.map(point => point.y)) + 192, rows: new Set(all.map(point => point.y)).size }; };
+  it('wraps into rows that keep the game about screen-shaped, without overlapping cards', () => {
+    const definition = line(24); const positions = autoLayout(definition); const { width, height, rows } = box(definition);
+    expect(rows).toBeGreaterThan(1);
+    expect(width / height).toBeGreaterThan(1); expect(width / height).toBeLessThan(3);
+    const spots = Object.values(positions).map(point => `${point.x},${point.y}`); expect(new Set(spots).size).toBe(spots.length);
+  });
+  it('keeps a short game on one row', () => {
+    expect(box(line(5)).rows).toBe(1);
+  });
+  it('runs an arrow into the next row along the gap between the rows', () => {
+    expect(curve({ x: 1500, y: 100 }, { x: 0, y: 600 })).toContain('L 0 350');
+    expect(pointOnCurve({ x: 1500, y: 100 }, { x: 0, y: 600 }, 0.5)).toEqual({ x: 750, y: 350 });
   });
 });

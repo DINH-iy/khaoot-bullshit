@@ -17,14 +17,18 @@ function remember(title: string, open: boolean) {
  * One group of settings in the scene panel: a heading with a one-line summary of
  * what is set, which opens to show the fields. A group is open or closed as it was
  * left last time (on any scene); `open` is only the start for a group never touched.
+ * `memory` names it when its title is used elsewhere too (a text group "Teams" is not
+ * the Game settings group "Teams"); `forceOpen` shows it open without remembering that
+ * (while a search finds something in it).
  */
-export function Section({ title, summary, open = false, children }: { title: string; summary?: string; open?: boolean; children: ReactNode }) {
-  const [isOpen, setOpen] = useState(() => remembered[title] ?? open);
+export function Section({ title, summary, open = false, memory = title, forceOpen = false, children }: { title: string; summary?: string; open?: boolean; memory?: string; forceOpen?: boolean; children: ReactNode }) {
+  const [isOpen, setOpen] = useState(() => remembered[memory] ?? open);
   // The click is handled here (not in the browser's later toggle event), so it is remembered at once,
   // even when the panel redraws right after, for example when a save comes back.
-  const set = (now: boolean) => { setOpen(now); remember(title, now); };
-  return <details className="ed-section" open={isOpen} onToggle={event => { if (event.currentTarget.open !== isOpen) set(event.currentTarget.open); }}>
-    <summary onClick={event => { event.preventDefault(); set(!isOpen); }}><svg className="ed-chevron" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="ed-section-title">{title}</span>{summary && <span className="ed-section-summary">{summary}</span>}</summary>
+  const set = (now: boolean) => { setOpen(now); remember(memory, now); };
+  const shown = forceOpen || isOpen;
+  return <details className="ed-section" open={shown} onToggle={event => { if (!forceOpen && event.currentTarget.open !== isOpen) set(event.currentTarget.open); }}>
+    <summary onClick={event => { event.preventDefault(); if (!forceOpen) set(!isOpen); }}><svg className="ed-chevron" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="ed-section-title">{title}</span>{summary && <span className="ed-section-summary">{summary}</span>}</summary>
     <div className="ed-section-body">{children}</div>
   </details>;
 }

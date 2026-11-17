@@ -19,6 +19,7 @@
 
 - For code/dependency changes, run npm run check and relevant targeted checks. Add meaningful tests for permissions, transactions, state/scoring invariants, and recovery; avoid tests that merely mirror an implementation.
 - For documentation-only changes, check links/consistency and git diff --check; do not run unrelated full test suites.
+- When a feature authors can use is added or changed (a scene type, setting, look option, award, wheel option…), update the AI instructions (the marked section of docs/guides/importing-games.md, copied by the app's "Copy instructions for an AI"), the text import and its example. apps/server/test/authoring/ai-instructions.test.ts fails and names what the instructions do not mention yet.
 - Keep production sign-in fail-closed. No implicit development bypass in production paths.
 - Distinguish local checks from actual-device load tests, provider integration tests, and deployments. Report remaining verification limits clearly.
 

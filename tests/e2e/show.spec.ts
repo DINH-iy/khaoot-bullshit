@@ -20,17 +20,28 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
     ] }));
   await section.getByRole('button', { name: 'Import' }).click();
   // The editor shows how long the game takes, and the wheel can be changed there.
-  await expect(page.locator('.editor-bar')).toContainText(/about \d+ min/);
+  await expect(page.locator('.game-overview')).toContainText(/about \d+ min/);
   // The wheels belong to the whole game (Game settings); the scene that spins one says which.
-  await page.getByRole('button', { name: 'Game settings' }).click();
+  await page.getByRole('button', { name: 'Game menu' }).click(); await page.getByRole('menuitem', { name: 'Game settings' }).click();
   await page.getByText('Wheels of fortune').click();
   await expect(page.getByLabel('Entry 1 of Forfeits', { exact: true })).toHaveValue('Sing a song');
+  // A test spin shows the real wheel in the game's look and lands on one of its entries; nothing is saved.
+  await page.locator('.game-settings-panel').getByRole('button', { name: 'Test spin…' }).click();
+  const spinTest = page.getByRole('dialog', { name: 'Test spin: Forfeits' });
+  await expect(spinTest.locator('.wheel-label')).toHaveCount(3);
+  await spinTest.getByRole('button', { name: 'Spin' }).click();
+  await expect(spinTest.getByRole('status')).toHaveText(/^(Sing a song|Tell a joke|Do a dance)$/, { timeout: 8000 });
+  expect((await new AxeBuilder({ page }).include('.wheel-test').analyze()).violations).toEqual([]);
+  await spinTest.getByRole('button', { name: 'Close' }).click();
+  // Its own slice colours instead of the game's answer colours.
+  await page.locator('.game-settings-panel').getByRole('group', { name: 'Slice colours' }).getByRole('button', { name: 'Its own colours' }).click();
+  await expect(page.getByLabel('Slice colour 1 of Forfeits')).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('tab', { name: 'Scene editor' }).click();
   await expect(page.getByLabel('On this scene')).toHaveText('The host spins “Forfeits”');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.getByRole('button', { name: 'Publish', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Play published version ↗' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await page.getByRole('menuitem', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & publish ▾' }).click(); await expect(page.getByRole('menuitem', { name: 'Play the published version ↗' })).toBeEnabled(); await page.keyboard.press('Escape');
   await page.goto(`${baseURL}/?host=1`);
   await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: `Open room for ${name}` }).click();
   const roomCode = (await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);

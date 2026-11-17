@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoomSnapshot, TextKey } from '@party/contracts';
-import { useText } from '../presentation/look.js';
+import { contrast } from '@party/contracts';
+import { useLook, useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
 import './room-extras.css';
 
 type View = RoomSnapshot['view'];
-const WHEEL_COLORS = ['var(--a1)', 'var(--a2)', 'var(--a3)', 'var(--a4)', 'var(--a5)', 'var(--a6)', 'var(--a7)', 'var(--a8)'];
 
 /** A break: the game is paused for everyone. Covers every screen until the host continues. */
 export function BreakOverlay({ state, host, disabled, onContinue }: { state: RoomSnapshot; host: boolean; disabled: boolean; onContinue: () => void }) {
@@ -35,18 +35,32 @@ export function WheelOverlay({ wheel, offset }: { wheel: View['wheel']; offset: 
     const timer = setInterval(() => setNow(Date.now() + offset), 250); return () => clearInterval(timer);
   }, [spin?.spunAt, offset]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!spin || now - spunAt > showFor || now < spunAt - 2000) return null;
-  const count = spin.entries.length; const slice = 360 / count; const done = now - spunAt >= spin.seconds * 1000;
-  // Several full turns, ending with the picked slice under the pointer at the top.
-  const turn = 360 * 6 - (spin.index * slice + slice / 2);
-  const gradient = `conic-gradient(${spin.entries.map((_, index) => `${WHEEL_COLORS[index % WHEEL_COLORS.length]} ${index * slice}deg ${(index + 1) * slice}deg`).join(', ')})`;
+  const done = now - spunAt >= spin.seconds * 1000;
   return <div className="wheel-overlay" role="status" aria-label={done ? `${spin.title}: ${spin.label}` : spin.title}>
     <p className="wheel-title">{spin.title}</p>
-    <div className="wheel-frame"><span className="wheel-pointer" aria-hidden="true" />
-      <div className="wheel-disc" key={spin.spunAt} style={{ background: gradient, '--turn': `${turn}deg`, '--spin-time': `${spin.seconds}s` } as React.CSSProperties} aria-hidden="true">
-        {spin.entries.map((label, index) => <span key={index} className="wheel-label" style={{ transform: `rotate(${index * slice + slice / 2}deg) translateY(-34%)` }}><i>{label.length > 18 ? `${label.slice(0, 17)}…` : label}</i></span>)}
-      </div></div>
+    <WheelDisc entries={spin.entries} index={spin.index} seconds={spin.seconds} spinKey={spin.spunAt} colors={spin.colors} />
     <p className={`wheel-result${done ? ' shown' : ''}`}>{done ? spin.label : '…'}</p>
   </div>;
+}
+/**
+ * The wheel itself: one slice per entry in the wheel's own colours (or the game's answer
+ * colours), each label in black or white, whichever reads better on its slice. A new
+ * `spinKey` spins it again for `seconds`, ending with entry `index` under the pointer.
+ * Used in the room and for the editor's test spin.
+ */
+export function WheelDisc({ entries, index, seconds, spinKey, colors, still = false }: { entries: string[]; index: number; seconds: number; spinKey: string; colors?: string[] | undefined; still?: boolean }) {
+  const { theme } = useLook();
+  const palette = colors?.length ? colors : theme.colors.answers;
+  const count = entries.length; const slice = 360 / count;
+  // Several full turns, ending with the picked slice under the pointer at the top.
+  const turn = 360 * 6 - (index * slice + slice / 2);
+  const fill = (at: number) => palette[at % palette.length]!;
+  const ink = (at: number) => contrast('#000000', fill(at)) >= contrast('#ffffff', fill(at)) ? '#1a1a1a' : '#ffffff';
+  const gradient = `conic-gradient(${entries.map((_, at) => `${fill(at)} ${at * slice}deg ${(at + 1) * slice}deg`).join(', ')})`;
+  return <div className="wheel-frame"><span className="wheel-pointer" aria-hidden="true" />
+    <div className="wheel-disc" key={spinKey} style={{ background: gradient, '--turn': `${turn}deg`, '--spin-time': `${seconds}s`, ...(still ? { animation: 'none', transform: 'none' } : {}) } as React.CSSProperties} aria-hidden="true">
+      {entries.map((label, at) => <span key={at} className="wheel-label" style={{ transform: `rotate(${at * slice + slice / 2}deg) translateY(-34%)` }}><i style={{ color: ink(at) }}>{label.length > 18 ? `${label.slice(0, 17)}…` : label}</i></span>)}
+    </div></div>;
 }
 /** The last wheel result, small in a corner of the shared screen and as a line on phones. */
 export function WheelBadge({ wheel }: { wheel: View['wheel'] }) {
@@ -65,13 +79,15 @@ export function FinaleShow({ state }: { state: RoomSnapshot }) {
   if (!slides.length) return null;
   const go = (step: number) => setAt(value => (value + step + slides.length) % slides.length);
   const slide = slides[Math.min(at, slides.length - 1)]!;
+  // The author's own title for this award, or the game's text for its rule.
+  const name = (entry: typeof slide) => entry.title ?? t(`stat.${entry.stat}` as TextKey);
   const players = slide.playerIds.map(id => state.players.find(player => player.id === id)).filter(player => player !== undefined);
   return <section className="finale" aria-labelledby="finale-heading"
     onPointerDown={event => { startX.current = event.clientX; }}
     onPointerUp={event => { const from = startX.current; startX.current = null; if (from === null) return; const dx = event.clientX - from; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); }}>
     <h2 id="finale-heading">{t('stat.title')}</h2>
-    <div className="finale-slide" key={slide.stat} aria-live="polite">
-      <p className="finale-stat">{t(`stat.${slide.stat}` as TextKey)}</p>
+    <div className="finale-slide" key={at} aria-live="polite">
+      <p className="finale-stat">{name(slide)}</p>
       <div className="finale-people">{players.length ? players.map(player => <span key={player.id}><Avatar look={player.look} size={84} /><strong>{player.displayName}</strong></span>) : <strong>—</strong>}</div>
       <p className="finale-value">{slide.value}</p>
     </div>
@@ -81,6 +97,6 @@ export function FinaleShow({ state }: { state: RoomSnapshot }) {
       <button type="button" className="finale-step" aria-label="Next award" onClick={() => go(1)}>›</button>
       <button type="button" className="finale-auto" aria-pressed={auto} onClick={() => setAuto(value => !value)}>{auto ? '⏸ Stop auto-play' : '▶ Auto-play'}</button>
     </div>}
-    {slides.length > 1 && <div className="finale-dots" role="group" aria-label="Awards">{slides.map((entry, index) => <button key={entry.stat} type="button" aria-pressed={index === at} aria-label={t(`stat.${entry.stat}` as TextKey)} onClick={() => setAt(index)} />)}</div>}
+    {slides.length > 1 && <div className="finale-dots" role="group" aria-label="Awards">{slides.map((entry, index) => <button key={index} type="button" aria-pressed={index === at} aria-label={name(entry)} onClick={() => setAt(index)} />)}</div>}
   </section>;
 }

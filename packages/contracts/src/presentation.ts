@@ -32,7 +32,7 @@ export const TEXT_DEFAULTS = {
   'break.title': 'Smoke break!', 'break.icon': '🚬', 'break.text': 'The game is paused. Back in a moment.', 'break.vote': 'Break', 'break.voted': 'You voted for a break', 'break.host': 'Continue the game',
   'wheel.spin': 'Spin the wheel', 'wheel.again': 'Spin again', 'wheel.current': 'Now: {result}',
   'stat.title': 'The awards', 'stat.winner': 'Winner', 'stat.mostCorrect': 'Most correct answers', 'stat.mostWrong': 'Most wrong answers', 'stat.fastest': 'Fastest fingers', 'stat.slowest': 'Took their time',
-  'stat.mostVotes': 'Crowd favourite', 'stat.minigameChamp': 'Minigame champion', 'stat.luckiest': 'Luckiest', 'stat.mostReactions': 'Most reactions',
+  'stat.mostVotes': 'Crowd favourite', 'stat.minigameChamp': 'Minigame champion', 'stat.luckiest': 'Luckiest', 'stat.mostReactions': 'Most reactions', 'stat.scene': 'Best in one scene', 'stat.fewest': 'Wooden spoon',
   'scores.open': 'Show the scoreboard', 'scores.close': 'Close', 'react.open': 'Send a reaction', 'react.title': 'React on the big screen',
   'minigame.getReady': 'Get ready…', 'minigame.wait': 'Wait for it…', 'minigame.go': 'GO!', 'minigame.tooSoon': 'Too soon!', 'minigame.tap': 'TAP!',
   'minigame.stop': 'Stop', 'minigame.pickDoor': 'Pick a door', 'minigame.door': 'Door {number}', 'minigame.result': 'Your result: {result}', 'minigame.played': 'Done! Waiting for the others…', 'minigame.paused': 'Paused. When the host continues, you get a new countdown.',
@@ -139,7 +139,7 @@ export function resolveTheme(...layers: (Theme | undefined)[]): FullTheme {
 }
 // Shapes drawn as text, not emoji (U+FE0E), so they take the tile's text colour.
 const SHAPES = ['★', '●', '▲', '■', '◆', '♥\uFE0E', '✚', '⬟'];
-const ROUTE_ARROWS: Record<number, string[]> = { 2: ['←', '→'], 3: ['←', '↑', '→'], 4: ['←', '↖', '↗', '→'], 5: ['←', '↖', '↑', '↗', '→'], 6: ['↙', '←', '↖', '↗', '→', '↘'] };
+const ROUTE_ARROWS: Record<number, string[]> = { 2: ['←', '→'], 3: ['←', '↑', '→'], 4: ['←', '↖', '↗', '→'], 5: ['←', '↖', '↑', '↗', '→'], 6: ['↙', '←', '↖', '↗', '→', '↘'], 7: ['↙', '←', '↖', '↑', '↗', '→', '↘'], 8: ['↙', '←', '↖', '↑', '↗', '→', '↘', '↓'] };
 /** The mark before an answer (or route) as the theme wants it: a letter, number, shape or arrow; null for none. */
 export function answerMark(theme: Pick<FullTheme, 'markers' | 'routeMarkers'> & { customMarks?: string[] | undefined }, index: number, count: number, route = false): string | null {
   if (route && theme.routeMarkers === 'arrows') return ROUTE_ARROWS[count]?.[index] ?? '➜';

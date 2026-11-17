@@ -86,7 +86,7 @@
 .wheel-disc { position: absolute; inset: 0; border-radius: 50%; border: 8px solid var(--r-text); box-shadow: 0 20px 60px rgb(0 0 0 / .45); animation: wheel-turn var(--spin-time) cubic-bezier(.12, .7, .1, 1) forwards; }
 @keyframes wheel-turn { from { transform: rotate(0deg); } to { transform: rotate(var(--turn)); } }
 .wheel-label { position: absolute; inset: 0; display: grid; justify-items: center; align-items: start; padding-top: 50%; pointer-events: none; }
-.wheel-label i { font-style: normal; font-weight: 800; font-size: clamp(.6rem, 1.6vw, 1rem); color: var(--a-text); writing-mode: vertical-rl; text-shadow: 0 1px 2px rgb(0 0 0 / .5); max-height: 40%; overflow: hidden; }
+.wheel-label i { font-style: normal; font-weight: 800; font-size: clamp(.6rem, 1.6vw, 1rem); color: var(--a-text); writing-mode: vertical-rl; max-height: 40%; overflow: hidden; }
 .wheel-result { margin: 0; min-height: 1.4em; padding: 8px 26px; border-radius: 999px; font-family: var(--r-heading-font); font-size: clamp(1.6rem, 5vw, 3rem); font-weight: 900; }
 .wheel-result.shown { background: var(--r-accent); color: var(--r-accent-ink); animation: points-pop 3.4s ease-out both; animation-name: wheel-pop; }
 @keyframes wheel-pop { 0% { transform: scale(.4); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }

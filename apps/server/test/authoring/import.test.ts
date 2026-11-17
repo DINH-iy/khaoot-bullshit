@@ -109,3 +109,22 @@ describe('importing a game from text', () => {
     expect(issues).toEqual([expect.objectContaining({ code: 'Choose a minigame', nodeKey: 'later' })]);
   });
 });
+
+describe('wheel colours', () => {
+  const game = (colors: unknown) => importDefinition(JSON.stringify({ title: 'Wheel colours', wheels: [{ title: 'Forfeits', entries: ['Sing', 'Dance', 'Joke'], colors }],
+    scenes: [{ id: 'spin', type: 'info', title: 'Spin', spin: 'Forfeits' }] })) as { wheels: { colors?: string[] }[] };
+  it('keeps a wheel’s own colours (2 to 8 valid ones) and the game stays valid', () => {
+    const definition = game(['#F39200', '#7ac6b6', 'not a colour']);
+    expect(definition.wheels[0]!.colors).toEqual(['#f39200', '#7ac6b6']);
+    expect(inspectDefinition(definition).issues).toEqual([]);
+  });
+  it('without enough valid colours the wheel uses the game’s answer colours', () => {
+    expect(game(['#f39200']).wheels[0]!.colors).toBeUndefined();
+    expect(game(undefined).wheels[0]!.colors).toBeUndefined();
+  });
+  it('refuses a colour that is not #rrggbb when saved from the editor', () => {
+    const definition = game(['#f39200', '#7ac6b6']);
+    definition.wheels[0]!.colors = ['#f39200', 'red'];
+    expect(inspectDefinition(definition).issues.length).toBeGreaterThan(0);
+  });
+});

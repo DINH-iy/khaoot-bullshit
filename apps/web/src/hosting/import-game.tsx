@@ -24,7 +24,7 @@ export function ImportGame() {
     <p>Make a whole game in one go, for example with an AI assistant such as Claude or ChatGPT:</p>
     <ol className="steps">
       <li>Press <strong>Copy instructions for an AI</strong> and paste them into the AI chat.</li>
-      <li>Underneath, describe your game: the theme, how long, how many players, which kinds of rounds (quiz, jokes, pictures, voting, challenges, a party choice between routes, teams…).</li>
+      <li>Underneath, describe your game in a sentence or two. The AI first asks a few short questions (who plays, how long, teams or not, which rounds, a style); answer them, or say “just make it”.</li>
       <li>Copy the AI’s whole answer, paste it below and press <strong>Import</strong>. The editor opens with your game as a draft.</li>
       <li>Check it there. Any problem is explained on the scene it concerns; fix it in the editor, or paste the problems back to the AI and import its corrected answer.</li>
       <li><strong>Rehearse</strong> to try it, then <strong>Publish</strong> to play.</li>

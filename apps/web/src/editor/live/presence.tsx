@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { EditorPeer } from '@party/contracts';
 import type { LiveState } from './use-live.js';
 import './presence.css';
@@ -10,14 +10,23 @@ const tint = (color: number) => ({ '--peer': peerColor(color) }) as CSSPropertie
 const VIEWS: Record<EditorPeer['view'], string> = { flow: 'Flow editor', scene: 'Scene editor', look: 'Look & feel' };
 export const peersOn = (peers: EditorPeer[], key: string) => peers.filter(peer => peer.selected.includes(key));
 
-/** In the editor's header: your own name for others, and who else is editing right now. */
+/**
+ * In the editor's header, compact: who else is editing (a coloured initial each; the
+ * name shows on hover and to screen readers), and your own initial, which opens the
+ * field for the name others see.
+ */
 export function PeerBar({ live }: { live: LiveState }) {
+  const [naming, setNaming] = useState(false);
   return <div className="peer-bar">
     {live.peers.length > 0 && <ul className="peer-list" aria-label="Also editing this game">{live.peers.map(peer =>
       <li key={peer.id} className="peer-chip" style={tint(peer.color)} title={`${peer.name} is in the ${VIEWS[peer.view]}`}>
-        <span className="peer-dot" aria-hidden="true">{peer.name.slice(0, 1).toUpperCase()}</span>{peer.name}<span className="visually-hidden">, in the {VIEWS[peer.view]}</span></li>)}</ul>}
-    <label className="peer-me" style={live.color === null ? undefined : tint(live.color)}><span>You are</span>
-      <input value={live.name} maxLength={40} onChange={event => live.setName(event.target.value)} aria-label="Your name, as others editing this game see it" /></label>
+        <span className="peer-dot" aria-hidden="true">{peer.name.slice(0, 1).toUpperCase()}</span><span className="visually-hidden">{peer.name}, in the {VIEWS[peer.view]}</span></li>)}</ul>}
+    <div className="peer-me" style={live.color === null ? undefined : tint(live.color)}>
+      <button type="button" className="peer-me-button" aria-expanded={naming} aria-label={`You are ${live.name || 'unnamed'}: change your name`} title={`You are ${live.name}`} onClick={() => setNaming(!naming)}>
+        <span className="peer-dot" aria-hidden="true">{(live.name || '?').slice(0, 1).toUpperCase()}</span></button>
+      {naming && <div className="peer-me-popover" onKeyDown={event => { if (event.key === 'Escape' || event.key === 'Enter') { event.stopPropagation(); setNaming(false); } }}>
+        <label>Your name, as others editing see it<input autoFocus value={live.name} maxLength={40} onChange={event => live.setName(event.target.value)} aria-label="Your name, as others editing this game see it" onBlur={() => setNaming(false)} /></label></div>}
+    </div>
   </div>;
 }
 

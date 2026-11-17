@@ -9,6 +9,12 @@ import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MINIGAME_KEYS, MI
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown, fallback = '') => typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : fallback;
+/** A wheel's own colours from the text: 2 to 8 valid "#rrggbb" values, or nothing. */
+function wheelColors(raw: unknown): { colors?: string[] } {
+  const colors = Array.isArray(raw) ? raw.map(entry => String(entry).trim().toLowerCase()).filter(entry => /^#[0-9a-f]{6}$/.test(entry)).slice(0, 8) : [];
+  return colors.length >= 2 ? { colors } : {};
+}
+
 export function slug(value: string, fallback: string): string {
   const cleaned = value.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   return /^[a-z]/.test(cleaned) ? cleaned : `${fallback}${cleaned ? `-${cleaned}` : ''}`.slice(0, 48);
@@ -192,8 +198,16 @@ export function importDefinition(input: string): Json | null {
     ...(isObject(raw['teams']) ? { teams: raw['teams'] } : {}), ...(isObject(raw['play']) ? { play: raw['play'] } : {}), ...(isObject(raw['look'] ?? raw['presentation']) ? { presentation: raw['look'] ?? raw['presentation'] } : {}),
     // Wheels of fortune: `{ "title": "Forfeits", "entries": ["Sing", "Dance"], "removePicked": true, "spinSeconds": 5 }`; awards: `"awards": ["winner", "mostWrong"]`.
     ...(Array.isArray(raw['wheels']) ? { wheels: raw['wheels'].filter(isObject).slice(0, 10).map((wheel, index) => ({ key: slug(text(wheel['title'] ?? wheel['key']), `wheel-${index + 1}`), title: text(wheel['title'], `Wheel ${index + 1}`).slice(0, 80),
-      entries: options(wheel['entries'], 'entry'), removePicked: wheel['removePicked'] !== false, spinSeconds: Math.max(2, Math.min(15, Math.round(Number(wheel['spinSeconds']) || 5))) })) } : {}),
-    ...(Array.isArray(raw['awards']) ? { finale: { stats: raw['awards'].map(entry => text(entry)) } } : isObject(raw['finale']) ? { finale: raw['finale'] } : {}),
+      entries: options(wheel['entries'], 'entry'), removePicked: wheel['removePicked'] !== false, spinSeconds: Math.max(2, Math.min(15, Math.round(Number(wheel['spinSeconds']) || 5))),
+      // Its own slice colours ("#rrggbb"), when given; otherwise the game's answer colours.
+      ...wheelColors(wheel['colors']) })) } : {}),
+    // Awards: names (["winner", "mostWrong"]) or, for an own title or a scene, objects such as
+    // { "award": "scene", "scene": "karaoke", "title": "Karaoke champion" }; a list with any object becomes the own list.
+    ...(Array.isArray(raw['awards']) ? { finale: raw['awards'].some(isObject)
+      ? { awards: raw['awards'].map(entry => isObject(entry)
+        ? { rule: text(entry['award'] ?? entry['rule']), ...(entry['title'] ? { title: text(entry['title']).slice(0, 60) } : {}), ...(keyFor(entry['scene']) ? { nodeKey: keyFor(entry['scene']) } : {}) }
+        : { rule: text(entry) }) }
+      : { stats: raw['awards'].map(entry => text(entry)) } } : isObject(raw['finale']) ? { finale: raw['finale'] } : {}),
     // Side games on the phones are on unless switched off; chips only with an explicit true.
     ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
