@@ -133,10 +133,15 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('duel.resign'), stageRunId: GameIdSchema }).strict(),
   // One turn of a relay drawing (Pass the pencil): the strokes this player added in turn `turn`.
   z.object({ ...envelope, type: z.literal('minigame.part'), stageRunId: GameIdSchema, turn: z.number().int().min(0).max(63), assetId: GameIdSchema }).strict(),
+  // A team step game (Drive the bus…): a move for the team's step `step`. Applied at once, or in a team vote a member's vote;
+  // `decide`: count the votes cast so far now (only someone who voted).
+  z.object({ ...envelope, type: z.literal('minigame.move'), stageRunId: GameIdSchema, step: z.number().int().min(0).max(63), option: z.string().min(1).max(40), decide: z.literal(true).optional() }).strict(),
+  // A team vote's time ran out (sent by the server's timer), or the host decides it now: the votes cast decide.
+  z.object({ ...envelope, type: z.literal('minigame.decide'), stageRunId: GameIdSchema, side: z.string().min(1).max(80), step: z.number().int().min(0).max(63), now: z.literal(true).optional() }).strict(),
 ]);
 export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Commands a player may send; every other command is the host's. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'player.look', 'minigame.part', 'duel.move', 'duel.resign'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { bendKey, bendsOf, isBendKey, pointOnRoute, routedPath, withBends, duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { toDoc } from '../../src/editor/live/document.js';
 
 const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] });
 const choice = (key: string) => ({ key, stages: [{ key: 'main', kind: 'route', prompt: 'Which way?', durationMs: null, options: [{ key: 'left', label: 'Left' }, { key: 'right', label: 'Right' }], decide: { method: 'host' } }] });
@@ -172,5 +173,31 @@ describe('tidying a long game', () => {
   it('runs an arrow into the next row along the gap between the rows', () => {
     expect(curve({ x: 1500, y: 100 }, { x: 0, y: 600 })).toContain('L 0 350');
     expect(pointOnCurve({ x: 1500, y: 100 }, { x: 0, y: 600 }, 0.5)).toEqual({ x: 750, y: 350 });
+  });
+});
+
+describe('bend points on an arrow', () => {
+  it('are kept with the positions and replaced as a whole', () => {
+    const positions = withBends({ a: { x: 0, y: 0 } }, 'ab', [{ x: 10, y: 20 }, { x: 30, y: 40 }]);
+    expect(bendsOf(positions, 'ab')).toEqual([{ x: 10, y: 20 }, { x: 30, y: 40 }]);
+    expect(positions['a']).toEqual({ x: 0, y: 0 });
+    const one = withBends(positions, 'ab', [{ x: 5, y: 5 }]);
+    expect(bendsOf(one, 'ab')).toEqual([{ x: 5, y: 5 }]); expect(Object.keys(one).filter(isBendKey)).toHaveLength(1);
+    expect(bendsOf(withBends(one, 'ab', []), 'ab')).toEqual([]);
+  });
+  it('make the arrow pass through them, still leaving and arriving horizontally', () => {
+    const path = routedPath({ x: 0, y: 0 }, { x: 400, y: 0 }, [{ x: 200, y: 300 }]);
+    expect(path).toMatch(/^M 0 0 C 60 0, .* 200 300 C .* 340 0, 400 0$/);
+    expect(pointOnRoute({ x: 0, y: 0 }, { x: 400, y: 0 }, [{ x: 200, y: 0 }], 0.75)).toEqual({ x: 300, y: 0 });
+    expect(routedPath({ x: 0, y: 0 }, { x: 400, y: 0 }, [])).toBe(curve({ x: 0, y: 0 }, { x: 400, y: 0 }));
+  });
+  it('are not cards: snapping ignores them', () => {
+    const definition = game(); const positions = withBends({ a: { x: 0, y: 0 }, c: { x: 600, y: 600 } }, 'ab', [{ x: 487, y: 312 }]);
+    expect(snapCard(definition, positions, 'c', { x: 489, y: 900 }).guides.x).toBeNull();
+  });
+  it('are saved only for arrows that still exist', () => {
+    const definition = game();
+    const doc = toDoc({ definition, positions: withBends(withBends({ a: { x: 0, y: 0 } }, 'ab', [{ x: 1, y: 2 }]), 'gone', [{ x: 3, y: 4 }]) });
+    expect(Object.keys(doc.editor!.positions!).sort()).toEqual(['a', bendKey('ab', 0)]);
   });
 });

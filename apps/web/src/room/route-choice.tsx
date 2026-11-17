@@ -1,6 +1,7 @@
 import { answerMark } from '@party/contracts';
 import { useLook, useText } from '../presentation/look.js';
 import type { RoomSnapshot } from '@party/contracts';
+import { Mark } from '../presentation/mark-icons.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Route = NonNullable<Stage['route']>;
@@ -21,6 +22,6 @@ export function RouteChoice({ state, stage, disabled, send }: { state: RoomSnaps
       : stage.status === 'CLOSED' && !host ? <p role="status">{route.method === 'host' ? t('route.hostChoosing') : t('route.closed')}</p> : null}
     {host && route.pending && <p role="alert" className="route-pending">{route.pending === 'tie' ? `Tie between ${(route.leaders ?? []).map(key => labelOf(route, key)).join(' and ')}. Choose a route.` : route.pending === 'no-votes' ? 'Nobody voted. Choose a route.' : 'Choose a route.'}</p>}
     {host && !decided && state.view.status === 'RUNNING' && <div className="actions">{route.options.map((option, index) =>
-      <button key={option.key} className="route-button" disabled={disabled} onClick={() => send('route.decide', { stageRunId: stage.id, optionKey: option.key })}>{(() => { const mark = answerMark(theme, index, route.options.length, true); return mark === null ? null : <span className="answer-mark" aria-hidden="true">{mark}</span>; })()} {stage.status === 'ACTIVE' && route.method !== 'host' ? `Close voting and choose ${option.label}` : `Choose ${option.label}`}</button>)}</div>}
+      <button key={option.key} className="route-button" disabled={disabled} onClick={() => send('route.decide', { stageRunId: stage.id, optionKey: option.key })}>{(() => { const mark = answerMark(theme, index, route.options.length, true); return mark === null ? null : <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>; })()} {stage.status === 'ACTIVE' && route.method !== 'host' ? `Close voting and choose ${option.label}` : `Choose ${option.label}`}</button>)}</div>}
   </div>;
 }

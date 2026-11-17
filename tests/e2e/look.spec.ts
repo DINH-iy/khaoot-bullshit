@@ -146,6 +146,9 @@ test('answer marks can be numbers, square and after the answer, and answers neve
   const phoneTiles = page.locator('.look-phone .tile');
   await expect(phoneTiles.first().locator('.answer-mark')).toHaveText('A');
   await page.locator('summary', { hasText: /^Answer marks/ }).click();
+  // Shapes are drawn as icons.
+  await page.getByRole('group', { name: 'Marks', exact: true }).getByRole('button', { name: '★ ● ▲' }).click();
+  await expect(phoneTiles.first().locator('.answer-mark svg.mark-icon')).toBeVisible();
   await page.getByRole('group', { name: 'Marks', exact: true }).getByRole('button', { name: '1 2 3' }).click();
   await page.getByRole('group', { name: 'Mark shape' }).getByRole('button', { name: 'Square', exact: true }).click();
   await page.getByRole('group', { name: 'Mark place' }).getByRole('button', { name: 'After the answer' }).click();

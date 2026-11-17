@@ -4,11 +4,12 @@ import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { JoinQr } from './join-qr.js';
 import { useRemaining } from './stage-timer.js';
-import { RoundInfo } from './round-info.js';
+import { ConnectionMenu, FloatingScores, Popover, RoundBar } from './room-chrome.js';
+import { FaIcon } from '../presentation/icons.js';
 import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
-import { JudgePanel, Scoreboard, StageResults } from './results.js';
+import { JudgePanel, leaderLine, Scoreboard, StageResults } from './results.js';
 import { VoteBallot } from './vote.js';
-import { SeatReclaim, SeatRequests } from './seat-reclaim.js';
+import { SeatApprovalSetting, SeatReclaim, SeatRequests } from './seat-reclaim.js';
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
 import { DuelPanel } from './duel.js';
@@ -28,6 +29,7 @@ import { KeySignIn } from '../people/key-sign-in.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 import { answerFit } from './answer-fit.js';
+import { Mark } from '../presentation/mark-icons.js';
 
 const initial = new URL(location.href);
 const access = new URLSearchParams(initial.hash.slice(1)).get('access');
@@ -108,9 +110,10 @@ export function RoomScreen() {
     void follow.then(next => { if (mounted) moveTo(next); }).catch(() => { if (mounted) setError('The game moved to a new lobby. Ask the host for the new room code.'); });
     return () => { mounted = false; };
   }, [nextRoom, sessionId, myRole]);
-  const [resetting, setResetting] = useState(false);
+  // The host panel's one open sheet (settings, invite, players, back to lobby), or none.
+  const [sheet, setSheet] = useState<'settings' | 'invite' | 'players' | 'lobby' | null>(null);
   const backToLobby = () => {
-    if (!sessionId) return; setResetting(false);
+    if (!sessionId) return; setSheet(null);
     void roomApi<{ sessionId: string }>(`/api/host/rooms/${sessionId}/restart`, { sessionId: newId(), commandId: newId() }).then(result => moveTo(result.sessionId))
       .catch(() => setError('Could not go back to the lobby. Try again.'));
   };
@@ -212,18 +215,12 @@ export function RoomScreen() {
       <div className="room-id"><p className="brand">party<span>.</span></p>
         <div><p className="room-game">{state?.view.title ?? 'Connecting…'}{state ? ` · ${t(state.view.status === 'LOBBY' ? 'status.waiting' : state.view.status === 'PAUSED' ? 'status.paused' : state.view.status === 'FINISHED' ? 'status.finished' : 'status.playing')}` : ''}</p>
           {state && <h2 id="room-heading" className="room-code">Room {state.roomCode}</h2>}</div></div>
-      <section className="room-connection" aria-labelledby="connection-heading"><h2 id="connection-heading" className="visually-hidden">Connection</h2>
-        {/* Sending an action shows as a small spinner here, so nothing on the page moves. */}
-        {room.saving && <span className="saving-spinner" role="status" aria-label="Saving"><span aria-hidden="true" /></span>}
-        <p role="status" aria-label="Connection status" className={`conn ${connected ? 'conn-ok' : 'conn-bad'}`}>{busy ? 'Verifying access…' : room.connection}</p>
-        <button className="ghost" onClick={room.reconnect} disabled={busy}>Reconnect and sync</button>
-        <details className="conn-details"><summary>Details</summary>
-          <dl className="metrics"><div><dt>Latest round trip</dt><dd>{room.samples.length ? `${Math.round(room.samples.at(-1)!)} ms` : 'Measuring…'}</dd></div>
-            <div><dt>p95 · last {room.samples.length} samples</dt><dd>{p95 === undefined ? 'Measuring…' : `${Math.round(p95)} ms`}</dd></div><div><dt>Reconnects</dt><dd>{room.reconnects}</dd></div><div><dt>Last saved action</dt><dd>{room.confirmMs === null ? '—' : `${room.confirmMs} ms`}</dd></div></dl>
-          <p>Round trip includes the connection and the server’s access check.</p></details>
-      </section>
+      <ConnectionMenu status={room.connection} ok={connected} busy={busy} saving={room.saving} onReconnect={room.reconnect} details={<details className="conn-details"><summary>Details</summary>
+        <dl className="metrics"><div><dt>Latest round trip</dt><dd>{room.samples.length ? `${Math.round(room.samples.at(-1)!)} ms` : 'Measuring…'}</dd></div>
+          <div><dt>p95 · last {room.samples.length} samples</dt><dd>{p95 === undefined ? 'Measuring…' : `${Math.round(p95)} ms`}</dd></div><div><dt>Reconnects</dt><dd>{room.reconnects}</dd></div><div><dt>Last saved action</dt><dd>{room.confirmMs === null ? '—' : `${room.confirmMs} ms`}</dd></div></dl>
+        <p>Round trip includes the connection and the server’s access check.</p></details>} />
     </header>
-    {stage && <RoundInfo stage={stage} phase={phase} remaining={remaining} timerRef={timerRef} />}
+    {stage && state && <RoundBar state={state} stage={stage} phase={phase} remaining={remaining} timerRef={timerRef} />}
     {/* Messages float over the page instead of pushing it down. An action still being sent only shows the spinner above;
         the retry choice appears once it is really stuck (sending stopped without a confirmation). */}
     <div className="room-toasts">
@@ -259,7 +256,8 @@ export function RoomScreen() {
           {stage.kind === 'minigame' && <MinigameStage state={state} stage={stage} offset={room.clockOffset} disabled={disabled}
             canPlay={role === 'player' && !answerBlock && stage.status === 'ACTIVE' && running}
             onResult={result => command('submission.submit', { stageRunId: stage.id, value: { kind: 'minigame', ...result } })}
-            live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })} />}
+            live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })}
+            onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} />}
           <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />
           <DuelPanel state={state} stage={stage} disabled={disabled} send={command} />
           {stage.kind !== 'route' && <div ref={resultsRef}><StageResults state={state} stage={stage} /></div>}
@@ -279,53 +277,55 @@ export function RoomScreen() {
         {role !== 'display' && <WheelBadge wheel={state.view.wheel} />}
         {state.view.status === 'FINISHED' && <FinaleShow state={state} />}
         {/* Phones keep the scores one tap away (the dock). The shared screen shows them with the results of a round, at scoreboard scenes and at the end: nothing it does not need. */}
-        {(role === 'host' || scoreMoment || (role === 'display' && stage?.revealed)) && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command} /></div>}
+        {scoreMoment && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command} /></div>}
       </div>
 
       {host && <aside className="room-controls" aria-label="Host controls">
         {primary && <button className="primary big" disabled={disabled || ('blocked' in primary && primary.blocked)} onClick={primary.run}>{primary.label}</button>}
         {nextAlso && <button disabled={disabled} onClick={() => command('stage.advance', { stageRunId: stage!.id })}>{t('host.next')}</button>}
         {running && stage && state.view.wheel.canSpin && <button disabled={disabled} onClick={() => command('wheel.spin', { stageRunId: stage.id })}>{state.view.wheel.spin ? t('wheel.again') : t('wheel.spin')}</button>}
-        <div className="actions">
-          {running && <button className="ghost" disabled={disabled} onClick={() => command('session.pause')}>{t('host.pause')}</button>}
-          {running && <button className="ghost" disabled={disabled} onClick={() => { void roomApi(`/api/rooms/${sessionId}/break`, {}).catch(() => setError('The break could not be started.')); }}>{t('break.icon')} {t('break.vote')}</button>}
-          {/* Start the game again from the lobby, with everyone; also "play again" once the game is over. */}
-          {state.view.status !== 'LOBBY' && !resetting && <button className="ghost" disabled={disabled} onClick={() => setResetting(true)}>Back to lobby</button>}
-          {running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.route?.decision && stage.route?.method !== 'host' && <>
+        {/* The round's tools in one row of icons (names on hover and for screen readers). */}
+        <div className="host-toolbar" role="toolbar" aria-label="Round tools">
+          {running && <button type="button" className="icon-tool" aria-label={t('host.pause')} title={t('host.pause')} disabled={disabled} onClick={() => command('session.pause')}><FaIcon name="pause" /></button>}
+          {running && <button type="button" className="icon-tool" aria-label={t('break.vote')} title={t('break.vote')} disabled={disabled} onClick={() => { void roomApi(`/api/rooms/${sessionId}/break`, {}).catch(() => setError('The break could not be started.')); }}><FaIcon name="smoking" /></button>}
+          {stage && stage.status === 'ACTIVE' && !stage.teams?.forming && <>
+            {remaining !== null && <button type="button" className="icon-tool text" title={`Add ${state.settings.quickTimeSeconds} seconds`} disabled={disabled} onClick={() => timer({ kind: 'add', ms: state.settings.quickTimeSeconds * 1000 })}>+{quickTime(state.settings.quickTimeSeconds)}<span className="visually-hidden"> (add {state.settings.quickTimeSeconds} seconds)</span></button>}
+            <Popover label="Set the time" icon="stopwatch" className="icon-tool">
+              {remaining !== null && <div className="actions"><button type="button" className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 60_000 })}>+1 min</button>
+                <button type="button" className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'clear' })}><FaIcon name="infinity" /> Remove time limit</button></div>}
+              <form className="inline-form time-set" onSubmit={event => { event.preventDefault(); if (validSeconds) timer({ kind: 'set', ms: seconds * 1000 }); }}>
+                <label>Time left (seconds)<input type="number" inputMode="numeric" min={1} max={3600} step={1} value={timerSeconds} onChange={event => setTimerSeconds(event.target.value)} /></label>
+                <button className="ghost small-button" disabled={disabled || !validSeconds}>Set time</button></form>
+            </Popover></>}
+          {running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.route?.decision && stage.route?.method !== 'host' && <Popover label="Reopen answers" icon="arrow-rotate-left" className="icon-tool">
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: 30_000 })}>Reopen for 30 seconds</button>
-            <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>Reopen without time limit</button></>}
+            <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>Reopen without time limit</button></Popover>}
         </div>
-        {/* Time: one compact row; the full wording is there for screen readers. */}
-        {resetting && <div className="reset-confirm" role="group" aria-label="Back to lobby">
-          <p>Start the game again in a new lobby? Everyone comes along (the room gets a new code); the scores of this game stay in its history.</p>
-          <div className="actions"><button className="danger" onClick={backToLobby}>Yes, back to lobby</button><button className="ghost" onClick={() => setResetting(false)}>Cancel</button></div>
-        </div>}
-        {stage && stage.status === 'ACTIVE' && !stage.teams?.forming && <div className="timer-controls" role="group" aria-label="Time controls">
-          <h3>Time</h3>
-          <div className="time-row">
-            {remaining !== null && <><button className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 30_000 })}>+30 s<span className="visually-hidden"> (add 30 seconds)</span></button>
-              <button className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'add', ms: 60_000 })}>+1 min<span className="visually-hidden"> (add 1 minute)</span></button>
-              <button className="ghost small-button" disabled={disabled} onClick={() => timer({ kind: 'clear' })}>No limit<span className="visually-hidden"> (remove time limit)</span></button></>}
-          </div>
-          <form className="inline-form time-set" onSubmit={event => { event.preventDefault(); if (validSeconds) timer({ kind: 'set', ms: seconds * 1000 }); }}>
-            <label>Time left (seconds)<input type="number" inputMode="numeric" min={1} max={3600} step={1} value={timerSeconds} onChange={event => setTimerSeconds(event.target.value)} /></label>
-            <button className="ghost small-button" disabled={disabled || !validSeconds}>Set time</button></form>
-        </div>}
         <SeatRequests state={state} sessionId={state.view.sessionId} onError={setError} />
-        {/* Always in sight, in the lobby and during the game: whether the phones get chips and side games. */}
-        <SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
-        {/* Less frequent things fold away, so the panel fits next to the round. */}
-        <details className="control-fold"><summary>Shared screen &amp; invite</summary>
-          <div className="control-block">
-            <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>
-            {displayUrl && <p><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a> on the TV or a second screen.</p>}
-            {state.view.status !== 'LOBBY' && <JoinQr origin={location.origin} roomCode={state.roomCode} />}
-          </div>
-        </details>
-        <details className="control-fold"><summary>Room settings</summary>
+        {/* Everything less frequent behind four icons; one sheet at a time, under the icons. */}
+        <div className="host-tabs" role="group" aria-label="More">
+          {([['settings', 'gear', 'Room settings'], ['invite', 'tv', 'Shared screen & invite'], ['players', 'users', `Players (${state.players.length})`], ['lobby', 'arrow-rotate-left', 'Back to lobby']] as const).map(([key, icon, label]) =>
+            (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">Players </span><span className="tool-count">{state.players.length}</span></>}</button>)}
+        </div>
+        {sheet === 'settings' && <div className="host-sheet" role="region" aria-label="Room settings">
+          <SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
           <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} />
-        </details>
-        <p className="control-back"><a href="/?host=1">Back to the host menu</a></p>
+          <SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} />
+          <p className="control-back"><a href="/?host=1">Back to the host menu</a></p></div>}
+        {sheet === 'invite' && <div className="host-sheet" role="region" aria-label="Shared screen & invite">
+          <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>
+          {displayUrl && <p><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a> on the TV or a second screen.</p>}
+          {state.view.status !== 'LOBBY' && <JoinQr origin={location.origin} roomCode={state.roomCode} />}</div>}
+        {(sheet === 'players' || state.view.status === 'LOBBY') && <section className="host-sheet players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
+          {me && state.view.status !== 'LOBBY' && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
+          <ul ref={playersRef}>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}<span className="visually-hidden"> · </span><span className="player-state">{player.connected ? 'connected' : 'disconnected'}</span>
+            {player.look.picture && <button className="small-button ghost" aria-label={`Remove the picture of ${player.displayName}`} onClick={() => command('player.removePicture', { playerId: player.id })}>Remove picture</button>}
+            <button className="small-button ghost player-revoke" aria-label={`Revoke access for ${player.displayName}`} title="Revoke access" onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError('Could not revoke access.')); }}><FaIcon name="xmark" /></button></li>)}</ul></section>}
+        {sheet === 'lobby' && <div className="host-sheet reset-confirm" role="group" aria-label="Back to lobby">
+          <p>Start the game again in a new lobby? Everyone comes along (the room gets a new code); the scores of this game stay in its history.</p>
+          <div className="actions"><button className="danger" onClick={backToLobby}>Yes, back to lobby</button><button className="ghost" onClick={() => setSheet(null)}>Cancel</button></div></div>}
+        {/* The scores, small and foldable, at the bottom of the panel (big only at a scoreboard scene and the end). */}
+        {!scoreMoment && state.view.status !== 'LOBBY' && <FloatingScores docked leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
       </aside>}
     </div>}
     {state && me && editingLook && <div className="look-sheet" role="dialog" aria-modal="true" aria-labelledby="look-builder-heading" onKeyDown={event => { if (event.key === 'Escape') setEditingLook(false); }}><LookBuilder initial={me.look} name={me.displayName} busy={disabled} sessionId={state.view.sessionId}
@@ -339,13 +339,8 @@ export function RoomScreen() {
       onBreak={vote => { void roomApi(`/api/rooms/${sessionId}/break`, { vote }).catch(() => setError('Your vote did not go through. Try again.')); }}
       scores={<Scoreboard state={state} disabled={disabled} send={command} />} />}
     {state && role === 'player' && <PointsCelebration roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
+    {state && role === 'display' && canSeeScores && !scoreMoment && state.view.status !== 'LOBBY' && stage?.revealed && <FloatingScores leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
     {state && role !== 'player' && state.settings.reactions && <ReactionsOverlay state={state} store={room.reactions} />}
-    {state && role === 'host' && <section className="players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
-      {me && state.view.status !== 'LOBBY' && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
-      <ul ref={playersRef}>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}<span className="visually-hidden"> · </span><span className="player-state">{player.connected ? 'connected' : 'disconnected'}</span>
-        {host && player.look.picture && <button className="small-button ghost" aria-label={`Remove the picture of ${player.displayName}`} onClick={() => command('player.removePicture', { playerId: player.id })}>Remove picture</button>}
-        {host && <button className="small-button ghost" aria-label={`Revoke access for ${player.displayName}`} onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError('Could not revoke access.')); }}>Revoke access</button>}</li>)}</ul>
-    </section>}
   </main></RoomSessionContext.Provider></LookContext.Provider>;
 }
 
@@ -356,5 +351,8 @@ function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>
   const entries = input.kind === 'choice' ? input.options : input.kind === 'order' ? input.items : [];
   if (!entries.length) return null;
   return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} style={answerFit(entries.map(entry => entry.label))} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
-    {entries.map((entry, index) => { const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route); return <li key={entry.key}>{mark !== null && <span className="answer-mark" aria-hidden="true">{mark}</span>}{entry.label}</li>; })}</ol>;
+    {entries.map((entry, index) => { const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route); return <li key={entry.key}>{mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}{entry.label}</li>; })}</ol>;
 }
+
+/** The quick time button's text: “30 s”, “1 min”, “1:30”. */
+function quickTime(seconds: number) { return seconds < 60 ? `${seconds} s` : seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }

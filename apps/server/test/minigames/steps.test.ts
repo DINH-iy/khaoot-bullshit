@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest';
+import { dueVotes, voteWinner } from '../../src/minigames/steps/engine.js';
+import { STEP_GAMES } from '../../src/minigames/steps/games.js';
+
+describe('a team vote', () => {
+  const options = ['red', 'black'];
+  it('goes to the option with the most votes cast', () => {
+    expect(voteWinner(options, [{ playerId: 'a', option: 'black' }, { playerId: 'b', option: 'black' }, { playerId: 'c', option: 'red' }], null, () => 0)).toBe('black');
+  });
+  it('on a tie, goes to the captain’s vote, else a random tied option', () => {
+    const tie = [{ playerId: 'a', option: 'red' }, { playerId: 'b', option: 'black' }];
+    expect(voteWinner(options, tie, 'b', () => 0)).toBe('black');
+    expect(voteWinner(options, tie, null, () => 1)).toBe('red');
+    expect(voteWinner(options, tie, null, () => 0)).toBe('black');
+  });
+  it('without any vote, picks a random option', () => {
+    expect(voteWinner(options, [], null, () => 1)).toBe('black');
+  });
+  it('is found once its time has run out', () => {
+    const stage = { presentation: { minigame: { startsAt: new Date(0).toISOString(), goAt: null, doorsMilli: null, steps: {
+      'team:a': { state: {}, step: 2, stepAt: new Date(0).toISOString(), captainId: null, voteEndsAt: new Date(10_000).toISOString() },
+      'team:b': { state: {}, step: 0, stepAt: new Date(0).toISOString(), captainId: null, voteEndsAt: null } } } } };
+    expect(dueVotes(stage, new Date(9_000))).toEqual([]);
+    expect(dueVotes(stage, new Date(10_000))).toEqual([{ side: 'team:a', step: 2 }]);
+  });
+});
+
+describe('the step games’ rules', () => {
+  const run = { startsAt: new Date(0).toISOString(), goAt: null, doorsMilli: ['0', '5000'] };
+  it('Drive the bus: four guesses, then done; screens see only the cards guessed', () => {
+    const bus = STEP_GAMES['bus']!; const settings = { sips: [1, 2, 3, 4] };
+    let state = bus.start(settings, run, () => 0);
+    expect((bus.view(state, settings, run, 0) as { cards: unknown[] }).cards).toEqual([]);
+    for (const guess of ['red', 'higher', 'inside', 'hearts']) { expect(bus.options(state, settings, run)).toContain(guess); state = bus.apply(state, guess, settings, run); }
+    expect(bus.options(state, settings, run)).toBeNull();
+    expect((bus.view(state, settings, run, 0) as { cards: unknown[] }).cards).toHaveLength(4);
+    expect(bus.result(state, settings, run)).toBeGreaterThanOrEqual(0); expect(bus.result(state, settings, run)).toBeLessThanOrEqual(10);
+  });
+  it('Lucky doors pays what is behind the door picked; Left or right keeps the choice secret', () => {
+    const doors = STEP_GAMES['lucky-doors']!; const settings = { doorsMilli: ['0', '5000'] };
+    expect(doors.payoutMilli!(doors.apply(doors.start(settings, run, () => 0), '1', settings, run), settings, run)).toBe(5000n);
+    const majority = STEP_GAMES['majority']!;
+    expect(majority.secret).toBe(true);
+    expect(majority.view(majority.apply(majority.start({}, run, () => 0), 'left', {}, run), {}, run, 0)).toEqual({ chosen: true });
+  });
+});
+
+describe('Lucky doors: which door hides what', () => {
+  it('is shuffled every game, unless the host fixed it as listed', async () => {
+    const { startMinigame } = await import('../../src/minigames/rules.js');
+    const doorsMilli = ['0', '1000', '2000', '3000'];
+    expect(startMinigame('lucky-doors', { doorsMilli, order: 'fixed' }, new Date(0), () => 0).doorsMilli).toEqual(doorsMilli);
+    expect(startMinigame('lucky-doors', { doorsMilli }, new Date(0), () => 0).doorsMilli).not.toEqual(doorsMilli);
+  });
+});
+
+describe('Drive the bus: a rainbow', () => {
+  const bus = STEP_GAMES['bus']!;
+  const card = (rank: number, suit: string) => ({ rank, suit });
+  const done = (suits: string[]) => ({ state: { cards: suits.map((suit, index) => card(index + 2, suit)), guesses: ['red', 'higher', 'inside', 'hearts'] }, done: true });
+  it('four different suits make every other team drink the last round’s sips', () => {
+    const settings = { sips: [1, 2, 3, 4], rainbow: true };
+    const rainbow = done(['hearts', 'diamonds', 'clubs', 'spades']); const plain = done(['hearts', 'hearts', 'clubs', 'spades']);
+    expect(bus.extras!([rainbow, plain], settings)).toEqual([0, 4]);
+    expect(bus.extras!([rainbow, rainbow], settings)).toEqual([4, 4]);
+    expect(bus.resultFlags!(rainbow.state, settings, { startsAt: '', goAt: null, doorsMilli: null })).toEqual({ rainbow: true });
+  });
+  it('can be switched off, and does not count before the fourth card', () => {
+    expect(bus.extras!([done(['hearts', 'diamonds', 'clubs', 'spades']), done(['hearts', 'hearts', 'clubs', 'spades'])], { sips: [1, 2, 3, 4], rainbow: false })).toEqual([0, 0]);
+    expect(bus.extras!([{ ...done(['hearts', 'diamonds', 'clubs', 'spades']), done: false }, done(['hearts', 'hearts', 'hearts', 'hearts'])], { sips: [1, 2, 3, 4] })).toEqual([0, 0]);
+  });
+});

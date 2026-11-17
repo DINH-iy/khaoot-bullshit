@@ -5,6 +5,7 @@ import { EligibilitySchema, type Transaction } from './model.js';
 import { readRoute } from './routes/routes.js';
 import { readForming, teamContext } from './teams/teams.js';
 import { ACCEPTANCE_GRACE_MS, remainingMs, SETTLE_MS, timerColumns } from './timing.js';
+import { isStepMinigame } from '@party/contracts';
 
 /** How long after the last answer the round closes unless the room sets another delay, so everyone sees "all in" before the result. */
 export const ALL_IN_CLOSE_MS = 3000;
@@ -28,7 +29,8 @@ export async function closeSoonWhenAllIn(tx: Transaction, session: GameSession, 
   const eligible = EligibilitySchema.safeParse(stage.eligibility); if (!eligible.success) return;
   const context = await teamContext(tx, stage);
   const needed = entry.stage.kind === 'route' ? readRoute(stage.presentation).voterKeys.length
-    : context && context.answers === 'captain' ? new Set(eligible.data.playerIds.map(id => context.teamOf.get(id)).filter(Boolean)).size
+    // A step game in a team round: each team finishes once (its result is written when it is done).
+    : context && (context.answers === 'captain' || (entry.stage.kind === 'minigame' && isStepMinigame(entry.stage.game))) ? new Set(eligible.data.playerIds.map(id => context.teamOf.get(id)).filter(Boolean)).size
     : eligible.data.playerIds.length;
   const answered = await tx.submission.count({ where: { stageRunId: stage.id, slotKey: 'answer' } });
   if (needed === 0 || answered < needed) return;

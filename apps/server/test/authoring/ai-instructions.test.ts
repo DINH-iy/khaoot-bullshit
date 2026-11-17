@@ -25,7 +25,7 @@ describe('the instructions for an AI know every feature', () => {
     expect(missing(quoted([...MINIGAME_KEYS, ...HEAD_TO_HEAD_KEYS]))).toEqual([]);
   });
   it('the game-wide extras: wheels, awards (every rule), side games, places and teams', () => {
-    expect(missing(quoted(['wheels', 'spin', 'wheelClear', 'awards', 'sideGames', 'chips', 'places', 'inTeams', 'look']))).toEqual([]);
+    expect(missing(quoted(['wheels', 'spin', 'wheelClear', 'awards', 'sideGames', 'chips', 'quickTime', 'places', 'inTeams', 'look']))).toEqual([]);
     expect(missing(quoted([...AWARD_RULES]))).toEqual([]);
   });
   it('every look: style presets, every theme setting and its choices, and every animation', () => {

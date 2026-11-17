@@ -12,6 +12,7 @@ import { InvitePanel } from './invite-panel.js';
 import { FieldLimit } from '../controls/field-limit.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { readMemory, rememberPlace } from './editor-memory.js';
+import { HelpPanel } from './help-panel.js';
 import { pendingClaim } from '../../people/use-me.js';
 import '../editor.css';
 
@@ -38,7 +39,7 @@ function EditorPage({ gameId }: { gameId: string }) {
 function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
   const d = useDraft(gameId);
   // Coming back opens the same place (K2): the link's view wins, then what was open last time in this browser.
-  const [memory] = useState(() => readMemory(gameId));
+  const [memory] = useState(() => readMemory(gameId)); const [helping, setHelping] = useState(false);
   const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'flow' || wanted === 'scene' || wanted === 'look' ? wanted : memory.view ?? 'flow'; });
   const [selected, setSelected] = useState<string[]>(memory.selected ?? []);
   const [exporting, setExporting] = useState(memory.panel === 'export'); const [settings, setSettings] = useState(memory.panel === 'settings'); const [inviting, setInviting] = useState(memory.panel === 'invite');
@@ -53,6 +54,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   const setView = (next: View) => { setViewState(next); const url = new URL(location.href); url.searchParams.set('view', next); history.replaceState(null, '', url); };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      // ? opens Help & shortcuts (not while typing).
+      if (event.key === '?' && !(event.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) { event.preventDefault(); setHelping(true); return; }
       if ((event.target as HTMLElement).closest('input, textarea, select') || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y') return;
       event.preventDefault(); if (event.key.toLowerCase() === 'y' || event.shiftKey) d.redo(); else d.undo();
     };
@@ -88,9 +91,11 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
           ...(role === 'owner' ? [{ label: draft.published ? 'Play the published version ↗' : 'Play (publish first)', disabled: d.busy || !draft.published, onSelect: d.play }] : []),
         ]} />
-        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', onSelect: () => openPanel('settings') }, { label: 'Invite people', onSelect: () => openPanel('invite') }, { label: 'Export as text', onSelect: () => openPanel('export') }]} />
+        <button type="button" className="small-button icon-only help-button" aria-label="Help & shortcuts" title="Help & shortcuts (?)" onClick={() => setHelping(true)}>?</button>
+        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', onSelect: () => openPanel('settings') }, { label: 'Invite people', onSelect: () => openPanel('invite') }, { label: 'Export as text', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', onSelect: () => setHelping(true) }]} />
       </div>
     </header>
+    {helping && <HelpPanel onClose={() => setHelping(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}

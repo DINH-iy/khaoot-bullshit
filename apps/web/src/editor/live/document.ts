@@ -1,4 +1,4 @@
-import { autoLayout, uniqueKey, type Definition, type Positions } from '../model.js';
+import { autoLayout, BEND, isBendKey, uniqueKey, type Definition, type Positions } from '../model.js';
 import { merge3, same } from './merge.js';
 
 // The editor's state (a game and where its cards sit) as the one document the
@@ -10,7 +10,10 @@ export type Doc = Definition & { editor?: { positions?: Positions } };
 
 export function toDoc(snapshot: Snapshot): Doc {
   const keys = new Set(snapshot.definition.nodes.map(node => node.key));
-  return { ...snapshot.definition, editor: { positions: Object.fromEntries(Object.entries(snapshot.positions).filter(([key]) => keys.has(key))) } };
+  // Cards of existing scenes, and bend points of existing arrows.
+  const edges = new Set(snapshot.definition.edges.map(edge => edge.key));
+  const kept = (key: string) => keys.has(key) || (isBendKey(key) && edges.has(key.slice(BEND.length, key.lastIndexOf('--'))));
+  return { ...snapshot.definition, editor: { positions: Object.fromEntries(Object.entries(snapshot.positions).filter(([key]) => kept(key))) } };
 }
 export function fromDoc(doc: Doc): Snapshot {
   const { editor, ...game } = doc; const definition = game as Definition;

@@ -43,6 +43,51 @@ const wrapsBack = (from: Point, to: Point) => to.x < from.x - CARD_WIDTH / 2;
 // The height of the run between the rows: halfway, or just below the start when going up.
 const returnY = (from: Point, to: Point) => to.y > from.y ? (from.y + to.y) / 2 : Math.max(from.y, to.y) + GRID * 4;
 
+// ---------- bend points ----------
+// An arrow's bend points (dragged by the author to lead it around something, while the scenes stay put).
+// They are layout, kept with the card positions under "bend--<arrow>--<n>", so saving, undo, live editing
+// and export carry them; code that treats positions as cards skips them (isBendKey).
+export const BEND = 'bend--';
+export const bendKey = (edge: string, index: number) => `${BEND}${edge}--${index}`;
+export const isBendKey = (key: string) => key.startsWith(BEND);
+export function bendsOf(positions: Positions, edge: string): Point[] {
+  const points: Point[] = []; for (let index = 0; positions[bendKey(edge, index)]; index++) points.push(positions[bendKey(edge, index)]!);
+  return points;
+}
+/** The positions with this arrow's bend points replaced (none: a plain curve again). */
+export function withBends(positions: Positions, edge: string, points: Point[]): Positions {
+  const next = Object.fromEntries(Object.entries(positions).filter(([key]) => !key.startsWith(`${BEND}${edge}--`)));
+  points.forEach((point, index) => { next[bendKey(edge, index)] = point; });
+  return next;
+}
+/**
+ * An arrow's path: the usual curve, or with bend points a smooth line through them
+ * (Catmull-Rom), still leaving the scene to the right and entering the next from the left.
+ */
+export function routedPath(from: Point, to: Point, bends: Point[]): string {
+  if (!bends.length) return curve(from, to);
+  const points = [from, ...bends, to]; const lead = 60;
+  let path = `M ${from.x} ${from.y}`;
+  for (let index = 0; index < points.length - 1; index++) {
+    const a = points[index]!; const b = points[index + 1]!; const before = points[index - 1]; const after = points[index + 2];
+    const c1 = index === 0 ? { x: a.x + lead, y: a.y } : { x: a.x + (b.x - before!.x) / 6, y: a.y + (b.y - before!.y) / 6 };
+    const c2 = index === points.length - 2 ? { x: b.x - lead, y: b.y } : { x: b.x - (after!.x - a.x) / 6, y: b.y - (after!.y - a.y) / 6 };
+    path += ` C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${b.x} ${b.y}`;
+  }
+  return path;
+}
+/** A point a fraction `t` along an arrow (with bend points: along the line through them, by length). */
+export function pointOnRoute(from: Point, to: Point, bends: Point[], t: number): Point {
+  if (!bends.length) return pointOnCurve(from, to, t);
+  const points = [from, ...bends, to]; const lengths = points.slice(1).map((point, index) => Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y));
+  let left = lengths.reduce((sum, length) => sum + length, 0) * t;
+  for (let index = 0; index < lengths.length; index++) {
+    if (left <= lengths[index]! || index === lengths.length - 1) { const a = points[index]!; const b = points[index + 1]!; const f = lengths[index] ? Math.min(1, left / lengths[index]!) : 0; return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f }; }
+    left -= lengths[index]!;
+  }
+  return to;
+}
+
 /** A point a fraction `t` along the curve: where an arrow's grab handle sits, so arrows into the same scene get separate handles. */
 export function pointOnCurve(from: Point, to: Point, t: number): Point {
   // On a wrapped arrow the handles sit on its long straight run.
@@ -262,7 +307,7 @@ export interface Guides { x: number | null; y: number | null }
  */
 export function snapCard(definition: Definition, positions: Positions, key: string, raw: Point): { point: Point; guides: Guides } {
   let x = snap(raw.x); let y = snap(raw.y); const guides: Guides = { x: null, y: null };
-  const others = Object.entries(positions).filter(([other]) => other !== key);
+  const others = Object.entries(positions).filter(([other]) => other !== key && !isBendKey(other));
   let bestX = ALIGN;
   for (const [, position] of others) if (Math.abs(raw.x - position.x) < bestX) { bestX = Math.abs(raw.x - position.x); x = position.x; guides.x = position.x; }
   let bestY = ALIGN + 4;

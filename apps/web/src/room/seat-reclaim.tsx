@@ -59,18 +59,30 @@ export function SeatReclaim({ roomCode, onJoined, onCancel }: { roomCode: string
 }
 
 /** Host: the approval setting and any phones waiting to take over a seat. */
-export function SeatRequests({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
+function useSeatAction(onError: (message: string) => void) {
   const [busy, setBusy] = useState(false);
   const act = (path: string, body: object) => { setBusy(true); void roomApi(path, body).catch(() => onError('That did not go through. The request may have expired; the list is up to date again.')).finally(() => setBusy(false)); };
+  return { busy, act };
+}
+
+/** The room setting (in the host's settings sheet): approve every seat takeover first. */
+export function SeatApprovalSetting({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
+  const { busy, act } = useSeatAction(onError);
+  return <label className="choice seat-approval"><input type="checkbox" checked={state.settings.reclaimApproval} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { reclaimApproval: event.target.checked })} />
+    Ask me before a new phone takes over a seat</label>;
+}
+
+/** Waiting seat requests, right in the host panel (nothing when there are none). */
+export function SeatRequests({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
+  const { busy, act } = useSeatAction(onError);
   const name = (playerId: string) => state.players.find(player => player.id === playerId);
+  if (!state.seatRequests.length) return null;
   return <div className="seat-requests">
-    <label className="choice"><input type="checkbox" checked={state.settings.reclaimApproval} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { reclaimApproval: event.target.checked })} />
-      Ask me before a new phone takes over a seat</label>
-    {state.seatRequests.length > 0 && <div role="region" aria-label="Seat requests"><h3>Seat requests</h3><ul className="plain-list">{state.seatRequests.map(request => {
+    <div role="region" aria-label="Seat requests"><h3>Seat requests</h3><ul className="plain-list">{state.seatRequests.map(request => {
       const seat = name(request.playerId); const label = seat?.displayName ?? 'a player';
       return <li key={request.requestId}>A new phone wants {label}’s seat{seat?.connected ? ' (their current phone is connected; approving disconnects it)' : ''}.
         <div className="actions"><button disabled={busy} onClick={() => act(`/api/rooms/${sessionId}/seat-requests`, { requestId: request.requestId, approve: true })}>Approve for {label}</button>
           <button disabled={busy} onClick={() => act(`/api/rooms/${sessionId}/seat-requests`, { requestId: request.requestId, approve: false })}>Deny for {label}</button></div></li>;
-    })}</ul></div>}
+    })}</ul></div>
   </div>;
 }

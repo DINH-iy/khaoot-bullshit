@@ -46,6 +46,12 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
         Play them with chips</label>
       <p className="hint">Side games: slot machine, blackjack, packs and challenges between players, on by default. Chips (play money only) add bets, stakes and a leaderboard; off by default, so the games are just for fun. The host can still switch both in the room.</p>
     </Section>
+    {/* Stored only when it differs from 30 seconds. */}
+    <Section title="Host tools" summary={`Quick time button: +${Number(definition['quickTimeSeconds'] ?? 30)} s`}>
+      <label>Seconds the host's quick time button adds<input type="number" inputMode="numeric" min={5} max={600} step={5} value={Number(definition['quickTimeSeconds'] ?? 30)}
+        onChange={event => { const value = Math.round(Number(event.target.value)); if (!(value >= 5 && value <= 600)) return; const next = { ...definition }; if (value === 30) delete next['quickTimeSeconds']; else next['quickTimeSeconds'] = value; onChange(next); }} /></label>
+      <p className="hint">One tap in the host panel adds this time to a running round. The host can change it in the room's settings too.</p>
+    </Section>
     <WheelSettings definition={definition} onChange={onChange} />
     <FinaleSettings definition={definition} onChange={onChange} />
     </fieldset>

@@ -58,10 +58,10 @@ Sources: Nielsen Norman Group ([Dropdowns: when to use them](https://www.nngroup
 
 ### G. Editor: canvas, layout, mobile
 
-- G1: zoom the Flow canvas with the mouse wheel.
-- G2: a long game zooms far out; wrap scenes into rows.
+- G1: zoom the Flow canvas with the mouse wheel. **Done (not committed yet):** the plain scroll wheel zooms around the pointer (smoothly; a trackpad pinch too), Shift + scroll moves the map, and you can zoom out to 25%.
+- G2: a long game zooms far out; wrap scenes into rows. **Done (not committed yet):** *Tidy up* (and a game without a layout) wraps a long game into rows of columns, about screen-shaped (16:10); games up to 6 steps stay on one row. The arrow from the end of a row runs back neatly along the gap between the rows.
 - G3: the Look & feel page is very long. **Done (not committed yet)** with K4: its style page and texts are small groups that open and close.
-- G4, G5: the editor on phones (the rehearse menu does not fit).
+- G4, G5: the editor on phones (the rehearse menu does not fit). **Done (not committed yet):** on a phone the top bar is three short rows, the map's tools one row of icons, the scene panel a sheet from the bottom, menus (Play & publish, ☰, your name) and the add-a-scene menu sheets at the bottom, and the Scene editor stacks list, preview and settings with the page scrolling. Checked with a phone-sized window, not yet on a real phone.
 
 ### H. Host menu and admin
 
@@ -102,6 +102,33 @@ From a UX designer's review, with your own additions:
 
 - M1: the instructions the app copies for an AI now cover every feature: wheels (with colours), awards (with titles, scene awards and the wooden spoon), side games and chips, all styles and every look setting (colours, fonts, backgrounds, tiles, gradient, answer marks, animations). A test (`apps/server/test/authoring/ai-instructions.test.ts`) fails and names what is missing when a feature is added without updating them; AGENTS.md says so too.
 - M2: the AI first asks the user a few short questions (who plays and the occasion, how long, teams or not, which rounds, language and topics, a style) in one message and waits for the answers before writing the game; "just make it" skips them. The import screen and the guide say so.
+
+### N. Editor details (17 November 2026, not committed yet)
+
+- N1: **Help & shortcuts**: a ? button in the top bar, the ☰ menu or the ? key open a panel with how the three editors work, every mouse and touch gesture on the map, every keyboard shortcut (⌘ on a Mac, Ctrl elsewhere) and how menus and lists work. New shortcuts belong there too.
+- N2: **bend points on arrows**: select an arrow, drag a dashed circle on it to bend it there (to lead it around something); drag a bend point to move it, double-click to remove it, *Straighten* removes them all. The scenes stay put. Bend points are layout (saved with the card positions, also when editing together and in exports).
+- N3: selecting an arrow no longer makes the map's toolbar jump: its actions (add a scene on it, straighten, remove) float at the top of the map instead of being added to the toolbar.
+- N4: route arrows and shape marks are icons now (Font Awesome Free, CC BY 4.0) instead of text characters: one arrow icon turned to each direction, and star, circle, triangle, square, diamond, heart, plus and bolt.
+
+### O. Step games and new minigames (17 November 2026, not committed yet)
+
+- O1: one engine for minigames played choice by choice: a game only brings its rules and its drawing; who chooses, team votes and their time, captains, saving, results and points are shared (see the architecture note *Step games*). Lucky doors runs on it now; new games of this kind need no new room code.
+- O2: how a team decides (scene setting, team rounds): anyone taps it, the team votes (each member once within *Seconds per vote*; who does not vote is not counted; *Decide now* counts the votes cast; a tie goes to the captain or a random pick), or the captain decides (a team without one gets a random captain, fixed for the round and shown to everyone).
+- O3: **Drive the bus** (the Dutch drinking game *bussen*, without the final bus): each team guesses red or black, higher or lower, inside or outside, then the suit; a wrong guess costs everyone in the team that round's sips (1, 2, 3, 4 by default); fewest sips wins.
+- O4: **Left or right**: everyone (or every team) picks left or right in secret; the majority gets the 1st-place points, a tie gives nobody anything.
+- O5: **Lucky doors**: the points behind the doors are shuffled every game, or fixed as listed (scene setting); in a team round the team picks one door together.
+- O6: built-in game **Bar games**: random teams with captains, Drive the bus with a team vote, then Left or right.
+
+- O7: **Rainbow** in Drive the bus: a team whose four cards are four different suits makes the other teams drink the last round's sips (scene setting, on by default); the sips per round are a scene setting too.
+
+### P. Room screen: less text, more icons (17 November 2026, not committed yet)
+
+- P1: the connection is a coloured dot in the top bar; its menu has the status, *Reconnect and sync* and the measurements.
+- P2: the round is one line of chips: what to do now (with an icon, readable on every style), your team as a coloured flag (a star for the captain), the time, and an (i) with everything else (your team mates, team rules, how to play, how a team decides, sips, rainbow).
+- P3: host panel: the big buttons, then one row of icon tools (pause, smoke break, a quick time button, the stopwatch with +1 min, no limit and set time, reopen), then four icons that open one sheet at a time: Room settings, Shared screen & invite, Players (with a count), Back to lobby.
+- P4: the scores are a small foldable card: at the bottom of the host panel, floating in a corner of the shared screen; big only at a scoreboard scene and the end.
+- P5: the quick time button adds 30 seconds unless the game says otherwise (Game settings → Host tools, `"quickTime"` in the text import); the host can change it in the room's settings.
+- Next (asked): an optional explanation per scene, shown before the round starts until the host continues; filled with the game's standard explanation, and the standard texts editable.
 
 ### Open questions
 

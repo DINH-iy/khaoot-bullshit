@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import jsQR from 'jsqr';
 import { createDatabase } from '../../apps/server/src/database/client.js';
 import { provisionRehearsal } from '../../apps/server/src/rooms/rehearsal.js';
-import { openHostFold } from './helpers.js';
+import { connectionStatus, openHostFold } from './helpers.js';
 
 const url = process.env['DATABASE_URL'];
 if (!url || !new URL(url).pathname.endsWith('_test') || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E test database required');
@@ -44,17 +44,19 @@ test('host and phone verify access, save privately, refresh and recover after a 
     const cookies = await context.cookies(); expect(cookies.filter(cookie => cookie.name.startsWith('party_')).every(cookie => cookie.httpOnly)).toBe(true);
     expect(await page.evaluate(() => document.cookie)).not.toContain('party_');
     await context.setOffline(true);
+    await connectionStatus(page);
     await page.getByRole('button', { name: 'Reconnect and sync' }).click();
-    await expect(page.getByRole('region', { name: 'Connection', exact: true }).getByRole('status', { name: 'Connection status' })).not.toHaveText('Connected');
+    await expect(await connectionStatus(page)).not.toHaveText('Connected');
     await context.setOffline(false);
-    await expect(page.getByRole('region', { name: 'Connection', exact: true }).getByRole('status', { name: 'Connection status' })).toHaveText('Connected', { timeout: 20000 });
+    await expect(await connectionStatus(page)).toHaveText('Connected', { timeout: 20000 });
     await expect(page.getByText('Your answer is in!')).toBeVisible();
     expect((await db.client.sessionPlayer.findFirstOrThrow({ where: { sessionId: f.sessionId } })).id).toBe(playerId);
     expect(await db.client.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await openHostFold(host, 'Players');
     await host.getByRole('button', { name: 'Revoke access for Phone player' }).click();
-    await expect(page.getByRole('region', { name: 'Connection', exact: true }).getByRole('status', { name: 'Connection status' })).not.toHaveText('Connected');
+    await expect(await connectionStatus(page)).not.toHaveText('Connected');
     await page.reload();
     await expect(page.getByText('Room access denied. Your access may have expired, been revoked, or your seat was taken over on another phone.')).toBeVisible();
   } finally { await hostContext.close(); }
@@ -70,6 +72,7 @@ test('display stays read-only without replacing host credentials in another tab'
     const display = await context.newPage(); await display.goto(href!);
     await expect(display.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
     await expect(display.getByRole('button', { name: 'Start the game' })).toHaveCount(0);
+    await connectionStatus(host);
     await host.getByRole('button', { name: 'Reconnect and sync' }).click();
     await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
   } finally { await context.close(); }

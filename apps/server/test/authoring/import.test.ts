@@ -45,6 +45,13 @@ describe('importing a game from text', () => {
     expect(check(`Sure! Here is your game:\n\n\`\`\`json\n${example}\n\`\`\`\nHave fun!`).issues).toEqual([]);
   });
 
+  it('takes the host’s quick time button from "quickTime", within 5 to 600 seconds', () => {
+    const game = (quickTime: unknown) => check(JSON.stringify({ title: 'Quick', quickTime, scenes: [{ type: 'cutscene', title: 'Hi', text: 'Welcome' }] })).definition;
+    expect(game(60).quickTimeSeconds).toBe(60);
+    expect(game(1).quickTimeSeconds).toBe(5);
+    expect(game(undefined).quickTimeSeconds).toBeUndefined();
+  });
+
   it('fills in names, the start, the order and defaults for a bare minimum game', () => {
     const { issues, definition } = check(JSON.stringify({ title: 'Mini', scenes: [
       { type: 'cutscene', title: 'Hi', text: 'Welcome' },

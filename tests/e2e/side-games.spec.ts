@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { openPhoneMenu } from './helpers.js';
+import { openHostFold, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -26,6 +26,7 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     // Side games are on and chips off in a new room; the host switches chips on in the lobby.
+    await openHostFold(host, 'Room settings');
     await expect(host.getByRole('switch', { name: 'Side games', exact: true })).toHaveAttribute('aria-checked', 'true');
     const chips = host.getByRole('switch', { name: 'Chips', exact: true });
     await expect(chips).toHaveAttribute('aria-checked', 'false');

@@ -22,6 +22,7 @@ import { breakVotesNeeded, createBreaks } from './breaks.js';
 import { personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 import { clientAddress } from '../http/client-address.js';
+import { decideDueVotes } from '../minigames/steps/engine.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
   const gateway = createRoomGateway(client, config); const limiter = new RateLimiter();
@@ -70,7 +71,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, confirmLooks: state.confirmLooks },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], nextRoom: state.nextRoom });
   };
@@ -279,9 +280,11 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const ticker = setInterval(() => { if (!publishing) publishTask = publish(); }, 250); ticker.unref();
   // Deadlines are durable rows, so automatic closing needs no per-room timer
   // and continues for rooms with nobody connected.
-  let closing = false; let closeTask: Promise<void> | undefined; const timeoutBackoff = new Map<string, number>();
+  let closing = false; let closeTask: Promise<void> | undefined; const timeoutBackoff = new Map<string, number>(); let voteTicks = 0;
   const closeDue = async () => {
     if (closing || shuttingDown) return; closing = true;
+    // Team votes in step games whose time ran out are decided too, about once a second.
+    if (++voteTicks % 4 === 0) await decideDueVotes(client as never, service).catch(() => app.log.warn({ event: 'step_votes_unavailable' }, 'Deciding team votes unavailable'));
     try { const { closed, failed } = await closeExpiredStages(client, service, undefined, timeoutBackoff); if (closed) app.log.info({ event: 'stages_timed_out', count: closed }, 'Timed stages closed'); if (failed) app.log.warn({ event: 'stage_timeout_failed', count: failed }, 'Some timed stages could not be closed; retrying later'); }
     catch { app.log.warn({ event: 'stage_timeout_unavailable' }, 'Timed stage closing unavailable'); }
     finally { closing = false; }

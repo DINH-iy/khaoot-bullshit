@@ -48,25 +48,6 @@ describe('minigames', () => {
     expect(revealed.standings).toHaveLength(2);
   });
 
-  it('keeps the doors secret until the reveal and pays what was behind the chosen door', async () => {
-    const w = world(); const f = await fixture(2, game({ game: 'lucky-doors', settings: { doorsMilli: ['0', '7000'] } }));
-    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
-    const view = await readSessionView(prisma, { role: 'player', playerId: f.players[0]!.id }, f.sessionId);
-    // Screens see the door values the author chose, never which door hides which.
-    expect(Object.keys(view.stage!.minigame!).sort()).toEqual(['game', 'goAt', 'relay', 'settings', 'startsAt']);
-    const run = readMinigameRun((await prisma.stageRun.findUniqueOrThrow({ where: { id: stageRunId } })).presentation)!;
-    const prize = run.doorsMilli!.indexOf('7000');
-    w.advance(3500);
-    await play(w, f, 0, stageRunId, prize); await play(w, f, 1, stageRunId, 1 - prize);
-    await expect(play(w, f, 1, stageRunId, prize)).rejects.toMatchObject({ code: 'ALREADY_SUBMITTED' });
-    await expect(play(w, f, 0, stageRunId, 5)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
-    await host(w, f, 'stage.close', { stageRunId });
-    // Moving on reveals it too, with its points.
-    await host(w, f, 'stage.advance', { stageRunId });
-    const totals = await prisma.scoreEntry.findMany({ where: { sessionId: f.sessionId }, select: { recipientPlayerId: true, amountMilli: true } });
-    expect(totals).toEqual([{ recipientPlayerId: f.players[0]!.id, amountMilli: 7000n }]);
-  });
-
   it('plays one against the rest in teams: the single player can win the round for their team', async () => {
     const w = world();
     const f = await fixture(4, game({ game: 'reaction', settings: { minWaitMs: 1000, maxWaitMs: 1000 }, placementMilli: ['10000', '4000'],

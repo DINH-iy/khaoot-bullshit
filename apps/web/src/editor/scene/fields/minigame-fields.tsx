@@ -1,4 +1,4 @@
-import { isMinigameKey, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { isMinigameKey, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
 import { PlacesFields } from './places-fields.js';
 import { useState } from 'react';
 import { ChoiceDialog } from '../../controls/choice-dialog.js';
@@ -20,6 +20,8 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
   const stage = node.stages[index]!; const game = String(stage['game'] ?? '');
   const edit = (change: (current: Stage) => Stage, field: string) => onChange(updateStage(definition, node.key, index, change), `${node.key}:${index}:${field}`);
   const known = isMinigameKey(game); const [picking, setPicking] = useState(false);
+  // Played in teams: the round's own teams, or the game's (from a Pick teams scene).
+  const inTeams = (stage['play'] as { kind?: string } | undefined)?.kind === 'teams' || ((definition['play'] as { kind?: string } | undefined)?.kind === 'teams' && (stage['play'] as { kind?: string } | undefined)?.kind !== 'solo');
   const settings = known ? parseMinigameSettings(game, stage['settings']) : null;
   const setSettings = (next: MinigameSettings, field: string) => edit(current => ({ ...current, settings: next }), field);
   // Points by place: `places` (a list or a split total); older scenes keep `placementMilli` until changed here.
@@ -52,10 +54,12 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
       <label>Clock disappears after (seconds)<input type="number" min={0} max={60} step={0.5} value={seconds(value.visibleMs)} onChange={event => setSettings({ ...value, visibleMs: ms(event.target.value, 0, 60) }, 'visible')} /></label>
     </div>; })()}
     {game === 'lucky-doors' && settings && (() => { const doors = (settings as MinigameSettings<'lucky-doors'>).doorsMilli; return <div className="door-list">
-      <p className="field-title">Points behind the doors (shuffled every game)</p>
-      {doors.map((door, position) => <div key={position} className="option-row"><label>Door {position + 1}<input type="number" min={0} value={toPoints(door)} onChange={event => setSettings({ doorsMilli: doors.map((entry, at) => at === position ? toMilli(event.target.value) : entry) }, `door-${position}`)} /></label>
-        <button className="small-button" disabled={doors.length <= 2} aria-label={`Remove door ${position + 1}`} onClick={() => setSettings({ doorsMilli: doors.filter((_, at) => at !== position) }, 'doors')}>Remove</button></div>)}
-      <button className="small-button" disabled={doors.length >= 8} onClick={() => setSettings({ doorsMilli: [...doors, '0'] }, 'doors')}>Add a door</button>
+      <Segmented label="Behind which door" value={(settings as MinigameSettings<'lucky-doors'>).order ?? 'random'} choices={[{ value: 'random', label: 'Shuffled every game' }, { value: 'fixed', label: 'As listed here' }]}
+        onChange={order => setSettings({ ...(settings as MinigameSettings<'lucky-doors'>), ...(order === 'fixed' ? { order: 'fixed' } : { order: undefined }) } as MinigameSettings<'lucky-doors'>, 'order')} />
+      <p className="field-title">Points behind the doors{(settings as MinigameSettings<'lucky-doors'>).order === 'fixed' ? ' (door 1 first; players do not see it)' : ' (shuffled every game)'}</p>
+      {doors.map((door, position) => <div key={position} className="option-row"><label>Door {position + 1}<input type="number" min={0} value={toPoints(door)} onChange={event => setSettings({ ...(settings as MinigameSettings<'lucky-doors'>), doorsMilli: doors.map((entry, at) => at === position ? toMilli(event.target.value) : entry) }, `door-${position}`)} /></label>
+        <button className="small-button" disabled={doors.length <= 2} aria-label={`Remove door ${position + 1}`} onClick={() => setSettings({ ...(settings as MinigameSettings<'lucky-doors'>), doorsMilli: doors.filter((_, at) => at !== position) }, 'doors')}>Remove</button></div>)}
+      <button className="small-button" disabled={doors.length >= 8} onClick={() => setSettings({ ...(settings as MinigameSettings<'lucky-doors'>), doorsMilli: [...doors, '0'] }, 'doors')}>Add a door</button>
     </div>; })()}
 
     {game === 'perfect-circle' && settings && <label>Time to draw the circle (seconds)<input type="number" min={3} max={30} value={(settings as MinigameSettings<'perfect-circle'>).seconds}
@@ -66,5 +70,22 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
         <label>Seconds to vote<input type="number" min={10} max={120} value={value.voteSeconds} onChange={event => setSettings({ ...value, voteSeconds: Math.round(Math.min(120, Math.max(10, Number(event.target.value) || 10))) }, 'vote')} /></label>
       </div>
       <p className="hint">Played in teams: set “Who plays this” below to teams. Every team gets as many turns as the biggest team has players. The question above is what they draw.</p></>; })()}
+    {game === 'bus' && settings && (() => { const sips = (settings as MinigameSettings<'bus'>).sips; return <div className="door-list">
+      <p className="field-title">Sips for everyone in the team when wrong</p>
+      <div className="field-pair">{['Red or black', 'Higher or lower', 'Inside or outside', 'Which suit'].map((round, position) => <label key={round}>{round}<input type="number" min={0} max={20} value={sips[position]}
+        onChange={event => setSettings({ sips: sips.map((entry, at) => at === position ? Math.round(Math.min(20, Math.max(0, Number(event.target.value) || 0))) : entry) }, `sips-${position}`)} /></label>)}</div>
+      <label className="choice"><input type="checkbox" checked={(settings as MinigameSettings<'bus'>).rainbow !== false} onChange={event => setSettings({ ...(settings as MinigameSettings<'bus'>), rainbow: event.target.checked }, 'rainbow')} />
+        Rainbow: a team whose four cards are four different suits makes the other teams drink the last round’s sips</label>
+      <p className="hint">Played in teams: the fewest sips wins. The final bus is not played.</p>
+    </div>; })()}
+    {game === 'majority' && <p className="hint">Everyone picks left or right in secret; whoever picked what most picked gets the 1st-place points (a tie: nobody). In a team round each team decides one choice.</p>}
+    {/* A step game in a team round: how the team decides each move, and the time for a team vote. */}
+    {known && isStepMinigame(game) && inTeams && <div className="step-decide-fields">
+      <Segmented label="How a team decides" stacked value={String(stage['decide'] ?? 'anyone')} onChange={decide => edit(current => { const copy: Stage = { ...current }; if (decide === 'anyone') delete copy['decide']; else copy['decide'] = decide; return copy; }, 'decide')}
+        choices={[{ value: 'anyone', label: 'Anyone in the team taps it', hint: 'They talk it over; the first tap counts' }, { value: 'vote', label: 'The team votes', hint: 'Each member votes; who does not vote in time is not counted' },
+          { value: 'captain', label: 'The captain decides', hint: 'A team without a captain gets one at random' }]} />
+      {stage['decide'] === 'vote' && <label className="ed-inline">Seconds per vote<span className="ed-unit"><input type="number" min={5} max={120} value={Number(stage['voteSeconds'] ?? 20)}
+        onChange={event => edit(current => ({ ...current, voteSeconds: Math.round(Math.min(120, Math.max(5, Number(event.target.value) || 20))) }), 'vote-seconds')} />sec</span></label>}
+    </div>}
   </div>;
 }

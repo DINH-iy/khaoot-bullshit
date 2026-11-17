@@ -137,8 +137,8 @@ export function resolveTheme(...layers: (Theme | undefined)[]): FullTheme {
   }
   return result;
 }
-// Shapes drawn as text, not emoji (U+FE0E), so they take the tile's text colour.
-const SHAPES = ['★', '●', '▲', '■', '◆', '♥\uFE0E', '✚', '⬟'];
+// Shape marks; screens draw each as an icon (apps/web/src/presentation/mark-icons.tsx).
+const SHAPES = ['★', '●', '▲', '■', '◆', '♥', '✚', '⬟'];
 const ROUTE_ARROWS: Record<number, string[]> = { 2: ['←', '→'], 3: ['←', '↑', '→'], 4: ['←', '↖', '↗', '→'], 5: ['←', '↖', '↑', '↗', '→'], 6: ['↙', '←', '↖', '↗', '→', '↘'], 7: ['↙', '←', '↖', '↑', '↗', '→', '↘'], 8: ['↙', '←', '↖', '↑', '↗', '→', '↘', '↓'] };
 /** The mark before an answer (or route) as the theme wants it: a letter, number, shape or arrow; null for none. */
 export function answerMark(theme: Pick<FullTheme, 'markers' | 'routeMarkers'> & { customMarks?: string[] | undefined }, index: number, count: number, route = false): string | null {

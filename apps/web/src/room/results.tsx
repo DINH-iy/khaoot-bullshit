@@ -98,7 +98,14 @@ export function JudgePanel({ state, stage, disabled, send }: { state: RoomSnapsh
   </div>;
 }
 
-export function Scoreboard({ state, disabled, send }: { state: RoomSnapshot; disabled: boolean; send: Send }) {
+/** The leader in a few words (for the folded score card): “Ada · 1,200”. */
+export function leaderLine(state: RoomSnapshot): string {
+  const top = [...state.view.standings].sort((a, b) => { const d = BigInt(b.amountMilli) - BigInt(a.amountMilli); return d > 0n ? 1 : d < 0n ? -1 : 0; })[0];
+  return top ? `${nameOf(state, top.playerId)} · ${formatPoints(top.amountMilli)}` : 'Scores';
+}
+
+/** The standings. `compact`: the small floating card (no heading or note, small faces). */
+export function Scoreboard({ state, disabled, send, compact = false }: { state: RoomSnapshot; disabled: boolean; send: Send; compact?: boolean }) {
   const t = useText();
   const [edit, setEdit] = useState<Record<string, string>>({}); const [correcting, setCorrecting] = useState(false);
   const totals = new Map(state.view.standings.map(row => [row.playerId, row.amountMilli]));
@@ -109,17 +116,17 @@ export function Scoreboard({ state, disabled, send }: { state: RoomSnapshot; dis
   const scene = state.view.stage?.status === 'ACTIVE' ? state.view.stage.scoreboard : null;
   const players = !scene || scene.show !== 'teams'; const teams = !scene || scene.show !== 'players';
   if (state.view.status === 'LOBBY' || (!rows.length && !state.view.teamStandings.length)) return null;
-  return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : undefined}><h2 id="scores-heading">{scene ? state.view.stage!.prompt : finished ? t('scores.final') : t('scores.title')}</h2>
+  return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : compact ? 'scoreboard-compact' : undefined}><h2 id="scores-heading" className={compact ? 'visually-hidden' : undefined}>{scene ? state.view.stage!.prompt : finished ? t('scores.final') : t('scores.title')}</h2>
     {scene && teams && !state.view.teamStandings.length && scene.show === 'teams' && <p>No teams have been made yet.</p>}
     {players && <ol className="scoreboard">{rows.map(row => {
       const milli = pointsToMilli(edit[row.id] ?? '', true); const valid = milli !== null && milli !== '0';
-      return <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? ' (you)' : ''}</span><span className="score-points">{formatPoints(row.milli)}</span>
+      return <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={compact ? 22 : 32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? ' (you)' : ''}</span><span className="score-points">{formatPoints(row.milli)}</span>
         {state.role === 'host' && correcting && <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) { send('score.adjust', { playerId: row.id, amountMilli: milli, reason: 'Host correction' }); setEdit({ ...edit, [row.id]: '' }); } }}>
           <label>Correct score for {row.name} (+ or −)<input type="number" inputMode="numeric" step={1} value={edit[row.id] ?? ''} onChange={event => setEdit({ ...edit, [row.id]: event.target.value })} /></label>
           <button disabled={disabled || !valid}>Correct score</button></form>}</li>;
     })}</ol>}
     {teams && <TeamStandings state={state} />}
     {state.role === 'host' && players && <button className="small-button ghost" aria-expanded={correcting} onClick={() => setCorrecting(!correcting)}>{correcting ? 'Done correcting' : 'Correct scores'}</button>}
-    {!finished && <p>{t('scores.note')}</p>}
+    {!finished && !compact && <p>{t('scores.note')}</p>}
   </section>;
 }

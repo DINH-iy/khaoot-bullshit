@@ -47,7 +47,7 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
             requireGame(version.definitionFormat === definition.formatVersion && contentHash(definition) === version.contentHash, 'INVALID_DEFINITION');
             assertExecutable(definition);
             // A new room starts with side games on and chips off unless the game says otherwise; the host can switch both.
-            session = await tx.gameSession.create({ data: { id: command.sessionId, gameVersionId: version.id, hostId: actor.data.creatorId, mode: command.mode, state: { sideGames: definition.sideGames ?? true, chips: definition.chips ?? false } }, include: { gameVersion: true } });
+            session = await tx.gameSession.create({ data: { id: command.sessionId, gameVersionId: version.id, hostId: actor.data.creatorId, mode: command.mode, state: { sideGames: definition.sideGames ?? true, chips: definition.chips ?? false, quickTimeSeconds: definition.quickTimeSeconds ?? 30 } }, include: { gameVersion: true } });
           }
           await authorize(tx, session, actor.data);
           if (!PLAYER_COMMANDS.includes(command.type)) requireHost(actor.data);
@@ -62,7 +62,7 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
           requireGame(session.gameVersion.definitionFormat === definition.formatVersion && contentHash(definition) === session.gameVersion.contentHash, 'INVALID_DEFINITION');
           assertExecutable(definition);
           const effect = await applyCommand(tx, session, definition, actor.data, command, receivedAt, live);
-          if (command.type === 'submission.submit' && effect.stageRunId) await closeSoonWhenAllIn(tx, session, definition, effect.stageRunId, receivedAt);
+          if ((command.type === 'submission.submit' || command.type === 'minigame.move' || command.type === 'minigame.decide') && effect.stageRunId) await closeSoonWhenAllIn(tx, session, definition, effect.stageRunId, receivedAt);
           const revision = session.revision + 1;
           const result = CommandReceiptSchema.parse({ formatVersion: 1, commandId: command.commandId, sessionId: session.id, revision, type: command.type, stageRunId: effect.stageRunId, submissionId: effect.submissionId });
           const saved = await tx.gameCommand.create({ data: { sessionId: session.id, commandKey: command.commandId, actorKey: key, type, requestHash, result } });

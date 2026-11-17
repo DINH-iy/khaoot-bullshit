@@ -37,10 +37,12 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
           <Row keys="Shift + Drag">Draw a box to select several scenes.</Row>
           <Row keys="Drag">Move the selected scenes; they snap to the grid and line up with each other.</Row>
           <Row keys="Double-click">Open the scene in the Scene editor.</Row>
-          <Row keys="Drag ●">Connect: drag from a scene's ● to another scene (or tap the ●, then tap the scene).</Row>
+          <Row keys="Drag ○">Connect: drag from a scene's ○ on its right edge to another scene (or tap the ○, then tap the scene).</Row>
           <Row keys="+">Add a scene connected to that output.</Row>
           <Row keys="Right-click">Add a scene on an empty spot.</Row>
-          <Row keys="Click an arrow">Add a scene on that arrow, or remove the connection. Drag an arrow's end to move it to another scene.</Row>
+          <Row keys="Click an arrow">Select it: its actions appear at the top of the map (add a scene on it, straighten it, remove it). Drag an arrow's end to move it to another scene.</Row>
+          <Row keys="Drag ◌">On a selected arrow: drag a dashed circle to bend the arrow there (to lead it around something); the scenes stay put.</Row>
+          <Row keys="Drag ●">Move a bend point; double-click it to remove it. <em>Straighten</em> removes them all.</Row>
         </tbody></table>
       </section>
 

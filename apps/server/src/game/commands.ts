@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
+import { isStepMinigame, MINIGAME_COUNTDOWN_MS, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
 import { checkBet, decideDuel, duelPlay, openDuel, pickDuelists } from './duel.js';
 import { CLOCK_SLACK_MS, judgeResult, NO_FAIRNESS, readMinigameRun, startMinigame } from '../minigames/rules.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay.js';
+import { stepDecide, stepMove } from '../minigames/steps/engine.js';
 import type { LiveSignals } from '../minigames/live.js';
 import { spinWheel } from './show/wheel.js';
 import { firstStage, locateStage, nextStage, type Located } from './graph.js';
@@ -152,7 +153,10 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       const entry = locateStage(definition, active.nodeKey, active.stageKey); const run = readMinigameRun(active.presentation);
       let restart = {};
       if (!pausing && entry?.stage.kind === 'minigame' && run) {
-        let started = { ...startOf(entry.stage, now), doorsMilli: run.doorsMilli };
+        // Step games keep their sides; a running team vote gets its full time again.
+        const rules0 = minigameRules(entry.stage);
+        const steps = run.steps ? Object.fromEntries(Object.entries(run.steps).map(([key, side]) => [key, side.voteEndsAt ? { ...side, voteEndsAt: new Date(now.getTime() + MINIGAME_COUNTDOWN_MS + rules0.voteSeconds * 1000).toISOString() } : side])) : null;
+        let started = { ...startOf(entry.stage, now), doorsMilli: run.doorsMilli, ...(steps ? { steps } : {}) };
         // Pass the pencil continues at the first turn some team has not drawn yet, with a fresh countdown.
         const rules = minigameRules(entry.stage); const context = rules.game === 'relay-drawing' ? await teamContext(tx, active) : null;
         if (context) {
@@ -297,7 +301,8 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(!decided, 'ALREADY_DECIDED');
     requireGame(await tx.stageJudgment.count({ where: { stageRunId: stage.id } }) === 0, 'ALREADY_JUDGED');
     // A reopened minigame starts again for those who have not played; results already sent stay.
-    const restarted = entry.stage.kind === 'minigame' ? { presentation: { ...(stage.presentation as object), minigame: startOf(entry.stage, now) } } : {};
+    const steps = readMinigameRun(stage.presentation)?.steps; // A step game keeps what its sides have played.
+    const restarted = entry.stage.kind === 'minigame' ? { presentation: { ...(stage.presentation as object), minigame: { ...startOf(entry.stage, now), ...(steps ? { steps } : {}) } } as object } : {};
     await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'ACTIVE', closedAt: null, ...restarted, ...timerColumns(command.durationMs, false, now) } });
     return { ...empty, stageRunId: stage.id };
   }
@@ -343,6 +348,19 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     const part = await tx.submission.create({ data: { id: randomUUID(), sessionId: session.id, stageRunId: stage.id, actorKey: actorKey(actor), slotKey, playerId: actor.playerId, value: { kind: 'drawing', assetId: asset.id } } });
     await tx.asset.update({ where: { id: asset.id }, data: { submissionId: part.id } });
     return { stageRunId: stage.id, submissionId: part.id };
+  }
+  if (command.type === 'minigame.move' || command.type === 'minigame.decide') {
+    // A step game (Drive the bus, Lucky doors, Left or right…): see minigames/steps/engine.ts.
+    requireGame(stage.status === 'ACTIVE' && entry.stage.kind === 'minigame' && !forming, 'INVALID_STATE');
+    const rules = minigameRules(entry.stage); const run = readMinigameRun(stage.presentation);
+    requireGame(isStepMinigame(rules.game) && run && now.getTime() >= Date.parse(run.startsAt) - CLOCK_SLACK_MS, 'INVALID_STATE');
+    const play = { tx, sessionId: session.id, stage, rules, context, now };
+    // minigame.decide is a host command (checked for every host command above): the server's timer sends it as the host.
+    if (command.type === 'minigame.decide') return { ...empty, stageRunId: stage.id, awards: (await stepDecide(play, command.side, command.step, command.now === true)).awards };
+    requireGame(actor.role === 'player' && eligible.data.playerIds.includes(actor.playerId), 'INELIGIBLE');
+    requireGame(!stage.deadlineAt || now.getTime() <= acceptsUntil(stage.deadlineAt, graceFor(entry.stage)), 'TOO_LATE');
+    const moved = await stepMove(play, actor.playerId, command.step, command.option, command.decide === true);
+    return { ...empty, stageRunId: stage.id, awards: moved.awards, ...(moved.submissionId ? { submissionId: moved.submissionId } : {}) };
   }
   if (command.type === 'submission.submit') {
     requireGame(actor.role === 'player', 'FORBIDDEN');

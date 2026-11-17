@@ -31,6 +31,28 @@ export function minigameOutcome(rules: MinigameRules, rows: Row[], context: Team
       awards: tallies.flatMap(tally => route({ amountMilli: pointsOf(placed.get(tally)), stageRunId, awardKey: `minigame:${stageRunId}:team:${tally.teamId}`, reason: 'Minigame place' }, { teamId: tally.teamId }, context)) };
   }
   const pointsFor = (place: number | undefined) => place === undefined ? 0n : BigInt(AwardMilliSchema.parse(rules.placementMilli[place - 1] ?? '0'));
+  if (rules.game === 'bus' && context) {
+    // Drive the bus: each team's sips plus the last round's sips for every other team's rainbow; fewest sips win.
+    const lastSips = (rules.settings as { sips: number[]; rainbow?: boolean }).sips[3] ?? 0;
+    const teams = [...context.members.keys()].map(teamId => ({ teamId, row: results.find(row => row.teamId === teamId) }));
+    const rainbows = teams.filter(team => team.row?.result.rainbow).length;
+    const totals = teams.map(team => ({ ...team, total: team.row ? team.row.result.value + (rainbows - (team.row.result.rainbow ? 1 : 0)) * lastSips : null }));
+    const placed = places(totals, team => team.total);
+    const entries = totals.map(team => ({ playerId: null, teamId: team.teamId, value: team.total, place: placed.get(team) ?? null })).sort((a, b) => (a.place ?? 999) - (b.place ?? 999));
+    return { entries, awards: totals.flatMap(team => route({ amountMilli: pointsFor(placed.get(team)), stageRunId, awardKey: `minigame:${stageRunId}:team:${team.teamId}`, reason: 'Minigame place' }, { teamId: team.teamId }, context)) };
+  }
+  if (rules.game === 'majority') {
+    // Left or right: everyone (or every team) on the side most chose shares 1st place and its points; a tie: nobody wins.
+    const sides = context ? [...context.members.keys()].map(teamId => ({ playerId: null, teamId, row: results.find(row => row.teamId === teamId) }))
+      : results.map(row => ({ playerId: row.playerId, teamId: null, row }));
+    const left = sides.filter(side => side.row?.result.value === 0).length; const right = sides.filter(side => side.row?.result.value === 1).length;
+    const winner = left === right ? null : left > right ? 0 : 1;
+    const entries = sides.map(side => ({ playerId: side.playerId, teamId: side.teamId, value: side.row ? side.row.result.value : null, place: side.row && side.row.result.value === winner ? 1 : null }))
+      .sort((a, b) => (a.place ?? 999) - (b.place ?? 999));
+    const awards = entries.filter(entry => entry.place === 1).flatMap(entry => route({ amountMilli: pointsFor(1), stageRunId, awardKey: `minigame:${stageRunId}:${entry.teamId ? `team:${entry.teamId}` : entry.playerId}`, reason: 'Minigame place' },
+      entry.teamId ? { teamId: entry.teamId } : { playerId: entry.playerId! }, context));
+    return { entries, awards };
+  }
   if (!context) {
     const placed = ranked ? places(results, row => rankValue(rules.game, rules.settings, row.result)) : new Map();
     const entries = results.map(row => ({ playerId: row.playerId, teamId: null, value: raw(row.result), place: placed.get(row) ?? null, ...(row.result.stroke ? { stroke: row.result.stroke } : {}) }))

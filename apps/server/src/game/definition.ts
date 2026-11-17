@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -77,7 +77,9 @@ const stageSchema = z.discriminatedUnion('kind', [
   // how members' results make a team's result. All optional, so placeholder
   // scenes saved earlier keep their hash.
   z.object({ ...common, kind: z.literal('minigame'), game: z.string().trim().min(1).max(64), settings: z.record(z.string(), z.json()).optional(),
-    placementMilli: z.array(AwardMilliSchema).min(1).max(12).optional(), places: PlacesSchema.optional(), teamResult: z.enum(['best', 'average', 'total']).optional() }).strict(),
+    placementMilli: z.array(AwardMilliSchema).min(1).max(12).optional(), places: PlacesSchema.optional(), teamResult: z.enum(['best', 'average', 'total']).optional(),
+    // Step games in a team round: how a team decides each move, and the seconds for a team vote.
+    decide: z.enum(TEAM_DECIDES).optional(), voteSeconds: z.number().int().min(5).max(120).optional() }).strict(),
   // A duel: two players (picked at random or by the host) face off in the room while everyone
   // else bets on the winner; the host taps the winner. `places`: 1st for the winner, 2nd for the
   // loser (left out: 10 points for the winner). `betMilli`: for every right bet. The timer is the
@@ -128,6 +130,8 @@ export const GameDefinitionSchema = z.object({
   // What a room of this game starts with on the phones: side games (challenges between players; left out: on) and
   // chips (slot machine, blackjack, packs and stakes; left out: off). The host can switch both in the room.
   sideGames: z.boolean().optional(), chips: z.boolean().optional(),
+  // The host's quick time button (+30 s by default): how many seconds it adds to a round.
+  quickTimeSeconds: z.number().int().min(5).max(600).optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),
   // `option` names the route option an edge belongs to (format 2 choice nodes only).
   edges: z.array(z.object({ key: GameKeySchema, from: GameKeySchema, to: GameKeySchema, option: GameKeySchema.optional() }).strict()).max(300),
@@ -204,11 +208,12 @@ export const isShowOnly = (stage: StageDefinition) => stage.kind === 'info' || s
 export const unplayable = (definition: GameDefinition) => allStages(definition).filter(({ stage }) => stage.kind === 'minigame' && !isMinigameKey(stage.game));
 export type MinigameStage = Extract<StageDefinition, { kind: 'minigame' }>;
 /** A playable minigame scene's rules, with defaults filled in. */
-export function minigameRules(stage: MinigameStage): { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total' } {
+export function minigameRules(stage: MinigameStage): { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total'; decide: TeamDecides; voteSeconds: number } {
   if (!isMinigameKey(stage.game)) throw new GameError('UNSUPPORTED_FEATURE');
   const settings = parseMinigameSettings(stage.game, stage.settings);
   if (!settings) throw new GameError('INVALID_DEFINITION');
-  return { game: stage.game, settings, placementMilli: stage.places ? placePoints(stage.places) : stage.placementMilli ?? ['10000', '6000', '3000'], teamResult: stage.teamResult ?? 'average' };
+  return { game: stage.game, settings, placementMilli: stage.places ? placePoints(stage.places) : stage.placementMilli ?? ['10000', '6000', '3000'], teamResult: stage.teamResult ?? 'average',
+    decide: stage.decide ?? 'anyone', voteSeconds: stage.voteSeconds ?? 20 };
 }
 export { MINIGAMES };
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {

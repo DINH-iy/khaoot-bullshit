@@ -4,6 +4,7 @@ import { play, useLook } from '../../presentation/look.js';
 import type { Definition, Stage } from '../model.js';
 import type { Scope } from './layer.js';
 import { answerFit } from '../../room/answer-fit.js';
+import { Mark } from '../../presentation/mark-icons.js';
 
 type Moment_ = 'join' | 'lobby' | 'question' | 'saved' | 'results' | 'scores';
 const MOMENTS_SHOWN: Record<Moment_, string> = { join: 'Joining', lobby: 'Lobby', question: 'Question', saved: 'Answer saved', results: 'Results', scores: 'Scoreboard' };
@@ -43,7 +44,7 @@ export function LookPreview({ definition, scope, style, className }: { definitio
             : shown === 'scores' ? <section className="stage-card"><h2>{t('scores.title')}</h2><ol className="scoreboard plain-list">{players.map((name, index) => <li key={name}>{name} · {40 - index * 10}</li>)}</ol><p>{t('scores.note')}</p></section>
             : <section className="stage-card"><h2>{sample.prompt}</h2>
               {shown === 'question' || shown === 'saved' ? <><p className="timer">{t('timer.left', { time: '0:15' })}</p>
-                <ol className="options-board" style={answerFit(sample.options)}>{sample.options.map((option, index) => { const mark = answerMark(look.theme, index, sample.options.length); return <li key={index}>{mark !== null && <span className="answer-mark">{mark}</span>}{option}</li>; })}</ol>
+                <ol className="options-board" style={answerFit(sample.options)}>{sample.options.map((option, index) => { const mark = answerMark(look.theme, index, sample.options.length); return <li key={index}>{mark !== null && <span className="answer-mark"><Mark text={mark} /></span>}{option}</li>; })}</ol>
                 <p className="progress-line">{t('progress.answered', { count: shown === 'saved' ? 3 : 2, total: 4 })}</p></>
                 : <><h3>{t('results.title')}</h3><p>{t('results.correct', { answer: sample.options[0]! })}</p><h4>{t('results.points')}</h4><ul className="plain-list">{players.slice(0, 2).map(name => <li key={name}>{name} · 10</li>)}</ul></>}
             </section>}
@@ -55,7 +56,7 @@ export function LookPreview({ definition, scope, style, className }: { definitio
             : shown === 'lobby' ? <section className="lobby"><h2>{t('lobby.playerTitle')}</h2><p>{t('lobby.playerText')}</p></section>
             : <section className="stage-card"><h2>{sample.prompt}</h2>
               {shown === 'question' ? <><p className="timer">{t('timer.left', { time: '0:15' })}</p><fieldset className="tiles" style={answerFit(sample.options)}><legend>{t('answer.legend')}</legend>
-                {sample.options.map((option, index) => { const mark = answerMark(look.theme, index, sample.options.length); return <label key={index} className="tile">{mark !== null && <span className="answer-mark tile-mark" aria-hidden="true">{mark}</span>}{option}</label>; })}</fieldset>
+                {sample.options.map((option, index) => { const mark = answerMark(look.theme, index, sample.options.length); return <label key={index} className="tile">{mark !== null && <span className="answer-mark tile-mark" aria-hidden="true"><Mark text={mark} /></span>}{option}</label>; })}</fieldset>
                 <button className="primary" type="button">{t('answer.submit')}</button></>
                 : shown === 'saved' ? <p className="answer-in">{t('answer.saved')}</p>
                 : shown === 'results' ? <><h3>{t('results.title')}</h3><p>{t('results.earned', { points: 10 })}</p></>

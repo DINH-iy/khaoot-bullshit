@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { closeRoundsByHand, openPhoneMenu } from './helpers.js';
+import { closeRoundsByHand, openHostFold, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -36,6 +36,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await expect(newPhone.getByText('No seat is free right now.')).toBeVisible();
     // The battery dies.
     await oldContext.close();
+    await openHostFold(host, 'Players');
     await expect(host.getByText('Sam · disconnected', { exact: false })).toBeVisible();
     await newPhone.getByRole('button', { name: 'Refresh seats' }).click();
     await newPhone.getByRole('button', { name: 'I am Sam' }).click();

@@ -1,4 +1,5 @@
-import { type MinigameSettings, type Presentation, GameIdSchema, SessionViewSchema, SubmissionValueSchema, type SessionView } from '@party/contracts';
+import { isStepMinigame, type MinigameSettings, type Presentation, GameIdSchema, SessionViewSchema, SubmissionValueSchema, type SessionView } from '@party/contracts';
+import { stepView } from '../minigames/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
 import { isVoteSource, minigameRules, parseDefinition, stagePlaces, type StageDefinition } from './definition.js';
@@ -93,8 +94,10 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       // A minigame shows its settings and start times while it runs; places (and what was behind each door) only once revealed.
       const rules = stageEntry?.kind === 'minigame' ? minigameRules(stageEntry) : null;
       const run = rules && current ? readMinigameRun(current.presentation) : null;
+      // A step game: every side's progress (secrets never; a team's vote counts only for its own members and the host).
+      const steps = rules && isStepMinigame(rules.game) && current ? await stepView(tx, current, rules, context, eligible?.success ? eligible.data.playerIds : [], { playerId: viewer, host: actor.data.role === 'host' }) : null;
       const relay = rules?.game === 'relay-drawing' && run && context && current ? await relayView(tx, current.id, relayPlan(context, rules.settings as MinigameSettings<'relay-drawing'>, run), context.teamOf) : null;
-      const minigame = rules ? { game: rules.game, settings: rules.settings, relay, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
+      const minigame = rules ? { game: rules.game, settings: rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
         // A paused room shows no GO: continuing restarts the duel with a fresh countdown and a new GO.
         goAt: current?.status === 'ACTIVE' && session.status === 'RUNNING' && run?.goAt &&Date.parse(run.goAt) <= clock().getTime() ? run.goAt : null } : null;
       const minigameAnswer = rules && revealed ? { kind: 'minigame', game: rules.game, doorsMilli: run?.doorsMilli ?? null,

@@ -5,7 +5,7 @@ import { Inspector } from '../scene/inspector.js';
 import { Minimap } from './minimap.js';
 import {
   addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, curve, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  insertOnEdge, insertPrefab, isRoute, prefabFrom, optionsOf, outputPort, pointOnCurve, snap, snapCard, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  bendsOf, insertOnEdge, insertPrefab, isRoute, prefabFrom, optionsOf, outputPort, pointOnRoute, routedPath, snap, snapCard, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SavePrefab } from './save-prefab.js';
@@ -229,8 +229,23 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
   const edgeMid = (() => {
     const edge = selectedEdge ? definition.edges.find(entry => entry.key === selectedEdge) : undefined; if (!edge) return null;
     const fromNode = definition.nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
-    return fromNode && from && to ? pointOnCurve(outputPort(fromNode, from, edge.option), inputPort(to), 0.5) : null;
+    return fromNode && from && to ? pointOnRoute(outputPort(fromNode, from, edge.option), inputPort(to), bendsOf(positions, edge.key), 0.5) : null;
   })();
+  const selectedBends = selectedEdge ? bendsOf(positions, selectedEdge) : [];
+  /**
+   * Drags a bend point of an arrow (index), or with `insert` a new one at that place in its list; the scenes stay put.
+   * Followed on the window, since a new point's + handle is replaced by the point itself while dragging.
+   */
+  const dragBend = (event: ReactPointerEvent<Element>, edge: string, index: number, insert: boolean) => {
+    if (event.button !== 0 || readOnly) return; event.stopPropagation(); event.preventDefault();
+    const before = positions; const points = [...bendsOf(positions, edge)]; const at = toCanvas(event.clientX, event.clientY);
+    if (insert) points.splice(index, 0, { x: snap(at.x), y: snap(at.y) });
+    let latest = withBends(before, edge, points); let moved = insert; if (insert) setPositions(latest);
+    const move = (moveEvent: PointerEvent) => { const here = toCanvas(moveEvent.clientX, moveEvent.clientY); points[index] = { x: snap(here.x), y: snap(here.y) }; latest = withBends(before, edge, points); moved = true; setPositions(latest); };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); if (moved) change(definition, latest, '', before); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  };
+  const removeBend = (edge: string, index: number) => { if (!readOnly) change(definition, withBends(positions, edge, bendsOf(positions, edge).filter((_, at) => at !== index))); };
   // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
   const contextMenu = (event: React.MouseEvent) => {
     if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button, input, textarea, select')) return;
@@ -298,8 +313,8 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
       <span className="tool-gap" />
       <button disabled={readOnly} onClick={() => change(definition, autoLayout(definition))}>Tidy up</button>
       <button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>−</button><button aria-label="Zoom in" onClick={() => zoomBy(1.2)}>+</button><button onClick={fit}>Fit</button>
-      {selectedEdge && !readOnly && <button onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove connection</button>}
-      <span className="flow-hint">{readOnly ? 'Viewing: nothing can be changed. Choose Edit at the top to make changes.' : `Right-click to add a scene · click an arrow to add a scene on it · drag from ● to connect · drag an arrow’s end to move it · Shift-drag to select several`}</span>
+      {/* A selected arrow's actions are on the arrow itself (+ Add a scene here, Remove), so the toolbar never jumps. */}
+      <span className="flow-hint">{readOnly ? 'Viewing: nothing can be changed. Choose Edit at the top to make changes.' : `Scroll to zoom · right-click to add a scene · click an arrow to bend it or add a scene on it · drag from ○ to connect · Shift-drag to select several · ? for help`}</span>
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
@@ -313,14 +328,20 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
           {definition.edges.map(edge => {
             const fromNode = nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
             if (!fromNode || !from || !to) return null;
-            const start = outputPort(fromNode, from, edge.option); const end = inputPort(to); const path = curve(start, end);
+            const start = outputPort(fromNode, from, edge.option); const end = inputPort(to); const bends = bendsOf(positions, edge.key); const path = routedPath(start, end, bends);
             const label = edge.option ? optionsOf(fromNode).find(option => option.key === edge.option)?.label : undefined; const on = selectedEdge === edge.key;
-            const grip = pointOnCurve(start, end, 0.82);
+            const grip = pointOnRoute(start, end, bends, 0.82);
             // While an arrow is being moved it stays mounted (the pointer is captured by its handle), just hidden.
             return <g key={edge.key} data-edge={edge.key} className={`edge${on ? ' selected' : ''}${connecting?.rewire === edge.key ? ' moving' : ''}`} onPointerDown={event => { event.stopPropagation(); setSelectedEdge(edge.key); setSelected([]); }}>
               <path d={path} className="edge-hit" /><path d={path} className="edge-line" markerEnd={on ? 'url(#arrow-on)' : 'url(#arrow)'} />
               {label && <text x={end.x - 12} y={end.y - 12} textAnchor="end" className="edge-label">{label}</text>}
               <circle cx={grip.x} cy={grip.y} r={10} className="edge-end" onPointerDown={event => { setSelectedEdge(edge.key); startConnect(event, edge.from, edge.option, edge.key); }}><title>Drag to move this arrow to another scene</title></circle>
+              {/* A selected arrow's bend points (drag; double-click removes) and + handles between them (drag to add one). */}
+              {on && !readOnly && <>
+                {[start, ...bends, end].slice(1).map((point, index) => { const previous = [start, ...bends][index]!; const mid = bends.length ? { x: (previous.x + point.x) / 2, y: (previous.y + point.y) / 2 } : pointOnRoute(start, end, bends, 0.5);
+                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={8} className="edge-bend-add" onPointerDown={event => dragBend(event, edge.key, index, true)}><title>Drag to bend the arrow here</title></circle>; })}
+                {bends.map((point, index) => <circle key={`bend-${index}`} cx={point.x} cy={point.y} r={8} className="edge-bend" onPointerDown={event => dragBend(event, edge.key, index, false)} onDoubleClick={event => { event.stopPropagation(); removeBend(edge.key, index); }}><title>Drag to move this bend point; double-click to remove it</title></circle>)}
+              </>}
             </g>;
           })}
           {connecting && (() => {
@@ -353,12 +374,14 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene }: { d: D
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" style={{ left: edgeMid.x, top: edgeMid.y, transform: `translate(-50%, -50%) scale(${1 / view.zoom})` }} onPointerDown={event => event.stopPropagation()}>
-          <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>
-          <button type="button" className="danger-outline" aria-label="Remove this connection" onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove</button>
-        </div>}
         {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.onEdge ? 'Add a scene on this arrow' : adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       </div>
+      {/* A selected arrow's actions float at the top of the map (never on the line, which keeps its bend handles free; never in the toolbar, which would jump). */}
+      {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" role="toolbar" aria-label="Selected arrow" onPointerDown={event => event.stopPropagation()}>
+        <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>
+        {selectedBends.length > 0 && <button type="button" onClick={() => change(definition, withBends(positions, selectedEdge, []))}>Straighten</button>}
+        <button type="button" className="danger-outline" aria-label="Remove this connection" onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove</button>
+      </div>}
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
     </div>

@@ -345,7 +345,7 @@
 .game-settings-panel .wheel-fields > legend { float: left; width: 100%; margin: 0 0 6px; }
 .game-settings-panel .wheel-fields > legend + * { clear: both; }
 /* The selected arrow's menu, in the middle of the arrow. */
-.edge-actions { position: absolute; z-index: 4; display: flex; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 8px 24px rgb(0 0 0 / .35); white-space: nowrap; transform-origin: center; }
+.edge-actions { position: absolute; z-index: 6; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 8px 24px rgb(0 0 0 / .35); white-space: nowrap; }
 .edge-actions button { min-height: 36px; padding: 6px 12px; border-radius: 9px; background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); font-weight: 600; }
 .edge-actions button:first-child { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1c1d22); }
 .edge-actions .danger-outline { color: var(--e-danger); border-color: var(--e-danger); background: transparent; }
@@ -473,3 +473,17 @@
   /* The rough phone preview: as wide as half the screen and not taller than its content needs. */
   .phone { flex: 1 1 160px; } .phone-screen { width: 100%; aspect-ratio: auto; min-height: 200px; }
 }
+/* Help & shortcuts. */
+.editor .help-button { font-weight: 800; font-size: 1.05rem; }
+.ed-dialog.help-panel { width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow: auto; gap: 14px; }
+.help-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: -20px; margin: -20px -20px 0; padding: 16px 20px 10px; background: var(--e-panel); z-index: 1; }
+.help-panel h3 { margin: 6px 0 6px; font-size: 1rem; } .help-panel ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--e-text); }
+.help-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.help-table th { text-align: left; font-weight: 400; white-space: nowrap; padding: 6px 12px 6px 0; vertical-align: top; width: 1%; }
+.help-table td { padding: 6px 0; color: var(--e-text); } .help-table tr + tr { border-top: 1px solid var(--e-border); }
+.help-panel kbd { display: inline-block; min-width: 1.4em; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--e-border); border-bottom-width: 2px; background: var(--e-bg); font: 600 .82rem/1.5 ui-monospace, Menlo, monospace; text-align: center; color: var(--e-text); }
+@media (max-width: 700px) { .help-table th { white-space: normal; } .editor-header .help-button { order: 2; } }
+/* A selected arrow's bend points (filled, drag them; double-click removes) and + handles between them (hollow, drag to add a bend). */
+.edge-bend { fill: var(--e-accent); stroke: var(--e-panel); stroke-width: 3; cursor: grab; }
+.edge-bend-add { fill: var(--e-panel); stroke: var(--e-accent); stroke-width: 2; stroke-dasharray: 3 3; cursor: copy; opacity: .9; }
+.edge-bend:hover, .edge-bend-add:hover { r: 10; opacity: 1; }

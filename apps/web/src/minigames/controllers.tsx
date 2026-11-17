@@ -70,16 +70,6 @@ export function StopClock({ settings, startsAt, offset, disabled, onResult }: Pr
   </Countdown>;
 }
 
-/** Choose one of the doors. */
-export function LuckyDoors({ settings, startsAt, offset, disabled, onResult }: Props<MinigameSettings<'lucky-doors'>>) {
-  const t = useText(); const [picked, setPicked] = useState<number | null>(null);
-  return <Countdown startsAt={startsAt} offset={offset}>
-    <p className="mg-sub">{t('minigame.pickDoor')}</p>
-    <div className="mg-doors">{settings.doorsMilli.map((_, index) => <button key={index} type="button" className="mg-door" disabled={disabled || picked !== null}
-      onClick={() => { setPicked(index); onResult({ value: index }); }}>{t('minigame.door', { number: index + 1 })}</button>)}</div>
-  </Countdown>;
-}
-
 /** Keeps at most `max` points of a stroke, evenly spread (the server scores the shape, not every pixel). */
 const thin = (points: readonly number[], max: number) => {
   const count = points.length / 2; if (count <= max) return [...points];

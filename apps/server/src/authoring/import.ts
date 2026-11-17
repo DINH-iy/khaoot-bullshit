@@ -98,8 +98,14 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const known = isMinigameKey(game);
       const points = Array.isArray(raw['points']) ? raw['points'].map(entry => milli(entry)).filter(entry => entry !== undefined).slice(0, 12) : [];
       const teamResult = ['best', 'average', 'total'].includes(text(raw['teamResult'])) ? { teamResult: text(raw['teamResult']) } : {};
+      // A step game in a team round: how the team decides ("anyone", "vote", "captain") and the seconds per vote.
+      const decide = ['anyone', 'vote', 'captain'].includes(text(raw['decide'])) ? { decide: text(raw['decide']) } : {};
+      const voteSeconds = raw['voteSeconds'] !== undefined ? { voteSeconds: Math.round(Math.min(120, Math.max(5, Number(raw['voteSeconds']) || 20))) } : {};
+      // Drive the bus: `"sips": [1, 2, 3, 4]` for the four rounds.
+      const busSips = Array.isArray(raw['sips']) && raw['sips'].length === 4 ? raw['sips'].map(entry => Math.round(Math.min(20, Math.max(0, Number(entry) || 0)))) : null;
+      const sips = game === 'bus' && (busSips || raw['rainbow'] === false) ? { settings: { sips: busSips ?? [1, 2, 3, 4], ...(raw['rainbow'] === false ? { rainbow: false } : {}) } } : {};
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...play };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...decide, ...voteSeconds, ...play };
     }
     case 'duel': {
       // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.
@@ -210,6 +216,8 @@ export function importDefinition(input: string): Json | null {
       : { stats: raw['awards'].map(entry => text(entry)) } } : isObject(raw['finale']) ? { finale: raw['finale'] } : {}),
     // Side games on the phones are on unless switched off; chips only with an explicit true.
     ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
+    // The host's quick time button in seconds (default 30).
+    ...(Number.isFinite(Number(raw['quickTime'])) && raw['quickTime'] !== undefined ? { quickTimeSeconds: Math.max(5, Math.min(600, Math.round(Number(raw['quickTime'])))) } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;

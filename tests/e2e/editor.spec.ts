@@ -104,7 +104,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
 
   // Removing a connection, then putting it back with the keyboard-friendly "Next scene" list.
   await page.locator('.edge-hit').last().dispatchEvent('pointerdown');
-  await page.getByRole('button', { name: 'Remove connection' }).click();
+  await page.getByRole('button', { name: 'Remove this connection' }).click();
   await expect(page.locator('.edge-line')).toHaveCount(6);
   await card(page, /^Standings$/).focus(); await page.keyboard.press('Enter');
   // The editor's own dropdown works with the keyboard: open it, type to find, Enter chooses.
@@ -161,8 +161,8 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   expect(await card(page, /Shared finale/).evaluate(element => (element as HTMLElement).style.cssText)).toBe(before);
 });
 
-async function openCopy(page: Page, baseURL: string, name: string) {
-  await page.setViewportSize({ width: 1440, height: 900 });
+async function openCopy(page: Page, baseURL: string, name: string, desktop = true) {
+  if (desktop) await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await page.getByLabel('Name of your new game').fill(name);
   await page.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
@@ -297,6 +297,72 @@ test('View mode: look through a game without changing it by accident; Edit chang
   await drag(page, again, { x: again.x - 150, y: again.y + 150 });
   expect(await card(page, /Shared finale/).evaluate(element => (element as HTMLElement).style.cssText)).not.toBe(before);
   await saved(page);
+});
+
+test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens with ? or its button', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await openCopy(page, baseURL!, `Zoom ${Date.now()}`);
+  const surface = page.locator('.flow-surface');
+  const zoom = async () => Number(/scale\(([\d.]+)\)/.exec((await surface.getAttribute('style'))!)![1]);
+  const area = (await page.locator('.flow-canvas').boundingBox())!;
+  await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2);
+  const before = await zoom();
+  await page.mouse.wheel(0, -300);
+  await expect.poll(zoom).toBeGreaterThan(before);
+  const zoomed = await zoom(); const moved = (await surface.getAttribute('style'))!;
+  await page.keyboard.down('Shift'); await page.mouse.wheel(0, 200); await page.keyboard.up('Shift');
+  await expect.poll(async () => (await surface.getAttribute('style'))!).not.toBe(moved);
+  expect(await zoom()).toBe(zoomed);
+  // Help & shortcuts: the ? key, and the ? button.
+  await page.keyboard.press('?');
+  const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
+  await expect(help.getByRole('row').filter({ hasText: 'Undo' })).toBeVisible();
+  expect((await new AxeBuilder({ page }).include('.help-panel').analyze()).violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(help).toHaveCount(0);
+  await page.getByRole('button', { name: 'Help & shortcuts' }).click();
+  await expect(help).toBeVisible();
+});
+
+test('the editor works on a phone: compact top bar, the scene panel and menus as sheets on screen', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Checked here with a phone-sized window.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCopy(page, baseURL!, `Phone ${Date.now()}`, false);
+  // The whole top bar fits in the first quarter of the screen.
+  expect((await page.locator('.editor-header').boundingBox())!.height).toBeLessThan(220);
+  await card(page, /Choose your challenge/).locator('.card-title').click();
+  const panel = page.getByRole('complementary');
+  const inView = async (locator: Locator) => { const box = (await locator.boundingBox())!; return box.y >= 0 && box.y + 40 <= 844 && box.x >= 0 && box.x + box.width <= 391; };
+  expect(await inView(panel.getByRole('button', { name: 'Edit this scene →' }))).toBe(true);
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Play & publish ▾' }).click();
+  expect(await inView(page.getByRole('menuitem', { name: 'Publish', exact: true }))).toBe(true);
+});
+
+test('an arrow gets bend points to lead it around something, while the scenes stay put', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await openCopy(page, baseURL!, `Bends ${Date.now()}`);
+  const edge = page.locator('.edge').first(); const key = (await edge.getAttribute('data-edge'))!;
+  const arrow = page.locator(`.edge[data-edge="${key}"]`);
+  const cards = async () => page.locator('.scene-card').evaluateAll(all => all.map(card => (card as HTMLElement).style.cssText).join('|'));
+  const before = await cards(); const line = await arrow.locator('.edge-line').getAttribute('d');
+  await arrow.locator('.edge-hit').dispatchEvent('pointerdown');
+  await expect(arrow.locator('.edge-bend-add')).toHaveCount(1);
+  // Drag the + handle down: a bend point there; the arrow passes through it; no scene moves.
+  const handle = await center(arrow.locator('.edge-bend-add'));
+  await drag(page, handle, { x: handle.x, y: handle.y + 160 });
+  await expect(arrow.locator('.edge-bend')).toHaveCount(1);
+  expect(await arrow.locator('.edge-line').getAttribute('d')).not.toBe(line);
+  expect(await cards()).toBe(before);
+  await saved(page);
+  // Kept after a reload.
+  await page.reload();
+  await page.locator(`.edge[data-edge="${key}"] .edge-hit`).dispatchEvent('pointerdown');
+  await expect(page.locator(`.edge[data-edge="${key}"] .edge-bend`)).toHaveCount(1);
+  // Straighten takes the bends away again.
+  await page.locator('.edge-actions').getByRole('button', { name: 'Straighten' }).click();
+  await expect(page.locator(`.edge[data-edge="${key}"] .edge-bend`)).toHaveCount(0);
+  expect(await page.locator(`.edge[data-edge="${key}"] .edge-line`).getAttribute('d')).toBe(line);
 });
 
 test('an arrow can be picked up by its end and moved to another scene; several scenes move together and undo restores them', async ({ page, baseURL }) => {

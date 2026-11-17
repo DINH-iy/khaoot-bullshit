@@ -41,6 +41,17 @@ The first executable definition has `formatVersion`, `title`, `startNodeKey`, no
 
 Initial definition limits: 100 nodes, 20 stages per node, 200 stages total and bounded labels/options. These are resource budgets, not player caps. Definitions must match the supported format and canonical content hash before commands execute.
 
+## Step games (minigames played choice by choice)
+
+Lucky doors, Drive the bus and Left or right run on one engine (`apps/server/src/minigames/steps/`), so a new game of choices only brings its rules:
+
+- **A game** (`games.ts`) is pure functions over its own JSON state per side: `start` (secrets allowed, such as dealt cards), `options` for the next step (null when done), `apply`, `result` (ranked as the catalog says), `view` (what screens may see: never the secrets), optionally `payoutMilli` (points at once, as Lucky doors) and `secret` (the result stays hidden until the reveal, as Left or right). Register it in `STEP_GAMES` and in `STEP_MINIGAMES` (contracts), and give it a renderer on the phone and screen (`apps/web/src/minigames/steps/renderers.tsx`: question, button labels, board).
+- **A side** plays: a team in a team round, else each player. Its record (state, step, captain, vote end) is kept with the round (`presentation.minigame.steps`), so a restart, pause or reopened round keeps it; a resumed vote gets its full time again.
+- **Moves** arrive as `minigame.move` (step, option). In a team round the scene's `decide` sets who chooses: `anyone` (the first tap; only the captain when captains answer), `captain` (the team's captain, else a member picked from a hash of round and team: random but fixed, so every screen shows the same one), or `vote`: each member votes once (a submission per member and step); the step is decided when all have voted, when someone who voted presses *Decide now*, or when `voteSeconds` run out. Who did not vote is not counted; a tie goes to the captain's vote, else a random tied option; no votes, a random option.
+- **Vote time** is durable like round deadlines: the room's ticker finds overdue votes about once a second and sends `minigame.decide` as the host, so it works with nobody connected and after a restart.
+- **Saving**: each applied move is a submission `step-<n>` of the side (the database keeps one per side and step), each vote `vote-<n>` of its player; when a side is done its result is its `answer`, so ranking, points by place, the reveal, the finale and auto-close (one answer per side) work as for every minigame. A plain answer to a step game is refused.
+- **Views**: every side's progress for every screen; a team's vote split only for its own members and the host (others see who has voted).
+
 ## Timed stages and host control
 
 A stage with a duration gets a `deadlineAt` on the server clock when it opens. Policy, implemented in `apps/server/src/game/timing.ts`:

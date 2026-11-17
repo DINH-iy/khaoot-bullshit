@@ -39,6 +39,8 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
     await expect(ada.getByText('You joined after voting opened')).toHaveCount(0);
     await host.getByRole('button', { name: 'Resume', exact: true }).click();
     await expect(host.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+    // Each route tile shows its direction as an arrow icon (not a text character).
+    await expect(ada.locator('.route-tiles .route-arrow svg.mark-icon')).toHaveCount(2);
     for (const [phone, label] of [[ada, 'Physical'], [ben, 'Physical'], [cleo, 'Music']] as const) {
       await phone.getByRole('radio', { name: label, exact: true }).check();
       await phone.getByRole('button', { name: 'Save vote', exact: true }).click();

@@ -79,10 +79,14 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
 }
 
 /** During a team round: who is in which team. */
+/** “Ben and Cleo”: the names, joined for a sentence. */
+export const nameList = (state: RoomSnapshot, ids: string[]) => list(state, ids);
+
 export function TeamSummary({ state, stage }: { state: RoomSnapshot; stage: Stage }) {
   const teams = stage.teams; if (!teams || teams.forming) return null;
   const mine = ownTeam(teams);
-  if (state.role === 'player') return <p className="team-summary">{mine ? <>You are in <strong>{mine.name}</strong> with {list(state, mine.memberIds.filter(id => id !== state.selfPlayerId))}.{teams.answers === 'captain' && mine.captainId ? ` Captain: ${mine.captainId === state.selfPlayerId ? 'you' : nameOf(state, mine.captainId)}.` : ''}</> : 'You sit this team round out.'}</p>;
+  // A player sees their team as a coloured flag in the round bar (with the team mates under its (i)).
+  if (state.role === 'player') return mine ? null : <p className="team-summary">You sit this team round out.</p>;
   // Host and shared screen: the same coloured columns as while picking, smaller.
   return <ul className="team-columns compact" aria-label="Teams">{teams.teams.map(team => <li key={team.index} className="team-column" style={{ '--team': teamColor(team.name, team.index) } as React.CSSProperties}>
     <div className="team-column-head"><strong>{team.name}</strong><span className="team-count"> · {team.memberIds.length}</span></div>

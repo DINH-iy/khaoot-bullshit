@@ -3,6 +3,7 @@ import { MediaUpload, type UploadedMedia } from './media-upload.js';
 import { answerFit } from './answer-fit.js';
 import { answerMark } from '@party/contracts';
 import { useLook } from '../presentation/look.js';
+import { Mark } from '../presentation/mark-icons.js';
 
 type Input = NonNullable<NonNullable<RoomSnapshot['view']['stage']>['input']>;
 export interface Draft { text: string; order: string[]; media?: UploadedMedia | undefined }
@@ -24,7 +25,7 @@ export function AnswerInput({ sessionId, input, draft, onChange, legend = 'Your 
     const tiles = route || input.layout === 'tiles';
     return <fieldset className={`${tiles ? 'tiles' : ''}${route ? ' route-tiles' : ''}`.trim() || undefined} style={tiles ? answerFit(input.options.map(option => option.label)) : undefined}><legend>{legend}</legend>{input.options.map((option, index) => <label className={tiles ? 'tile' : 'choice'} key={option.key}>
       <input type="radio" name="answer" value={option.key} checked={draft.text === option.key} onChange={() => onChange({ ...draft, text: option.key })} />
-      {tiles && (() => { const mark = answerMark(theme, index, input.options.length, route); return mark === null ? null : <span className={`answer-mark ${route ? 'route-arrow' : 'tile-mark'}`} aria-hidden="true">{mark}</span>; })()}{option.label}</label>)}</fieldset>;
+      {tiles && (() => { const mark = answerMark(theme, index, input.options.length, route); return mark === null ? null : <span className={`answer-mark ${route ? 'route-arrow' : 'tile-mark'}`} aria-hidden="true"><Mark text={mark} /></span>; })()}{option.label}</label>)}</fieldset>;
   }
   if (input.kind === 'text') return <><label>Your private answer<textarea value={draft.text} onChange={event => onChange({ ...draft, text: event.target.value })} maxLength={input.maxLength} /></label>
     {/* How much room is left, so the limit never comes as a surprise. */}

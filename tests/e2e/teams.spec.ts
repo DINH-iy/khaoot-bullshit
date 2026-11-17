@@ -40,7 +40,11 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     expect((await new AxeBuilder({ page: ada }).analyze()).violations).toEqual([]);
     await host.getByRole('button', { name: 'Start round with these teams' }).click();
 
-    await expect(ada.getByText('You are in Red with Ben. Captain: you.')).toBeVisible();
+    // A player's team is a coloured flag in the round bar; the (i) says who is in it.
+    await expect(ada.locator('.team-flag')).toContainText('Your team: Red');
+    await ada.getByRole('button', { name: 'About this round' }).click();
+    await expect(ada.getByRole('dialog', { name: 'About this round' })).toContainText('You are in Red with Ben. Captain: you.');
+    await ada.keyboard.press('Escape');
     // The teams are set: the host moves on to the first round, played in them.
     await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(ben.getByText('Your captain Ada answers for Red.')).toBeVisible();
@@ -62,7 +66,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     // Solo override: no teams, everybody answers for themselves.
     await host.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(ben.getByRole('radio', { name: '8', exact: true })).toBeVisible();
-    await expect(ben.getByText('You are in', { exact: false })).toHaveCount(0);
+    await expect(ben.locator('.team-flag')).toHaveCount(0);
     await host.getByRole('button', { name: 'Close answers' }).click();
 
     // One against the rest, for this round only, judged per side.
@@ -88,7 +92,7 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     const blue = host.getByRole('region', { name: 'Team forming' }).locator('.team-column', { hasText: 'Blue' });
     await expect(blue).toContainText('Ada'); await expect(blue).toContainText('Ben');
     await host.getByRole('button', { name: 'Start round with these teams' }).click();
-    await expect(cleo.getByText('You are in Red', { exact: false })).toBeVisible();
+    await expect(cleo.locator('.team-flag')).toContainText('Red');
     for (const page of [host, ada]) expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   } finally { for (const context of contexts) await context.close().catch(() => undefined); }
 });

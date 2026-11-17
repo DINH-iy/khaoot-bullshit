@@ -39,13 +39,13 @@
 .room-id { display: flex; gap: 14px; align-items: center; }
 .room-game { margin: 0; color: var(--r-muted); font-size: .9rem; }
 .room-code { margin: 0; font-size: 1.15rem; letter-spacing: .04em; }
-.room-connection { display: flex !important; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.room-connection { display: flex !important; gap: 8px; align-items: center; }
 .conn { margin: 0; display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; background: var(--r-card); font-size: .9rem; }
 .conn::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--r-bad); }
 .conn-ok::before { background: var(--r-ok); }
 .room-connection .ghost { min-height: 40px; font-size: .85rem; }
 .conn-details summary { cursor: pointer; color: var(--r-muted); font-size: .85rem; }
-.conn-details[open] { flex-basis: 100%; } .conn-details p { color: var(--r-muted); font-size: .85rem; }
+.conn-details p { color: var(--r-muted); font-size: .85rem; }
 .room-toast { margin: 12px 20px 0; padding: 10px 14px; border-radius: 12px; background: var(--r-card); }
 .room-toast.pending { display: grid; gap: 8px; }
 
@@ -304,3 +304,6 @@
 .room.marks-end .route-tiles .tile > .answer-mark { order: 2; }
 .room.marks-top .tile, .room.marks-top .options-board li { flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; }
 .room.marks-top .route-tiles .tile { grid-template-columns: 1fr; justify-items: start; }
+/* Icon marks (route arrows, shapes): sized like the text they replace. */
+.mark-icon { width: .9em; height: .9em; display: block; }
+.room .route-arrow .mark-icon { width: .75em; height: .75em; }

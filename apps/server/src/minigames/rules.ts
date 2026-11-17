@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
-import { circleScore, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameKey, type MinigameSettings } from '@party/contracts';
-import { requireGame } from '../game/errors.js';
+import { circleScore, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, SUITS, type MinigameKey, type MinigameSettings, type PlayingCard } from '@party/contracts';
+import { GameError, requireGame } from '../game/errors.js';
 
 /** Allowed difference between a phone's clock (after correction) and the server's. */
 export const CLOCK_SLACK_MS = 2000;
@@ -14,7 +14,11 @@ export const MAX_TAPS_PER_SECOND = 16;
  * Stored on the stage run when play starts. `doorsMilli` is the shuffled secret
  * for lucky doors; views never show it before the reveal.
  */
-export const MinigameRunSchema = z.object({ startsAt: z.string().datetime(), goAt: z.string().datetime().nullable(), doorsMilli: z.array(z.string()).nullable() }).strict();
+// `steps`: a step game's sides ("team:<id>" or "player:<id>"): the game's own state (with its secrets), the step it is at and when it began, the side's captain (when the captain decides) and, in a team vote, when the vote ends.
+export const StepSideSchema = z.object({ state: z.unknown(), step: z.number().int().min(0), stepAt: z.string().datetime(), captainId: z.string().uuid().nullable(), voteEndsAt: z.string().datetime().nullable() }).strict();
+export type StepSide = z.infer<typeof StepSideSchema>;
+export const MinigameRunSchema = z.object({ startsAt: z.string().datetime(), goAt: z.string().datetime().nullable(), doorsMilli: z.array(z.string()).nullable(),
+  steps: z.record(z.string(), StepSideSchema).optional() }).strict();
 export type MinigameRun = z.infer<typeof MinigameRunSchema>;
 export const readMinigameRun = (presentation: unknown): MinigameRun | null => {
   const parsed = MinigameRunSchema.safeParse((presentation as { minigame?: unknown } | null)?.minigame);
@@ -29,9 +33,9 @@ export function startMinigame(game: MinigameKey, settings: MinigameSettings, now
     return { startsAt: new Date(startsAt).toISOString(), goAt: new Date(startsAt + minWaitMs + random(maxWaitMs - minWaitMs + 1)).toISOString(), doorsMilli: null };
   }
   if (game === 'lucky-doors') {
-    // Fisher–Yates with the system's secure random numbers.
+    // Fixed: door 1 hides the first value, and so on (the host decided). Else Fisher–Yates with the system's secure random numbers.
     const doors = [...(settings as MinigameSettings<'lucky-doors'>).doorsMilli];
-    for (let index = doors.length - 1; index > 0; index--) { const other = random(index + 1); [doors[index], doors[other]] = [doors[other]!, doors[index]!]; }
+    if ((settings as MinigameSettings<'lucky-doors'>).order !== 'fixed') for (let index = doors.length - 1; index > 0; index--) { const other = random(index + 1); [doors[index], doors[other]] = [doors[other]!, doors[index]!]; }
     return { startsAt: new Date(startsAt).toISOString(), goAt: null, doorsMilli: doors };
   }
   return { startsAt: new Date(startsAt).toISOString(), goAt: null, doorsMilli: null };
@@ -91,8 +95,9 @@ export function judgeResult(game: MinigameKey, settings: MinigameSettings, run: 
     return { value: circleScore(value.stroke), stroke: value.stroke };
   }
   if (game === 'relay-drawing') { requireGame(value.teamId !== undefined, 'INVALID_SUBMISSION'); return { value: 0, teamId: value.teamId }; }
-  requireGame(value.value < run.doorsMilli!.length, 'INVALID_SUBMISSION');
-  return { value: value.value };
+  // Step games are played move by move (minigame.move); their result is written by the server when a side is done.
+  requireGame(!isStepMinigame(game), 'INVALID_SUBMISSION');
+  throw new GameError('INVALID_SUBMISSION');
 }
 
 /** A number to rank by (lower is better), or null when the result does not rank (false start). */
@@ -102,6 +107,7 @@ export function rankValue(game: MinigameKey, settings: MinigameSettings, value: 
   if (game === 'tap-race') return -value.value;
   if (game === 'stop-clock') return Math.abs(value.value - (settings as MinigameSettings<'stop-clock'>).targetMs);
   if (game === 'perfect-circle') return -value.value;
+  if (game === 'bus') return value.value;
   return null;
 }
 
@@ -122,3 +128,10 @@ export function teamValue(game: MinigameKey, rule: 'best' | 'average' | 'total',
 }
 
 export { parseMinigameSettings };
+
+/** Four cards for a team in Drive the bus: from a fresh, securely shuffled deck of 52. */
+export function dealBus(random: (max: number) => number = randomInt): PlayingCard[] {
+  const deck = SUITS.flatMap(suit => Array.from({ length: 13 }, (_, index) => ({ rank: index + 2, suit })));
+  for (let index = deck.length - 1; index > 0; index--) { const other = random(index + 1); [deck[index], deck[other]] = [deck[other]!, deck[index]!]; }
+  return deck.slice(0, 4);
+}

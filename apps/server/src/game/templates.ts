@@ -98,6 +98,20 @@ const minigameMadness = parseDefinition({
   edges: [{ key: 'a', from: 'intro', to: 'reaction' }, { key: 'b', from: 'reaction', to: 'taps' }, { key: 'c', from: 'taps', to: 'clock' }, { key: 'd', from: 'clock', to: 'doors' }, { key: 'e', from: 'doors', to: 'showdown' }],
 });
 
+// Step games: teams drive the bus deciding each guess by a team vote, then everyone picks left or right without talking.
+const barGames = parseDefinition({
+  formatVersion: 2, title: 'Bar games', startNodeKey: 'intro',
+  nodes: [
+    { key: 'intro', stages: [{ key: 'cutscene', kind: 'info', title: 'BAR GAMES', prompt: 'Drive the bus in teams, then left or right on your own. Drink responsibly.', durationMs: null }] },
+    { key: 'teams', stages: [{ key: 'pick', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'random' }, captains: true }] },
+    { key: 'bus', stages: [{ key: 'play', kind: 'minigame', prompt: 'Drive the bus', game: 'bus', settings: { sips: [1, 2, 3, 4] }, durationMs: 180_000, decide: 'vote', voteSeconds: 20,
+      places: { kind: 'list', pointsMilli: ['10000'] }, play: { kind: 'teams', lineup: { kind: 'game' }, answers: 'everyone', points: 'members' } }] },
+    { key: 'sides', stages: [{ key: 'play', kind: 'minigame', prompt: 'Left or right? No talking!', game: 'majority', durationMs: 20_000, places: { kind: 'list', pointsMilli: ['5000'] } },
+      { key: 'scores', kind: 'scoreboard', prompt: 'Final standings', show: 'players', durationMs: null }] },
+  ],
+  edges: [{ key: 'a', from: 'intro', to: 'teams' }, { key: 'b', from: 'teams', to: 'bus' }, { key: 'c', from: 'bus', to: 'sides' }],
+});
+
 // Drawing: a blind drawing and its vote, a doodle to finish, the roundest circle, and teams passing the pencil.
 const squiggle = { v: 1 as const, strokes: [{ c: 0, w: 10, p: [300, 600, 360, 520, 440, 500, 500, 560, 560, 620, 640, 600, 700, 520] }] };
 const drawParty = parseDefinition({
@@ -119,6 +133,7 @@ export const builtInGames: readonly { key: string; description: string; definiti
   { key: 'friday-night-chaos', description: 'The party votes on a route: Music Mayhem or Living Sculpture. Both routes end in the same finale.', definition: fridayNightChaos },
   { key: 'team-party', description: 'Teams picked at the start (two random teams with captains), a solo round, one player against the rest, then players pick new teams and vote.', definition: teamParty },
   { key: 'minigame-madness', description: 'Reaction duel, tap race, stop the clock and lucky doors, then one player against everyone in a final tap race.', definition: minigameMadness },
+  { key: 'bar-games', description: 'Teams drive the bus, voting on every guess (red or black, higher or lower, inside or outside, the suit; wrong: drink), then everyone picks left or right without talking.', definition: barGames },
   { key: 'draw-party', description: 'A blind portrait of the host and a vote, a doodle to finish, the roundest circle, then teams pass the pencil and vote for the best drawing.', definition: drawParty },
   { key: 'picture-party', description: 'Players answer by uploading pictures, GIFs or short videos, shown to everyone at the reveal.', definition: pictureParty },
   { key: 'first-reliable-game', description: 'Untimed quiz question, a host-judged challenge and a writing round. The host closes each stage.', definition: preparedGame },
