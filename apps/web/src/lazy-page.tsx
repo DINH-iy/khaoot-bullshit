@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, type ComponentType, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 
 // Parts of the app that load when opened (editor, admin, arcade, test bench). The page never reloads by itself:
 // a failed download (a network blip on a phone) is tried again a few times, and only if it keeps failing does the
@@ -22,7 +22,29 @@ class LoadProblem extends Component<{ children: ReactNode }, { failed: boolean }
   }
 }
 
-/** A part loaded on demand, with "Opening the …" while it loads and a way out if it cannot. */
+/**
+ * While a part downloads: nothing for the first moment (a quick load shows no loader at all), then the party logo
+ * with a soft pulse and three dots, centred, in the page's colours. Never shown during a game: the room screen is in
+ * the first download.
+ */
+function PageLoader({ what }: { what: string }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => setShown(true), 180); return () => clearTimeout(timer); }, []);
+  return <main className={`page-loader${shown ? ' shown' : ''}`} aria-busy="true">
+    <p className="page-loader-mark" aria-hidden="true">party<span>.</span></p>
+    <p className="page-loader-dots" aria-hidden="true"><i /><i /><i /></p>
+    <p role="status" className="visually-hidden">Opening the {what}…</p>
+  </main>;
+}
+
+/** A part loaded on demand, with a loader while it loads and a way out if it cannot. */
 export function OnDemand({ what, children }: { what: string; children: ReactNode }) {
-  return <LoadProblem><Suspense fallback={<main><p role="status">Opening the {what}…</p></main>}>{children}</Suspense></LoadProblem>;
+  return <LoadProblem><Suspense fallback={<PageLoader what={what} />}>{children}</Suspense></LoadProblem>;
+}
+
+/** Downloads parts ahead, once the page is idle, so opening them later needs no loader (only the parts asked for). */
+export function prefetchLater(...loads: (() => Promise<unknown>)[]) {
+  const run = () => { for (const load of loads) void load().catch(() => {}); };
+  const idle = (window as { requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number }).requestIdleCallback;
+  if (idle) idle(run, { timeout: 4000 }); else setTimeout(run, 1500);
 }

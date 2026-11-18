@@ -26,7 +26,7 @@ export function JoinLookPanel() {
     {error && <p role="alert" className="error">{error}</p>}
     <div className="join-look-grid">
       <div className="editor join-look-controls">
-        <ThemePanel theme={draft.theme} below={[]} title="Join screen" onChange={(next: Theme | undefined) => { setSaved(false); setDraft(next ? { theme: next } : {}); }} />
+        <ThemePanel noAnswers theme={draft.theme} below={[]} title="Join screen" onChange={(next: Theme | undefined) => { setSaved(false); setDraft(next ? { theme: next } : {}); }} />
       </div>
       <div className="join-look-side">
         <figure className="join-look-preview" aria-label="Preview of the join screen"><figcaption>Preview</figcaption>

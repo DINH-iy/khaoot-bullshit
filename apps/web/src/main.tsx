@@ -4,7 +4,7 @@ import { RoomScreen } from './room/room-screen.js';
 import { HostMenu } from './hosting/host-menu.js';
 import { FeedbackButton } from './feedback/feedback-button.js';
 import { applyTheme } from './theme.js';
-import { lazyPage, OnDemand } from './lazy-page.js';
+import { lazyPage, OnDemand, prefetchLater } from './lazy-page.js';
 import { onNavigate } from './navigation.js';
 import './style.css';
 
@@ -28,6 +28,12 @@ function App() {
   // menu or one editor the screen stays and reads the address itself.
   const screen = editing ? `edit:${editing}` : params.has('admin') ? 'admin' : params.has('host') ? 'host' : params.has('bench') ? `bench:${params.get('bench')}`
     : params.has('arcade') ? `arcade:${params.get('arcade')}` : `room:${address}`;
+  // Parts this person is likely to open next are fetched ahead while idle: the owner's pages fetch the editor and
+  // the admin menu; the start page (no room yet) fetches the arcade. A player in a game fetches nothing extra.
+  useEffect(() => {
+    if (screen === 'host' || screen === 'admin' || screen.startsWith('edit:')) prefetchLater(() => import('./editor/shell/editor-shell.js'), () => import('./admin/admin-page.js'));
+    else if (screen.startsWith('room:') && !params.get('room')) prefetchLater(() => import('./arcade/arcade-page.js'));
+  }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
   return <Fragment key={screen}>{editing && /^[0-9a-f-]{36}$/i.test(editing)
     ? <OnDemand what="editor"><EditorShell gameId={editing} /></OnDemand>
     : params.has('admin') ? <OnDemand what="admin menu"><AdminPage /></OnDemand>

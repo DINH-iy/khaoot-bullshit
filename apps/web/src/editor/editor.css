@@ -698,3 +698,5 @@
 .try-pop::before { content: ''; position: absolute; top: -6px; right: 14px; width: 10px; height: 10px; background: var(--e-panel); border-left: 1px solid var(--e-border); border-top: 1px solid var(--e-border); transform: rotate(45deg); }
 .try-pop { right: auto; left: 50%; transform: translateX(-50%); width: min(260px, 70vw); }
 .try-pop::before { right: auto; left: calc(50% - 5px); }
+/* The logo stays on phones: it is the way to the other parts of the site. */
+@media (max-width: 760px) { .editor-title .editor-logo.app-logo-button { display: grid; } }

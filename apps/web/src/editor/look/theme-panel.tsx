@@ -46,7 +46,8 @@ export function contrastWarnings(theme: FullTheme): string[] {
 }
 
 /** Colours, fonts, shapes and backgrounds. Every change is a block of choices, never code. */
-export function ThemePanel({ theme, below, title = '', onChange }: { theme: Theme | undefined; below: (Theme | undefined)[]; title?: string; onChange: (theme: Theme | undefined) => void }) {
+/** `noAnswers`: for a screen without answers (the site's join screen): no answer colours, tiles or marks. */
+export function ThemePanel({ theme, below, title = '', onChange, noAnswers = false }: { theme: Theme | undefined; below: (Theme | undefined)[]; title?: string; onChange: (theme: Theme | undefined) => void; noAnswers?: boolean }) {
   const [palette, setPalette] = useState<'import' | 'export' | null>(null);
   const layer = theme ?? {}; const full = resolveTheme(...below, theme);
   const set = (patch: Partial<Theme>) => onChange({ ...layer, ...patch });
@@ -69,13 +70,13 @@ export function ThemePanel({ theme, below, title = '', onChange }: { theme: Them
 
     {warnings.length > 0 && <div className="look-warnings" role="status"><h3>Readability</h3><ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
 
-    <Section title="Colours" memory="look:colours" summary={`${answers.length} answer colours`}>
-      <div className="color-grid">{(Object.keys(COLOR_LABELS) as ColorName[]).map(name => <label key={name} className="color-field">
+    <Section title="Colours" memory="look:colours" summary={noAnswers ? 'Background, cards, text, buttons' : `${answers.length} answer colours`}>
+      <div className="color-grid">{(Object.keys(COLOR_LABELS) as ColorName[]).filter(name => !noAnswers || name !== 'answerText').map(name => <label key={name} className="color-field">
         <input type="color" value={full.colors[name]} onChange={event => setColor(name, event.target.value)} />{COLOR_LABELS[name]}</label>)}</div>
-      <p className="field-title">Answer colours, in order</p>
+      {!noAnswers && <><p className="field-title">Answer colours, in order</p>
       <Swatches colors={answers} name={index => `Answer ${String.fromCharCode(65 + index)} colour`} removeName={index => `Remove answer colour ${String.fromCharCode(65 + index)}`}
         onChange={next => setColor('answers', next)} />
-      <p className="hint">With more answers than colours, the colours repeat.</p>
+      <p className="hint">With more answers than colours, the colours repeat.</p></>}
       {/* Bringing colours in from a brand kit, or taking them out: below the colours they change. */}
       <div className="palette-actions">
         <button type="button" className="link-button" onClick={() => setPalette('import')}>Import colours…</button>
@@ -92,23 +93,23 @@ export function ThemePanel({ theme, below, title = '', onChange }: { theme: Them
       <label className="choice"><input type="checkbox" checked={full.uppercaseHeadings} onChange={event => set({ uppercaseHeadings: event.target.checked })} />Titles in capitals</label>
     </Section>
 
-    <Section title="Shapes and background" memory="look:shapes" summary={`${BACKGROUNDS[full.background]} · ${TILES[full.tiles]}${full.gradients ? ' · gradient' : ''}`}>
+    <Section title="Shapes and background" memory="look:shapes" summary={`${BACKGROUNDS[full.background]}${noAnswers ? '' : ` · ${TILES[full.tiles]}`}${full.gradients ? ' · gradient' : ''}`}>
       <label>Corner roundness · {full.radius}px<input type="range" min={0} max={40} value={full.radius} onChange={event => set({ radius: Number(event.target.value) })} /></label>
       <p className="field-title">Background</p>
       <div className="segmented" role="group" aria-label="Background">{(Object.keys(BACKGROUNDS) as (keyof typeof BACKGROUNDS)[]).map(key => <button key={key} aria-pressed={full.background === key} onClick={() => set({ background: key })}>{BACKGROUNDS[key]}</button>)}</div>
-      <p className="field-title">Answer tiles</p>
-      <div className="segmented" role="group" aria-label="Answer tiles">{(Object.keys(TILES) as (keyof typeof TILES)[]).map(key => <button key={key} aria-pressed={full.tiles === key} onClick={() => set({ tiles: key })}>{TILES[key]}</button>)}</div>
-      <label className="choice"><input type="checkbox" checked={full.gradients} onChange={event => set({ gradients: event.target.checked })} />Gradient effect on answer tiles and main buttons</label>
+      {!noAnswers && <><p className="field-title">Answer tiles</p>
+      <div className="segmented" role="group" aria-label="Answer tiles">{(Object.keys(TILES) as (keyof typeof TILES)[]).map(key => <button key={key} aria-pressed={full.tiles === key} onClick={() => set({ tiles: key })}>{TILES[key]}</button>)}</div></>}
+      <label className="choice"><input type="checkbox" checked={full.gradients} onChange={event => set({ gradients: event.target.checked })} />{noAnswers ? 'Gradient effect on the main button' : 'Gradient effect on answer tiles and main buttons'}</label>
     </Section>
 
-    <Section title="Answer marks" memory="look:marks" summary={markName}>
+    {!noAnswers && <Section title="Answer marks" memory="look:marks" summary={markName}>
       {MARK_CHOICES.map(({ key, label, options }) => <div key={key}>
         <p className="field-title">{label}</p>
         <div className="segmented" role="group" aria-label={label}>{Object.entries(options).map(([value, name]) => <button key={value} aria-pressed={full[key] === value} onClick={() => set({ [key]: value })}>{name}</button>)}</div>
         {key === 'markers' && full.markers === 'custom' && <CustomMarks marks={full.customMarks} onChange={customMarks => set({ customMarks })} />}
       </div>)}
       <p className="hint">The marks show before (or after, or above) each answer on the phones and the shared screen.</p>
-    </Section>
+    </Section>}
     {theme && <button className="small-button" onClick={() => onChange(undefined)}>Remove all look changes here</button>}
   </div>;
 }

@@ -243,3 +243,6 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 @media (max-width: 900px) { .join-look-grid { grid-template-columns: 1fr; } .join-look-side { position: static; } .join-look-phone { height: 520px; } }
 /* The preview uses the room's own button colours, not the admin page's. */
 .join-look-phone .room button.primary { background: var(--r-accent); color: var(--r-accent-ink); border-color: var(--r-accent); }
+/* The editor's own buttons inside the Join screen controls, in the editor's colours (not the admin page's). */
+.join-look-controls button.small-button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 600; }
+.join-look-controls > button.small-button { margin-top: 12px; }

@@ -85,3 +85,15 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 /* A part of the app that could not load (lazy-page.tsx). */
 .load-problem { max-width: 28rem; margin: 15vh auto; padding: 0 16px; display: grid; gap: 12px; justify-items: start; }
 .load-problem h1 { margin: 0; font-size: 1.5rem; } .load-problem p { margin: 0; }
+
+/* The loader while a part of the app downloads (lazy-page.tsx): appears only after a moment, then fades in. */
+.page-loader { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px; opacity: 0; transition: opacity .25s; }
+.page-loader.shown { opacity: 1; }
+.page-loader-mark { margin: 0; font-weight: 900; font-size: 2.6rem; letter-spacing: -.03em; animation: loader-pulse 1.4s ease-in-out infinite; }
+.page-loader-mark span { color: #ffb400; }
+.page-loader-dots { display: flex; gap: 8px; margin: 0; }
+.page-loader-dots i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .35; animation: loader-dot 1.2s ease-in-out infinite; }
+.page-loader-dots i:nth-child(2) { animation-delay: .15s; } .page-loader-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes loader-pulse { 50% { transform: scale(1.04); opacity: .85; } }
+@keyframes loader-dot { 40% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .page-loader-mark, .page-loader-dots i { animation: none; } }

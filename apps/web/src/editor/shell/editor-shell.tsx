@@ -6,7 +6,7 @@ import { PeerBar } from '../live/presence.js';
 import { LookView } from '../look/look-view.js';
 import { estimateMinutes, isRoute } from '../model.js';
 import { useDraft, type SaveState } from './use-draft.js';
-import { OwnerNav, useHostRole, type HostRole } from '../../owner/owner-nav.js';
+import { AppMenu, useHostRole, type HostRole } from '../../owner/owner-nav.js';
 import { GameSettingsPanel } from './game-settings.js';
 import { InvitePanel } from './invite-panel.js';
 import { FieldLimit } from '../controls/field-limit.js';
@@ -37,7 +37,8 @@ export function EditorShell({ gameId }: { gameId: string }) {
 
 function EditorPage({ gameId }: { gameId: string }) {
   const role = useHostRole();
-  return <div className="editor-page"><OwnerNav current="editor" role={role} /><EditorBody gameId={gameId} role={role} /><FieldLimit /></div>;
+  // No separate bar above the editor: its own "p." logo opens the other places (AppMenu), so it keeps one header.
+  return <div className="editor-page"><EditorBody gameId={gameId} role={role} /><FieldLimit /></div>;
 }
 
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
@@ -90,7 +91,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
     {/* One compact bar: the game and its state, the three editors, and the actions; the rest is in the ☰ menu. */}
     <header className="editor-header">
       <h1 className="visually-hidden">{VIEW_NAMES[view]}: {definition.title}</h1>
-      <div className="editor-title"><span className="editor-logo" aria-hidden="true">p.</span>
+      <div className="editor-title"><AppMenu role={role} />
         <div><label className="visually-hidden" htmlFor="game-title">Game name</label>
           <input id="game-title" className="title-input" readOnly={d.readOnly} value={definition.title} maxLength={160} onChange={event => d.change({ ...definition, title: event.target.value }, undefined, 'title')} />
           <p className="crumb" title={overview}>{draft.builtIn ? <><a href="/?host=1">Built-in games</a> / <span className="crumb-builtin" title={`Your own version of the built-in game “${draft.builtIn.title}”. Once published, the host menu and rooms use it; “Restore original…” in the host menu goes back.`}>Your version of “{draft.builtIn.title}”</span></> : <a href="/?host=1">Your games</a>} / Draft{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : ' + changes'}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{saveText[d.save]}</span> · <span className="game-overview">{overview}</span></p></div></div>

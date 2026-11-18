@@ -1,13 +1,41 @@
-/* The owner's (and editors') top bar on the host menu, the editor and the admin pages. */
-.owner-nav { background: light-dark(#1d1a2b, #121019); color: #fff; border-bottom: 1px solid light-dark(#2f2a45, #2c2840); }
-.owner-nav ul { display: flex; gap: 4px; margin: 0 auto; padding: 6px 16px; list-style: none; max-width: 1180px; overflow-x: auto; scrollbar-width: none; }
-.owner-nav li { margin: 0; flex: none; }
-.owner-nav a, .owner-nav button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: inherit; text-decoration: none; font-family: inherit; font-weight: 600; font-size: .95rem; opacity: .8; cursor: pointer; }
-.owner-nav a:hover, .owner-nav button:hover { opacity: 1; background: rgb(255 255 255 / .1); }
-.owner-nav a:focus-visible, .owner-nav button:focus-visible { opacity: 1; outline: 3px solid #ffcf4a; outline-offset: 0; }
-.owner-nav a[aria-current=page] { opacity: 1; background: #ffcf4a; color: #2a1d00; font-weight: 800; }
-/* Feedback sits apart on the right, outlined, so it does not read as a section. */
-.owner-nav .owner-nav-end { margin-left: auto; padding-left: 12px; }
-.owner-nav .owner-nav-end button { border: 1px solid rgb(255 255 255 / .35); opacity: .9; }
-/* On phones the bar wraps rather than scrolling, so Feedback is never cut off. */
-@media (max-width: 520px) { .owner-nav ul { flex-wrap: wrap; overflow: visible; gap: 2px; padding: 6px 12px; } .owner-nav a, .owner-nav button { padding: 0 10px; font-size: .9rem; } }
+/* The header of the host menu and the admin pages (OwnerNav), in the page's own colours: the logo and the main
+   places on the left (the current one underlined), Feedback and the owner's menu on the right. */
+.app-header { display: flex; align-items: center; gap: 8px 20px; max-width: 1280px; margin: 0 auto; padding: 10px 28px; box-sizing: border-box; border-bottom: 1px solid light-dark(#e3def2, #2c2840); }
+.app-brand { font-weight: 900; font-size: 1.35rem; letter-spacing: -.02em; color: inherit; text-decoration: none; }
+.app-brand span { color: #ffb400; }
+.app-main ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.app-main li { margin: 0; }
+.app-main a { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: inherit; text-decoration: none; font-weight: 600; opacity: .72; border-radius: 10px; }
+.app-main a:hover { opacity: 1; background: light-dark(rgb(0 0 0 / .05), rgb(255 255 255 / .07)); }
+.app-main a[aria-current=page] { opacity: 1; font-weight: 800; }
+.app-main a[aria-current=page]::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 4px; height: 3px; border-radius: 3px; background: light-dark(#6d3fd6, #b9a2ff); }
+.app-end { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.app-header button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid light-dark(#d9d3ea, #3a3550); background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.app-header button:hover { background: light-dark(rgb(0 0 0 / .05), rgb(255 255 255 / .07)); }
+.app-header a:focus-visible, .app-header button:focus-visible, .app-menu a:focus-visible, .app-logo-button:focus-visible { outline: 3px solid light-dark(#6d3fd6, #b9a2ff); outline-offset: 2px; }
+.app-owner { position: relative; }
+.app-header .app-owner-button { padding-left: 5px; }
+.app-header .app-owner-button.here { border-color: light-dark(#6d3fd6, #b9a2ff); }
+.app-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #ffcf4a; color: #2a1d00; font-size: .85rem; }
+.app-caret { font-size: .75em; opacity: .7; }
+/* The menus (the owner's, and the editor's logo menu). */
+.app-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; min-width: 15rem; margin: 0; padding: 6px; list-style: none; display: grid; gap: 2px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); color: light-dark(#1d1d22, #eceef3); box-shadow: 0 14px 40px rgb(0 0 0 / .25); }
+.app-menu.start { left: 0; right: auto; }
+.app-menu li { margin: 0; }
+.app-menu a { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 9px; color: inherit; text-decoration: none; font-weight: 600; }
+.app-menu a:hover { background: light-dark(#f1edfb, #2c2840); }
+.app-menu a[aria-current=page] { background: light-dark(#f1edfb, #2c2840); font-weight: 800; }
+.app-menu a svg { width: 16px; opacity: .75; }
+.app-menu-head { margin: 6px 0 2px; padding: 6px 12px 0; border-top: 1px solid light-dark(#eeeaf7, #2c2840); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .65; }
+/* The editor's logo is the button for its menu. */
+.app-logo-menu { position: relative; flex: none; }
+.app-logo-button { border: 0; padding: 0; cursor: pointer; }
+/* Phones: Feedback shows only its icon; the main places stay. */
+@media (max-width: 640px) {
+  .app-header { padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
+  /* Only the icon shows; the words stay for screen readers (and the button keeps its name). */
+  .app-feedback span, .app-owner-button > span:nth-child(2) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .app-main a { padding: 0 8px; }
+}
+.app-header .fa-icon, .app-menu .fa-icon { width: 1em; height: 1em; flex: none; }
+.app-avatar .fa-icon { width: 15px; height: 15px; }

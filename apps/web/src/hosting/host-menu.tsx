@@ -71,9 +71,9 @@ export function HostMenu() {
   const owner = menu?.role === 'owner';
   return <><OwnerNav current={hash === '#my-games' || (menu && !owner) ? 'editor' : 'host'} role={menu?.role ?? null} /><main className="host-page">
     {!menu || owner
-      ? <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Host</p><h1>Host a game</h1>
+      ? <header className="host-hero"><p className="eyebrow">Host</p><h1>Host a game</h1>
         <p>Pick a game and open a room. Players join on their phones with the room code or the QR code on the next screen.</p></header>
-      : <header className="host-hero"><p className="brand">party<span>.</span></p><p className="eyebrow">Editor</p><h1>Edit games</h1>
+      : <header className="host-hero"><p className="eyebrow">Editor</p><h1>Edit games</h1>
         <p>Make and change games, publish them and rehearse them in a practice room. Hosting real rooms is up to the organiser.</p></header>}
     {error && <p role="alert" className="error">{error}</p>}
     {busy && !menu && <p role="status">Loading your games…</p>}
