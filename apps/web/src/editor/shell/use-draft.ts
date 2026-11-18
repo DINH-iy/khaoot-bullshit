@@ -5,10 +5,14 @@ import { SIGNED_OUT_TEXT } from '../../owner/owner-session.js';
 import { convertLegacyTeams, type Definition, type Positions } from '../model.js';
 import { combine, fromDoc, toDoc, type Doc, type Snapshot } from '../live/document.js';
 import { same } from '../live/merge.js';
+import { describeStep } from './history-labels.js';
 
 export type SaveState = 'saved' | 'pending' | 'saving' | 'error';
-/** One of your own edits: the game just before and just after it. Undo and redo replay only this difference. */
-interface Step { before: Snapshot; after: Snapshot }
+/**
+ * One of your own edits: the game just before and just after it. Undo and redo replay only this difference.
+ * `label` says what it was (for the history list), `at` when.
+ */
+interface Step { before: Snapshot; after: Snapshot; label: string; at: number }
 const HISTORY = 100;
 
 /**
@@ -114,9 +118,10 @@ export function useDraft(gameId: string) {
     // `before`: card positions from before a drag, since the screen already shows the dragged ones.
     const from = { definition: current.definition, positions: before ?? current.positions }; const to = { definition: next, positions: nextPositions ?? current.positions };
     const grouped = Boolean(group) && group === lastRecord.current.group && now - lastRecord.current.at < 1200;
-    setHistory(previous => grouped && previous.undo.length
-      ? { undo: [...previous.undo.slice(0, -1), { before: previous.undo.at(-1)!.before, after: to }], redo: [] }
-      : { undo: [...previous.undo.slice(-HISTORY + 1), { before: from, after: to }], redo: [] });
+    setHistory(previous => {
+      if (grouped && previous.undo.length) { const first = previous.undo.at(-1)!.before; return { undo: [...previous.undo.slice(0, -1), { before: first, after: to, label: describeStep(first as Required<Snapshot>, to as Required<Snapshot>), at: now }], redo: [] }; }
+      return { undo: [...previous.undo.slice(-HISTORY + 1), { before: from, after: to, label: describeStep(from as Required<Snapshot>, to as Required<Snapshot>), at: now }], redo: [] };
+    });
     lastRecord.current = { at: now, group };
     show(to); schedule();
   }, [schedule]);
@@ -124,13 +129,19 @@ export function useDraft(gameId: string) {
    * Undo and redo touch only what that step of yours changed. Whatever other
    * people did since stays, also where they changed the very same field.
    */
-  const restore = (kind: 'undo' | 'redo') => {
+  /** Undoes (or redoes) `count` of your steps at once, newest first: the history list jumps this way. */
+  const restore = (kind: 'undo' | 'redo', count = 1) => {
     if (viewing.current) return;
-    const current = latest.current; const step = history[kind].at(-1);
-    if (!current.definition || !step) return;
-    const [from, to] = kind === 'undo' ? [step.after, step.before] : [step.before, step.after];
-    show(fromDoc(combine(toDoc(from), toDoc(current as Snapshot), toDoc(to)))); lastRecord.current = { at: 0, group: '' };
-    setHistory(kind === 'undo' ? { undo: history.undo.slice(0, -1), redo: [...history.redo, step] } : { redo: history.redo.slice(0, -1), undo: [...history.undo, step] });
+    let current = latest.current as Snapshot; if (!current.definition) return;
+    const undo = [...history.undo]; const redo = [...history.redo];
+    for (let index = 0; index < count; index++) {
+      const step = (kind === 'undo' ? undo : redo).pop(); if (!step) break;
+      const [from, to] = kind === 'undo' ? [step.after, step.before] : [step.before, step.after];
+      current = fromDoc(combine(toDoc(from), toDoc(current), toDoc(to)));
+      (kind === 'undo' ? redo : undo).push(step);
+    }
+    show(current); lastRecord.current = { at: 0, group: '' };
+    setHistory({ undo, redo });
     schedule();
   };
 
@@ -154,6 +165,8 @@ export function useDraft(gameId: string) {
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.');
 
   return { draft, loadError, definition, positions, setPositions, issues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
-    undo: () => restore('undo'), redo: () => restore('redo'), canUndo: !readOnly && history.undo.length > 0, canRedo: !readOnly && history.redo.length > 0 };
+    undo: () => restore('undo'), redo: () => restore('redo'), restore,
+    // Your steps in words, for the history list: done (oldest first) and undone (the next redo last).
+    steps: { undo: history.undo.map(step => ({ label: step.label, at: step.at })), redo: history.redo.map(step => ({ label: step.label, at: step.at })) }, canUndo: !readOnly && history.undo.length > 0, canRedo: !readOnly && history.redo.length > 0 };
 }
 export type DraftState = ReturnType<typeof useDraft>;

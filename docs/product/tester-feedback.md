@@ -242,6 +242,15 @@ Side games:
 - V6: **Tidy up** is tighter: 96 px between columns (was 144), each row only as tall as its own tallest column, 96 px between rows (was the tallest column of the whole game plus 192). *Line up in a row* uses the same spacing. The map's messages (*Tidied up into rows.*) are a neutral pill instead of red text.
 - V7: host room, *Add people…*: the ticks fill the row (the player list's chip style no longer reaches them).
 
+### W. Problems and history boxes (owner, 18 November 2026)
+
+**Built, waiting for the owner's review; no new tests.** Screenshots before and after in `screenshots/problems-panel/`.
+
+- W1: **Problems** at the bottom left of every editor (Flow, Scene, Look & feel): folded, a small *4 problems* button; open, every problem grouped by scene in the game's order (problems of the whole game first, under *Whole game*). Clicking one selects its scene: the map centres it (zoomed to at least 80%), the Scene editor opens it, Look & feel switches to the Scene editor. Open or folded is remembered in this browser. It replaces the old box for whole-game problems.
+- W2: **History** next to it: your edits in this visit, newest on top, each in words (*Added “…”*, *Changed “…”*, *Removed …*, *Moved …*, *Changed the connections*, *Renamed the game to …*, *Changed the look*, *Changed the game settings*) with the time; undone steps above **Now** in grey. Clicking one goes back to just after it (or forward to it), the same as that many Undo/Redo presses, so other people's changes stay; *When you opened the game* undoes everything; after going back, **Back to the latest** at the top redoes everything again. Rows are highlighted on hover. The button has its own icon (a clock with an arrow turning back). Locked in View mode.
+- W3: with problems, **Play & publish** shows a warning triangle and one red line, *⚠ 4 problems to fix first* (its tooltip says where they are listed). Rehearsing works as the server does: it skips scenes it cannot reach from where it starts, so only problems of the whole game and of the scenes it would play stop it; those items then say *(fix 3 problems first)* and cannot be clicked. Publish needs every problem fixed.
+- W4: the corner stays quiet over the map: the folded buttons and the open lists are see-through with a blur behind them (solid when *Reduce transparency* is on). Not an opacity on the whole button: that made the text too faint for the contrast check.
+
 ### Open questions
 
 - "You're far away" (host screen on an iPhone): that text is not in this app; what was on screen?

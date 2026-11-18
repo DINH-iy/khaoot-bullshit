@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons.js';
 
 /** One item: `icon` before it, `shortcut` (as the Help panel writes it, "Ctrl + Shift + L") after it. */
@@ -11,7 +11,7 @@ export interface MenuAction { label: string; onSelect: () => void; danger?: bool
  * With `text` the button is labelled ("Play & publish ▾"), with `icon` too; `align`
  * says which edge of the button the list lines up with (the end by default).
  */
-export function ActionMenu({ label, actions, text, icon, intro, align = 'end' }: { label: string; actions: MenuAction[]; text?: string; icon?: string; intro?: string | undefined; align?: 'start' | 'end' }) {
+export function ActionMenu({ label, actions, text, icon, intro, align = 'end' }: { label: string; actions: MenuAction[]; text?: string; icon?: string; intro?: ReactNode | undefined; align?: 'start' | 'end' }) {
   const [open, setOpen] = useState(false); const id = useId();
   const box = useRef<HTMLDivElement>(null); const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {

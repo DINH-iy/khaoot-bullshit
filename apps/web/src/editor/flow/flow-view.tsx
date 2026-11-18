@@ -29,7 +29,7 @@ function readClip(): Clip | null { try { const value = JSON.parse(localStorage.g
 const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const blockedText: Record<string, string> = { self: 'A scene cannot lead to itself.', circle: 'That would make the game go round in a circle.', 'same-scene': 'Another option of this choice already leads there.' };
 
-export function FlowView({ d, selected, setSelected, live, onOpenScene, onHelp }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
+export function FlowView({ d, selected, setSelected, focus = null, live, onOpenScene, onHelp }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; focus?: { key: string; at: number } | null; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
   const readOnly = d.readOnly;
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -187,6 +187,13 @@ export function FlowView({ d, selected, setSelected, live, onOpenScene, onHelp }
     return { zoom, x: anchor.x - (anchor.x - current.x) * (zoom / current.zoom), y: anchor.y - (anchor.y - current.y) * (zoom / current.zoom) };
   });
   /** Shows these scenes (all of them when none are given) as large as fits, up to full size. */
+  // A scene asked for from outside (the problems box): centred on the map, zoomed in enough to read it.
+  useEffect(() => {
+    const point = focus ? positions[focus.key] : undefined; const rect = canvas.current?.getBoundingClientRect();
+    if (!point || !rect) return;
+    setView(current => { const zoom = Math.max(current.zoom, 0.8); return { zoom, x: rect.width / 2 - (point.x + CARD_WIDTH / 2) * zoom, y: rect.height / 2 - (point.y + 96) * zoom }; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
   const fitTo = useCallback((keys?: string[]) => {
     const rect = canvas.current?.getBoundingClientRect(); const all = keys?.length ? keys.map(key => positions[key]).filter((point): point is Point => Boolean(point)) : Object.values(positions);
     if (!rect || !all.length) return;

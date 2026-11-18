@@ -16,6 +16,8 @@ import { HelpPanel } from './help-panel.js';
 import { Icon } from '../controls/icons.js';
 import { pendingClaim } from '../../people/use-me.js';
 import { chooseTheme, currentTheme } from '../../theme.js';
+import { ProblemsPanel } from './problems-panel.js';
+import { HistoryPanel } from './history-panel.js';
 import '../editor.css';
 
 const saveText: Record<SaveState, string> = { saved: 'All changes saved', pending: 'Saving soon…', saving: 'Saving…', error: 'Not saved: the server could not be reached. Retrying…' };
@@ -45,6 +47,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   const [memory] = useState(() => readMemory(gameId)); const [helping, setHelping] = useState(false); const [theme, setTheme] = useState(currentTheme);
   const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'flow' || wanted === 'scene' || wanted === 'look' ? wanted : memory.view ?? 'flow'; });
   const [selected, setSelected] = useState<string[]>(memory.selected ?? []);
+  // A scene to bring into view on the map (from the problems box); `at` makes the same scene count again.
+  const [focus, setFocus] = useState<{ key: string; at: number } | null>(null);
   const [exporting, setExporting] = useState(memory.panel === 'export'); const [settings, setSettings] = useState(memory.panel === 'settings'); const [inviting, setInviting] = useState(memory.panel === 'invite');
   // Remembered scenes that no longer exist (deleted meanwhile) are dropped once the game is loaded.
   const checked = useRef(false);
@@ -68,6 +72,16 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   if (!d.definition || !d.draft) return <main className="editor-message"><p role="status">Opening the editor…</p></main>;
   const { definition, draft } = d; const nodes = definition.nodes; const routes = nodes.filter(isRoute).length;
   const ready = d.issues.length === 0 && d.save === 'saved';
+  const problemCount = `${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'}`;
+  // Rehearsing skips scenes it cannot reach from where it starts (work in progress), as the server does:
+  // only problems of the whole game and of the scenes it would play stop it. Publishing needs every problem fixed.
+  const blocking = (start: string | undefined) => {
+    if (!start) return 0; const reached = new Set<string>(); const queue = [start];
+    while (queue.length) { const key = queue.shift()!; if (reached.has(key)) continue; reached.add(key); for (const edge of definition.edges) if (edge.from === key) queue.push(edge.to); }
+    return d.issues.filter(issue => !issue.nodeKey || reached.has(issue.nodeKey)).length;
+  };
+  const fromStart = blocking(definition.startNodeKey); const fromScene = blocking(selected[0]);
+  const fix = (count: number) => `fix ${count} ${count === 1 ? 'problem' : 'problems'} first`;
   const openPanel = (panel: 'settings' | 'invite' | 'export') => { setSettings(panel === 'settings'); setInviting(panel === 'invite'); setExporting(panel === 'export'); };
   const overview = `about ${estimateMinutes(definition)} min · ${nodes.length} ${nodes.length === 1 ? 'scene' : 'scenes'}${routes ? `, ${routes} ${routes === 1 ? 'party choice' : 'party choices'}` : ''} · ${d.issues.length ? `${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'}` : 'no problems'}`;
   return <div className={`editor${d.readOnly ? ' viewing' : ''}`}>
@@ -90,10 +104,12 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           title={d.readOnly ? 'Viewing: nothing can be changed. Click to edit.' : 'Editing. Click to only view (nothing can be changed by accident).'} onClick={() => d.setReadOnly(!d.readOnly)}>
           <Icon name={d.readOnly ? 'eye' : 'edit'} size={18} /><span>{d.readOnly ? 'Viewing' : 'Editing'}</span></button>
         {/* Trying out, publishing and playing: one menu. Each item says why when it cannot be used yet. */}
-        <ActionMenu label="Play and publish" text="Play & publish" intro="Rehearse plays the draft in a practice room, without publishing it." actions={[
-          { label: 'Rehearse from the start', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(null) },
-          { label: selected.length === 1 ? 'Rehearse from the selected scene' : 'Rehearse from a scene (select one first)', disabled: d.busy || d.save !== 'saved' || selected.length !== 1, onSelect: () => d.rehearse(selected[0]!) },
-          { label: draft.published?.matchesDraft ? 'Publish (nothing new to publish)' : d.issues.length ? `Publish (fix ${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'} first)` : d.save !== 'saved' ? 'Publish (saving…)' : 'Publish',
+        {/* A game with problems cannot be rehearsed or published: the menu says so, and the problems are in the box at the bottom left. */}
+        <ActionMenu label="Play and publish" text="Play & publish" {...(d.issues.length ? { icon: 'warning' } : {})}
+          intro={d.issues.length ? <span className="menu-warning" title="The problems are listed at the bottom left; click one to go to it. Rehearsing skips scenes it cannot reach; publishing needs every problem fixed."><Icon name="warning" size={16} />{problemCount} to fix first</span> : 'Rehearse plays the draft in a practice room, without publishing it.'} actions={[
+          { label: fromStart ? `Rehearse from the start (${fix(fromStart)})` : 'Rehearse from the start', disabled: d.busy || d.save !== 'saved' || fromStart > 0, onSelect: () => d.rehearse(null) },
+          { label: selected.length !== 1 ? 'Rehearse from a scene (select one first)' : fromScene ? `Rehearse from the selected scene (${fix(fromScene)})` : 'Rehearse from the selected scene', disabled: d.busy || d.save !== 'saved' || selected.length !== 1 || fromScene > 0, onSelect: () => d.rehearse(selected[0]!) },
+          { label: draft.published?.matchesDraft ? 'Publish (nothing new to publish)' : d.issues.length ? `Publish (fix ${problemCount} first)` : d.save !== 'saved' ? 'Publish (saving…)' : 'Publish',
             disabled: d.busy || !ready || Boolean(draft.published?.matchesDraft), onSelect: d.publish },
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
           ...(role === 'owner' ? [{ label: draft.published ? 'Play the published version ↗' : 'Play (publish first)', disabled: d.busy || !draft.published, onSelect: d.play }] : []),
@@ -109,9 +125,13 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}
     <main className="editor-main">
-      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
+      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} focus={focus} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
         : view === 'scene' ? <SceneView d={d} selected={selected} setSelected={setSelected} peers={live.peers} onOpenFlow={key => { setSelected([key]); setView('flow'); }} /> : <LookView d={d} selected={selected} gameId={gameId} />}
-      {d.issues.some(issue => !issue.nodeKey) && <div className="general-problems" role="region" aria-label="Problems in the whole game"><h2>Problems in the whole game</h2><ul>{d.issues.filter(issue => !issue.nodeKey).map((issue, index) => <li key={index}>{issue.message}</li>)}</ul></div>}
+      {/* Bottom left: your edits (History) and every problem of the game; each folds into a small button. A problem goes to its scene. */}
+      <div className="editor-corner">
+        <HistoryPanel steps={d.steps} disabled={d.readOnly} onRestore={d.restore} />
+        <ProblemsPanel issues={d.issues} definition={definition} onGo={key => { setSelected([key]); if (view === 'look') setView('scene'); setFocus({ key, at: Date.now() }); }} />
+      </div>
     </main>
   </div>;
 }

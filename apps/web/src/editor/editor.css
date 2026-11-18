@@ -88,8 +88,6 @@
 .hint, .start-note { margin: 0; color: var(--e-muted); font-size: .9rem; }
 .editor button.danger { background: var(--e-danger); color: light-dark(#fff, #2a0d12); border-color: var(--e-danger); }
 .editor button.danger-outline { color: var(--e-danger); border-color: var(--e-danger); background: transparent; }
-.general-problems { position: absolute; left: 16px; bottom: 16px; max-width: min(420px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 12px; border: 1px solid var(--e-danger); background: var(--e-panel); }
-.general-problems h2 { margin: 0; font-size: .95rem; color: var(--e-danger); } .general-problems ul { margin: 6px 0 0; padding-left: 18px; }
 @media (max-width: 700px) {
   .flow-hint { display: none; }
   .editor-body.with-inspector { grid-template-columns: minmax(0, 1fr); }
@@ -631,3 +629,46 @@
 .flow-tools { align-items: center; }
 .editor .flow-tools > button, .editor .flow-tools .action-menu-text, .editor .flow-tools .info-tip.with-text .info-tip-button { display: inline-flex; align-items: center; gap: 8px; height: 44px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-weight: 600; font-size: 1rem; }
 .crumb-builtin { display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--e-accent-soft); color: var(--e-text); font-weight: 600; }
+/* Problems: a small button at the bottom left of every editor, opening into a list grouped by scene. */
+.problems-panel, .history-panel { display: grid; gap: 8px; justify-items: start; max-width: min(400px, calc(100vw - 32px)); }
+.editor .problems-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 8px; border-radius: 999px; border: 1px solid var(--e-danger); background: var(--e-panel); color: var(--e-text); font-weight: 700; box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
+.problems-dot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--e-danger); color: var(--e-panel); font-size: .85rem; font-weight: 900; }
+.problems-caret { font-size: .75em; color: var(--e-muted); }
+.problems-list { order: -1; width: 100%; max-height: min(50vh, 460px); overflow: auto; display: grid; gap: 10px; padding: 12px; border-radius: 14px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 12px 36px rgb(0 0 0 / .3); }
+.problems-group h3 { margin: 0 0 4px; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--e-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.problems-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.problems-group li { margin: 0; } .problems-group p { margin: 0; padding: 6px 8px; font-size: .9rem; }
+.editor .problems-group button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; min-height: 0; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--e-text); text-align: left; font-size: .9rem; font-weight: 500; }
+.editor .problems-group button:hover, .editor .problems-group button:focus-visible { background: var(--e-accent-soft); }
+.problems-group button svg { flex: none; color: var(--e-muted); }
+/* The bottom-left corner of every editor: History and Problems side by side; an open list rises above its button. */
+.editor-main { position: relative; }
+.editor-corner { position: absolute; left: 16px; bottom: 16px; z-index: 30; display: flex; align-items: flex-end; gap: 8px; max-width: calc(100% - 32px); pointer-events: none; }
+.editor-corner > * { pointer-events: auto; }
+.history-panel { gap: 8px; justify-items: start; max-width: min(400px, calc(100vw - 32px)); }
+.editor .history-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 10px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 700; box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
+.history-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--e-accent-soft); font-size: .8rem; text-align: center; }
+.history-list { order: -1; width: min(360px, calc(100vw - 32px)); max-height: min(50vh, 460px); overflow: auto; padding: 8px; border-radius: 14px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 12px 36px rgb(0 0 0 / .3); }
+.history-list ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.history-list li { margin: 0; }
+.editor .history-list button { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; min-height: 0; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--e-text); text-align: left; font-size: .9rem; font-weight: 500; }
+.editor .history-list button:hover:not(:disabled), .editor .history-list button:focus-visible { background: var(--e-accent-soft); }
+.editor .history-list button:disabled { opacity: 1; cursor: default; }
+.history-list time { flex: none; font-size: .78rem; color: var(--e-muted); font-variant-numeric: tabular-nums; }
+.history-list .undone button { color: var(--e-muted); font-style: italic; }
+/* "Now" reads like the scene headings in the problems list: small grey capitals, with a thin line to the right. */
+.history-now { display: flex; align-items: center; gap: 8px; margin: 4px 0; padding: 0 8px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--e-muted); }
+.history-now::after { content: ''; flex: 1; height: 1px; background: var(--e-border); }
+.history-empty { margin: 0; padding: 6px 8px; font-size: .9rem; color: var(--e-muted); }
+.editor .action-menu-text.with-icon svg:has(path[d^="M12 3.5L2.5"]) { color: var(--e-danger); }
+.editor .editor-corner > section { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+/* The corner stays quiet over the map: folded buttons see-through with a blur behind them and no shadow (the text keeps
+   full contrast, as an opacity would make it too faint to read); open lists the same, a little more solid. */
+.editor .editor-corner :is(.problems-toggle, .history-toggle) { background: color-mix(in srgb, var(--e-panel) 40%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: none; transition: background .15s; }
+.editor .editor-corner :is(.problems-toggle, .history-toggle):hover, .editor .editor-corner .open > :is(.problems-toggle, .history-toggle) { background: var(--e-panel); }
+.editor .editor-corner .history-toggle { border-color: color-mix(in srgb, var(--e-border) 70%, transparent); }
+.editor .editor-corner :is(.problems-list, .history-list) { background: color-mix(in srgb, var(--e-panel) 65%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 8px 28px rgb(0 0 0 / .22); }
+@media (prefers-reduced-transparency: reduce) { .editor .editor-corner :is(.problems-toggle, .history-toggle, .problems-list, .history-list) { background: var(--e-panel); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+.menu-warning { display: flex; align-items: center; gap: 6px; color: var(--e-danger); font-weight: 700; font-size: .9rem; white-space: nowrap; }
+.editor .history-latest button { color: var(--e-accent); font-weight: 700; }
+.editor .history-latest button > span { display: inline-flex; align-items: center; gap: 6px; }
