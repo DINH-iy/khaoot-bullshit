@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { GameIdSchema, GameErrorCodeSchema, SessionViewSchema } from './game.js';
 import { PlayerLookSchema } from './players.js';
+import { ArcadeLinkSchema } from './arcade.js';
 
 export const ROOM_CODE_LENGTH = 6;
 export const RoomCodeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -18,6 +19,7 @@ export const ClaimRoomSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-
 export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.literal(true).optional() }).strict();
 export const NetworkErrorCodeSchema = z.enum([
   ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'CHIPS_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
+  'LOBBY_LOCKED', 'LOBBY_FULL', 'ARCADE_FULL', 'ROUND_ON', 'NOT_ENOUGH_PLAYERS',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
@@ -32,6 +34,8 @@ export const RoomSnapshotSchema = z.object({
   seatRequests: z.array(z.object({ requestId: GameIdSchema, playerId: GameIdSchema, requestedAt: z.string().datetime() }).strict()),
   // The host went back to the lobby: this room has ended and everyone moves into this one (phones and the shared screen follow by themselves).
   nextRoom: GameIdSchema.nullable(),
+  // An arcade round: its lobby, and whether this phone is the leader who runs the round (absent outside the arcade).
+  arcade: ArcadeLinkSchema.nullable().optional(),
 }).strict();
 // Seat takeover from a new phone. The request ID is created by that phone and
 // kept while it waits; repeating the request checks on it.
@@ -39,7 +43,7 @@ export const ReclaimSeatSchema = z.object({ roomCode: RoomCodeSchema, playerId: 
 export const SeatListSchema = z.object({ approval: z.boolean(), seats: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40) }).strict()) }).strict();
 export const SeatDecisionSchema = z.object({ requestId: GameIdSchema, approve: z.boolean() }).strict();
 /** Emoji and stickers players can send to the shared screen. A reaction is its position in this list. */
-export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤️', '🎉', '🤔', '💀', '🙈', '🍻', 'GG', 'LOL', 'NOOO', 'YES!', 'WOW', 'BOO'] as const;
+export const REACTIONS = ['👍', '😂', '🔥', '😮', '😱', '👏', '❤️', '🎉', '🤔', '💀', '🙈', '🍻', 'GG EZ', 'LOL', 'NOOO', 'YES!', 'WOW', 'BOO', 'GO NEXT', 'TY FOR TUTORIAL'] as const;
 /** Challenges one player may have waiting for an answer at once: the standard, and the most a game or host may allow. */
 export const OPEN_INVITES_DEFAULT = 3; export const MAX_OPEN_INVITES = 10;
 // Host settings for the room; send only what changes.

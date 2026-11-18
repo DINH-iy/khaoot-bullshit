@@ -68,6 +68,8 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
         await lockRoom(tx, room.id);
         const current = await tx.gameSession.findUniqueOrThrow({ where: { id: room.id } });
         roomAssert(current.status !== 'FINISHED' && (config.NODE_ENV !== 'production' || current.mode !== 'REHEARSAL'), 'ROOM_NOT_AVAILABLE');
+        // An arcade round's seats come only from its lobby (which may be locked), never from the room code.
+        roomAssert(await tx.arcadeRound.count({ where: { sessionId: room.id } }) === 0, 'ROOM_NOT_AVAILABLE');
         const joinKeyHash = tokenHash(`${room.id}:${data.joinId}`);
         const existing = await tx.sessionPlayer.findUnique({ where: { joinKeyHash } });
         if (existing) {

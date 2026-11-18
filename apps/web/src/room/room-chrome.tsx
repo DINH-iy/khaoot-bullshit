@@ -12,7 +12,7 @@ type Stage = NonNullable<RoomSnapshot['view']['stage']>;
  * A small button with a panel that opens over the page (not pushing anything down): the
  * room's way of keeping details one tap away. Escape or a tap outside closes it.
  */
-export function Popover({ label, icon, text, className, children, align = 'end' }: { label: string; icon?: IconName; text?: ReactNode; className?: string; children: ReactNode; align?: 'start' | 'end' }) {
+export function Popover({ label, icon, text, className, children, align = 'end', closeOnAction = false }: { label: string; icon?: IconName; text?: ReactNode; className?: string; children: ReactNode; align?: 'start' | 'end'; closeOnAction?: boolean }) {
   const [open, setOpen] = useState(false); const box = useRef<HTMLDivElement>(null); const id = useId();
   useEffect(() => {
     if (!open) return;
@@ -22,7 +22,9 @@ export function Popover({ label, icon, text, className, children, align = 'end' 
   return <div ref={box} className={`popover${className ? ` ${className}` : ''}`} onKeyDown={event => { if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false); } }}>
     <button type="button" className="popover-button" aria-expanded={open} aria-controls={open ? id : undefined} aria-label={text ? undefined : label} title={label} onClick={() => setOpen(!open)}>
       {icon && <FaIcon name={icon} />}{text}</button>
-    {open && <div id={id} className={`popover-panel align-${align}`} role="dialog" aria-label={label}>{children}</div>}
+    {/* `closeOnAction`: a menu of actions closes once one is chosen (a button marked data-keep-open, such as "ask first", keeps it open). */}
+    {open && <div id={id} className={`popover-panel align-${align}`} role="dialog" aria-label={label}
+      onClick={closeOnAction ? event => { const button = (event.target as HTMLElement).closest('button'); if (button && !button.hasAttribute('data-keep-open')) setOpen(false); } : undefined}>{children}</div>}
   </div>;
 }
 
@@ -51,21 +53,23 @@ const KIND_ICON: Partial<Record<Stage['kind'], IconName>> = { minigame: 'stopwat
  * The round in one line: what to do now, your team (a coloured flag), the time; everything
  * else (team rules, how a team decides, sips…) behind the (i).
  */
-export function RoundBar({ state, stage, phase, remaining, timerRef }: { state: RoomSnapshot; stage: Stage; phase: string | null; remaining: number | null; timerRef: RefObject<HTMLDivElement | null> }) {
+export function RoundBar({ state, stage, phase, remaining, timerRef, tools }: { state: RoomSnapshot; stage: Stage; phase: string | null; remaining: number | null; timerRef: RefObject<HTMLDivElement | null>; tools?: ReactNode }) {
   const forming = Boolean(stage.teams?.forming); const teams = stage.teams;
   const mine = state.role === 'player' && teams && !forming ? teams.teams.find(team => team.memberIds.includes(state.selfPlayerId ?? '')) : undefined;
   const t = useText(); const details = roundDetails(stage, t);
   if (mine) { const mates = mine.memberIds.filter(id => id !== state.selfPlayerId); const captain = teams?.answers === 'captain' && mine.captainId ? ` Captain: ${mine.captainId === state.selfPlayerId ? 'you' : state.players.find(player => player.id === mine.captainId)?.displayName ?? 'someone'}.` : '';
     details.unshift(['flag', `You are in ${mine.name}${mates.length ? ` with ${nameList(state, mates)}` : ''}.${captain}`]); }
-  if (!phase && !mine && !details.length && (forming || stage.status !== 'ACTIVE')) return null;
+  if (!phase && !mine && !details.length && !tools && (forming || stage.status !== 'ACTIVE')) return null;
   return <div className="round-info" role="group" aria-label="This round">
     {phase && <p className={`chip phase-pill${forming ? ' teams' : ''}`} role="status">{KIND_ICON[stage.kind] && <FaIcon name={KIND_ICON[stage.kind]!} />}{phase}</p>}
     {mine && <p className="chip team-flag" style={{ '--team': teamColor(mine.name, mine.index) } as React.CSSProperties} title={`Your team: ${mine.name}`}>
       <FaIcon name="flag" /><span className="visually-hidden">Your team: </span>{mine.name}{mine.captainId === state.selfPlayerId && <span className="team-captain" title="You are the captain"><FaIcon name="star" label="captain" /></span>}</p>}
     {stage.input?.kind === 'drawing' && stage.input.blind && <p className="chip chip-warn"><span aria-hidden="true">🙈</span> Blind</p>}
-    {details.length > 0 && <Popover label="About this round" icon="circle-info" className="round-about" align="start">
-      <ul className="round-details">{details.map(([icon, text]) => <li key={text}><FaIcon name={icon} />{text}</li>)}</ul></Popover>}
     {!forming && !stage.explain && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
+    {details.length > 0 && <Popover label="About this round" icon="circle-info" className="round-about" align="end">
+      <ul className="round-details">{details.map(([icon, text]) => <li key={text}><FaIcon name={icon} />{text}</li>)}</ul></Popover>}
+    {/* Extra tools at the right end, after the ⓘ (an arcade round's leader menu). */}
+    {tools}
   </div>;
 }
 

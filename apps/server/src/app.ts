@@ -14,6 +14,9 @@ import { createOwnerAccess } from './hosting/owner-access.js';
 import { registerFeedbackRoutes } from './feedback/routes.js';
 import { registerPeopleRoutes } from './people/routes.js';
 import { registerSideGames } from './side-games/routes.js';
+import { registerArcade } from './arcade/routes.js';
+import { createLobbies } from './arcade/lobbies.js';
+import { createRounds } from './arcade/rounds.js';
 import { registerPrefabRoutes } from './authoring/prefabs.js';
 import { createEditorLive } from './authoring/live.js';
 import { registerAssetRoutes } from './assets/routes.js';
@@ -124,6 +127,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerPeopleRoutes(app, options.database.client, config, owner, live);
     registerPrefabRoutes(app, options.database.client, owner);
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway, rooms.io);
+    if (rooms) { const lobbies = createLobbies(options.database.client); registerArcade(app, options.database.client, config, rooms.gateway, createRounds(options.database.client, config, rooms.service, lobbies), lobbies); }
   }
   if (config.SERVE_WEB) {
     void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: false, index: false, cacheControl: false });

@@ -23,6 +23,7 @@ import { personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 import { clientAddress } from '../http/client-address.js';
 import { decideDueVotes } from '../minigames/steps/engine.js';
+import { arcadeLink } from '../arcade/link.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
   const gateway = createRoomGateway(client, config); const limiter = new RateLimiter();
@@ -56,10 +57,12 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   };
   const seats = createSeatReclaim(client, config, connectedPlayers, (id, playerId) => { io.in(`player:${id}:${playerId}`).disconnectSockets(true); });
   const snapshot = async (principal: Principal) => {
-    const [view, players, session] = await Promise.all([
+    const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
+    const [view, players, session, arcade] = await Promise.all([
       readSessionView(client, principal.actor, principal.sessionId),
       client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true, look: true }, orderBy: { joinedAt: 'asc' } }),
       client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true, state: true } }),
+      arcadeLink(client, principal.sessionId, selfId),
     ]);
     const connected = connectedPlayers(principal.sessionId); const state = readRoomState(session.state);
     // Secret scores: phones and the shared screen get no standings during the game, only at a scoreboard scene and at the end. The host always sees them.
@@ -68,12 +71,11 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const reacted = view.awards?.some(slide => slide.stat === 'mostReactions') ? reactions.most(principal.sessionId) : null;
     const awards = view.awards?.flatMap(slide => slide.stat !== 'mostReactions' ? [slide] : reacted ? [{ ...slide, playerIds: reacted.playerIds, value: `${reacted.count} ${reacted.count === 1 ? 'reaction' : 'reactions'}` }] : []) ?? null;
     const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), awards };
-    const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
       players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
-      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], nextRoom: state.nextRoom });
+      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], nextRoom: state.nextRoom, arcade });
   };
 
   app.post('/api/rooms/join', async (request, reply) => {
@@ -299,5 +301,5 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     if (running.length) app.log.info({ event: 'rooms_recovered', count: running.length }, 'Recovered rooms paused for host review');
   });
   app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); minigames.close(); await publishTask; await closeTask; await io.close(); });
-  return { io, gateway, snapshot };
+  return { io, gateway, snapshot, service };
 }

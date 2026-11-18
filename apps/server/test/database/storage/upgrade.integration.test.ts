@@ -17,7 +17,7 @@ it('upgrades populated initial tables without losing existing game data', async 
   try {
     const directory = new URL('../../../database/migrations/', import.meta.url);
     const migrations = (await readdir(directory, { withFileTypes: true })).filter(item => item.isDirectory()).map(item => item.name).sort();
-    expect(migrations).toHaveLength(16);
+    expect(migrations).toHaveLength(17);
     await pool.query(await readFile(new URL(`${migrations[0]}/migration.sql`, directory), 'utf8'));
     const { rows: creators } = await pool.query('INSERT INTO creators (issuer, subject) VALUES ($1, $2) RETURNING id', ['https://identity.example/', randomUUID()]);
     const { rows: games } = await pool.query('INSERT INTO games ("creatorId", title) VALUES ($1, $2) RETURNING id', [creators[0].id, 'Preserved game']);
@@ -34,6 +34,8 @@ it('upgrades populated initial tables without losing existing game data', async 
     // Prefabs and phone challenges are tables of their own.
     expect((await pool.query("SELECT to_regclass('side_challenges') AS name")).rows).toEqual([{ name: 'side_challenges' }]);
     expect((await pool.query("SELECT to_regclass('scene_prefabs') AS name")).rows).toEqual([{ name: 'scene_prefabs' }]);
+    // The arcade is tables of its own, with one unfinished round per lobby at most.
+    expect((await pool.query("SELECT to_regclass('arcade_rounds_one_open_per_lobby') AS name")).rows).toEqual([{ name: 'arcade_rounds_one_open_per_lobby' }]);
     // Challenge stakes may be bets and payouts without a side-game round; slot and blackjack ones still need their round.
     const rule = (await pool.query("SELECT pg_get_constraintdef(oid) AS rule FROM pg_constraint WHERE conname = 'chips_valid_amount'")).rows[0].rule as string;
     expect(rule).toContain('tictactoe'); expect(rule).toContain('"roundId" IS NOT NULL');

@@ -49,8 +49,8 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
   return {
     /** Seats a new phone may take over: joined, not removed by the host, and with no phone connected right now. */
     async seats(roomCode: string) {
-      const room = await client.gameSession.findUnique({ where: { roomCode }, select: { id: true, status: true, state: true, players: { where: { leftAt: null }, select: { id: true, displayName: true }, orderBy: { joinedAt: 'asc' } } } });
-      roomAssert(room && room.status !== 'FINISHED', 'ROOM_NOT_AVAILABLE');
+      const room = await client.gameSession.findUnique({ where: { roomCode }, select: { id: true, status: true, state: true, arcadeRound: { select: { id: true } }, players: { where: { leftAt: null }, select: { id: true, displayName: true }, orderBy: { joinedAt: 'asc' } } } });
+      roomAssert(room && room.status !== 'FINISHED' && !room.arcadeRound, 'ROOM_NOT_AVAILABLE');
       const online = connected(room.id);
       return { approval: readRoomState(room.state).reclaimApproval, seats: room.players.filter(player => !online.has(player.id)) };
     },
@@ -61,7 +61,9 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
     async request(input: unknown) {
       const parsed = ReclaimSeatSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE'); const { roomCode, playerId, requestId } = parsed.data;
-      const room = await client.gameSession.findUnique({ where: { roomCode }, select: { id: true } }); roomAssert(room, 'ROOM_NOT_AVAILABLE');
+      const room = await client.gameSession.findUnique({ where: { roomCode }, select: { id: true, arcadeRound: { select: { id: true } } } });
+      // An arcade round's seats belong to its lobby's members: no taking them over by room code.
+      roomAssert(room && !room.arcadeRound, 'ROOM_NOT_AVAILABLE');
       const sessionId = room.id; const token = joinToken(config.ROOM_TOKEN_SECRET, sessionId, `reclaim:${requestId}`);
       const outcome = await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);

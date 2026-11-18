@@ -158,6 +158,7 @@ model GameSession {
   auditEvents AuditEvent[]
   outbox      OutboxEvent[]
   roomCredentials RoomCredential[]
+  arcadeRound     ArcadeRound?
 
   @@index([hostId, status])
   @@index([gameVersionId])
@@ -189,6 +190,7 @@ model SessionPlayer {
   items       CollectedItem[]
   challengesMade     SideChallenge[] @relation("ChallengeChallenger")
   challengesReceived SideChallenge[] @relation("ChallengeOpponent")
+  arcadeSeat         ArcadeSeat?
 
   @@unique([sessionId, id])
   // A person has at most one seat per room: joining again continues it.
@@ -546,6 +548,8 @@ model Person {
   chips   ChipEntry[]
   rounds  SideRound[]
   items   CollectedItem[]
+  arcadeMembers ArcadeMember[]
+  arcadeResults ArcadeResult[]
 
   @@map("people")
 }
@@ -681,4 +685,113 @@ model SideChallenge {
 
   @@index([sessionId, status])
   @@map("side_challenges")
+}
+
+// Arcade: lobbies any player opens to play minigames together, outside a game.
+// The lobby and its members last across rounds; each round is an ordinary room
+// (game session) with one minigame scene, hosted by the arcade's own creator,
+// into which the lobby's members are seated. The leader (a member) runs the round.
+// A lobby nobody has been seen in for 15 minutes is closed.
+model ArcadeLobby {
+  id           String    @id @db.Uuid
+  title        String    @db.VarChar(60)
+  // Locked: nobody new may join; members can still come back.
+  locked       Boolean   @default(false)
+  leaderId     String?   @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  // The last time any member was seen; the lobby closes after 15 quiet minutes.
+  lastActiveAt DateTime  @default(now()) @db.Timestamptz(3)
+  closedAt     DateTime? @db.Timestamptz(3)
+
+  members ArcadeMember[]
+  rounds  ArcadeRound[]
+
+  @@index([closedAt, lastActiveAt])
+  @@map("arcade_lobbies")
+}
+
+model ArcadeMember {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lobbyId     String    @db.Uuid
+  // SHA-256 of the member key in this browser's HttpOnly cookie.
+  tokenHash   String    @unique @db.Char(64)
+  displayName String    @db.VarChar(40)
+  // The person (account) this member is; null for guests.
+  personId    String?   @db.Uuid
+  look        Json?     @db.JsonB
+  joinedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
+  leftAt      DateTime? @db.Timestamptz(3)
+
+  lobby   ArcadeLobby    @relation(fields: [lobbyId], references: [id], onDelete: Restrict)
+  person  Person?        @relation(fields: [personId], references: [id], onDelete: Restrict)
+  seats   ArcadeSeat[]
+  results ArcadeResult[]
+
+  // A person is one member of a lobby: joining again continues it.
+  @@unique([lobbyId, personId])
+  @@index([lobbyId, joinedAt])
+  @@map("arcade_members")
+}
+
+model ArcadeRound {
+  id        String    @id @db.Uuid
+  lobbyId   String    @db.Uuid
+  sessionId String    @unique @db.Uuid
+  number    Int
+  game      String    @db.VarChar(20)
+  // Null for everyone on their own; otherwise the number of teams.
+  teams     Int?
+  startedAt DateTime  @default(now()) @db.Timestamptz(3)
+  // Set once the round's results are recorded (or it was abandoned).
+  endedAt   DateTime? @db.Timestamptz(3)
+
+  lobby   ArcadeLobby    @relation(fields: [lobbyId], references: [id], onDelete: Restrict)
+  session GameSession    @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  seats   ArcadeSeat[]
+  results ArcadeResult[]
+
+  @@unique([lobbyId, number])
+  @@index([lobbyId, endedAt])
+  @@map("arcade_rounds")
+}
+
+// Which member plays in which seat of a round's room.
+model ArcadeSeat {
+  roundId  String @db.Uuid
+  memberId String @db.Uuid
+  playerId String @unique @db.Uuid
+
+  round  ArcadeRound   @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  member ArcadeMember  @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  player SessionPlayer @relation(fields: [playerId], references: [id], onDelete: Restrict)
+
+  @@id([roundId, memberId])
+  @@map("arcade_seats")
+}
+
+// A member's result in one round: the lobby's running total and the all-time
+// leaderboards (people only) are sums and bests over these rows.
+model ArcadeResult {
+  roundId     String   @db.Uuid
+  memberId    String   @db.Uuid
+  personId    String?  @db.Uuid
+  game        String   @db.VarChar(20)
+  // 1 for a win (own place, or the team's); null when unranked or no result.
+  place       Int?
+  pointsMilli BigInt
+  // The measured result (ms, taps…), null for none or a false start.
+  value       Int?
+  // Lower is better; only for ranked results played alone (the leaderboards' "best").
+  bestKey     Int?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  round  ArcadeRound  @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  member ArcadeMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  person Person?      @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@id([roundId, memberId])
+  @@index([personId, game])
+  @@index([game, bestKey])
+  @@map("arcade_results")
 }

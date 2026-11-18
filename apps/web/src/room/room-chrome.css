@@ -16,11 +16,18 @@
 .room .round-info .phase-pill { background: var(--r-accent); color: var(--r-accent-ink); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: .8rem; letter-spacing: .05em; padding: 6px 12px; }
 .round-info .team-flag { background: color-mix(in srgb, var(--team) 30%, var(--r-card)); border: 2px solid var(--team); white-space: nowrap; }
 .round-info .team-flag > .fa-icon { color: var(--team); filter: brightness(1.3); }
+/* A round that has closed has no clock: no empty pill. */
+.round-info .chip-timer:empty { display: none; }
 .team-captain { display: inline-flex; color: var(--r-accent); }
-/* The (i) panel spans the bar (it opens under it, never off the side of a phone). */
-.room .round-about { position: static; }
-.round-about .popover-panel { left: 16px; right: auto; top: calc(100% + 4px); max-width: min(440px, calc(100vw - 32px)); }
-.round-about .popover-button { min-width: 34px; min-height: 34px; padding: 0; font-size: 1.05rem; }
+/* The (i) sits at the right end of the bar; its panel opens under the bar, never off the side of a phone. */
+.room .round-about { position: static; margin-left: auto; }
+.round-about .popover-panel { right: 16px; left: auto; top: calc(100% + 4px); max-width: min(440px, calc(100vw - 32px)); }
+.round-about .popover-button, .round-tools .popover-button { min-width: 34px; min-height: 34px; padding: 0; font-size: 1.05rem; }
+/* A tools menu after the ⓘ: also at the right end, its panel opening under the bar. */
+.room .round-tools { position: static; margin-left: auto; }
+.room .round-about + .round-tools { margin-left: 0; }
+.round-tools .popover-panel { right: 16px; left: auto; top: calc(100% + 4px); }
+.round-tools .popover-panel button { display: inline-flex; gap: 10px; align-items: center; justify-content: flex-start; width: 100%; }
 .round-details { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .round-details li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; } .round-details .fa-icon { margin-top: 3px; color: var(--r-accent); }
 

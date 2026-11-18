@@ -27,6 +27,7 @@ import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js
 import { useMe, type Person } from '../people/use-me.js';
 import { wasOwner } from '../owner/owner-session.js';
 import { KeySignIn } from '../people/key-sign-in.js';
+import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 import { answerFit } from './answer-fit.js';
@@ -71,6 +72,8 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
             {problems.name && <p id="join-name-problem" className="field-problem" role="alert">{problems.name}</p>}</>}
         <button className="primary big" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
+      {/* The arcade: minigames with friends, no host or game needed. */}
+      <p className="join-links"><a href="/?arcade">Arcade: play minigames with friends</a></p>
       {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
       <details className="join-more">
         <summary>More options</summary>
@@ -92,6 +95,8 @@ export function RoomScreen() {
   const [draft, setDraft] = useState(emptyDraft(null)); const [editingLook, setEditingLook] = useState(false); const [displayUrl, setDisplayUrl] = useState(''); const [timerSeconds, setTimerSeconds] = useState('30'); const [reclaiming, setReclaiming] = useState(false);
   const room = useRoom(ready ? sessionId : undefined, initial.searchParams.get('display') === '1'); const state = room.snapshot;
   const account = useMe();
+  // An arcade round: keeps this phone in its lobby and goes back there when the round ends.
+  useArcadeRound(state);
   useEffect(() => {
     if (!access || !sessionId) return; let mounted = true;
     void roomApi(`/api/rooms/${sessionId}/claim`, { token: access }).then(() => { if (mounted) setReady(true); }).catch(() => { if (mounted) setError('Host/display access could not be verified. Open a fresh access link.'); }).finally(() => { if (mounted) setBusy(false); });
@@ -225,7 +230,7 @@ export function RoomScreen() {
           <div><dt>p95 · last {room.samples.length} samples</dt><dd>{p95 === undefined ? 'Measuring…' : `${Math.round(p95)} ms`}</dd></div><div><dt>Reconnects</dt><dd>{room.reconnects}</dd></div><div><dt>Last saved action</dt><dd>{room.confirmMs === null ? '—' : `${room.confirmMs} ms`}</dd></div></dl>
         <p>Round trip includes the connection and the server’s access check.</p></details>} />
     </header>
-    {stage && state && <RoundBar state={state} stage={stage} phase={phase} remaining={remaining} timerRef={timerRef} />}
+    {stage && state && <RoundBar state={state} stage={stage} phase={phase} remaining={remaining} timerRef={timerRef} tools={state.arcade?.leader && role === 'player' && state.view.status !== 'FINISHED' ? <ArcadeLeaderMenu state={state} disabled={disabled} /> : undefined} />}
     {/* Messages float over the page instead of pushing it down. An action still being sent only shows the spinner above;
         the retry choice appears once it is really stuck (sending stopped without a confirmation). */}
     <div className="room-toasts">
@@ -238,7 +243,8 @@ export function RoomScreen() {
 
     {state && <div className="room-grid">
       <div className="room-main">
-        {state.view.status === 'LOBBY' && <section className="lobby" aria-labelledby="lobby-heading">
+        {state.arcade && role === 'player' && <ArcadeLeaderNext state={state} disabled={disabled} />}
+        {state.view.status === 'LOBBY' && !state.arcade && <section className="lobby" aria-labelledby="lobby-heading">
           {role === 'player' ? <><h2 id="lobby-heading">{t('lobby.playerTitle')}</h2><p>{t('lobby.playerText')}</p>
             {me && <div className="my-look"><Avatar look={me.look} size={96} /><button className="ghost" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button></div>}</>
             : <><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2><div className="lobby-join"><JoinQr origin={location.origin} roomCode={state.roomCode} copy={role !== 'display'} />

@@ -12,6 +12,7 @@ export * from './people.js';
 export * from './side-games.js';
 export * from './prefabs.js';
 export * from './head-to-head.js';
+export * from './arcade.js';
 
 export const ProblemSchema = z.object({
   error: z.object({

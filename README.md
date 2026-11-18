@@ -107,6 +107,23 @@ Players play on their own phone while waiting: in the lobby, between rounds, aft
 - Side games are **on** in a new room and chips are **off**, so everyone can play the slot machine, blackjack, packs and challenges just for fun (no bets, free packs, no leaderboard). Chips are an extra: with them on, players bet chips, stake them in challenges and get the leaderboard. A game can change both (editor → Game settings → *Side games & chips*, or `"sideGames": false` / `"chips": true` in an imported game), and the host can switch both at any time with the *Side games* and *Chips* switches in the host panel, in the lobby and during the game. Rooms opened before this change keep both on.
 - What pays and the chances are shown in each game. The slot machine pays back about 94 of every 100 chips bet, blackjack pays 3 to 2 for a blackjack (dealer stands on 17, doubling on the first two cards, no splitting), packs never pay chips back. The server draws every card, reel and pack.
 
+### 5. Arcade: minigames with friends, without a host or a game
+
+Anyone can play the minigames together outside a game: **Arcade: play minigames with friends** on the start page (or `/?arcade`).
+
+1. Type your name (a phone signed in with a personal key plays as that person) and **Open a lobby**. You are its *leader*.
+2. Invite people with the lobby's link or QR code (**Invite players**), or they find the lobby under **Open lobbies** on the arcade page and tap **Join**.
+3. The lobby is open by default. The leader taps **Open: lock** to lock it: nobody new can join, but players who were in it can always come back. **Locked: unlock** opens it again.
+4. The leader picks the next round from three dropdowns: the minigame, *Everyone alone* or *In N teams* (2 to 6, never more than there are players), and for teams *At random* or *By the players*. Drive the bus and Pass the pencil are team-only. **Play** sends every phone in the lobby into the round by itself.
+5. There is no host: the leader runs the round while playing along. The leader's phone shows one big button only when the round waits for them (start with these teams, start once everyone tapped *Got it!*, show the results, back to the lobby). The rest is in the **☰ Leader tools** menu next to the ⓘ in the round bar: shuffle random teams, end now and count the results, and stop the round (it asks first).
+6. Back in the lobby everyone sees the last round's results and the **total in this lobby** (points, wins, rounds played).
+
+- The arcade page also shows the all-time **leaderboards**: most wins, and the best result per minigame (played alone). Only people with a personal key are on them; guests count in their lobby's total only.
+- If the leader leaves or is gone for 45 seconds, the player who joined first among those still there becomes leader. Someone who arrives during a round plays in the next one.
+- A lobby that nobody has been in for 15 minutes closes by itself (a round still open there ends without results).
+- Limits: 40 open lobbies, 24 players a lobby, 10 new lobbies a minute per address.
+- Like hosting, the arcade only runs in the test version, never in production (until sign-in exists). Each round is an ordinary room hosted by the arcade, which nobody can join with its room code or take a seat in: only the lobby's members are seated. Code: `apps/server/src/arcade/` and `apps/web/src/arcade/`.
+
 ## Authentication boundary
 
 Creator sign-in provider selection is deferred. There is **no development login bypass**, password store, sign-in screen, or token-issuing endpoint.
@@ -178,7 +195,7 @@ npm run db:test           # migration and integration checks
 npm run db:test:stop
 ```
 
-Use Prisma **7.10.1** commands, not the current Prisma 8 prerelease workflow. There are sixteen migrations; the latest six add feedback reports, people with side-game chips, personal keys with editor rights, scene prefabs, challenges between players, and chip stakes for those challenges (before it, accepting a challenge with a stake failed). Uploaded files are stored in `.local/media` (or `MEDIA_DIR`), not in the database. `npm run db:migrate:create -- --name describe_change` generates SQL for review; `npm run db:migrate:dev` applies it to a guarded local development database. `npm run db:generate` is also run by root build/test/typecheck commands. No database is reset or migrated automatically by the web server.
+Use Prisma **7.10.1** commands, not the current Prisma 8 prerelease workflow. There are seventeen migrations; the latest seven add feedback reports, people with side-game chips, personal keys with editor rights, scene prefabs, challenges between players, chip stakes for those challenges (before it, accepting a challenge with a stake failed), and the arcade (lobbies, members, rounds, seats and results, with at most one unfinished round per lobby). Uploaded files are stored in `.local/media` (or `MEDIA_DIR`), not in the database. `npm run db:migrate:create -- --name describe_change` generates SQL for review; `npm run db:migrate:dev` applies it to a guarded local development database. `npm run db:generate` is also run by root build/test/typecheck commands. No database is reset or migrated automatically by the web server.
 
 ## Credits
 

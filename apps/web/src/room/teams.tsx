@@ -47,7 +47,7 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
   return <div role="region" aria-label="Team forming" className="team-forming">
     <div className="team-forming-head">
       <h3>{teams.scope === 'game' ? 'Teams for the game' : 'Teams for this round'}</h3>
-      <p>{host ? (picked ? `Now tap the team for ${nameOf(state, picked)}${captains && pickedTeam ? ', or make them captain' : ''}.` : 'Tap a player, then their team (or drag them). Then start the round.') : how[teams.formation]}
+      <p>{host ? (picked ? `Now tap the team for ${nameOf(state, picked)}${captains && pickedTeam ? ', or make them captain' : ''}.` : 'Tap a player, then their team (or drag them). Then start the round.') : state.arcade && teams.formation === 'random' ? 'Teams were drawn at random. The leader can shuffle them.' : how[teams.formation]}
         {' '}{captains ? 'Each team’s captain answers for the team.' : 'Everyone answers.'} {pointsText[teams.points]}</p>
     </div>
     <ul className="team-columns">{teams.teams.map(team => {
