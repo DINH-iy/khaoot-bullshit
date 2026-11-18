@@ -150,3 +150,57 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .admin-page button.person-link-button { display: inline-flex; align-items: center; min-height: 0; padding: 2px 10px; border-radius: 999px; border: 1px solid light-dark(#cfc7e6, #4a4466); background: light-dark(#f1edfb, #2c2840); color: inherit; font: inherit; font-weight: 700; text-decoration: none; }
 .person-stats dd small { display: block; font-size: .8rem; font-weight: 500; color: light-dark(#5f5873, #b3acc8); }
 .person-stats dd:has(small) { white-space: normal; }
+
+/* Chips & packs */
+.packs-admin { display: grid; gap: 14px; max-width: 62rem; }
+.packs-admin .admin-intro { margin: 0; }
+.packs-saved { margin: 0; display: inline-flex; gap: 6px; align-items: center; color: light-dark(#17663e, #8be0b4); font-weight: 600; }
+.packs-admin .person-card { gap: 12px; padding: 16px 18px; }
+.packs-admin input:not([type=checkbox]), .packs-admin select { box-sizing: border-box; width: 100%; min-width: 0; height: 42px; min-height: 42px; padding: 0 12px; margin: 0; border-radius: 10px; font: inherit; font-size: .95rem; }
+.packs-admin button { display: inline-flex; gap: 6px; align-items: center; justify-content: center; min-height: 42px; }
+.packs-admin button.icon-only { width: 42px; height: 42px; padding: 0; border-radius: 10px; flex: none; }
+/* Fields: label on one line above, then the field; every field the same height, so rows line up. */
+.packs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 12px; align-items: end; }
+.packs-field { display: grid; gap: 4px; font-size: .82rem; font-weight: 600; min-width: 0; }
+.packs-field > span { height: 18px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.packs-field input { font-variant-numeric: tabular-nums; }
+.packs-economy-save { display: flex; gap: 8px; justify-content: flex-end; grid-column: -2 / -1; }
+.packs-sets-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 6px; }
+.packs-sets-head h2 { margin: 0; font-size: 1.2rem; }
+/* A set: one slim row with its quick buttons. */
+.packs-admin .packs-set { padding: 8px 10px 8px 16px; gap: 0; }
+.packs-set-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.packs-admin .packs-set-title { flex: 1; min-width: 0; justify-content: flex-start; gap: 12px; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.packs-set-title strong { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.packs-set-title small { opacity: .7; white-space: nowrap; }
+.packs-set-quick { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.packs-set-quick > span { font-size: .85rem; }
+.packs-set-body { display: grid; gap: 12px; padding: 12px 6px 8px 0; border-top: 1px solid light-dark(#e3def2, #3a3550); margin-top: 8px; }
+.packs-set-settings { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.packs-set-settings > * { grid-column: span 3; }
+.packs-set-settings > .packs-name { grid-column: span 5; } .packs-set-settings > :nth-child(3) { grid-column: span 4; }
+.packs-set-save { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.packs-total { margin: 0 auto 0 0; font-weight: 700; font-size: .85rem; color: light-dark(#17663e, #8be0b4); }
+.packs-total.bad { color: light-dark(#9d1717, #ffb4b4); }
+.packs-warning { margin: 0; font-size: .85rem; }
+/* Items: one row each, all fields the same height. */
+.packs-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.packs-item { display: grid; grid-template-columns: 3rem minmax(8rem, 1fr) 8rem minmax(10rem, 2fr) 90px; gap: 6px; align-items: center; padding: 5px 6px 5px 8px; border-radius: 10px; border-left: 4px solid #9a93ad; background: light-dark(#f7f5fc, #25222f); }
+.packs-item.rarity-rare { border-left-color: #3d8bff; } .packs-item.rarity-epic { border-left-color: #a64dff; } .packs-item.rarity-legendary { border-left-color: #f0a500; }
+.packs-item.new { border-left-style: dashed; }
+.packs-admin .packs-emoji { text-align: center; font-size: 1.25rem; padding: 0; }
+.packs-item-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
+.packs-admin .packs-item button.danger { border-color: transparent; }
+.packs-admin .packs-item button.danger:hover, .packs-admin .packs-item button.danger:focus-visible { border-color: currentColor; }
+@media (max-width: 720px) {
+  .packs-set-row { flex-wrap: wrap; }
+  .packs-set-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); } .packs-set-settings > *, .packs-set-settings > :nth-child(3) { grid-column: auto; } .packs-set-settings > .packs-name { grid-column: 1 / -1; }
+  .packs-economy-save { grid-column: 1 / -1; }
+  .packs-item { grid-template-columns: 3rem minmax(0, 1fr) 90px; }
+  .packs-item select, .packs-item input:nth-of-type(3) { grid-column: 1 / -1; }
+  .packs-item-actions { grid-column: 3; grid-row: 1; }
+}
+.packs-admin button.icon-only:not(.danger):not(.primary) { background: transparent; color: inherit; border: 1px solid light-dark(#cfc8e3, #4a4560); }
+.packs-badge { flex: none; padding: 2px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: light-dark(#eeeaf7, #2c2840); color: light-dark(#5f5873, #b3acc8); }
+.packs-badge.on { background: light-dark(#d8f5e6, #1d4a34); color: light-dark(#17663e, #8be0b4); }
+.packs-admin button.icon-only.packs-sale.on { background: light-dark(#1f8a55, #2fa86b); border-color: transparent; color: #fff; }
