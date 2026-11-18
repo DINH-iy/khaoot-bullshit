@@ -25,7 +25,7 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
       // The room update that follows carries the saved value; until then the chosen value stays visible.
       .finally(() => { setBusy(false); setTimeout(() => setPending(previous => { const { [setting]: _done, ...rest } = previous; return rest; }), 1500); });
   };
-  return <fieldset className="room-settings"><legend>Room settings</legend>
+  return <fieldset className="room-settings"><legend>During the game</legend>
     {(Object.keys(LABELS) as Setting[]).map(setting => <label key={setting} className="choice"><input type="checkbox" checked={shown[setting]}
       onChange={event => change(setting, event.target.checked)} />{LABELS[setting]}</label>)}
     {shown.autoClose && <label className="inline-setting">Seconds to wait after the last answer

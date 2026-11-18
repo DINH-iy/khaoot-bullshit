@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
-import { RoomCodeSchema } from '@party/contracts';
+import { formatRoomCode, RoomCodeSchema } from '@party/contracts';
+import { FaIcon } from '../presentation/icons.js';
 
 export function publicJoinUrl(origin: string, code: string): string {
   const parsed = new URL(origin);
@@ -27,13 +28,28 @@ export function useQr(url: string) {
   }, [url]);
 }
 
-export function JoinQr({ origin, roomCode, copy = true }: { origin: string; roomCode: string; copy?: boolean }) {
+/** A small icon button that copies a text; a tick shows for a moment (a cross when the browser refuses). */
+export function CopyIcon({ text, label, icon = 'copy' }: { text: string; label: string; icon?: 'copy' | 'link' }) {
+  const [copied, setCopied] = useState<'yes' | 'no' | null>(null);
+  useEffect(() => { if (!copied) return; const timer = setTimeout(() => setCopied(null), 1600); return () => clearTimeout(timer); }, [copied]);
+  return <button type="button" className={`icon-button copy-icon${copied === 'yes' ? ' copied' : ''}`} title={label} aria-label={copied === 'yes' ? 'Copied' : copied === 'no' ? 'Could not copy' : label}
+    onClick={() => { navigator.clipboard.writeText(text).then(() => setCopied('yes'), () => setCopied('no')); }}><FaIcon name={copied === 'yes' ? 'check' : copied === 'no' ? 'xmark' : icon} /></button>;
+}
+
+/** The join link as a QR code, and (with `link`) the address under it with a copy button. */
+export function JoinQr({ origin, roomCode, copy = true, link = true }: { origin: string; roomCode: string; copy?: boolean; link?: boolean }) {
   const url = publicJoinUrl(origin, roomCode);
   const image = useQr(url);
-  return <div className="join-qr"><h3>Scan to join</h3>
-    {image ? <img src={image.src} width={image.pixels} height={image.pixels} alt={`Scan to join room ${roomCode}`} /> : <p>QR unavailable. Use the room code or link below.</p>}
-    <p>Room code: <strong>{roomCode}</strong></p><a href={url}>{url}</a>
-    {/* Handy for sending the room to someone in a chat; the shared screen has nobody to copy for. */}
-    {copy && <div className="copy-row"><CopyButton text={roomCode} label="Copy code" /><CopyButton text={url} label="Copy link" /></div>}
+  return <div className="join-qr">
+    {image ? <img src={image.src} width={image.pixels} height={image.pixels} alt={`Scan to join room ${roomCode}`} /> : <p>QR unavailable. Use the room code or link.</p>}
+    {link && <JoinLink url={url} copy={copy} />}
   </div>;
+}
+/** The join address, short, with a copy button (handy for a chat; the shared screen has nobody to copy for). */
+export function JoinLink({ url, copy }: { url: string; copy: boolean }) {
+  return <p className="join-link"><a href={url}>{url.replace(/^https?:\/\//, '')}</a>{copy && <CopyIcon text={url} label="Copy link" />}</p>;
+}
+/** The room code in big letters, with a copy button for the host. */
+export function BigCode({ roomCode, copy }: { roomCode: string; copy: boolean }) {
+  return <p className="big-code-row"><span className="big-code" aria-label={`Room code ${roomCode}`}>{formatRoomCode(roomCode)}</span>{copy && <CopyIcon text={roomCode} label="Copy room code" />}</p>;
 }

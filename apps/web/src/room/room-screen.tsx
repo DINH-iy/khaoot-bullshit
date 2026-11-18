@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
-import { JoinQr } from './join-qr.js';
+import { BigCode, CopyIcon, JoinLink, JoinQr, publicJoinUrl } from './join-qr.js';
 import { useRemaining } from './stage-timer.js';
-import { ConnectionMenu, FloatingScores, Popover, RoundBar } from './room-chrome.js';
+import { ConnectionMenu, FloatingScores, HostDialog, Popover, RoundBar } from './room-chrome.js';
 import { FaIcon } from '../presentation/icons.js';
 import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
 import { JudgePanel, leaderLine, Scoreboard, StageResults } from './results.js';
 import { VoteBallot } from './vote.js';
 import { SeatApprovalSetting, SeatReclaim, SeatRequests } from './seat-reclaim.js';
+import { ExpectedPeople, NameRequests, NewKeyCard, PickYourName, SignupSetting } from './room-people.js';
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
 import { ExplainPanel } from './explain-panel.js';
@@ -38,10 +39,12 @@ const access = new URLSearchParams(initial.hash.slice(1)).get('access');
 if (access) history.replaceState(null, '', `${initial.pathname}${initial.search}`);
 
 /** Joining from a phone: room code and name, plus seat takeover and a way to host instead. */
-function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title, person, linked, onForget, onSignIn }: {
+function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title, person, linked, onForget, onSignIn, signup, makeAccount, setMakeAccount, expected, onPicked }: {
   roomCode: string; setRoomCode: (value: string) => void; name: string; setName: (value: string) => void; busy: boolean; error: string; onJoin: () => void; onReclaim: () => void;
   style: React.CSSProperties; className: string; title: string | null;
   person: Person | null | undefined; linked: { name: string | null } | null; onForget: () => void; onSignIn: (key: string) => Promise<void>;
+  // People in the room: whether a guest may make an account here, and the people the host added (pick your name).
+  signup: boolean; makeAccount: boolean; setMakeAccount: (value: boolean) => void; expected: { id: string; name: string }[]; onPicked: (name: string) => void;
 }) {
   const t = useText(); const [ownerBrowser] = useState(wasOwner);
   // Our own messages under the field, instead of the browser's small "fill in this field" bubble.
@@ -69,9 +72,12 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
         {person ? <div className="person-badge"><span>Playing as <strong>{person.name}</strong></span><button type="button" className="link-button" onClick={onForget}>Not {person.name}?</button></div>
           : <><label>{t('join.name')}<input ref={nameRef} autoComplete="nickname" enterKeyHint="go" value={name} maxLength={40} aria-invalid={problems.name ? true : undefined} aria-describedby={problems.name ? 'join-name-problem' : undefined}
             onChange={event => { setName(event.target.value); setProblems(({ name: _name, ...rest }) => rest); }} /></label>
-            {problems.name && <p id="join-name-problem" className="field-problem" role="alert">{problems.name}</p>}</>}
+            {problems.name && <p id="join-name-problem" className="field-problem" role="alert">{problems.name}</p>}
+            {signup && <label className="choice make-account"><input type="checkbox" checked={makeAccount} onChange={event => setMakeAccount(event.target.checked)} />
+              <span>Make me an account <small>next time you are you again (look, chips and stats), with a personal code</small></span></label>}</>}
         <button className="primary big" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
+      {person === null && roomCode.length === ROOM_CODE_LENGTH && <PickYourName roomCode={roomCode} people={expected} onSignedIn={onPicked} />}
       {/* The arcade: minigames with friends, no host or game needed. */}
       <p className="join-links"><a href="/?arcade">Arcade: play minigames with friends</a></p>
       {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
@@ -123,17 +129,23 @@ export function RoomScreen() {
     void roomApi<{ sessionId: string }>(`/api/host/rooms/${sessionId}/restart`, { sessionId: newId(), commandId: newId() }).then(result => moveTo(result.sessionId))
       .catch(() => setError('Could not go back to the lobby. Try again.'));
   };
-  const join = async () => {
+  // People in the room: make an account while joining (when allowed), then the new personal code is shown once before going in.
+  const [makeAccount, setMakeAccount] = useState(false); const [newKey, setNewKey] = useState<{ name: string; key: string } | null>(null);
+  const join = async (displayName?: string) => {
     setBusy(true); setError('');
     try {
+      if (makeAccount && !account.person && !displayName) {
+        const made = await roomApi<{ name: string; key: string }>('/api/rooms/signup', { roomCode, name });
+        await account.refresh(); setMakeAccount(false); setNewKey(made); return;
+      }
       const key = `party_join_${roomCode.trim().toUpperCase()}`; let joinId: string | null = null;
       try { joinId = localStorage.getItem(key); } catch { /* Online join can still work. */ }
       if (!joinId) { joinId = newId(); try { localStorage.setItem(key, joinId); } catch { /* optional recovery */ } }
       const look = savedLook();
       // A person joins under their own name (the server decides), with the look they had last time unless this phone has its own.
-      const result = await roomApi<{ sessionId: string }>('/api/rooms/join', { roomCode, displayName: account.person?.name ?? name, joinId, ...(look ? { look } : {}) });
-      history.replaceState(null, '', `/?room=${result.sessionId}`); setReady(true); setSessionId(result.sessionId);
-    } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error ? cause.message : 'Joining failed. Please retry.'); } finally { setBusy(false); }
+      const result = await roomApi<{ sessionId: string }>('/api/rooms/join', { roomCode, displayName: displayName ?? account.person?.name ?? name, joinId, ...(look ? { look } : {}) });
+      history.replaceState(null, '', `/?room=${result.sessionId}`); setReady(true); setSessionId(result.sessionId); setNewKey(null);
+    } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error && cause.message === 'NAME_TAKEN' ? 'Someone already has that name. Pick another, or tap your name under “Played with us before?”.' : cause instanceof Error ? cause.message : 'Joining failed. Please retry.'); } finally { setBusy(false); }
   };
   const command = (type: string, extra: Record<string, unknown> = {}) => {
     if (!state) return; const base = { formatVersion: 1, commandId: newId(), sessionId: state.view.sessionId, type };
@@ -151,12 +163,14 @@ export function RoomScreen() {
     if (value) command('submission.submit', { stageRunId: stage.id, value });
   }, [timeUp]);
   // The game's look: from the room once joined, or (on the join screen) the look of the room whose code was entered.
-  const [joinLook, setJoinLook] = useState<{ title: string; presentation: LookInput } | null>(null);
+  const [joinLook, setJoinLook] = useState<{ title: string; presentation: LookInput; signup?: boolean; expected?: { id: string; name: string }[] } | null>(null);
   useEffect(() => {
     if (sessionId) return; const code = roomCode.trim().toUpperCase(); if (!/^[A-Z2-9]{6}$/.test(code)) { setJoinLook(null); return; }
     let mounted = true;
-    void roomApi(`/api/rooms/look/${code}`).then(data => { if (mounted) setJoinLook(RoomLookSchema.parse(data) as { title: string; presentation: LookInput }); }).catch(() => { if (mounted) setJoinLook(null); });
-    return () => { mounted = false; };
+    const fetchLook = () => { void roomApi(`/api/rooms/look/${code}`).then(data => { if (mounted) setJoinLook(RoomLookSchema.parse(data) as { title: string; presentation: LookInput; signup?: boolean; expected?: { id: string; name: string }[] }); }).catch(() => { if (mounted) setJoinLook(null); }); };
+    // Looked at again now and then: the host may add people (or allow accounts) while someone waits on this screen.
+    fetchLook(); const again = setInterval(fetchLook, 10_000);
+    return () => { mounted = false; clearInterval(again); };
   }, [roomCode, sessionId]);
   const look = useBuiltLook(state?.view.presentation ?? joinLook?.presentation); const t = look.text;
   const lookStyle = themeStyle(look.theme); const lookClass = themeClass(look.theme);
@@ -172,8 +186,10 @@ export function RoomScreen() {
   useMoment(playersRef, 'lobbyJoin', state?.view.status === 'LOBBY' && state.players.length ? state.players.length : null, {}, look);
 
   if (!sessionId && reclaiming) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">Join a game</h1><div className="join-card"><SeatReclaim roomCode={roomCode.trim().toUpperCase()} onCancel={() => setReclaiming(false)} onJoined={id => { history.replaceState(null, '', `/?room=${id}`); setReady(true); setSessionId(id); }} /></div></main>;
+  if (!sessionId && newKey) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">Your personal code</h1><div className="join-card"><NewKeyCard name={newKey.name} personalKey={newKey.key} busy={busy} onContinue={() => { void join(newKey.name); }} />{error && <p role="alert" className="join-error">{error}</p>}</div></main>;
   if (!sessionId) return <LookContext.Provider value={look}><JoinScreen style={lookStyle} className={lookClass} title={joinLook?.title ?? null} roomCode={roomCode} setRoomCode={setRoomCode} name={name} setName={setName} busy={busy} error={error} onJoin={() => { void join(); }} onReclaim={() => { setError(''); setReclaiming(true); }}
-    person={account.person} linked={account.linked} onForget={() => { void account.forget().catch(() => setError('Could not sign this phone out. Try again.')); }} onSignIn={account.signIn} /></LookContext.Provider>;
+    person={account.person} linked={account.linked} onForget={() => { void account.forget().catch(() => setError('Could not sign this phone out. Try again.')); }} onSignIn={account.signIn}
+    signup={Boolean(joinLook?.signup)} makeAccount={makeAccount} setMakeAccount={setMakeAccount} expected={joinLook?.expected ?? []} onPicked={picked => { void account.refresh().then(() => join(picked)); }} /></LookContext.Provider>;
 
   const sorted = [...room.samples].sort((a, b) => a - b); const p95 = sorted[Math.max(0, Math.ceil(sorted.length * .95) - 1)];
   const seconds = Number(timerSeconds); const validSeconds = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600;
@@ -225,7 +241,7 @@ export function RoomScreen() {
       <div className="room-id"><p className="brand">party<span>.</span></p>
         <div><p className="room-game">{state?.view.title ?? 'Connecting…'}{state ? ` · ${t(state.view.status === 'LOBBY' ? 'status.waiting' : state.view.status === 'PAUSED' ? 'status.paused' : state.view.status === 'FINISHED' ? 'status.finished' : 'status.playing')}` : ''}</p>
           {state && <h2 id="room-heading" className="room-code">Room {state.roomCode}</h2>}</div></div>
-      <ConnectionMenu status={room.connection} ok={connected} busy={busy} saving={room.saving} onReconnect={room.reconnect} details={<details className="conn-details"><summary>Details</summary>
+      <ConnectionMenu status={room.connection} ok={connected} slow={slowConnection(room.samples)} busy={busy} saving={room.saving} onReconnect={room.reconnect} details={<details className="conn-details"><summary>Details</summary>
         <dl className="metrics"><div><dt>Latest round trip</dt><dd>{room.samples.length ? `${Math.round(room.samples.at(-1)!)} ms` : 'Measuring…'}</dd></div>
           <div><dt>p95 · last {room.samples.length} samples</dt><dd>{p95 === undefined ? 'Measuring…' : `${Math.round(p95)} ms`}</dd></div><div><dt>Reconnects</dt><dd>{room.reconnects}</dd></div><div><dt>Last saved action</dt><dd>{room.confirmMs === null ? '—' : `${room.confirmMs} ms`}</dd></div></dl>
         <p>Round trip includes the connection and the server’s access check.</p></details>} />
@@ -247,9 +263,19 @@ export function RoomScreen() {
         {state.view.status === 'LOBBY' && !state.arcade && <section className="lobby" aria-labelledby="lobby-heading">
           {role === 'player' ? <><h2 id="lobby-heading">{t('lobby.playerTitle')}</h2><p>{t('lobby.playerText')}</p>
             {me && <div className="my-look"><Avatar look={me.look} size={96} /><button className="ghost" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button></div>}</>
-            : <><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2><div className="lobby-join"><JoinQr origin={location.origin} roomCode={state.roomCode} copy={role !== 'display'} />
-              <div><p>{t('lobby.screenGo', { host: location.host })}</p><p className="big-code" aria-label={`Room code ${state.roomCode}`}>{formatRoomCode(state.roomCode)}</p></div></div>
-              {state.players.length > 0 && <ul className="lobby-crowd" aria-label="Players who joined">{state.players.map(player => <li key={player.id}><Avatar look={player.look} size={72} /><span>{player.displayName}</span></li>)}</ul>}</>}
+            : <>{/* Like a party game's lobby: how to join across the top, then a stage of seats that fill up as people join. */}
+              <div className="lobby-band">
+                <div className="lobby-band-text"><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2><p className="lobby-go">{t('lobby.screenGo', { host: location.host })}</p><BigCode roomCode={state.roomCode} copy={role !== 'display'} /></div>
+                <JoinQr origin={location.origin} roomCode={state.roomCode} link={false} />
+                {role !== 'display' && <div className="lobby-band-link"><CopyIcon text={publicJoinUrl(location.origin, state.roomCode)} label="Copy join link" icon="link" /></div>}
+              </div>
+              <div className="lobby-stage">
+                <p className="lobby-count" aria-label={`${state.players.length} ${state.players.length === 1 ? 'player' : 'players'} joined`}><FaIcon name="users" /> {state.players.length}</p>
+                <ul ref={playersRef} className="lobby-seats" aria-label="Players who joined">
+                  {state.players.map(player => <li key={player.id} className="seat taken"><Avatar look={player.look} size={88} /><span>{player.displayName}</span></li>)}
+                  {Array.from({ length: emptySeats(state.players.length) }, (_, index) => <li key={`empty-${index}`} className="seat empty" aria-hidden="true"><span className="seat-ring"><FaIcon name="user-plus" /></span></li>)}
+                </ul>
+              </div></>}
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}`} aria-labelledby="stage-heading">
           {stage.info && <p className="stage-banner">{stage.info.title}</p>}
@@ -314,25 +340,36 @@ export function RoomScreen() {
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>Reopen without time limit</button></Popover>}
         </div>
         <SeatRequests state={state} sessionId={state.view.sessionId} onError={setError} />
+        <NameRequests state={state} sessionId={state.view.sessionId} onError={setError} />
         {/* Everything less frequent behind four icons; one sheet at a time, under the icons. */}
         <div className="host-tabs" role="group" aria-label="More">
           {([['settings', 'gear', 'Room settings'], ['invite', 'tv', 'Shared screen & invite'], ['players', 'users', `Players (${state.players.length})`], ['lobby', 'arrow-rotate-left', 'Back to lobby']] as const).map(([key, icon, label]) =>
             (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">Players </span><span className="tool-count">{state.players.length}</span></>}</button>)}
         </div>
-        {sheet === 'settings' && <div className="host-sheet" role="region" aria-label="Room settings">
-          <SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
-          <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} />
-          <SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} />
-          <p className="control-back"><a href="/?host=1">Back to the host menu</a></p></div>}
-        {sheet === 'invite' && <div className="host-sheet" role="region" aria-label="Shared screen & invite">
-          <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>
-          {displayUrl && <p><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a> on the TV or a second screen.</p>}
-          {state.view.status !== 'LOBBY' && <JoinQr origin={location.origin} roomCode={state.roomCode} />}</div>}
-        {(sheet === 'players' || state.view.status === 'LOBBY') && <section className="host-sheet players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
-          {me && state.view.status !== 'LOBBY' && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
+        {sheet === 'settings' && <HostDialog title="Room settings" icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
+          <div className="settings-col"><h3>Phones while waiting</h3><SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
+            <h3>Joining</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} />
+            <p className="control-back"><a href="/?host=1">Back to the host menu</a></p></div>
+          <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} /></div></HostDialog>}
+        {sheet === 'invite' && <HostDialog title="Shared screen & invite" icon="tv" size="compact" onClose={() => setSheet(null)}>
+          <div className="invite-join"><JoinQr origin={location.origin} roomCode={state.roomCode} link={false} />
+            <div className="invite-code"><h3>Invite players</h3><BigCode roomCode={state.roomCode} copy /><JoinLink url={publicJoinUrl(location.origin, state.roomCode)} copy /></div></div>
+          <div className="invite-display"><FaIcon name="tv" /><p><strong>Shared screen</strong> Questions and scores on a TV or second screen.</p>
+            {displayUrl ? <span className="invite-display-open"><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a><CopyIcon text={displayUrl} label="Copy display link" icon="link" /></span>
+              : <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>}</div>
+        </HostDialog>}
+        {state.view.status === 'LOBBY' && <section className="host-sheet players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
+
+          <ul>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}<span className="visually-hidden"> · </span><span className="player-state">{player.connected ? 'connected' : 'disconnected'}</span>
+            {player.look.picture && <button className="small-button ghost" aria-label={`Remove the picture of ${player.displayName}`} onClick={() => command('player.removePicture', { playerId: player.id })}>Remove picture</button>}
+            <button className="icon-button player-revoke" aria-label={`Revoke access for ${player.displayName}`} title={`Kick ${player.displayName} out`} onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError('Could not revoke access.')); }}><FaIcon name="boot" /></button></li>)}</ul>
+          <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section>}
+        {sheet === 'players' && state.view.status !== 'LOBBY' && <HostDialog title={t('players.title', { count: state.players.length })} icon="users" onClose={() => setSheet(null)}><section className="host-sheet players in-dialog" aria-label="Players">
+          {me && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
           <ul ref={playersRef}>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}<span className="visually-hidden"> · </span><span className="player-state">{player.connected ? 'connected' : 'disconnected'}</span>
             {player.look.picture && <button className="small-button ghost" aria-label={`Remove the picture of ${player.displayName}`} onClick={() => command('player.removePicture', { playerId: player.id })}>Remove picture</button>}
-            <button className="small-button ghost player-revoke" aria-label={`Revoke access for ${player.displayName}`} title="Revoke access" onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError('Could not revoke access.')); }}><FaIcon name="xmark" /></button></li>)}</ul></section>}
+            <button className="icon-button player-revoke" aria-label={`Revoke access for ${player.displayName}`} title={`Kick ${player.displayName} out`} onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError('Could not revoke access.')); }}><FaIcon name="boot" /></button></li>)}</ul>
+          <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section></HostDialog>}
         {sheet === 'lobby' && <div className="host-sheet reset-confirm" role="group" aria-label="Back to lobby">
           <p>Start the game again in a new lobby? Everyone comes along (the room gets a new code); the scores of this game stay in its history.</p>
           <div className="actions"><button className="danger" onClick={backToLobby}>Yes, back to lobby</button><button className="ghost" onClick={() => setSheet(null)}>Cancel</button></div></div>}
@@ -365,6 +402,12 @@ function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>
   return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} style={answerFit(entries.map(entry => entry.label))} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
     {entries.map((entry, index) => { const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route); return <li key={entry.key}>{mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}{entry.label}</li>; })}</ol>;
 }
+
+/** Slow: the last three round trips took more than 400 ms on average (the connection dot turns orange). */
+const slowConnection = (samples: number[]) => { const recent = samples.slice(-3); return recent.length > 0 && recent.reduce((sum, ms) => sum + ms, 0) / recent.length > 400; };
+
+/** Empty seats on the lobby stage, so it reads as "waiting for more": at least 8 seats, then always a few more than joined. */
+const emptySeats = (joined: number) => Math.max(8 - joined, joined < 24 ? 4 - (joined % 4) : 0);
 
 /** The quick time button's text: “30 s”, “1 min”, “1:30”. */
 function quickTime(seconds: number) { return seconds < 60 ? `${seconds} s` : seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }

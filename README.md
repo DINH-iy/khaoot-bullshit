@@ -82,7 +82,12 @@ What a report keeps: the page address without the part after `#` (so never a key
 4. From then on that phone joins every room as Dinny: the name is filled in, the character comes back, and the chips carry over between games. Joining the same room from a second phone of the same person continues the same seat. A new phone signs in with the same key.
 5. On a phone, **Not Dinny?** on the join screen signs that phone out.
 
-In the People list: **Editor** (tick or untick editor rights; takes effect at once), **Show key** (when someone forgot it), **New key** (the old key and link stop working; phones already signed in stay signed in), **Rename**, **Sign out phones** (all of that person's phones become guests), **Remove** (signs out, stops the key, frees the name; past games and chips stay in the history). The list shows phones, last seen, games played, chips and how much they bet in total. People made before keys existed show no key until you make a new one; their old links keep working.
+The People list shows what matters at a glance (a search box, the **Editor** switch, phones, last seen on a 24-hour clock, **Show key**) with a few totals on top. A name opens that person's own page: their stats (games, wins, top 3, points, right and wrong answers, minigames, challenges per game and their main rival, arcade, side games, chips, favourite and last game, each with their rank), **Can edit games**, **Show key** / **New key** (the old key and link stop working; phones already signed in stay signed in) / **Sign out phones** (all of that person's phones become guests), **Rename** and **Remove** (signs out, stops the key, frees the name; past games and chips stay in the history). The **Leaderboard** tab ranks everyone: titles with the top three each (Champion, Brainiac, Confidently wrong, Sharpshooter, Never misses a party, Arcade king, Duel master, High roller) and a table that sorts by any column. Stats count finished real games only (never practice rooms); answers given as a team in team rounds count for nobody yet. People made before keys existed show no key until you make a new one; their old links keep working.
+
+Without a key at hand, in a room:
+
+- **Players can make an account when joining** (Room settings, off by default): the join screen then offers *Make me an account*; the phone becomes that new person and shows their personal key once, to write down (you can look it up in People).
+- **People you added** (the host's Players sheet → *Add people…*): tick people who played before. Their key shows next to their name (to tell them in person) with whether they are in the room. On the join screen they see *Played with us before?* with those names; tapping one asks you (*A phone says it is Anouk: Yes / No*), and once you say yes that phone is signed in as them for good. Only the phone that asked gets it, once. The list and the setting carry over to *Back to lobby*.
 
 Editors: a person with **Can edit games** gets an **Edit games** link on the start page once signed in (or opens `/?host=1`). They can make, import, change, publish, rehearse (practice rooms) and remove games, and edit together with you live. They cannot open real rooms, see your open rooms, or use the admin menu. Unticking the rights, signing their phones out or removing them stops it at once, including an editor they have open. Editing uses the same owner access as hosting, so it only works where the owner link works (never in production).
 
@@ -92,7 +97,7 @@ Good to know:
 - The server checks keys by their hash. So you can look a key up, it is also stored encrypted with a key derived from `ROOM_TOKEN_SECRET`: a copy of the database alone does not reveal keys, but the database together with `.env` does. Changing `ROOM_TOKEN_SECRET` makes existing keys unviewable (they still work; make new ones to see them).
 - Typing keys is limited to 20 tries a minute per address (behind a Cloudflare tunnel, set `TRUST_CLOUDFLARE_LOCAL=true` so that is per visitor).
 - A phone's sign-in belongs to one address. On a new address (such as a new temporary test link) people sign in again with their key.
-- Players without a personal key still join as guests by typing a name.
+- Players without a personal key still join as guests by typing a name (or make an account, or pick their name, as above).
 
 ### 4. Side games on the phones
 

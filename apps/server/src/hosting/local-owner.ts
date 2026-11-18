@@ -14,6 +14,7 @@ import { joinToken, newToken, roomAssert, roomCookie, tokenHash } from '../rooms
 import { OWNER_COOKIE, type OwnerAccess } from './owner-access.js';
 import { readRoomState } from '../rooms/reclaim.js';
 import { linkNextRoom } from '../rooms/restart.js';
+import { closeRoom } from '../rooms/close.js';
 import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
 
 // Local owner hosting: the person running this server opens a private link and
@@ -109,6 +110,20 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
         await tx.roomCredential.create({ data: { sessionId: id.data, role: 'HOST', source: 'LOCAL_REHEARSAL', tokenHash: tokenHash(token), expiresAt } });
       });
       reply.header('set-cookie', roomCookie(config, id.data, token, expiresAt));
+      return { ok: true, data: { sessionId: id.data } };
+    } catch (error) { return fail(reply, error); }
+  });
+
+  // Close a room from the host menu: it ends like a finished game (its history stays) and leaves "Your open rooms".
+  // Closing a room that already ended is fine, so a repeated click does no harm.
+  app.post('/api/host/rooms/:sessionId/close', async (request, reply) => {
+    try {
+      requireOwner(request);
+      const id = GameIdSchema.safeParse((request.params as { sessionId?: string }).sessionId); roomAssert(id.success, 'INVALID_COMMAND');
+      const creator = await ownerCreator();
+      const session = await client.gameSession.findUnique({ where: { id: id.data }, select: { hostId: true, roomCode: true } });
+      roomAssert(session && session.hostId === creator.id && session.roomCode, 'ROOM_NOT_AVAILABLE');
+      await client.$transaction(tx => closeRoom(tx, id.data));
       return { ok: true, data: { sessionId: id.data } };
     } catch (error) { return fail(reply, error); }
   });

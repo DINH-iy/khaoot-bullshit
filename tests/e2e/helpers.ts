@@ -10,7 +10,15 @@ export async function openPhoneMenu(page: Page): Promise<Locator> {
 /** Opens a sheet of the host panel by its icon (Room settings, Shared screen & invite, Players, Back to lobby); leaves it open if it already is. */
 export async function openHostFold(host: Page, name: string) {
   const tab = host.getByRole('group', { name: 'More' }).getByRole('button', { name });
-  if (await tab.getAttribute('aria-expanded') !== 'true') await tab.click();
+  if (await tab.getAttribute('aria-expanded') === 'true') return;
+  // Room settings, Shared screen & invite and (during the game) Players are popups over the screen: one at a time.
+  await closeHostFold(host);
+  await tab.click();
+}
+/** Closes the host's popup (room settings, invite, players), if one is open, so the rest of the screen can be used again. */
+export async function closeHostFold(host: Page) {
+  const dialog = host.locator('.host-dialog');
+  if (await dialog.count()) { await host.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); }
 }
 /** Opens one of the host's round tools that keep their choices in a small panel (Set the time, Reopen answers). */
 export async function openHostTool(host: Page, name: string) {
@@ -30,6 +38,7 @@ export async function closeRoundsByHand(host: Page) {
   await setting.uncheck(); await expect(setting).not.toBeChecked();
   // Saved on the server too (the room update confirms it).
   await host.waitForTimeout(400);
+  await closeHostFold(host);
 }
 /** Phones keep the scoreboard behind the bottom bar: open it, check what it lists, close it again. */
 export async function expectPhoneScores(page: Page, expected: string[] | string) {

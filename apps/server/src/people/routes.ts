@@ -1,16 +1,15 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimPersonSchema, GameIdSchema, MeSchema, NewPersonSchema, PeopleListSchema, PersonEditorSchema, PersonKeyViewSchema, PlayerLookSchema, RenamePersonSchema } from '@party/contracts';
+import { ClaimPersonSchema, GameIdSchema, MeSchema, NewPersonSchema, PeopleListSchema, PeopleStatsSchema, PersonEditorSchema, PersonKeyViewSchema, PlayerLookSchema, RenamePersonSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
-import { Prisma } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
 import type { EditorLive } from '../authoring/live.js';
 import { allowedOrigin, newToken, RateLimiter, RoomError, roomAssert, tokenHash } from '../rooms/security.js';
 import { clearPersonCookie, personCookie, personFromCookie } from './identity.js';
-import { newPersonKey, openPersonKey, personKeyHash, sealPersonKey } from './keys.js';
+import { openPersonKey, personKeyHash } from './keys.js';
+import { peopleStats } from './stats.js';
+import { addDevice, createPerson, keyFields, nameKey, nameTaken as taken } from './accounts.js';
 
-const nameKey = (name: string) => name.trim().toLowerCase();
-const taken = (error: unknown) => error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
 export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess, live?: EditorLive) {
   const limiter = new RateLimiter(2048);
@@ -27,8 +26,7 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
       const hash = personKeyHash(parsed.data.token); roomAssert(hash, 'UNAUTHORIZED');
       const person = await client.person.findUnique({ where: { linkHash: hash } });
       roomAssert(person && !person.removedAt, 'UNAUTHORIZED');
-      const token = newToken();
-      await client.personDevice.create({ data: { personId: person.id, tokenHash: tokenHash(token) } });
+      const token = await addDevice(client, person.id);
       reply.header('set-cookie', personCookie(config, token));
       app.log.info({ event: 'person_device_added' }, 'Phone signed in as a person');
       return { ok: true, data: { name: person.name } };
@@ -57,7 +55,6 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
   // The owner makes and manages people in the admin menu. Editors never get here.
   const idParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { id?: string }).id); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   /** A key and its two stored forms: the hash to check it by, and the sealed copy the owner can open. */
-  const keyFields = (roomSecret: string) => { const key = newPersonKey(); return { key, data: { linkHash: tokenHash(key), keySealed: sealPersonKey(roomSecret, key) } }; };
   const activePerson = async (id: string) => roomAssert(await client.person.count({ where: { id, removedAt: null } }) === 1, 'NOT_FOUND');
   app.get('/api/host/people', async (request, reply) => {
     try {
@@ -77,13 +74,19 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
       })) }) };
     } catch (error) { return owner.fail(reply, error); }
   });
+  // Totals per person over every real game (stats.ts), for the People page and its leaderboard.
+  app.get('/api/host/people/stats', async (request, reply) => {
+    try {
+      owner.requireOwner(request);
+      const people = await client.person.findMany({ where: { removedAt: null }, select: { id: true }, take: 500 });
+      return { ok: true, data: PeopleStatsSchema.parse({ stats: await peopleStats(client, people.map(person => person.id)) }) };
+    } catch (error) { return owner.fail(reply, error); }
+  });
   app.post('/api/host/people', async (request, reply) => {
     try {
       const { roomSecret } = owner.requireOwner(request);
       const parsed = NewPersonSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
-      const { key, data } = keyFields(roomSecret);
-      const person = await client.person.create({ data: { name: parsed.data.name, nameKey: nameKey(parsed.data.name), canEdit: parsed.data.canEdit, ...data } })
-        .catch(error => { throw taken(error) ? new RoomError('NAME_TAKEN') : error; });
+      const { person, key } = await createPerson(client, roomSecret, parsed.data.name, parsed.data.canEdit);
       app.log.info({ event: 'person_added', canEdit: person.canEdit }, 'Person added');
       return { ok: true, data: PersonKeyViewSchema.parse({ id: person.id, name: person.name, key }) };
     } catch (error) { return owner.fail(reply, error); }

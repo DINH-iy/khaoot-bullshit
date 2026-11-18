@@ -22,6 +22,9 @@ const paths: Record<string, string> = {
   duel: 'M4 4l9 9 M20 4l-9 9 M7 14l3 3 M17 14l-3 3 M5 16l-2 2 2 2 2-2 M19 16l2 2-2 2-2-2',
   // A menu of more actions: three lines.
   menu: 'M4 7h16 M4 12h16 M4 17h16',
+  // Copy: two overlapping sheets; Copied: a tick.
+  copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
+  check: 'M5 12l5 5L20 7',
   // Prefabs: two stacked cards.
   prefab: 'M8 8h12v12H8z M4 16V4h12',
   // Help: a question mark in a circle.

@@ -1,11 +1,11 @@
 /* Host menu: a wider page with a hero, game cards and a detail panel. */
 main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
-.host-hero { display: grid; gap: 6px; padding: 28px 32px; border-radius: 24px; color: #fff;
+.host-hero { display: grid; gap: 4px; padding: 18px 24px; border-radius: 20px; color: #fff;
   background: radial-gradient(circle at 85% 20%, rgb(255 207 74 / .35), transparent 40%), linear-gradient(135deg, #2a1d5c, #6d3fd6 55%, #c2185b); }
-.host-hero h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 3.4rem); }
+.host-hero h1 { margin: 0; font-size: clamp(1.6rem, 3.5vw, 2.2rem); }
 .host-hero p { margin: 0; max-width: 46rem; line-height: 1.5; }
-.host-hero .brand { font-weight: 900; font-size: 1.4rem; } .host-hero .brand span { color: #ffcf4a; }
-.host-hero .eyebrow { opacity: .85; text-transform: uppercase; letter-spacing: .12em; font-size: .8rem; font-weight: 700; }
+.host-hero .brand { font-weight: 900; font-size: 1.1rem; } .host-hero .brand span { color: #ffcf4a; }
+.host-hero .eyebrow { color: inherit; opacity: .85; text-transform: uppercase; letter-spacing: .12em; font-size: .8rem; font-weight: 700; }
 .host-games h2 { margin-top: 0; }
 
 .game-picker { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.25fr); gap: 20px; align-items: start; }
@@ -37,7 +37,7 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .feature-chips li { display: inline-flex; gap: 6px; align-items: center; margin: 0; padding: 6px 12px; border-radius: 999px; background: light-dark(#f1edfb, #2c2840); font-size: .9rem; font-weight: 600; }
 .game-detail button.big { width: 100%; min-height: 56px; font-size: 1.15rem; font-weight: 800; border-radius: 14px; background: #ffcf4a; color: #2a1d00; border: 0; }
 
-@media (max-width: 820px) { .game-picker { grid-template-columns: 1fr; } .game-detail { position: static; order: -1; } main.host-page { padding: 12px 16px 40px; } .host-hero { padding: 22px; } }
+@media (max-width: 820px) { .game-picker { grid-template-columns: 1fr; } .game-detail { position: static; order: -1; } main.host-page { padding: 12px 16px 40px; } .host-hero { padding: 16px 18px; } }
 .host-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 
 /* Your games: one card per game (name and two badges, then its actions), and a compact "New game" row. */
@@ -76,3 +76,29 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .new-game select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid light-dark(#767676, #999); background: light-dark(#fff, #171717); color: inherit; font: inherit; }
 .new-game button { min-height: 44px; }
 @media (max-width: 700px) { .new-game { grid-template-columns: 1fr; } .my-game-actions .quiet-danger, .my-game-confirm { margin-left: 0; } }
+
+/* Your open rooms: one row per room, its name and badges on the left, the button on the right (no list bullets or indent). */
+.open-rooms { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.open-room { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0; padding: 14px 18px; border-radius: 16px;
+  border: 1px solid light-dark(#e3def2, #3a3550); border-left: 5px solid light-dark(#bfb3e8, #5b5280); background: light-dark(#fff, #1e1c28); }
+.open-room.status-running { border-left-color: #1f9d55; } .open-room.status-paused, .open-room.status-recovering { border-left-color: #f0a400; }
+.open-room-info { display: grid; gap: 6px; min-width: 0; }
+.open-room h3 { margin: 0; font-size: 1.1rem; overflow-wrap: anywhere; }
+.open-room button.primary { min-height: 44px; padding: 8px 18px; border-radius: 10px; font-weight: 700; background: #6d3fd6; border-color: #6d3fd6; color: #fff; }
+.open-room button.primary:hover:not(:disabled) { background: #5b31bf; }
+@media (max-width: 520px) { .open-room-actions { width: 100%; } .open-room button.primary { flex: 1; } }
+.open-room-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.open-room-ask { font-weight: 600; }
+.open-room button.danger, .open-room button.keep { min-height: 44px; padding: 8px 16px; border-radius: 10px; font-weight: 700; }
+/* Red, with a white bin: closing a room ends the game for everyone in it. */
+.open-room button.danger { display: inline-grid; place-items: center; background: light-dark(#b42318, #d92d20); border: 1px solid transparent; color: #fff; }
+.open-room button.danger.icon-only { width: 44px; padding: 0; }
+.open-room button.danger:hover:not(:disabled) { background: light-dark(#912018, #b42318); }
+.open-room button.keep { background: transparent; color: inherit; border: 1px solid light-dark(#cfc7e6, #4a4466); }
+/* The name, then the code and a small copy button on the same line. */
+.open-room-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.room-code-copy { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+.open-room .room-code { font: 700 1rem/1 ui-monospace, monospace; letter-spacing: .08em; padding: 4px 8px; border-radius: 8px; background: light-dark(#f1edfb, #2c2840); }
+.open-room button.copy-code { display: inline-grid; place-items: center; width: 32px; height: 32px; min-height: 0; margin-left: 0; padding: 0; border-radius: 8px; border: 0; background: transparent; color: light-dark(#5f5873, #b3acc8); }
+.open-room button.copy-code:hover { background: light-dark(#f1edfb, #2c2840); color: inherit; }
+.open-room button.copy-code.copied { color: #1f9d55; }

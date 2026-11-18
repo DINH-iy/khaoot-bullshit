@@ -34,5 +34,7 @@ export function useMe() {
     setLinked({ name: result.name });
     setPerson(MeSchema.parse(await roomApi('/api/people/me')).person);
   }, []);
-  return { person, linked, forget, signIn };
+  /** Asks the server again who this phone is (after it was signed in another way: a new account, an approved name). */
+  const refresh = useCallback(async () => { const me = MeSchema.parse(await roomApi('/api/people/me')).person; setPerson(me); return me; }, []);
+  return { person, linked, forget, signIn, refresh };
 }

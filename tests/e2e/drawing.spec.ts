@@ -42,10 +42,10 @@ test('players draw blind and vote, draw the roundest circle, and pass the pencil
   // No need to tap Use this drawing: unless the host wants confirmation, Done uses the drawing.
   await builder.getByRole('button', { name: 'Done' }).click();
   await expect(builder).toHaveCount(0);
-  await expect(host.locator('.lobby-crowd .avatar-picture')).toHaveCount(1);
-  await expect(host.locator('.lobby-crowd .avatar-picture path')).not.toHaveCount(0);
+  await expect(host.locator('.lobby-seats .avatar-picture')).toHaveCount(1);
+  await expect(host.locator('.lobby-seats .avatar-picture path')).not.toHaveCount(0);
   await host.getByRole('button', { name: 'Remove the picture of Ada' }).click();
-  await expect(host.locator('.lobby-crowd .avatar-picture')).toHaveCount(0);
+  await expect(host.locator('.lobby-seats .avatar-picture')).toHaveCount(0);
 
   // Blind drawing: the strokes stay hidden until sent.
   await host.getByRole('button', { name: 'Start the game' }).click();

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { HostMenuSchema, type HostMenu } from '@party/contracts';
+import { formatRoomCode, HostMenuSchema, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { MyGames } from './my-games.js';
 import { ImportGame } from './import-game.js';
 import { GamePicker } from './game-picker.js';
 import { OwnerNav } from '../owner/owner-nav.js';
+import { Icon } from '../editor/controls/icons.js';
 import { rememberOwner, SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import './host-menu.css';
 
@@ -18,7 +19,16 @@ const problems: Record<string, string> = {
   AUTH_UNAVAILABLE: 'Hosting from the browser is not set up on this server yet.',
   RATE_LIMITED: 'Too many attempts. Wait a minute and try again.',
 };
+const ROOM_STATUS: Record<HostMenu['rooms'][number]['status'], string> = { LOBBY: 'In the lobby', RUNNING: 'Playing', PAUSED: 'Paused', RECOVERING: 'Reconnecting', FINISHED: 'Finished' };
 const explain = (cause: unknown) => problems[cause instanceof Error ? cause.message : ''] ?? 'The server could not be reached. Check that it is running and try again.';
+
+/** Copies a room code (without the dash, as players type it); a tick shows for a moment once copied. */
+function CopyCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { if (!copied) return; const timer = setTimeout(() => setCopied(false), 1600); return () => clearTimeout(timer); }, [copied]);
+  return <button type="button" className={`copy-code${copied ? ' copied' : ''}`} aria-label={copied ? 'Room code copied' : `Copy room code ${code}`} title={copied ? 'Copied' : 'Copy the room code'}
+    onClick={() => { void navigator.clipboard.writeText(code).then(() => setCopied(true), () => setCopied(false)); }}><Icon name={copied ? 'check' : 'copy'} size={16} /></button>;
+}
 
 export function HostMenu() {
   const [menu, setMenu] = useState<HostMenu>(); const [error, setError] = useState(''); const [busy, setBusy] = useState(true);
@@ -51,6 +61,12 @@ export function HostMenu() {
     setBusy(true); setError('');
     work.then(result => location.assign(`/?room=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
   };
+  // Closing a room asks first (the game ends for everyone in it); afterwards the list is loaded again.
+  const [closing, setClosing] = useState<string | null>(null);
+  const closeRoom = (sessionId: string) => {
+    setBusy(true); setError('');
+    roomApi(`/api/host/rooms/${sessionId}/close`, {}).then(() => { setClosing(null); reload(); }).catch(cause => setError(explain(cause))).finally(() => setBusy(false));
+  };
   // Editors (people with editor rights) work on the games only: no hosting, no open rooms, no admin.
   const owner = menu?.role === 'owner';
   return <><OwnerNav current={hash === '#my-games' || (menu && !owner) ? 'editor' : 'host'} role={menu?.role ?? null} /><main className="host-page">
@@ -62,16 +78,23 @@ export function HostMenu() {
     {error && <p role="alert" className="error">{error}</p>}
     {busy && !menu && <p role="status">Loading your games…</p>}
     {menu && <>
+      {menu.rooms.length > 0 && <section aria-labelledby="rooms-heading"><div className="my-games-head"><h2 id="rooms-heading">Your open rooms</h2><span className="my-games-count">{menu.rooms.length}</span></div>
+        <ul className="open-rooms">{menu.rooms.map(room => <li key={room.sessionId} className={`open-room status-${room.status.toLowerCase()}`}>
+          <div className="open-room-info"><div className="open-room-title"><h3>{room.title}</h3><span className="room-code-copy"><span className="room-code" aria-label={`Room code ${room.roomCode}`}>{formatRoomCode(room.roomCode)}</span><CopyCode code={room.roomCode} /></span></div>
+            <p className="game-badges"><span className={`badge${room.status === 'RUNNING' ? ' good' : room.status === 'PAUSED' || room.status === 'RECOVERING' ? ' warn' : ''}`}>{ROOM_STATUS[room.status]}</span><span className="badge">{room.playerCount} {room.playerCount === 1 ? 'player' : 'players'}</span></p></div>
+          {closing === room.sessionId
+            ? <span className="open-room-actions" role="group" aria-label={`Close room ${room.roomCode}?`}><span className="open-room-ask">Close this room? The game ends for everyone in it.</span>
+              <button type="button" className="keep" onClick={() => setClosing(null)}>Keep it</button>
+              <button type="button" className="danger" disabled={busy} aria-label={`Yes, close room ${room.roomCode}`} onClick={() => closeRoom(room.sessionId)}>Yes, close</button></span>
+            : <span className="open-room-actions"><button className="primary" disabled={busy} aria-label={`Return to room ${room.roomCode}`} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>Return to room</button>
+              <button type="button" className="danger icon-only" disabled={busy} aria-label={`Close room ${room.roomCode}`} title="Close this room" onClick={() => setClosing(room.sessionId)}><Icon name="trash" size={20} /></button></span>}</li>)}</ul>
+      </section>}
       {owner && <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">Choose a game</h2>
         <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))} />
         <p className="hint">These are the built-in games. Make your own under Your games, or import one from text.</p>
       </section>}
       <MyGames menu={menu} reload={reload} openRoom={owner ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
       <ImportGame />
-      {menu.rooms.length > 0 && <section aria-labelledby="rooms-heading"><h2 id="rooms-heading">Your open rooms</h2>
-        <ul>{menu.rooms.map(room => <li key={room.sessionId}>{room.title} · room {room.roomCode} · {room.status.toLowerCase()} · {room.playerCount} {room.playerCount === 1 ? 'player' : 'players'}
-          <button className="small-button" disabled={busy} aria-label={`Return to room ${room.roomCode}`} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>Return to room</button></li>)}</ul>
-      </section>}
     </>}
     <p className="host-links"><a href="/">Join a game as a player instead</a>{owner && <><a href="/?admin">Admin: feedback from testers</a><a href="/?admin=people">Admin: people (accounts)</a></>}</p>
   </main></>;

@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
+import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenVerifier } from '../auth/auth.js';
@@ -14,12 +14,13 @@ import { closeExpiredStages } from '../game/timing.js';
 import { parseDefinition } from '../game/definition.js';
 import { createRoomGateway, lockRoom, type Principal } from './gateway.js';
 import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js';
+import { createRoomPeople } from './room-people.js';
 import { followRoom } from './restart.js';
 import { createLiveSignals } from '../minigames/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
 import { registerReactions } from './reactions.js';
 import { breakVotesNeeded, createBreaks } from './breaks.js';
-import { personFromCookie } from '../people/identity.js';
+import { personCookie, personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 import { clientAddress } from '../http/client-address.js';
 import { decideDueVotes } from '../minigames/steps/engine.js';
@@ -55,6 +56,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     }
     return connected;
   };
+  const people = createRoomPeople(client, config);
   const seats = createSeatReclaim(client, config, connectedPlayers, (id, playerId) => { io.in(`player:${id}:${playerId}`).disconnectSockets(true); });
   const snapshot = async (principal: Principal) => {
     const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
@@ -71,11 +73,13 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const reacted = view.awards?.some(slide => slide.stat === 'mostReactions') ? reactions.most(principal.sessionId) : null;
     const awards = view.awards?.flatMap(slide => slide.stat !== 'mostReactions' ? [slide] : reacted ? [{ ...slide, playerIds: reacted.playerIds, value: `${reacted.count} ${reacted.count === 1 ? 'reaction' : 'reactions'}` }] : []) ?? null;
     const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), awards };
+    // The host also sees the people added to the room and the phones asking to sign in as one of them.
+    const roomPeople = principal.role === 'host' ? await people.hostView(principal.sessionId, state) : { expected: [], nameRequests: [] };
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, signup: state.signup },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
-      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], nextRoom: state.nextRoom, arcade });
+      seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], ...roomPeople, nextRoom: state.nextRoom, arcade });
   };
 
   app.post('/api/rooms/join', async (request, reply) => {
@@ -91,11 +95,12 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     try {
       requireOrigin(request); roomAssert(limiter.allow(`look:${request.ip}`, 120), 'RATE_LIMITED');
       const code = RoomCodeSchema.safeParse((request.params as { roomCode?: string }).roomCode); roomAssert(code.success, 'INVALID_COMMAND');
-      const room = await client.gameSession.findUnique({ where: { roomCode: code.data }, select: { status: true, gameVersion: { select: { definition: true } } } });
+      const room = await client.gameSession.findUnique({ where: { roomCode: code.data }, select: { id: true, status: true, state: true, gameVersion: { select: { definition: true } } } });
       roomAssert(room && room.status !== 'FINISHED', 'ROOM_NOT_AVAILABLE');
       const definition = parseDefinition(room.gameVersion.definition);
       const look = definition.presentation;
-      return { ok: true, data: RoomLookSchema.parse({ title: definition.title, presentation: { texts: look?.texts ?? {}, animations: look?.animations ?? {}, themes: look?.theme ? [look.theme] : [] } }) };
+      const joining = await people.joinInfo(room.id, readRoomState(room.state));
+      return { ok: true, data: RoomLookSchema.parse({ title: definition.title, presentation: { texts: look?.texts ?? {}, animations: look?.animations ?? {}, themes: look?.theme ? [look.theme] : [] }, ...joining }) };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 404).send(failure(error)); }
   });
   app.get('/api/rooms/seats/:roomCode', async (request, reply) => {
@@ -113,6 +118,40 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       if (result.status === 'approved') reply.header('set-cookie', roomCookie(config, result.sessionId, result.token, result.expiresAt));
       return { ok: true, data: { status: result.status, sessionId: result.status === 'approved' ? result.sessionId : null } };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  // People in a room (room-people.ts). A guest makes their own account while joining (when the host allows it):
+  // this phone is signed in as the new person and gets the key once, to write down.
+  app.post('/api/rooms/signup', async (request, reply) => {
+    try {
+      requireOrigin(request); roomAssert(limiter.allow(`signup:${request.ip}`, 10), 'RATE_LIMITED');
+      const made = await people.signup(request.body, Boolean(await personFromCookie(client, cookie(request))));
+      reply.header('set-cookie', personCookie(config, made.device));
+      app.log.info({ event: 'person_signed_up' }, 'Guest made an account while joining');
+      return { ok: true, data: { name: made.name, key: made.key } };
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  // A phone asks to sign in as one of the people the host added, and repeats the call while it waits for the host.
+  app.post('/api/rooms/pick', async (request, reply) => {
+    try {
+      requireOrigin(request); roomAssert(limiter.allow(`pick:${request.ip}`, 120), 'RATE_LIMITED');
+      const result = await people.pick(request.body);
+      if (result.status === 'approved') { reply.header('set-cookie', personCookie(config, result.device)); return { ok: true, data: { status: 'approved', name: result.name } }; }
+      return { ok: true, data: { status: 'pending', name: null } };
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+  });
+  app.post('/api/rooms/:sessionId/expected', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      roomAssert(ExpectedPeopleSchema.safeParse(request.body).success, 'INVALID_COMMAND');
+      await people.setExpected(id, principal, request.body); return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  app.post('/api/rooms/:sessionId/name-requests', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      const body = SeatDecisionSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await people.decide(id, principal, body.data.requestId, body.data.approve); return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
   });
   app.post('/api/rooms/:sessionId/seat-requests', async (request, reply) => {
     try {

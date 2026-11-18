@@ -34,12 +34,14 @@ export function Badge({ icon, value, label, tone }: { icon: IconName; value: Rea
 }
 
 /** The connection as a dot (green or red) with a menu: the status in words, reconnect, and the measurements. */
-export function ConnectionMenu({ status, ok, busy, saving, onReconnect, details }: { status: string; ok: boolean; busy: boolean; saving: boolean; onReconnect: () => void; details: ReactNode }) {
+export function ConnectionMenu({ status, ok, slow = false, busy, saving, onReconnect, details }: { status: string; ok: boolean; slow?: boolean; busy: boolean; saving: boolean; onReconnect: () => void; details: ReactNode }) {
   return <div className="room-connection" role="region" aria-label="Connection">
     {/* Sending an action shows as a small spinner here, so nothing on the page moves. */}
     {saving && <span className="saving-spinner" role="status" aria-label="Saving"><span aria-hidden="true" /></span>}
-    <Popover label={`Connection: ${busy ? 'verifying access' : status}`} className="conn-menu" text={<span className={`conn-dot ${ok ? 'ok' : 'bad'}`} aria-hidden="true" />}>
+    {/* Green: connected; orange: connected but slow; red: not connected. */}
+    <Popover label={`Connection: ${busy ? 'verifying access' : status}${ok && slow ? ' (slow)' : ''}`} className="conn-menu" text={<span className={`conn-dot ${ok ? (slow ? 'slow' : 'ok') : 'bad'}`} aria-hidden="true" />}>
       <p role="status" aria-label="Connection status" className={`conn ${ok ? 'conn-ok' : 'conn-bad'}`}>{busy ? 'Verifying access…' : status}</p>
+      {ok && slow && <p className="conn-slow">The connection is slow: actions may take a moment.</p>}
       <button type="button" className="ghost" onClick={onReconnect} disabled={busy}><FaIcon name="rotate" /> Reconnect and sync</button>
       {details}
     </Popover>
@@ -103,4 +105,23 @@ export function FloatingScores({ children, leader, docked = false }: { children:
       <FaIcon name="trophy" /><span className="floating-scores-title">{open ? 'Scores' : leader}</span><FaIcon name={open ? 'chevron-down' : 'chevron-up'} /></button>
     {open && <div className="floating-scores-body">{children}</div>}
   </section>;
+}
+
+/**
+ * A wide popup over the host screen for the less frequent things (room settings, shared screen & invite,
+ * players during the game), so the host panel stays short. Escape, the × or a click outside closes it.
+ */
+export function HostDialog({ title, icon, onClose, children, size = 'wide' }: { title: string; icon: IconName; onClose: () => void; children: ReactNode; size?: 'wide' | 'compact' }) {
+  const box = useRef<HTMLDivElement>(null); const id = useId();
+  useEffect(() => { const previous = document.activeElement as HTMLElement | null; box.current?.focus(); return () => previous?.focus?.(); }, []);
+  // Escape closes it wherever focus is (a button inside may have been replaced, leaving focus on the page).
+  const close = useRef(onClose); close.current = onClose;
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close.current(); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, []);
+  return <div className="host-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div ref={box} tabIndex={-1} className={`host-dialog ${size}`} role="dialog" aria-modal="true" aria-labelledby={id}>
+      <header className="host-dialog-head"><h2 id={id}><FaIcon name={icon} /> {title}</h2>
+        <button type="button" className="icon-button" aria-label="Close" title="Close" onClick={onClose}><FaIcon name="xmark" /></button></header>
+      <div className="host-dialog-body">{children}</div>
+    </div>
+  </div>;
 }

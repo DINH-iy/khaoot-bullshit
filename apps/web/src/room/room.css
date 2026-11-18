@@ -319,3 +319,104 @@
 .explain-faces li { position: relative; display: grid; justify-items: center; gap: 4px; font-size: .85rem; opacity: .45; transition: opacity .2s; }
 .explain-faces li.ready { opacity: 1; }
 .explain-check { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--r-ok); color: #06301c; font-size: .7rem; }
+/* People in the room: make an account while joining, pick your name, the new code (room-people.tsx). */
+.room .make-account { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; font-weight: 700; }
+.room .make-account input { flex: none; margin-top: 2px; } .make-account small { display: block; font-weight: 400; color: var(--r-muted); }
+.pick-name { display: grid; gap: 8px; padding: 14px; border-radius: 14px; background: var(--r-card-strong); }
+.pick-name h2 { margin: 0; font-size: 1.05rem; } .pick-name p { margin: 0; } .pick-name-hint { color: var(--r-muted); font-size: .9rem; }
+.pick-name-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-name-list li { margin: 0; } .pick-name-list button { min-height: 44px; padding: 8px 16px; border-radius: 999px; font-weight: 700; }
+.new-key { display: grid; gap: 14px; justify-items: center; text-align: center; } .new-key h2, .new-key p { margin: 0; } .new-key h2 { font-size: 1.7rem; }
+.new-key-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--r-card-strong); color: var(--r-accent); font-size: 1.6rem; }
+.new-key-code { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 18px; border-radius: 16px; background: var(--r-card-strong); }
+.new-key-code code { font: 800 clamp(1.15rem, 6vw, 1.6rem)/1.2 ui-monospace, monospace; letter-spacing: .06em; white-space: nowrap; }
+.room .new-key-code .icon-button { width: 44px; height: 44px; }
+.new-key-note { color: var(--r-muted); font-size: .9rem; }
+.new-key .primary.big { width: 100%; }
+/* Host: the people added to this room, with their codes. */
+.expected-people { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--r-line); }
+.expected-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .expected-head h3 { margin: 0; font-size: 1rem; }
+/* Name and whether they are in on the first line, the code and × on the second (the host panel is narrow). */
+.host-sheet.players .expected-list { display: grid; gap: 6px; }
+.host-sheet.players .expected-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "key remove"; align-items: center; gap: 4px 8px; border-radius: 12px; padding: 8px 8px 8px 12px; }
+.expected-list .expected-name { grid-area: name; } .expected-list .expected-state { grid-area: state; } .expected-list .expected-key { grid-area: key; justify-self: start; } .expected-list button { grid-area: remove; }
+.expected-name { font-weight: 700; overflow-wrap: anywhere; }
+.expected-key { white-space: nowrap; font: 700 .95rem ui-monospace, monospace; letter-spacing: .06em; padding: 2px 8px; border-radius: 8px; background: var(--r-card-strong); }
+.expected-state { font-size: .8rem; color: var(--r-muted); } .expected-state.in { color: #1f9d55; font-weight: 700; }
+.people-picker { display: grid; gap: 6px; max-height: 280px; overflow: auto; padding: 8px; border-radius: 12px; background: var(--r-card-strong); }
+.people-picker ul { margin: 0; }
+.host-sheet.players .expected-list .icon-button { justify-self: end; }
+
+/* Icon buttons: one size everywhere in the room (copy, add people, kick, close). */
+.room .icon-button { display: inline-grid; place-items: center; flex: none; width: 38px; height: 38px; min-height: 38px; margin: 0; padding: 0; border-radius: 10px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font-size: 1rem; }
+.room .icon-button:hover:not(:disabled) { border-color: var(--r-accent); }
+.room .icon-button.copied { color: var(--r-ok); border-color: var(--r-ok); }
+
+/* The host screen uses the width: a wide stage and a fixed panel. */
+@media (min-width: 861px) { .room-host .room-grid { max-width: 1680px; grid-template-columns: minmax(0, 1fr) 360px; } }
+
+/* Lobby: the QR code next to the big code, with the address under it; copy buttons right next to what they copy. */
+.room .lobby-join { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 32px; align-items: center; }
+.room .lobby-join .join-qr img { width: 240px; height: auto; }
+.lobby-code { display: grid; gap: 10px; justify-items: start; } .lobby-code > p { margin: 0; color: var(--r-muted); font-size: 1.1rem; }
+.big-code-row { display: flex; align-items: center; gap: 14px; margin: 0; }
+.big-code-row .big-code { margin: 0; }
+.room .big-code-row .icon-button { width: 48px; height: 48px; font-size: 1.2rem; }
+.join-link { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .95rem; } .join-link a { color: var(--r-muted); overflow-wrap: anywhere; }
+@media (max-width: 760px) { .room .lobby-join { grid-template-columns: 1fr; justify-items: center; } .room .lobby-join .join-qr img { width: 200px; } .lobby-code { justify-items: center; text-align: center; } }
+
+/* The host's popup for room settings, the shared screen & invite, and players during the game. */
+.host-dialog-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / .55); }
+.host-dialog { width: min(1040px, 100%); max-height: min(88dvh, 940px); overflow: auto; overscroll-behavior: contain; display: grid; gap: 16px; align-content: start; padding: 20px 24px 24px; border-radius: var(--r-radius); border: 1px solid var(--r-line); background: var(--r-surface); color: var(--r-text); box-shadow: 0 24px 60px rgb(0 0 0 / .45); }
+.host-dialog:focus { outline: none; }
+.host-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.host-dialog-head h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.35rem; }
+.host-dialog h3 { margin: 4px 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); }
+.settings-layout { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+.settings-col { display: grid; gap: 10px; }
+.host-dialog .room-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+.host-dialog .room-settings > :is(.reaction-settings, .hint) { grid-column: 1 / -1; }
+.host-dialog.compact { width: min(640px, 100%); }
+/* Invite: the QR code next to the code and the address; the shared screen as one slim row under it. */
+.invite-join { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: center; }
+.invite-join .join-qr img { width: 190px; height: auto; border-radius: 14px; background: #fff; padding: 8px; display: block; }
+.invite-code { display: grid; gap: 10px; justify-items: start; }
+.room .invite-code .big-code { font-size: 3rem; line-height: 1; }
+.invite-display { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--r-card-strong); }
+.invite-display > .fa-icon { flex: none; font-size: 1.3rem; color: var(--r-muted); }
+.invite-display p { flex: 1; margin: 0; font-size: .92rem; color: var(--r-muted); } .invite-display strong { display: block; color: var(--r-text); font-size: 1rem; }
+.invite-display button { flex: none; white-space: nowrap; }
+.invite-display-open { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.host-sheet.players.in-dialog ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+@media (max-width: 760px) {
+  .host-dialog-backdrop { padding: 0; place-items: end stretch; }
+  .host-dialog { width: 100%; max-height: 92dvh; border-radius: var(--r-radius) var(--r-radius) 0 0; padding: 16px; }
+  .settings-layout, .invite-join, .host-dialog .room-settings { grid-template-columns: 1fr; } .invite-join { justify-items: center; } .invite-code { justify-items: center; } .invite-display { flex-wrap: wrap; }
+}
+.host-dialog .room-settings legend { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); }
+
+/* Lobby on the host and shared screen (like Kahoot's and Jackbox's): a band across the top with the address, the big code
+   and the QR code; below it a stage of seats that fill with players' faces as they join, with empty seats still to fill. */
+.room .lobby:has(.lobby-band) { display: grid; gap: 20px; padding: 0 !important; overflow: hidden; }
+.lobby-band { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 24px; padding: 24px 28px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--r-accent) 22%, var(--r-card-strong)), var(--r-card-strong)); border-bottom: 1px solid var(--r-line); }
+.lobby-band-text { display: grid; gap: 6px; justify-items: start; }
+.room .lobby-band h2 { margin: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: .1em; color: var(--r-muted); }
+.lobby-go { margin: 0; font-size: 1.3rem; font-weight: 700; }
+.room .lobby-band .big-code { font-size: clamp(3rem, 6vw, 6rem); white-space: nowrap; line-height: 1; }
+.room .lobby-band .join-qr img { width: clamp(150px, 13vw, 210px); height: auto; border-radius: 16px; background: #fff; padding: 8px; }
+.lobby-band-link { position: absolute; top: 14px; right: 14px; }
+.lobby-stage { display: grid; gap: 16px; padding: 0 28px 28px; }
+.lobby-count { justify-self: center; display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 8px 20px; border-radius: 999px; background: var(--r-card-strong); font-size: 1.6rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.lobby-seats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 14px; }
+.seat { display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 150px; margin: 0; padding: 14px 8px; border-radius: 18px; text-align: center; font-weight: 800; font-size: 1.05rem; overflow-wrap: anywhere; }
+.seat.taken { background: var(--r-card-strong); border: 1px solid var(--r-line); }
+.seat.empty { border: 2px dashed var(--r-line); opacity: .55; }
+.seat-ring { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: rgb(255 255 255 / .05); color: var(--r-muted); font-size: 1.5rem; }
+@media (prefers-reduced-motion: no-preference) { .seat.empty .seat-ring { animation: seat-wait 2.4s ease-in-out infinite; } .seat.empty:nth-child(2n) .seat-ring { animation-delay: .6s; } }
+@keyframes seat-wait { 50% { transform: scale(.92); opacity: .6; } }
+@media (min-width: 861px) { :is(.room-host, .room-display) .lobby:has(.lobby-band) { min-height: calc(100dvh - 140px); grid-template-rows: auto 1fr; } .lobby-stage { align-content: start; } }
+@media (max-width: 760px) {
+  .lobby-band { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 20px 16px; } .lobby-band-text { justify-items: center; }
+  .lobby-stage { padding: 0 16px 20px; } .lobby-seats { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); } .seat { min-height: 120px; }
+}

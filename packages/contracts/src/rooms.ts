@@ -27,11 +27,14 @@ export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), signup: z.boolean() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
   seatRequests: z.array(z.object({ requestId: GameIdSchema, playerId: GameIdSchema, requestedAt: z.string().datetime() }).strict()),
+  // Host only (empty for others): people the host added to this room, whether they have a seat yet, and phones asking to sign in as one of them.
+  expected: z.array(z.object({ personId: GameIdSchema, name: z.string(), joined: z.boolean() }).strict()).optional(),
+  nameRequests: z.array(z.object({ requestId: GameIdSchema, personId: GameIdSchema, requestedAt: z.string().datetime() }).strict()).optional(),
   // The host went back to the lobby: this room has ended and everyone moves into this one (phones and the shared screen follow by themselves).
   nextRoom: GameIdSchema.nullable(),
   // An arcade round: its lobby, and whether this phone is the leader who runs the round (absent outside the arcade).
@@ -62,6 +65,8 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   confirmLooks: z.boolean(),
   // `quickTimeSeconds`: what the host's quick time button adds to a round.
   quickTimeSeconds: z.number().int().min(5).max(600),
+  // `signup`: a guest may make their own account while joining (and sees their personal key once).
+  signup: z.boolean(),
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();
@@ -93,4 +98,12 @@ export const HostRoomSchema = z.object({ gameKey: HostGameSchema.shape.key.optio
 export const RestartRoomSchema = z.object({ sessionId: GameIdSchema, commandId: GameIdSchema }).strict();
 
 // The public look of a room, for its join screen: title, texts and theme only.
-export const RoomLookSchema = z.object({ title: z.string().min(1).max(160), presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), z.unknown()), themes: z.array(z.unknown()).max(2) }).strict() }).strict();
+export const RoomLookSchema = z.object({ title: z.string().min(1).max(160), presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), z.unknown()), themes: z.array(z.unknown()).max(2) }).strict(),
+  // For the join screen: whether a guest may make an account here, and the people the host added who have no seat yet ("Are you one of these?").
+  signup: z.boolean().optional(), expected: z.array(z.object({ id: GameIdSchema, name: z.string() }).strict()).max(100).optional() }).strict();
+/** A guest makes their own account while joining (only when the room allows it). The key is shown once on the phone. */
+export const SignupSchema = z.object({ roomCode: RoomCodeSchema, name: z.string().trim().min(1).max(40) }).strict();
+/** A phone asks to sign in as one of the people the host added; the request ID is made by that phone and repeated while it waits. */
+export const NamePickSchema = z.object({ roomCode: RoomCodeSchema, personId: GameIdSchema, requestId: GameIdSchema }).strict();
+/** The host sets which people are expected in the room (replaces the list). */
+export const ExpectedPeopleSchema = z.object({ personIds: z.array(GameIdSchema).max(100) }).strict();

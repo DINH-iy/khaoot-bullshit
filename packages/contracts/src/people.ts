@@ -33,3 +33,26 @@ export const PeopleListSchema = z.object({ people: z.array(PersonRowSchema) }).s
 /** A person's key, for the owner: shown after adding, after a new key, or when looked up. */
 export const PersonKeyViewSchema = z.object({ id: z.uuid(), name: z.string(), key: PersonKeySchema }).strict();
 export type PersonKeyView = z.infer<typeof PersonKeyViewSchema>;
+
+/**
+ * A person's totals over every real game they played (practice rooms never count):
+ * the owner's People page shows them per person and as a leaderboard.
+ */
+export const PersonStatsSchema = z.object({
+  personId: z.uuid(),
+  // Finished games (not arcade rounds) with a seat, and how they ended: 1st place (ties share it) and top 3, by own points.
+  games: z.number().int().min(0), wins: z.number().int().min(0), podiums: z.number().int().min(0), points: z.number().int(),
+  // Answers in quiz and ordering rounds, once revealed: right or wrong. Minigame rounds played.
+  right: z.number().int().min(0), wrong: z.number().int().min(0), minigames: z.number().int().min(0),
+  arcadeRounds: z.number().int().min(0), arcadeWins: z.number().int().min(0),
+  // Side games: challenges (duels between two phones) and rounds of the solo side games.
+  duelsWon: z.number().int().min(0), duelsLost: z.number().int().min(0), duelsDrawn: z.number().int().min(0),
+  sideRounds: z.number().int().min(0), biggestWin: z.number().int().min(0),
+  // Challenges per head-to-head game (only games played at least once), and the main rival: the one challenged most (either way).
+  duelGames: z.array(z.object({ game: z.string(), won: z.number().int().min(0), lost: z.number().int().min(0), drawn: z.number().int().min(0) }).strict()),
+  rival: z.object({ name: z.string(), personId: z.uuid().nullable(), times: z.number().int().min(1), won: z.number().int().min(0), lost: z.number().int().min(0) }).strict().nullable(),
+  favouriteGame: z.object({ title: z.string(), times: z.number().int().min(1) }).strict().nullable(),
+  lastGame: z.object({ title: z.string(), at: z.string() }).strict().nullable(),
+}).strict();
+export type PersonStats = z.infer<typeof PersonStatsSchema>;
+export const PeopleStatsSchema = z.object({ stats: z.array(PersonStatsSchema) }).strict();

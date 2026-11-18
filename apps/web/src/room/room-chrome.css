@@ -5,9 +5,13 @@
 .popover-panel { position: absolute; top: calc(100% + 8px); z-index: 60; display: grid; gap: 10px; width: max-content; min-width: 240px; max-width: min(340px, calc(100vw - 32px)); padding: 14px; border-radius: 16px; border: 1px solid var(--r-line); background: var(--r-surface); color: var(--r-text); box-shadow: 0 16px 40px rgb(0 0 0 / .35); text-align: left; font-size: .95rem; font-weight: 400; }
 .popover-panel.align-end { right: 0; } .popover-panel.align-start { left: 0; }
 .popover-panel p { margin: 0; }
-.conn-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--r-bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-bad) 30%, transparent); }
+.conn-dot { width: 14px; height: 14px; border-radius: 50%; background: #ff4d4f; box-shadow: 0 0 0 3px rgb(255 77 79 / .3); }
 .conn-dot.ok { background: var(--r-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-ok) 25%, transparent); }
+.conn-dot.slow { background: #ff9f1a; box-shadow: 0 0 0 3px rgb(255 159 26 / .3); }
+.conn-slow { margin: 0; color: #ffb547; font-size: .9rem; }
 .conn-menu .conn { justify-self: start; }
+/* The connection button: a square box with the round dot in the middle. */
+.room .room-connection .popover-button { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 12px; }
 .conn-details .metrics { margin: 8px 0; display: grid; gap: 4px; font-size: .85rem; }
 .conn-details .metrics div { display: flex; justify-content: space-between; gap: 12px; } .conn-details dd { margin: 0; font-variant-numeric: tabular-nums; }
 .room .fa-icon { width: 1em; height: 1em; fill: currentColor; flex: none; }
