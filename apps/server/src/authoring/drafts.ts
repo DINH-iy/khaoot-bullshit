@@ -72,8 +72,9 @@ export function createAuthoring(client: PrismaClient) {
   };
   const api = {
     async list(creatorId: string): Promise<GameSummary[]> {
-      // Games with a draft are authored games; built-in games played by the owner have none.
-      const games = await client.game.findMany({ where: { creatorId, archivedAt: null, draft: { isNot: null } }, include: { draft: true, versions: { orderBy: { number: 'desc' }, take: 1 } }, orderBy: { updatedAt: 'desc' }, take: 100 });
+      // Games with a draft are authored games; built-in games played by the owner have none. The owner's own
+      // versions of built-in games are shown with the built-in game instead.
+      const games = await client.game.findMany({ where: { creatorId, archivedAt: null, builtInKey: null, draft: { isNot: null } }, include: { draft: true, versions: { orderBy: { number: 'desc' }, take: 1 } }, orderBy: { updatedAt: 'desc' }, take: 100 });
       return games.map(game => summary(game, game.draft!, game.versions[0] ?? null));
     },
     /** Creates a game with its first draft. Repeating the request returns the same game. */
@@ -84,7 +85,9 @@ export function createAuthoring(client: PrismaClient) {
       if (existing) { requireGame(existing.creatorId === creatorId && existing.draft, 'FORBIDDEN'); return draftView(existing, existing.draft, existing.versions[0] ?? null); }
       const template = startFrom === null ? null : builtInGames.find(game => game.key === startFrom);
       requireGame(startFrom === null || template, 'NOT_FOUND');
-      const definition = template ? { ...structuredClone(template.definition), title } : blankDefinition(title);
+      // A copy of a built-in game is a copy of what the menu shows: the owner's published version, if any.
+      const own = template ? (await api.builtInVersions(creatorId)).get(template.key) : undefined;
+      const definition = template ? { ...structuredClone(own?.definition ?? template.definition), title } : blankDefinition(title);
       const game = await client.game.create({ data: { id: gameId, creatorId, title, draft: { create: { definition, definitionFormat: formatOf(definition) } } }, include: { draft: true } });
       return draftView(game, game.draft!, null);
     },
@@ -181,6 +184,36 @@ export function createAuthoring(client: PrismaClient) {
       });
     },
     /** The latest published version of an owned game, for opening a room. */
+    /**
+     * The owner's own versions of built-in games, by key: the game to edit, and its latest published version (used
+     * by the menu and rooms instead of the built-in) or null while nothing is published yet.
+     */
+    async builtInVersions(creatorId: string) {
+      const games = await client.game.findMany({ where: { creatorId, archivedAt: null, builtInKey: { not: null } },
+        include: { draft: true, versions: { orderBy: { number: 'desc' }, take: 1 } } });
+      return new Map(games.map(game => {
+        const latest = game.versions[0] ?? null; const inspected = game.draft ? inspectDefinition(game.draft.definition) : null;
+        return [game.builtInKey!, { gameId: game.id, versionId: latest?.id ?? null, definition: latest ? latest.definition as GameDefinition : null,
+          unpublished: !latest || !inspected?.definition || contentHash(inspected.definition) !== latest.contentHash }];
+      }));
+    },
+    /** Opens a built-in game for editing: the owner's own version of it, made from the built-in the first time. */
+    async editBuiltIn(creatorId: string, key: string): Promise<string> {
+      const template = builtInGames.find(game => game.key === key); requireGame(template, 'NOT_FOUND');
+      const find = () => client.game.findFirst({ where: { creatorId, builtInKey: key, archivedAt: null }, select: { id: true } });
+      const existing = await find(); if (existing) return existing.id;
+      const definition = structuredClone(template.definition);
+      try {
+        return (await client.game.create({ data: { creatorId, title: definition.title, builtInKey: key, draft: { create: { definition, definitionFormat: formatOf(definition) } } }, select: { id: true } })).id;
+      } catch (error) {
+        // Two clicks at once: the other one made it.
+        const made = await find(); if (made) return made.id; throw error;
+      }
+    },
+    /** Back to the built-in game: the owner's version is archived (games played with it keep their history). */
+    async restoreBuiltIn(creatorId: string, key: string) {
+      await client.game.updateMany({ where: { creatorId, builtInKey: key, archivedAt: null }, data: { archivedAt: new Date(), builtInKey: null } });
+    },
     async latestVersion(creatorId: string, gameId: string) {
       const version = await client.gameVersion.findFirst({ where: { gameId, game: { creatorId, archivedAt: null } }, orderBy: { number: 'desc' }, select: { id: true } });
       requireGame(version, 'NOT_FOUND');

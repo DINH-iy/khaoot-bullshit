@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { HostMenu } from '@party/contracts';
 import { Icon } from '../editor/controls/icons.js';
 
@@ -8,6 +9,9 @@ const FEATURES: Record<Feature, { label: string; icon: string }> = {
   drawing: { label: 'Drawing', icon: 'drawing' }, uploads: { label: 'Photos & videos', icon: 'upload' }, votes: { label: 'Voting', icon: 'vote' },
   minigames: { label: 'Minigames', icon: 'minigame' }, challenges: { label: 'Challenges in the room', icon: 'challenge' }, teams: { label: 'Teams', icon: 'scoreboard' }, routes: { label: 'The party picks a route', icon: 'route' }, duels: { label: 'Duels with bets', icon: 'duel' },
 };
+/** The short line under a game in the list when the owner has their own version of it. */
+const customLabel = (custom: NonNullable<Game['custom']>) => custom.inUse ? (custom.unpublished ? 'Your version · changes not published' : 'Your version') : 'Being edited · not published';
+
 /** A different angle and pattern per game, so covers are told apart even when games share colours. */
 const seed = (key: string) => [...key].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7);
 
@@ -28,14 +32,16 @@ export function GameCover({ game, size }: { game: Game; size: 'small' | 'large' 
  * the right (stacked on a phone). The list is a group of radio buttons, so it
  * works with the keyboard and screen readers like any choice.
  */
-export function GamePicker({ games, chosen, onChoose, busy, onOpen }: { games: Game[]; chosen: string; onChoose: (key: string) => void; busy: boolean; onOpen: () => void }) {
+export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRestore }: { games: Game[]; chosen: string; onChoose: (key: string) => void; busy: boolean; onOpen: () => void; onEdit?: (key: string) => void; onRestore?: (key: string) => void }) {
   const game = games.find(entry => entry.key === chosen) ?? games[0];
+  const [restoring, setRestoring] = useState<string | null>(null);
   return <form className="game-picker" onSubmit={event => { event.preventDefault(); onOpen(); }}>
     <fieldset className="game-list"><legend>Available games</legend>
       {games.map(entry => <label key={entry.key} className={`game-card${entry.key === chosen ? ' chosen' : ''}`}>
         <input type="radio" name="game" value={entry.key} checked={entry.key === chosen} onChange={() => onChoose(entry.key)} />
         <GameCover game={entry} size="small" />
-        <span className="game-card-text"><strong>{entry.title}</strong><small>{entry.branches ? 'up to ' : ''}{entry.stageCount} rounds · about {entry.minutes} min</small></span>
+        <span className="game-card-text"><strong>{entry.title}</strong><small>{entry.branches ? 'up to ' : ''}{entry.stageCount} rounds · about {entry.minutes} min</small>
+          {entry.custom && <small className="custom-badge">{customLabel(entry.custom)}</small>}</span>
       </label>)}
     </fieldset>
     {game && <article className="game-detail" aria-labelledby="game-detail-title">
@@ -49,7 +55,15 @@ export function GamePicker({ games, chosen, onChoose, busy, onOpen }: { games: G
           <li>{game.timed ? 'Timed rounds' : 'No time limits'}</li>
         </ul>
         <ul className="feature-chips" aria-label="In this game">{game.features.map(feature => <li key={feature}><Icon name={FEATURES[feature].icon} size={16} />{FEATURES[feature].label}</li>)}</ul>
+        {game.custom && <p className="custom-note"><Icon name="edit" size={16} /> {game.custom.inUse ? `Your own version${game.custom.unpublished ? ' (with changes not published yet)' : ''}: rooms play it.` : 'Your own version is not published yet: rooms still play the original.'}</p>}
         <button type="submit" className="primary big" disabled={busy}>{busy ? 'Opening…' : 'Open room'}</button>
+        {/* The owner may change a built-in game: their own version, edited and published like any game. */}
+        {onEdit && <div className="game-detail-actions">
+          <button type="button" className="ghost" disabled={busy} onClick={() => onEdit(game.key)}><Icon name="edit" size={18} /> {game.custom ? 'Edit your version' : 'Edit this game'}</button>
+          {game.custom && onRestore && (restoring === game.key
+            ? <span className="restore-confirm">Back to the original? Your changes are put away.<button type="button" className="danger" onClick={() => { setRestoring(null); onRestore(game.key); }}>Yes, restore</button><button type="button" className="ghost" onClick={() => setRestoring(null)}>Keep mine</button></span>
+            : <button type="button" className="ghost" disabled={busy} onClick={() => setRestoring(game.key)}>Restore original…</button>)}
+        </div>}
       </div>
     </article>}
   </form>;

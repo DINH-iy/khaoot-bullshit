@@ -90,8 +90,10 @@ export function HostMenu() {
               <button type="button" className="danger icon-only" disabled={busy} aria-label={`Close room ${room.roomCode}`} title="Close this room" onClick={() => setClosing(room.sessionId)}><Icon name="trash" size={20} /></button></span>}</li>)}</ul>
       </section>}
       {owner && <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">Choose a game</h2>
-        <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))} />
-        <p className="hint">These are the built-in games. Make your own under Your games, or import one from text.</p>
+        <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))}
+          onEdit={key => { setBusy(true); void roomApi<{ gameId: string }>(`/api/host/builtins/${key}/edit`, {}).then(result => location.assign(`/?edit=${result.gameId}`)).catch(cause => { setError(explain(cause)); setBusy(false); }); }}
+          onRestore={key => { void roomApi(`/api/host/builtins/${key}/restore`, {}).then(reload).catch(cause => setError(explain(cause))); }} />
+        <p className="hint">These are the built-in games. Change one with <strong>Edit this game</strong> (rooms play your version once you publish it), make your own under Your games, or import one from text.</p>
       </section>}
       <MyGames menu={menu} reload={reload} openRoom={owner ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
       <ImportGame />

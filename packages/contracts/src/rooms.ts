@@ -81,7 +81,10 @@ export const HeartbeatReplySchema = z.object({ nonce: z.string(), serverTime: z.
 export const HostGameSchema = z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(1).max(160), description: z.string().max(240), stageCount: z.number().int().min(1), timed: z.boolean(), branches: z.boolean(),
   // For the menu: what is in the game, about how long it takes, and its colours (for the cover).
   features: z.array(z.enum(['quiz', 'order', 'writing', 'drawing', 'uploads', 'votes', 'minigames', 'challenges', 'teams', 'routes', 'duels'])), minutes: z.number().int().min(1),
-  colors: z.object({ from: z.string(), to: z.string(), accent: z.string() }).strict() }).strict();
+  colors: z.object({ from: z.string(), to: z.string(), accent: z.string() }).strict(),
+  // The owner's own version of this built-in game, if any: `inUse` once it is published (the menu and rooms then use it),
+  // `unpublished` while its draft has changes that are not published yet.
+  custom: z.object({ gameId: GameIdSchema, inUse: z.boolean(), unpublished: z.boolean() }).strict().nullable().optional() }).strict();
 export const HostMenuSchema = z.object({
   games: z.array(HostGameSchema),
   // The owner's own games, with their draft and publishing state.

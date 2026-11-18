@@ -1,6 +1,6 @@
 import { gameFacts } from './game-facts.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, GameIdSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
+import { ClaimRoomSchema, GameIdSchema, HostGameSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash } from '../game/definition.js';
@@ -68,14 +68,19 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   app.get('/api/host', async (request, reply) => {
     try {
       const { role } = await requireEditor(request);
-      const creator = await ownerCreator();
+      const creator = await ownerCreator(); const custom = await authoring.builtInVersions(creator.id);
       const rooms = role !== 'owner' ? [] : await client.gameSession.findMany({
         where: { hostId: creator.id, status: { not: 'FINISHED' }, roomCode: { not: null }, createdAt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
         select: { id: true, roomCode: true, status: true, gameVersion: { select: { game: { select: { title: true } } } }, _count: { select: { players: { where: { leftAt: null } } } } },
         orderBy: { createdAt: 'desc' }, take: 10,
       });
       return { ok: true, data: HostMenuSchema.parse({
-        games: builtInGames.map(game => ({ key: game.key, title: game.definition.title, description: game.description, stageCount: maxPathStages(game.definition), branches: allStages(game.definition).some(entry => entry.stage.kind === 'route'), timed: allStages(game.definition).some(entry => entry.stage.durationMs !== null), ...gameFacts(game.definition) })),
+        games: builtInGames.map(game => {
+          // The owner's published version replaces the built-in in the menu (and in rooms); the description stays.
+          const own = custom.get(game.key); const definition = own?.definition ?? game.definition;
+          return { key: game.key, title: definition.title, description: game.description, stageCount: maxPathStages(definition), branches: allStages(definition).some(entry => entry.stage.kind === 'route'), timed: allStages(definition).some(entry => entry.stage.durationMs !== null), ...gameFacts(definition),
+            custom: own ? { gameId: own.gameId, inUse: own.versionId !== null, unpublished: own.unpublished } : null };
+        }),
         myGames: await authoring.list(creator.id),
         role,
         rooms: rooms.map(room => ({ sessionId: room.id, roomCode: room.roomCode, title: room.gameVersion.game.title, status: room.status, playerCount: room._count.players })),
@@ -90,7 +95,9 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       const creator = await ownerCreator();
       // A built-in game, or the latest published version of one of your own games.
       const game = gameKey ? builtInGames.find(entry => entry.key === gameKey) : null; roomAssert(!gameKey || game, 'NOT_FOUND');
-      const gameVersionId = game ? await versionFor(creator.id, game) : await authoring.latestVersion(creator.id, gameId!);
+      // A built-in game plays the owner's published version of it, if there is one.
+      const own = game ? (await authoring.builtInVersions(creator.id)).get(game.key)?.versionId ?? null : null;
+      const gameVersionId = own ?? (game ? await versionFor(creator.id, game) : await authoring.latestVersion(creator.id, gameId!));
       const expiresAt = await openRoom(settings.roomSecret, creator.id, gameVersionId, sessionId, commandId);
       const token = joinToken(settings.roomSecret, sessionId, `owner:${commandId}`);
       reply.header('set-cookie', roomCookie(config, sessionId, token, expiresAt));
@@ -126,6 +133,16 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       await client.$transaction(tx => closeRoom(tx, id.data));
       return { ok: true, data: { sessionId: id.data } };
     } catch (error) { return fail(reply, error); }
+  });
+
+  // Built-in games: the owner edits their own version of one (opened in the editor like any game, used once published)
+  // or goes back to the original. Editors (people with editor rights) do not change the built-in games.
+  const builtInKey = (request: FastifyRequest) => { const key = HostGameSchema.shape.key.safeParse((request.params as { key?: string }).key); roomAssert(key.success && builtInGames.some(game => game.key === key.data), 'NOT_FOUND'); return key.data; };
+  app.post('/api/host/builtins/:key/edit', async (request, reply) => {
+    try { requireOwner(request); return { ok: true, data: { gameId: await authoring.editBuiltIn((await ownerCreator()).id, builtInKey(request)) } }; } catch (error) { return fail(reply, error); }
+  });
+  app.post('/api/host/builtins/:key/restore', async (request, reply) => {
+    try { requireOwner(request); await authoring.restoreBuiltIn((await ownerCreator()).id, builtInKey(request)); return { ok: true, data: {} }; } catch (error) { return fail(reply, error); }
   });
 
   // Back to the lobby: the same game again in a fresh room; the old one ends and everyone follows (rooms/restart.ts).
