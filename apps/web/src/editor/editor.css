@@ -165,8 +165,9 @@
 .tv-timer { margin: 0; justify-self: end; padding: 4px 10px; border-radius: 999px; background: rgb(255 255 255 / .15); font-variant-numeric: tabular-nums; }
 .phone { flex: 0 0 220px; }
 .phone-screen { width: 220px; aspect-ratio: 9 / 18; box-sizing: border-box; border-radius: 28px; border: 8px solid light-dark(#26272e, #0d0e11); background: light-dark(#fff, #1b1c21); color: var(--e-text); padding: 18px 14px; display: grid; gap: 12px; align-content: start; overflow: hidden; }
-.phone-prompt { margin: 0; font-weight: 700; font-size: .95rem; }
-.phone-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .phone-list { display: grid; gap: 6px; }
+.phone-prompt { margin: 0; font-weight: 700; font-size: .95rem; overflow-wrap: anywhere; }
+.phone-tiles span, .phone-list span { overflow-wrap: anywhere; hyphens: auto; }
+.phone-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .phone-list { display: grid; gap: 6px; }
 .phone-tiles span, .phone-list span { padding: 10px; border-radius: 10px; border: 1.5px solid var(--e-border); font-size: .85rem; font-weight: 600; }
 .phone-tiles span { min-height: 48px; display: grid; place-items: center; text-align: center; }
 .phone-hint { margin: 0; color: var(--e-muted); font-size: .85rem; }
@@ -676,3 +677,24 @@
 .editor .link-button { border-color: var(--e-border); background: var(--e-panel); color: var(--e-text); }
 .editor .link-button:hover:not(:disabled) { border-color: var(--e-accent); }
 .editor .part-list .link-button { justify-content: flex-start; border-radius: 8px; }
+/* A scene with a problem: a red border on its card (flow map) and its row (scene list). */
+.scene-card.has-problems { border-color: var(--e-danger) !important; box-shadow: 0 0 0 1px var(--e-danger); }
+.scene-row.has-problems { box-shadow: inset 0 0 0 2px var(--e-danger); border-radius: 10px; }
+/* An open list rises above its own button and never moves the buttons in the corner. */
+.problems-panel, .history-panel { position: relative; }
+.problems-list, .history-list { position: absolute; left: 0; bottom: calc(100% + 8px); width: min(400px, calc(100vw - 32px)); }
+/* Problems behind a menu item: a red "!" on the ☰ button and a red count next to the item (Game settings). */
+.action-menu > button { position: relative; }
+.action-menu-alert { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--e-danger); color: var(--e-panel); font-size: .7rem; font-weight: 900; box-shadow: 0 0 0 2px var(--e-panel); }
+.action-menu-problems { margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--e-danger); color: var(--e-panel); font-size: .75rem; font-weight: 800; text-align: center; }
+/* A settings group with a problem: a red line on its left, its title and count in red, the problem in red on top. */
+.ed-section.has-problems { border-left: 3px solid var(--e-danger); padding-left: 10px; }
+.ed-section.has-problems > summary .ed-section-title, .ed-section-alert { color: var(--e-danger); font-weight: 700; }
+.ed-section-problems { margin: 0 0 10px; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--e-danger); font-size: .9rem; font-weight: 600; }
+/* "Try this scene" when it cannot work: greyed out, a red "!" on its corner, and the reason in a bubble under it. */
+.try-wrap { position: relative; display: inline-flex; }
+.editor .try-alert { position: absolute; top: -7px; right: -7px; display: grid; place-items: center; width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--e-panel); background: var(--e-danger); color: var(--e-panel); font-size: .75rem; font-weight: 900; line-height: 1; cursor: help; }
+.try-pop { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; width: min(300px, 80vw); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-size: .85rem; line-height: 1.4; box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
+.try-pop::before { content: ''; position: absolute; top: -6px; right: 14px; width: 10px; height: 10px; background: var(--e-panel); border-left: 1px solid var(--e-border); border-top: 1px solid var(--e-border); transform: rotate(45deg); }
+.try-pop { right: auto; left: 50%; transform: translateX(-50%); width: min(260px, 70vw); }
+.try-pop::before { right: auto; left: calc(50% - 5px); }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { PackResultSchema, RARITY_KEYS, RARITY_NAMES, type PackItemView, type PackResult, type PackSetView, type RarityKey } from '@party/contracts';
+import { packPrice, PackResultSchema, RARITY_KEYS, RARITY_NAMES, type PackItemView, type PackResult, type PackSetView, type RarityKey } from '@party/contracts';
 import { newId } from '../room/api.js';
 import { chips, sideApi, sideProblem } from './side-api.js';
 import { FaIcon } from '../presentation/icons.js';
@@ -59,12 +59,12 @@ export function Packs({ sessionId, balance, onBalance, collection, onCollected, 
   if (!chosen) return <div className="side-game packs"><p className="pack-hint">No packs on sale right now.</p></div>;
   const owned = chosen.items.filter(entry => collection.has(entry.key)).length;
   const others = otherItems.filter(entry => collection.has(entry.key));
-  const price = chosen.price;
+  const price = packPrice(chosen);
   return <div className="side-game packs">
     {/* Which set to open: only before opening or once a pack is done, so a pack is never swapped halfway. */}
     {sets.length > 1 && (!opening || phase === 'done') && <div className="pack-sets" role="radiogroup" aria-label="Pack set">
       {sets.map(set => <button key={set.id} type="button" role="radio" aria-checked={set.id === chosen.id} className={`pack-set${set.id === chosen.id ? ' chosen' : ''}`} onClick={() => setChosenId(set.id)}>
-        <strong>{set.name}</strong><small>🪙 {set.price.toLocaleString()} · {set.items.filter(entry => collection.has(entry.key)).length}/{set.items.length}</small></button>)}
+        <strong>{set.name}</strong>{set.sale && <span className="pack-set-sale">{set.sale}% off</span>}<small>🪙 {set.sale ? <><s>{set.price.toLocaleString()}</s> {packPrice(set).toLocaleString()}</> : set.price.toLocaleString()} · {set.items.filter(entry => collection.has(entry.key)).length}/{set.items.length}</small></button>)}
     </div>}
     {opening && (phase === 'sealed' || phase === 'tearing') && <div className="pack-stage">
       <button type="button" className={`foil-pack${phase === 'tearing' ? ' tearing' : ''}`} onClick={tear} aria-label="Tear the pack open">
@@ -77,7 +77,7 @@ export function Packs({ sessionId, balance, onBalance, collection, onCollected, 
     {opening && phase === 'done' && opening.result.god && <><p className="god-pack-banner" role="status">God pack!<small>Only epic and legendary items</small></p>
       <span className="pack-confetti" aria-hidden="true">{Array.from({ length: 40 }, (_, index) => <i key={index} style={{ left: `${(index * 29) % 100}%`, animationDelay: `${(index % 9) * 80}ms`, background: ['#ffcf4a', '#ff5fa2', '#7ce0ff', '#c77dff', '#fff'][index % 5] }} />)}</span></>}
     {opening && phase === 'done' && <ul className="pack-reveal" aria-label="In this pack">{opening.order.map((key, index) => { const found = item(key); return <li key={`${opening.result.roundId}-${index}`} className={`rarity-${found?.rarity ?? 'common'}`} style={{ animationDelay: `${index * 90}ms` }}>
-      <span aria-hidden="true">{found?.emoji}</span><strong>{found?.name ?? key}</strong><small>{rarityName(found?.rarity ?? '')}</small></li>; })}</ul>}
+      <span aria-hidden="true"><ItemArt item={found} /></span><strong>{found?.name ?? key}</strong><small>{rarityName(found?.rarity ?? '')}</small></li>; })}</ul>}
     {opening && phase === 'done' && balance < price && <p className="pack-hint">Win chips in the games to open the next pack.</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {(!opening || phase === 'done') && <button type="button" className="primary big" disabled={busy || balance < price} onClick={() => void open()}>{busy ? 'Opening…' : `${opening ? 'Open another pack' : 'Open a pack'} for ${chips(price)}`}</button>}
@@ -91,9 +91,14 @@ export function Packs({ sessionId, balance, onBalance, collection, onCollected, 
   </div>;
 }
 
+/** An item's picture when it has one, otherwise its emoji. */
+export function ItemArt({ item }: { item: PackItemView | undefined }) {
+  return item?.image ? <img className="item-art" src={item.image} alt="" draggable={false} /> : <>{item?.emoji}</>;
+}
+
 function collectionItem(entry: PackItemView, count: number) {
   return <li key={entry.key} className={`rarity-${entry.rarity}${count ? '' : ' missing'}`} title={count ? entry.flavor : undefined}>
-    <span aria-hidden="true">{count ? entry.emoji : '❔'}</span><small>{count ? `${entry.name}${count > 1 ? ` ×${count}` : ''}` : rarityName(entry.rarity)}</small></li>;
+    <span aria-hidden="true">{count ? <ItemArt item={entry} /> : '❔'}</span><small>{count ? `${entry.name}${count > 1 ? ` ×${count}` : ''}` : rarityName(entry.rarity)}</small></li>;
 }
 
 /** The cards one at a time: the latest big and turned over, the earlier ones small above it, the rest still in the stack. */
@@ -111,7 +116,7 @@ function RevealStack({ opening, item, onNext, onShowAll }: { opening: Opening; i
     {/* A flash over the whole sheet for epic and legendary, and confetti for legendary. */}
     {current && big && <span key={`flash-${shown}`} className={`pack-flash flash-${rarity}`} aria-hidden="true" />}
     {current && rarity === 'legendary' && <span key={`confetti-${shown}`} className="pack-confetti" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} style={{ left: `${(index * 37) % 100}%`, animationDelay: `${(index % 7) * 90}ms`, background: ['#ffcf4a', '#ff5fa2', '#7ce0ff', '#c77dff', '#fff'][index % 5] }} />)}</span>}
-    <ol className="pack-row" aria-label="Shown so far">{order.slice(0, Math.max(0, shown - 1)).map((key, index) => { const earlier = item(key); return <li key={index} className={`rarity-${earlier?.rarity ?? 'common'}`} title={earlier?.name}><span aria-hidden="true">{earlier?.emoji}</span></li>; })}</ol>
+    <ol className="pack-row" aria-label="Shown so far">{order.slice(0, Math.max(0, shown - 1)).map((key, index) => { const earlier = item(key); return <li key={index} className={`rarity-${earlier?.rarity ?? 'common'}`} title={earlier?.name}><span aria-hidden="true"><ItemArt item={earlier} /></span></li>; })}</ol>
     <div className="pack-stack">
       {/* The rest of the stack, face down and all alike (nothing gives away what comes), behind the current card. */}
       {Array.from({ length: Math.min(left, 3) }, (_, index) => <span key={index} className="card-back stacked" style={{ transform: `translate(${(index + 1) * 5}px, ${(index + 1) * 5}px)` }} aria-hidden="true" />)}
@@ -122,7 +127,7 @@ function RevealStack({ opening, item, onNext, onShowAll }: { opening: Opening; i
             {rarity === 'legendary' && <span className="card-rays" aria-hidden="true" />}
             {rarity !== 'common' && <span className="card-burst" aria-hidden="true">{Array.from({ length: sparks }, (_, index) => <i key={index} style={{ transform: `rotate(${index * (360 / sparks)}deg)` }} />)}</span>}
             {rarity === 'rare' && <span className="card-stars" aria-hidden="true">{['✦', '✧', '✦', '✧', '✦'].map((star, index) => <i key={index}>{star}</i>)}</span>}
-            <span className="card-emoji" aria-hidden="true">{found?.emoji}</span><strong>{found?.name}</strong><small>{rarityName(rarity)}</small>
+            <span className="card-emoji" aria-hidden="true"><ItemArt item={found} /></span><strong>{found?.name}</strong><small>{rarityName(rarity)}</small>
             <em className="card-flavor">{found?.flavor}</em>
           </span>
           {big && <span className="card-stamp" aria-hidden="true">{rarity === 'legendary' ? 'Legendary!' : 'Epic!'}</span>}

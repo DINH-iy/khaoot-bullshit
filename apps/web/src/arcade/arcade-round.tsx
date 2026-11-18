@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ArcadeAction, RoomSnapshot } from '@party/contracts';
 import { roomApi } from '../room/api.js';
+import { navigate } from '../navigation.js';
 import { Popover } from '../room/room-chrome.js';
 import { FaIcon, type IconName } from '../presentation/icons.js';
 import { arcadeProblem } from './arcade-text.js';
@@ -20,7 +21,7 @@ export function useArcadeRound(state: RoomSnapshot | undefined) {
     const here = () => { void roomApi(`/api/arcade/lobbies/${lobbyId}/here`, {}).catch(() => {}); };
     here(); const timer = setInterval(here, HERE_MS); return () => clearInterval(timer);
   }, [lobbyId]);
-  useEffect(() => { if (lobbyId && finished) location.replace(`/?arcade=${lobbyId}`); }, [lobbyId, finished]);
+  useEffect(() => { if (lobbyId && finished) navigate(`/?arcade=${lobbyId}`, { replace: true }); }, [lobbyId, finished]);
 }
 
 /** Sends one of the leader's steps; shared by the big button and the menu. */
@@ -52,7 +53,7 @@ export function ArcadeLeaderNext({ state, disabled }: { state: RoomSnapshot; dis
   const { act, busy, error } = useLeaderStep(state);
   const arcade = state.arcade!; const stage = state.view.stage;
   if (state.view.status === 'FINISHED') return <p role="status" className="arcade-round">Back to the lobby…</p>;
-  if (!arcade.leader) return stage?.revealed ? <p className="arcade-round wait-note">Waiting for the leader to go back to the lobby… <a href={`/?arcade=${arcade.lobbyId}`}>Go now</a></p> : null;
+  if (!arcade.leader) return stage?.revealed ? <p className="arcade-round wait-note">Waiting for the leader to go back to the lobby… <button type="button" className="ghost" onClick={() => navigate(`/?arcade=${arcade.lobbyId}`, { replace: true })}>Go now</button></p> : null;
   const next = waitingStep(state);
   if (!next && !error) return null;
   return <div className="arcade-round" role="group" aria-label="Leader">

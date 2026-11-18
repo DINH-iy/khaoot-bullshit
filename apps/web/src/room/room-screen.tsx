@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
-import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
+import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, SiteLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { BigCode, CopyIcon, JoinLink, JoinQr, publicJoinUrl } from './join-qr.js';
@@ -35,9 +35,10 @@ import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, 
 import { answerFit } from './answer-fit.js';
 import { Mark } from '../presentation/mark-icons.js';
 
-const initial = new URL(location.href);
-const access = new URLSearchParams(initial.hash.slice(1)).get('access');
-if (access) history.replaceState(null, '', `${initial.pathname}${initial.search}`);
+const first = new URL(location.href);
+// A host/display access token arrives once, in the first address; it is taken out of the address at once.
+let pendingAccess = new URLSearchParams(first.hash.slice(1)).get('access');
+if (pendingAccess) history.replaceState(null, '', `${first.pathname}${first.search}`);
 
 /** Joining from a phone: room code and name, plus seat takeover and a way to host instead. */
 function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin, onReclaim, style, className, title, person, linked, onForget, onSignIn, signup, makeAccount, setMakeAccount, expected, onPicked }: {
@@ -96,6 +97,8 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
 }
 
 export function RoomScreen() {
+  // The address when this screen opened: the arcade switches rooms without reloading the page (navigation.ts).
+  const [{ initial, access }] = useState(() => { const taken = pendingAccess; pendingAccess = null; return { initial: new URL(location.href), access: taken }; });
   const [sessionId, setSessionId] = useState(initial.searchParams.get('room') ?? undefined);
   const [roomCode, setRoomCode] = useState(cleanRoomCode(initial.searchParams.get('code') ?? '')); const [name, setName] = useState('');
   const [error, setError] = useState(''); const [closedMessage, setClosedMessage] = useState(''); const [busy, setBusy] = useState(Boolean(access)); const [ready, setReady] = useState(!access);
@@ -182,7 +185,11 @@ export function RoomScreen() {
     fetchLook(); const again = setInterval(fetchLook, 10_000);
     return () => { mounted = false; clearInterval(again); };
   }, [roomCode, sessionId]);
-  const look = useBuiltLook(state?.view.presentation ?? joinLook?.presentation); const t = look.text;
+  // Before a room is known, the join screen wears the site's look (Admin → Join screen); a room code typed in
+  // shows that room's game look, and in the room the game's look applies.
+  const [siteLook, setSiteLook] = useState<LookInput | undefined>();
+  useEffect(() => { let mounted = true; void roomApi('/api/site/look').then(data => { const parsed = SiteLookSchema.safeParse(data); if (mounted && parsed.success && parsed.data.theme) setSiteLook({ themes: [parsed.data.theme] }); }).catch(() => {}); return () => { mounted = false; }; }, []);
+  const look = useBuiltLook(state?.view.presentation ?? joinLook?.presentation ?? siteLook); const t = look.text;
   const lookStyle = themeStyle(look.theme); const lookClass = themeClass(look.theme);
   // Animation moments.
   const stageRef = useRef<HTMLElement>(null); const answersRef = useRef<HTMLDivElement>(null); const savedRef = useRef<HTMLParagraphElement>(null);
@@ -419,7 +426,7 @@ function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>
 }
 
 /** The host screen inside the test bench (its frame is opened with `&bench=1`). */
-const onBench = initial.searchParams.get('bench') === '1' && typeof window !== 'undefined' && window.top !== window.self;
+const onBench = first.searchParams.get('bench') === '1' && typeof window !== 'undefined' && window.top !== window.self;
 // (`&bench=real`: on the bench with real phones joining too, so the join strip stays.)
 
 /** Slow: the last three round trips took more than 400 ms on average (the connection dot turns orange). */

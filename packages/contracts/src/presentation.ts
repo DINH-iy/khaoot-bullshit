@@ -225,3 +225,10 @@ const TextsSchema = z.record(z.string(), z.string().max(400)).refine(texts => Ob
 const AnimationsSchema = z.record(z.string(), AnimationChoiceSchema).refine(animations => Object.keys(animations).every(key => key in MOMENTS), 'Unknown moment');
 export const PresentationSchema = z.object({ texts: TextsSchema.optional(), theme: ThemeSchema.optional(), animations: AnimationsSchema.optional() }).strict();
 export type Presentation = z.infer<typeof PresentationSchema>;
+
+/**
+ * The site's own look (Admin → Join screen): the screen where players type a room code and their name, before
+ * they are in a room. Rooms and their scenes keep the look of their game.
+ */
+export const SiteLookSchema = z.object({ theme: ThemeSchema.optional() }).strict();
+export type SiteLook = z.infer<typeof SiteLookSchema>;

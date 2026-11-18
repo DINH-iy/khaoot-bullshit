@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PackAdminSchema, RARITY_KEYS, RARITY_NAMES, type Chances, type Economy, type PackAdmin, type PackItemView, type PackSetAdmin, type RarityKey } from '@party/contracts';
+import { PACK_PICTURE_SIDE, PackAdminSchema, packPrice, RARITY_KEYS, RARITY_NAMES, type Chances, type Economy, type PackAdmin, type PackItemView, type PackSetAdmin, type RarityKey } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import { Icon } from '../editor/controls/icons.js';
@@ -17,6 +17,17 @@ export function PacksPanel() {
     setError(''); setSaved('');
     try { setData(PackAdminSchema.parse(await roomApi(`/api/host/packs${path}`, body))); setSaved(done); return true; } catch (cause) { setError(problem(cause)); return false; }
   };
+  // A picture is sent as the PNG itself (made square and small on this device first, see squarePicture).
+  const upload = async (key: string, file: File, done: string) => {
+    setError(''); setSaved('');
+    try {
+      const body = await squarePicture(file);
+      const response = await fetch(`/api/host/packs/items/${encodeURIComponent(key)}/picture`, { method: 'POST', credentials: 'same-origin', headers: { 'x-party-request': '1', 'content-type': 'image/png' }, body });
+      const reply = await response.json() as { ok: boolean; data?: unknown; error?: { code: string } };
+      if (!reply.ok) throw new Error(reply.error?.code ?? 'FAILED');
+      setData(PackAdminSchema.parse(reply.data)); setSaved(done);
+    } catch (cause) { setError(cause instanceof Error && cause.message === 'NOT_A_PICTURE' ? 'That file is not a picture this browser can open. Try a PNG or JPG.' : problem(cause)); }
+  };
   if (!data) return error ? <p role="alert" className="error">{error}</p> : <p role="status">Loading…</p>;
   return <div className="packs-admin">
     <p className="admin-intro">Players earn chips by playing in rooms with chips on, and spend them on packs. Changes count from the next pack or game.</p>
@@ -24,9 +35,9 @@ export function PacksPanel() {
     {saved && <p role="status" className="packs-saved"><Icon name="check" size={16} /> {saved}</p>}
     <EconomyCard key={JSON.stringify(data.economy)} economy={data.economy} onSave={economy => void send('/economy', economy, 'Chip amounts saved.')} />
     <div className="packs-sets-head"><h2>Pack sets</h2>
-      <button type="button" className="primary" onClick={() => void send('/sets', { name: 'New set', price: 100, onSale: false, chances: { common: 70, rare: 22, epic: 7, legendary: 1 }, godPackOdds: 500 }, 'Set added (not on sale yet).')}><Icon name="plus" size={18} /> New set</button></div>
+      <button type="button" className="primary" onClick={() => void send('/sets', { name: 'New set', price: 100, active: false, onSale: false, salePercent: 50, chances: { common: 70, rare: 22, epic: 7, legendary: 1 }, godPackOdds: 500 }, 'Set added (hidden until you make it active).')}><Icon name="plus" size={18} /> New set</button></div>
     {data.sets.length === 0 && <p className="admin-empty">No pack sets yet.</p>}
-    {data.sets.map(set => <SetCard key={set.id} set={set} send={send} />)}
+    {data.sets.map(set => <SetCard key={set.id} set={set} send={send} upload={upload} />)}
   </div>;
 }
 
@@ -59,25 +70,32 @@ function EconomyCard({ economy, onSave }: { economy: Economy; onSave: (economy: 
 }
 
 type Send = (path: string, body: unknown, done: string) => Promise<boolean>;
+type Upload = (key: string, file: File, done: string) => Promise<void>;
 /** A set as one slim row (name, price, items, on sale, edit, remove); Edit unfolds its settings and items. */
-function SetCard({ set, send }: { set: PackSetAdmin; send: Send }) {
-  const stored = { name: set.name, price: set.price, chances: set.chances, godPackOdds: set.godPackOdds };
+function SetCard({ set, send, upload }: { set: PackSetAdmin; send: Send; upload: Upload }) {
+  const stored = { name: set.name, price: set.price, salePercent: set.salePercent, chances: set.chances, godPackOdds: set.godPackOdds };
+  const now = { ...stored, active: set.active, onSale: set.onSale };
   const [draft, setDraft] = useState(stored); const [removing, setRemoving] = useState(false); const [editing, setEditing] = useState(set.items.length === 0);
   const total = RARITY_KEYS.reduce((sum, key) => sum + draft.chances[key], 0);
   const changed = JSON.stringify(draft) !== JSON.stringify(stored);
   const chance = (key: RarityKey, value: number) => setDraft({ ...draft, chances: { ...draft.chances, [key]: Math.min(100, value) } as Chances });
   const missing = RARITY_KEYS.filter(key => draft.chances[key] > 0 && !set.items.some(item => item.rarity === key));
-  const toggleSale = () => void send(`/sets/${set.id}`, { ...stored, onSale: !set.onSale }, set.onSale ? `${set.name} is hidden.` : `${set.name} is on sale.`);
+  // Two quick switches: active (players see the set) and on sale (salePercent off), each saved at once.
+  const toggleActive = () => void send(`/sets/${set.id}`, { ...now, active: !set.active }, set.active ? `${set.name} is hidden from players.` : `${set.name} is active.`);
+  const toggleSale = () => void send(`/sets/${set.id}`, { ...now, onSale: !set.onSale }, set.onSale ? `${set.name} is no longer on sale.` : `${set.name} is on sale: ${set.salePercent}% off.`);
   return <section className={`person-card packs-set${editing ? ' editing' : ''}`} aria-label={set.name}>
     <div className="packs-set-row">
       <button type="button" className="packs-set-title" aria-expanded={editing} onClick={() => setEditing(!editing)}>
-        <strong>{set.name}</strong><span className={`packs-badge${set.onSale ? ' on' : ''}`}>{set.onSale ? 'On sale' : 'Hidden'}</span><small>🪙 {set.price} · {set.items.length} items</small></button>
+        <strong>{set.name}</strong><span className={`packs-badge${set.active ? ' on' : ''}`}>{set.active ? 'Active' : 'Hidden'}</span>
+        {set.onSale && <span className="packs-badge sale">{set.salePercent}% off</span>}
+        <small>🪙 {set.onSale ? <><s>{set.price}</s> {packPrice(set)}</> : set.price} · {set.items.length} items</small></button>
       {removing ? <span className="packs-set-quick"><span>Remove? Collections keep their items.</span>
         <button type="button" onClick={() => setRemoving(false)}>Keep</button>
         <button type="button" className="danger" onClick={() => void send(`/sets/${set.id}/delete`, {}, `${set.name} removed.`)}>Remove</button></span>
         : <span className="packs-set-quick">
-          {/* A toggle button: filled while the set is on sale, outlined while it is hidden. */}
-          <button type="button" className={`icon-only packs-sale${set.onSale ? ' on' : ''}`} aria-pressed={set.onSale} aria-label={`${set.name} on sale`} title={set.onSale ? 'On sale: click to hide' : 'Hidden: click to put on sale'} onClick={toggleSale}><Icon name="eye" size={18} /></button>
+          {/* Toggle buttons: filled while on, outlined while off. */}
+          <button type="button" className={`packs-toggle${set.active ? ' on' : ''}`} aria-pressed={set.active} title={set.active ? 'Players see this set: click to hide it' : 'Hidden from players: click to make it active'} onClick={toggleActive}><Icon name="eye" size={18} /> Active</button>
+          <button type="button" className={`packs-toggle sale${set.onSale ? ' on' : ''}`} aria-pressed={set.onSale} title={set.onSale ? `${set.salePercent}% off: click to end the sale` : `Click to put it on sale (${set.salePercent}% off)`} onClick={toggleSale}>% On sale</button>
           <button type="button" className="icon-only" aria-label={`Edit ${set.name}`} aria-expanded={editing} title={editing ? 'Close' : 'Edit'} onClick={() => setEditing(!editing)}><Icon name="edit" size={18} /></button>
           <button type="button" className="danger icon-only" aria-label={`Remove ${set.name}`} title="Remove this set" onClick={() => setRemoving(true)}><Icon name="trash" size={18} /></button>
         </span>}
@@ -86,17 +104,19 @@ function SetCard({ set, send }: { set: PackSetAdmin; send: Send }) {
       <div className="packs-set-settings">
         <label className="packs-field packs-name"><span>Name</span><input value={draft.name} maxLength={60} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
         <NumberField label="🪙 Price" value={draft.price} onChange={price => setDraft({ ...draft, price })} />
+        <NumberField label="% Sale: off" value={draft.salePercent} onChange={salePercent => setDraft({ ...draft, salePercent: Math.min(99, Math.max(1, salePercent)) })} />
         <NumberField label="✨ God pack 1 in (0 = never)" value={draft.godPackOdds} onChange={godPackOdds => setDraft({ ...draft, godPackOdds })} />
         {RARITY_KEYS.map(key => <NumberField key={key} label={`${RARITY_NAMES[key]} %`} value={draft.chances[key]} onChange={value => chance(key, value)} />)}
       </div>
       <div className="packs-set-save">
         <p className={`packs-total${total === 100 ? '' : ' bad'}`} aria-live="polite">{total === 100 ? 'Chances add up to 100%' : `Chances add up to ${total}%, need 100%`}</p>
         {changed && <button type="button" className="icon-only" aria-label="Undo changes" title="Undo changes" onClick={() => setDraft(stored)}><Icon name="undo" size={18} /></button>}
-        <button type="button" className="primary" disabled={!changed || total !== 100 || !draft.name.trim()} onClick={() => void send(`/sets/${set.id}`, { ...draft, onSale: set.onSale }, `${draft.name} saved.`)}><Icon name="check" size={18} /> Save</button>
+        <button type="button" className="primary" disabled={!changed || total !== 100 || !draft.name.trim()} onClick={() => void send(`/sets/${set.id}`, { ...draft, active: set.active, onSale: set.onSale }, `${draft.name} saved.`)}><Icon name="check" size={18} /> Save</button>
       </div>
       {missing.length > 0 && <p className="packs-warning">No {missing.map(key => RARITY_NAMES[key].toLowerCase()).join(' or ')} items yet: those draws give the nearest rarity instead.</p>}
       <ul className="packs-items" aria-label={`Items in ${set.name}`}>
         {set.items.map(item => <ItemRow key={`${item.key}-${item.name}-${item.emoji}-${item.rarity}-${item.flavor}`} item={item} onSave={input => send(`/items/${item.key}`, input, `${input.name} saved.`)}
+          onPicture={file => void upload(item.key, file, `Picture of ${item.name} saved.`)} onRemovePicture={() => void send(`/items/${item.key}/picture/delete`, {}, `${item.name} shows its emoji again.`)}
           onRemove={() => void send(`/items/${item.key}/delete`, {}, `${item.name} removed from packs.`)} />)}
         <ItemRow key={`new-${set.items.length}`} onSave={input => send(`/sets/${set.id}/items`, input, `${input.name} added.`)} />
       </ul>
@@ -106,13 +126,17 @@ function SetCard({ set, send }: { set: PackSetAdmin; send: Send }) {
 
 type ItemInput = { name: string; emoji: string; rarity: RarityKey; flavor: string };
 /** One item, edited in place; without `item` it is the empty row that adds one. */
-function ItemRow({ item, onSave, onRemove }: { item?: PackItemView; onSave: (input: ItemInput) => Promise<boolean>; onRemove?: () => void }) {
+function ItemRow({ item, onSave, onRemove, onPicture, onRemovePicture }: { item?: PackItemView; onSave: (input: ItemInput) => Promise<boolean>; onRemove?: () => void;
+  onPicture?: (file: File) => void; onRemovePicture?: () => void }) {
   const stored: ItemInput = item ? { name: item.name, emoji: item.emoji, rarity: item.rarity, flavor: item.flavor } : { name: '', emoji: '', rarity: 'common', flavor: '' };
   const [draft, setDraft] = useState(stored);
   const changed = JSON.stringify(draft) !== JSON.stringify(stored);
   const label = item ? item.name : 'new item';
   return <li className={`packs-item rarity-${draft.rarity}${item ? '' : ' new'}`}>
-    <input className="packs-emoji" aria-label={`Emoji of ${label}`} placeholder="🙂" value={draft.emoji} maxLength={16} onChange={event => setDraft({ ...draft, emoji: event.target.value })} />
+    {/* The picture, when there is one (× shows the emoji again), or the emoji. */}
+    {item?.image ? <span className="packs-picture"><img src={item.image} alt={`Picture of ${label}`} />
+      {onRemovePicture && <button type="button" className="packs-picture-remove" aria-label={`Remove the picture of ${label}`} title="Remove the picture (shows the emoji again)" onClick={onRemovePicture}>×</button>}</span>
+      : <input className="packs-emoji" aria-label={`Emoji of ${label}`} placeholder="🙂" value={draft.emoji} maxLength={16} onChange={event => setDraft({ ...draft, emoji: event.target.value })} />}
     <input aria-label={`Name of ${label}`} placeholder={item ? 'Name' : 'New item name'} value={draft.name} maxLength={40} onChange={event => setDraft({ ...draft, name: event.target.value })} />
     <select aria-label={`Rarity of ${label}`} value={draft.rarity} onChange={event => setDraft({ ...draft, rarity: event.target.value as RarityKey })}>{RARITY_KEYS.map(key => <option key={key} value={key}>{RARITY_NAMES[key]}</option>)}</select>
     <input aria-label={`Line on the card of ${label}`} placeholder="A line on the card" value={draft.flavor} maxLength={120} onChange={event => setDraft({ ...draft, flavor: event.target.value })} />
@@ -120,7 +144,19 @@ function ItemRow({ item, onSave, onRemove }: { item?: PackItemView; onSave: (inp
       {/* An item's save button shows only once it is changed; the empty row always has its add button. */}
       {(!item || changed) && <button type="button" className="primary icon-only" disabled={!changed || !draft.name.trim()} aria-label={item ? `Save ${label}` : 'Add this item'} title={item ? 'Save' : 'Add'}
         onClick={() => void onSave(draft)}><Icon name={item ? 'check' : 'plus'} size={18} /></button>}
+      {onPicture && <label className="packs-upload" title={item?.image ? 'Choose another picture' : 'Use a picture instead of the emoji'}>
+        <input type="file" accept="image/*" className="visually-hidden" aria-label={`Picture of ${label}`} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onPicture(file); }} /><Icon name="upload" size={18} /></label>}
       {onRemove && <button type="button" className="danger icon-only" aria-label={`Remove ${label} from packs`} title="Remove from packs (collections keep it)" onClick={onRemove}><Icon name="trash" size={18} /></button>}
     </span>
   </li>;
+}
+
+/** A picture file made square (cropped to the middle) and PACK_PICTURE_SIDE pixels a side, as a PNG. */
+async function squarePicture(file: File): Promise<Blob> {
+  let bitmap: ImageBitmap; try { bitmap = await createImageBitmap(file); } catch { throw new Error('NOT_A_PICTURE'); }
+  const side = Math.min(bitmap.width, bitmap.height); const size = Math.max(16, Math.min(PACK_PICTURE_SIDE, side));
+  const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+  canvas.getContext('2d')!.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size); bitmap.close();
+  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('NOT_A_PICTURE'); return blob;
 }

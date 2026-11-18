@@ -16,13 +16,13 @@ const wheelsOf = (definition: Definition) => (definition['wheels'] as Wheel[] | 
 const withWheels = (definition: Definition, wheels: Wheel[]): Definition => { const next = { ...definition }; if (wheels.length) next['wheels'] = wheels; else delete next['wheels']; return next; };
 
 /** Wheels of fortune for this game: entries, whether a picked entry leaves the wheel, and how long it spins. */
-export function WheelSettings({ definition, onChange }: { definition: Definition; onChange: Change }) {
+export function WheelSettings({ definition, onChange, problems = [] }: { definition: Definition; onChange: Change; problems?: string[] }) {
   const wheels = wheelsOf(definition);
   const set = (key: string, change: (wheel: Wheel) => Wheel, field: string) => onChange(withWheels(definition, wheels.map(wheel => wheel.key === key ? change(wheel) : wheel)), `wheel:${key}:${field}`);
   const remove = (key: string) => onChange({ ...withWheels(definition, wheels.filter(wheel => wheel.key !== key)),
     // Scenes that spun this wheel no longer spin anything.
     nodes: definition.nodes.map(node => ({ ...node, stages: node.stages.map(stage => { if ((stage['spin'] as { wheel?: string } | undefined)?.wheel !== key) return stage; const copy = { ...stage }; delete copy['spin']; return copy; }) })) });
-  return <Section title="Wheels of fortune" summary={wheels.length ? wheels.map(wheel => wheel.title).join(', ') : 'None'}>
+  return <Section title="Wheels of fortune" problems={problems} summary={wheels.length ? wheels.map(wheel => wheel.title).join(', ') : 'None'}>
     <p className="hint">Add a Wheel of fortune scene to spin one during the game. All the game’s wheels are here; the result stays in a corner of the shared screen until the next spin.</p>
     {wheels.map(wheel => <fieldset key={wheel.key} className="wheel-fields"><legend>{wheel.title}</legend>
       <WheelFields definition={definition} wheel={wheel} set={(change, field) => set(wheel.key, change, field)} onRemove={() => remove(wheel.key)} />
@@ -104,7 +104,7 @@ interface Award { rule: AwardRule; title?: string; nodeKey?: string }
  * wanted; "best in one scene" names its scene. Awards without anything to show are skipped
  * by themselves. Older games keep a plain list of rules; it becomes this list when edited.
  */
-export function FinaleSettings({ definition, onChange }: { definition: Definition; onChange: Change }) {
+export function FinaleSettings({ definition, onChange, problems = [] }: { definition: Definition; onChange: Change; problems?: string[] }) {
   const finale = definition['finale'] as { stats?: FinaleStat[]; awards?: Award[] } | undefined;
   const chosen: Award[] = finale?.awards ?? (finale?.stats ?? [...FINALE_STATS]).map(rule => ({ rule }));
   const set = (awards: Award[], field = 'finale') => onChange({ ...definition, finale: { awards } }, field);
@@ -114,7 +114,7 @@ export function FinaleSettings({ definition, onChange }: { definition: Definitio
   // Each statistic once; "best in one scene" as often as wanted.
   const available = RULES.filter(rule => rule === 'scene' || !chosen.some(award => award.rule === rule)); const [picking, setPicking] = useState(false);
   const scenes = definition.nodes.map(node => ({ value: node.key, label: sceneLabel(definition, node.key) }));
-  return <Section title="End-of-game awards" summary={chosen.length ? `${chosen.length} awards` : 'None'}>
+  return <Section title="End-of-game awards" problems={problems} summary={chosen.length ? `${chosen.length} awards` : 'None'}>
     <p className="hint">After the last scene, the screens show these awards one by one. Pick the ones you want, put them in order, and give them your own title if you like.</p>
     <ol className="award-list">{chosen.map((award, position) => <li key={position}>
       <div className="award-main">

@@ -15,6 +15,7 @@ import { registerFeedbackRoutes } from './feedback/routes.js';
 import { registerPeopleRoutes } from './people/routes.js';
 import { registerSideGames } from './side-games/routes.js';
 import { registerPackAdminRoutes } from './side-games/pack-admin-routes.js';
+import { registerSiteLook } from './site/look.js';
 import { registerArcade } from './arcade/routes.js';
 import { createLobbies } from './arcade/lobbies.js';
 import { createRounds } from './arcade/rounds.js';
@@ -65,6 +66,9 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   app.addHook('onSend', async (request, reply, payload) => {
     const state = requests.get(request);
     if (state) reply.header('server-timing', `app;dur=${(now() - state.start).toFixed(2)}`);
+    // Built files carry a content hash in their name, so they never change: browsers may keep them, which makes
+    // switching between parts of the app quick. Everything else (pages, API) stays no-store.
+    if (config.SERVE_WEB && reply.statusCode === 200 && request.method === 'GET' && /^\/assets\/[\w.-]+-[\w-]{8,}\.(js|css|woff2?|svg|png|webp)$/.test(request.url)) reply.header('cache-control', 'public, max-age=31536000, immutable');
     return payload;
   });
   app.addHook('onResponse', async (request, reply) => {
@@ -130,12 +134,15 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerFeedbackRoutes(app, options.database.client, config, owner);
     registerPeopleRoutes(app, options.database.client, config, owner, live);
     registerPrefabRoutes(app, options.database.client, owner);
-    registerPackAdminRoutes(app, options.database.client, owner);
+    registerPackAdminRoutes(app, options.database.client, config, owner);
+    registerSiteLook(app, options.database.client, owner);
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway, rooms.io);
     if (rooms) { const lobbies = createLobbies(options.database.client); registerArcade(app, options.database.client, config, rooms.gateway, createRounds(options.database.client, config, rooms.service, lobbies), lobbies); }
   }
   if (config.SERVE_WEB) {
-    void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: false, index: false, cacheControl: false });
+    // Files are looked up on each request (wildcard), not listed once at start: after a rebuild or deploy the new
+    // files are served at once, instead of "not found" (which left pages that load a part on demand blank).
+    void app.register(staticFiles, { root: fileURLToPath(new URL('../../web/dist/', import.meta.url)), prefix: '/', wildcard: true, index: false, cacheControl: false });
     app.get('/', async (_request, reply) => reply.sendFile('index.html'));
   }
   return app;

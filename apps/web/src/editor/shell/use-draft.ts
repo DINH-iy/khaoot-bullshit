@@ -161,7 +161,7 @@ export function useDraft(gameId: string) {
   const play = () => openRoom('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() }, () => 'Publish the game before playing it.');
   /** Practise the current draft without publishing it, from the start or from one scene (`only`: just that scene). */
   const rehearse = (startNodeKey: string | null, only = false) => openRoom(`/api/host/games/${gameId}/rehearse`, { expectedRevision: revision.current, startNodeKey, ...(only ? { only: true } : {}), sessionId: newId(), commandId: newId() },
-    code => code === 'INVALID_DEFINITION' ? (startNodeKey ? 'This scene cannot be rehearsed on its own: it needs something earlier in the game, such as the round it votes on or the teams it uses. Try an earlier scene.' : 'Fix the problems listed before rehearsing.')
+    code => code === 'INVALID_DEFINITION' ? (startNodeKey ? 'This scene cannot be played on its own: it needs something earlier in the game, such as the teams it plays in. Use Rehearse from here on an earlier scene.' : 'Fix the problems listed before rehearsing.')
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.');
 
   return { draft, loadError, definition, positions, setPositions, issues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,

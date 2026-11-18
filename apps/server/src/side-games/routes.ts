@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  BLACKJACK_OUTCOMES, BlackjackMoveSchema, BlackjackResultSchema, BlackjackStartSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
+  BLACKJACK_OUTCOMES, BlackjackMoveSchema, packPrice, BlackjackResultSchema, BlackjackStartSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
   REFILL_BELOW, REFILL_CHIPS, SlotResultSchema, SlotSpinSchema, slotMultiplier, WalletSchema, type GamblerRow, type RoomReply, type SlotSymbol,
 } from '@party/contracts';
 import type { Config } from '../config.js';
@@ -134,10 +134,10 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
         roomAssert(chips, 'CHIPS_OFF');
         // The set the player chose, at its price now (the owner may change it, or take it off sale).
         const set = await saleSet(tx, setId); roomAssert(set !== null && set.items.length > 0, 'NOT_FOUND');
-        roomAssert(await balance(tx, seat) >= set.price, 'NOT_ENOUGH_CHIPS');
+        const price = packPrice(set); roomAssert(await balance(tx, seat) >= price, 'NOT_ENOUGH_CHIPS');
         const { items, god } = drawPack(set);
-        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: set.price, state: { items, god, setId } } });
-        if (set.price > 0) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -set.price } });
+        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: price, state: { items, god, setId } } });
+        if (price > 0) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -price } });
         await tx.collectedItem.createMany({ data: items.map(itemKey => ({ ...entryFor(seat), roundId, itemKey })) });
         return PackResultSchema.parse({ roundId, items, balance: await balance(tx, seat), god });
       }) };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { Inspector } from '../scene/inspector.js';
@@ -277,10 +277,17 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const at = fromKeyboard || !rect ? { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } : toCanvas(event.clientX, event.clientY);
     select([]); setAdding({ from: null, option: undefined, at, place: { x: at.x - CARD_WIDTH / 2, y: at.y - 24 } });
   };
+  // The add menu stays inside the map: its real size is measured once shown, and it moves left or up to fit.
+  const menuRef = useRef<HTMLDivElement>(null); const [menuSize, setMenuSize] = useState({ width: 300, height: 560 });
+  useLayoutEffect(() => {
+    const menu = menuRef.current?.firstElementChild as HTMLElement | null; if (!menu) return;
+    const size = { width: menu.offsetWidth, height: menu.offsetHeight };
+    if (size.width !== menuSize.width || size.height !== menuSize.height) setMenuSize(size);
+  });
   const menuSpot = (at: Point) => {
     const rect = canvas.current?.getBoundingClientRect(); if (!rect) return { left: at.x, top: at.y };
-    const screenX = Math.min(Math.max(8, at.x * view.zoom + view.x), rect.width - 300);
-    const screenY = Math.min(Math.max(8, at.y * view.zoom + view.y), rect.height - 560);
+    const screenX = Math.max(8, Math.min(at.x * view.zoom + view.x, rect.width - menuSize.width - 8));
+    const screenY = Math.max(8, Math.min(at.y * view.zoom + view.y, rect.height - menuSize.height - 8));
     return { left: (screenX - view.x) / view.zoom, top: (Math.max(8, screenY) - view.y) / view.zoom, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 0' };
   };
 
@@ -408,7 +415,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           const position = positions[node.key]; if (!position) return null;
           const text = cardText(definition, node); const problems = problemsBy.get(node.key) ?? []; const isTarget = connecting?.target === node.key; const on = selected.includes(node.key);
           const incoming = definition.edges.some(edge => edge.to === node.key); const others = peersOn(live.peers, node.key);
-          return <div key={node.key} className={`scene-card kind-${text.kind}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
+          return <div key={node.key} className={`scene-card kind-${text.kind}${problems.length ? ' has-problems' : ''}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
             style={{ ...peerOutline(others), left: position.x, top: position.y, width: CARD_WIDTH, height: cardHeight(node) }} tabIndex={0} role="group" aria-roledescription="scene card"
             aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? ' Start scene.' : ''}${on ? ' Selected.' : ''}${others.length ? ` ${others.map(peer => peer.name).join(', ')} working here.` : ''}${problems.length ? ` ${problems.length} problems.` : ''}`}
             onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)} onDoubleClick={() => onOpenScene(node.key)}>
@@ -416,7 +423,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
             <p className="card-label">{definition.startNodeKey === node.key && <span className="start-flag">Start · </span>}{text.label}</p>
             <div className={`card-thumb thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true">{text.banner ?? <Icon name={sceneIcon(text.kind, text.input)} size={26} />}</div>
             <p className="card-title">{text.title}</p><p className="card-line">{text.line}</p>
-            {problems.length > 0 && <p className="card-problems">{problems.length} {problems.length === 1 ? 'problem' : 'problems'}</p>}
+            {problems.length > 0 && <p className="card-problems" title={problems.map(issue => issue.message).join('\n')}>{problems.length} {problems.length === 1 ? 'problem' : 'problems'}</p>}
             <span className={`port port-in${incoming ? ' grabbable' : ''}${isTarget && !connecting?.blocked ? ' port-hot' : ''}`} style={{ top: inputPort(position).y - position.y }} aria-hidden="true"
               onPointerDown={incoming ? event => grabInput(event, node.key) : undefined} title={incoming ? 'Drag to move the arrow into this scene' : undefined} />
             {isRoute(node) ? optionsOf(node).map(option => <span key={option.key} className="port-row" style={{ top: outputPort(node, position, option.key).y - position.y }}>
@@ -428,7 +435,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {adding && <div className="add-menu-anchor" style={menuSpot(adding.at)}><ScenePalette label={adding.onEdge ? 'Add a scene on this arrow' : adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
+        {adding && <div className="add-menu-anchor" ref={menuRef} style={menuSpot(adding.at)}><ScenePalette label={adding.onEdge ? 'Add a scene on this arrow' : adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       </div>
       {/* A selected arrow's actions float at the top of the map (never on the line, which keeps its bend handles free; never in the toolbar, which would jump). */}
       {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" role="toolbar" aria-label="Selected arrow" onPointerDown={event => event.stopPropagation()}>

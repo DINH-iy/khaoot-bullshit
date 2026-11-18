@@ -8,18 +8,19 @@ import { secure, type Draw } from './rules.js';
 // anything from a collection: a removed set is archived, a removed item retired (no longer in packs).
 
 type Db = PrismaClient | Transaction;
-type ItemRow = { key: string; name: string; emoji: string; rarity: string; flavor: string; retiredAt: Date | null };
-type SetRow = { id: string; name: string; price: number; onSale: boolean; sortOrder: number; chances: unknown; godPackOdds: number; items: ItemRow[] };
+type ItemRow = { key: string; name: string; emoji: string; imageId: string | null; rarity: string; flavor: string; retiredAt: Date | null };
+export const pictureUrl = (imageId: string) => `/api/packs/pictures/${imageId}`;
+type SetRow = { id: string; name: string; price: number; active: boolean; onSale: boolean; salePercent: number; sortOrder: number; chances: unknown; godPackOdds: number; items: ItemRow[] };
 const STANDARD: Chances = { common: 70, rare: 22, epic: 7, legendary: 1 };
 const chancesOf = (value: unknown): Chances => { const parsed = ChancesSchema.safeParse(value); return parsed.success ? parsed.data : STANDARD; };
 const rarityOf = (value: string): RarityKey => (RARITY_KEYS as readonly string[]).includes(value) ? value as RarityKey : 'common';
-export const itemView = (item: ItemRow): PackItemView => ({ key: item.key, name: item.name, emoji: item.emoji, rarity: rarityOf(item.rarity), flavor: item.flavor, retired: item.retiredAt !== null });
-const setView = (set: SetRow): PackSetView => ({ id: set.id, name: set.name, price: set.price, chances: chancesOf(set.chances), godPackOdds: set.godPackOdds, items: set.items.filter(item => !item.retiredAt).map(itemView) });
+export const itemView = (item: ItemRow): PackItemView => ({ key: item.key, name: item.name, emoji: item.emoji, image: item.imageId ? pictureUrl(item.imageId) : null, rarity: rarityOf(item.rarity), flavor: item.flavor, retired: item.retiredAt !== null });
+const setView = (set: SetRow): PackSetView => ({ id: set.id, name: set.name, price: set.price, sale: set.onSale ? set.salePercent : null, chances: chancesOf(set.chances), godPackOdds: set.godPackOdds, items: set.items.filter(item => !item.retiredAt).map(itemView) });
 const withItems = { items: { orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] } };
 
-/** The sets players can buy: on sale, not archived, with at least one item. */
+/** The sets players can buy: active, not archived, with at least one item. */
 export async function setsOnSale(db: Db): Promise<PackSetView[]> {
-  const sets = await db.packSet.findMany({ where: { onSale: true, archivedAt: null }, include: withItems, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+  const sets = await db.packSet.findMany({ where: { active: true, archivedAt: null }, include: withItems, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
   return sets.map(setView).filter(set => set.items.length > 0);
 }
 /** Items from anywhere (any set, retired too), for collections. */
@@ -29,11 +30,11 @@ export async function itemsByKey(db: Db, keys: string[]): Promise<PackItemView[]
 /** Every set that is not archived, for the owner. */
 export async function adminSets(db: Db): Promise<PackSetAdmin[]> {
   const sets = await db.packSet.findMany({ where: { archivedAt: null }, include: withItems, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
-  return sets.map(set => ({ ...setView(set), onSale: set.onSale, sortOrder: set.sortOrder }));
+  return sets.map(set => ({ ...setView(set), active: set.active, onSale: set.onSale, salePercent: set.salePercent, sortOrder: set.sortOrder }));
 }
 /** A set that can be bought now, or null. */
 export async function saleSet(db: Db, id: string) {
-  const set = await db.packSet.findFirst({ where: { id, onSale: true, archivedAt: null }, include: withItems });
+  const set = await db.packSet.findFirst({ where: { id, active: true, archivedAt: null }, include: withItems });
   return set ? setView(set) : null;
 }
 
@@ -58,16 +59,17 @@ export function drawPack(set: PackSetView, draw: Draw = secure): { items: string
   }) };
 }
 
+type SetInput = { name: string; price: number; active: boolean; onSale: boolean; salePercent: number; chances: Chances; godPackOdds: number };
 /** The owner's changes. */
 export const packAdmin = {
-  async createSet(db: Db, input: { name: string; price: number; onSale: boolean; chances: Chances; godPackOdds: number }) {
+  async createSet(db: Db, input: SetInput) {
     const last = await db.packSet.aggregate({ where: { archivedAt: null }, _max: { sortOrder: true } });
     return (await db.packSet.create({ data: { ...input, sortOrder: (last._max.sortOrder ?? -1) + 1 } })).id;
   },
-  async updateSet(db: Db, id: string, input: { name: string; price: number; onSale: boolean; chances: Chances; godPackOdds: number }) {
+  async updateSet(db: Db, id: string, input: SetInput) {
     return (await db.packSet.updateMany({ where: { id, archivedAt: null }, data: input })).count === 1;
   },
-  async archiveSet(db: Db, id: string) { return (await db.packSet.updateMany({ where: { id, archivedAt: null }, data: { archivedAt: new Date(), onSale: false } })).count === 1; },
+  async archiveSet(db: Db, id: string) { return (await db.packSet.updateMany({ where: { id, archivedAt: null }, data: { archivedAt: new Date(), active: false } })).count === 1; },
   async addItem(db: Db, setId: string, input: { name: string; emoji: string; rarity: RarityKey; flavor: string }) {
     const last = await db.packItem.aggregate({ where: { setId }, _max: { sortOrder: true } });
     // A fresh key, never reused: collections refer to it.
@@ -75,6 +77,11 @@ export const packAdmin = {
   },
   async updateItem(db: Db, key: string, input: { name: string; emoji: string; rarity: RarityKey; flavor: string }) {
     return (await db.packItem.updateMany({ where: { key, retiredAt: null }, data: input })).count === 1;
+  },
+  /** Sets or clears an item's picture; answers the picture it had before (to remove its file), or false. */
+  async setPicture(db: Db, key: string, imageId: string | null) {
+    const item = await db.packItem.findFirst({ where: { key, retiredAt: null }, select: { imageId: true } }); if (!item) return false;
+    await db.packItem.update({ where: { key }, data: { imageId } }); return { previous: item.imageId };
   },
   async retireItem(db: Db, key: string) { return (await db.packItem.updateMany({ where: { key, retiredAt: null }, data: { retiredAt: new Date() } })).count === 1; },
 };

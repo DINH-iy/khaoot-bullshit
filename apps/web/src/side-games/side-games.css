@@ -201,3 +201,22 @@
 .pack-set strong { font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pack-set small { color: var(--r-muted); font-weight: 700; }
 .pack-set.chosen { border-color: var(--r-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-accent) 25%, transparent); }
+.pack-set-sale { justify-self: start; padding: 1px 8px; border-radius: 999px; background: #ff7a3d; color: #2a1000; font-size: .72rem; font-weight: 800; }
+.pack-set s { opacity: .7; }
+/* An item's uploaded picture: the size of its emoji (1em square), rounded a little. */
+.item-art { display: inline-block; width: 1em; height: 1em; object-fit: cover; border-radius: .14em; vertical-align: middle; }
+/* The game switcher: one button with the current game; it opens a grid of every game (there will be many). */
+.side-picker { min-width: 0; }
+.room button.side-picker-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 10px; border-radius: 999px; border: 0; background: var(--r-card-strong); color: var(--r-text); font-weight: 800; max-width: 100%; }
+.side-picker-button > span:first-child { font-size: 1.3rem; }
+.side-picker-caret { font-size: .75em; color: var(--r-muted); }
+.side-picker-grid { list-style: none; margin: 0; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; border-radius: 16px; background: var(--r-card-strong); max-height: 50dvh; overflow: auto; }
+.side-picker-grid li { margin: 0; }
+.room .side-picker-grid button { width: 100%; display: grid; justify-items: center; gap: 4px; min-height: 84px; padding: 10px 6px; border-radius: 12px; border: 2px solid transparent; background: var(--r-card); color: var(--r-text); font-size: .85rem; font-weight: 700; text-align: center; }
+.room .side-picker-grid button[aria-current=true] { border-color: var(--r-accent); }
+.side-picker-icon { font-size: 1.8rem; line-height: 1; }
+.room .side-picker-grid button > span:last-child { overflow-wrap: normal; word-break: normal; hyphens: manual; font-size: .82rem; }
+.side-picker-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+/* The grid of games floats over the sheet, under the switcher. */
+.side-top { position: relative; }
+.side-picker-grid { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30; box-shadow: 0 16px 40px rgb(0 0 0 / .45); border: 1px solid var(--r-line); }

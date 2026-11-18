@@ -50,7 +50,9 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await sheet.getByRole('button', { name: 'Spin for 10 chips' }).click();
     await expect(sheet.getByRole('status').filter({ hasText: /You win|No luck/ })).toBeVisible();
     expect((await new AxeBuilder({ page }).include('.bottom-sheet').analyze()).violations).toEqual([]);
-    await sheet.getByRole('tab', { name: 'Leaderboard' }).click();
+    // One button names the game being played and opens all games.
+    await sheet.getByRole('button', { name: /choose another game/ }).click();
+    await sheet.getByRole('list', { name: 'Side games' }).getByRole('button', { name: 'Leaderboard' }).click();
     await expect(sheet.getByRole('row', { name: new RegExp(name) }).first()).toContainText('10');
 
     // The host starts the game: the round needs the player, so the side game steps aside.

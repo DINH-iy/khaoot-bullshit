@@ -1,5 +1,5 @@
 /* Admin menu: a wide working page for the owner. */
-main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
+main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .admin-head { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
 .admin-head h1 { margin: 0 0 6px; } .admin-head p { margin: 0; max-width: 46rem; }
 .admin-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 24px 0 16px; }
@@ -179,6 +179,8 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .packs-set-settings { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .packs-set-settings > * { grid-column: span 3; }
 .packs-set-settings > .packs-name { grid-column: span 5; } .packs-set-settings > :nth-child(3) { grid-column: span 4; }
+/* Row two: god pack odds, then the four chances. */
+.packs-set-settings > :nth-child(4) { grid-column: span 4; } .packs-set-settings > :nth-child(n+5) { grid-column: span 2; }
 .packs-set-save { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .packs-total { margin: 0 auto 0 0; font-weight: 700; font-size: .85rem; color: light-dark(#17663e, #8be0b4); }
 .packs-total.bad { color: light-dark(#9d1717, #ffb4b4); }
@@ -194,7 +196,7 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .packs-admin .packs-item button.danger:hover, .packs-admin .packs-item button.danger:focus-visible { border-color: currentColor; }
 @media (max-width: 720px) {
   .packs-set-row { flex-wrap: wrap; }
-  .packs-set-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); } .packs-set-settings > *, .packs-set-settings > :nth-child(3) { grid-column: auto; } .packs-set-settings > .packs-name { grid-column: 1 / -1; }
+  .packs-set-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); } .packs-set-settings > *, .packs-set-settings > :nth-child(n) { grid-column: auto; } .packs-set-settings > .packs-name { grid-column: 1 / -1; }
   .packs-economy-save { grid-column: 1 / -1; }
   .packs-item { grid-template-columns: 3rem minmax(0, 1fr) 90px; }
   .packs-item select, .packs-item input:nth-of-type(3) { grid-column: 1 / -1; }
@@ -203,4 +205,41 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .packs-admin button.icon-only:not(.danger):not(.primary) { background: transparent; color: inherit; border: 1px solid light-dark(#cfc8e3, #4a4560); }
 .packs-badge { flex: none; padding: 2px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: light-dark(#eeeaf7, #2c2840); color: light-dark(#5f5873, #b3acc8); }
 .packs-badge.on { background: light-dark(#d8f5e6, #1d4a34); color: light-dark(#17663e, #8be0b4); }
-.packs-admin button.icon-only.packs-sale.on { background: light-dark(#1f8a55, #2fa86b); border-color: transparent; color: #fff; }
+.packs-admin button.packs-toggle { background: transparent; color: inherit; border: 1px solid light-dark(#cfc8e3, #4a4560); padding: 0 14px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
+.packs-admin button.packs-toggle.on { background: light-dark(#1f8a55, #2fa86b); border-color: transparent; color: #fff; }
+.packs-admin button.packs-toggle.sale.on { background: light-dark(#c2410c, #ea7a3b); }
+.packs-badge.sale { background: light-dark(#ffe7d6, #4a2a14); color: light-dark(#9a3412, #ffb98a); }
+.packs-set-title s { opacity: .7; }
+/* A person's page on a wide screen: the stats on the left at full width, the small cards (rights, key, account) in a
+   column on the right. Narrower screens keep one column. */
+@media (min-width: 980px) {
+  .person-page { max-width: none; grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); align-items: start; }
+  .person-page > .person-page-head { grid-column: 1 / -1; }
+  .person-page > .person-card:first-of-type { grid-column: 1; grid-row: 2 / span 3; }
+  .person-page > .person-card:not(:first-of-type) { grid-column: 2; }
+  .person-page .person-stats { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+/* An item's picture (instead of its emoji), with a small × to go back to the emoji; the upload button next to save. */
+.packs-picture { position: relative; display: block; width: 42px; height: 42px; justify-self: center; }
+.packs-picture img { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; display: block; }
+.packs-admin button.packs-picture-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: light-dark(#3a3550, #e3def2); color: light-dark(#fff, #1e1c28); font-size: .85rem; line-height: 1; }
+.packs-upload { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; border: 1px solid light-dark(#cfc8e3, #4a4560); cursor: pointer; }
+.packs-upload:focus-within { outline: 2px solid light-dark(#6d3fd6, #b9a2ff); outline-offset: 2px; }
+.packs-item { grid-template-columns: 3rem minmax(8rem, 1fr) 8rem minmax(10rem, 2fr) 140px; }
+@media (max-width: 720px) { .packs-item { grid-template-columns: 3rem minmax(0, 1fr) 140px; } }
+
+/* Join screen: the style controls on the left (the editor's own), a phone-sized preview on the right that stays in view. */
+.join-look { display: grid; gap: 16px; }
+.join-look .admin-intro { margin: 0; }
+.join-look-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+.editor.join-look-controls { display: block; height: auto; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--e-border); background: var(--e-panel); }
+.join-look-side { position: sticky; top: 16px; display: grid; gap: 12px; }
+.join-look-preview { margin: 0; display: grid; gap: 6px; } .join-look-preview figcaption { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }
+.join-look-phone { height: 600px; overflow: hidden; border-radius: 28px; border: 8px solid #16171c; }
+.join-look-phone .room { min-height: 100%; height: 100%; }
+.join-look-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.join-look-actions .packs-saved { margin-right: auto; }
+.join-look-actions button { display: inline-flex; gap: 6px; align-items: center; }
+@media (max-width: 900px) { .join-look-grid { grid-template-columns: 1fr; } .join-look-side { position: static; } .join-look-phone { height: 520px; } }
+/* The preview uses the room's own button colours, not the admin page's. */
+.join-look-phone .room button.primary { background: var(--r-accent); color: var(--r-accent-ink); border-color: var(--r-accent); }

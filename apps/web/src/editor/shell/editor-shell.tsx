@@ -72,6 +72,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   if (!d.definition || !d.draft) return <main className="editor-message"><p role="status">Opening the editor…</p></main>;
   const { definition, draft } = d; const nodes = definition.nodes; const routes = nodes.filter(isRoute).length;
   const ready = d.issues.length === 0 && d.save === 'saved';
+  // Problems of the whole game (not on a scene) are fixed in Game settings: the ☰ menu and that item show them.
+  const gameIssues = d.issues.filter(issue => !issue.nodeKey || !definition.nodes.some(node => node.key === issue.nodeKey)); const gameProblems = gameIssues.length;
   const problemCount = `${d.issues.length} ${d.issues.length === 1 ? 'problem' : 'problems'}`;
   // Rehearsing skips scenes it cannot reach from where it starts (work in progress), as the server does:
   // only problems of the whole game and of the scenes it would play stop it. Publishing needs every problem fixed.
@@ -114,7 +116,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
           ...(role === 'owner' ? [{ label: draft.published ? 'Play the published version ↗' : 'Play (publish first)', disabled: d.busy || !draft.published, onSelect: d.play }] : []),
         ]} />
-        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', icon: 'gear', onSelect: () => openPanel('settings') }, { label: 'Invite people', icon: 'invite', onSelect: () => openPanel('invite') }, { label: 'Export as text', icon: 'export', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
+        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', icon: 'gear', onSelect: () => openPanel('settings'), problems: gameProblems }, { label: 'Invite people', icon: 'invite', onSelect: () => openPanel('invite') }, { label: 'Export as text', icon: 'export', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
           { label: theme === 'dark' ? 'Light mode' : 'Dark mode', icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}
         <PeerBar live={live} />
@@ -122,7 +124,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
     </header>
     {helping && <HelpPanel onClose={() => setHelping(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
-    {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
+    {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}
     <main className="editor-main">
       {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} focus={focus} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
@@ -130,7 +132,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
       {/* Bottom left: your edits (History) and every problem of the game; each folds into a small button. A problem goes to its scene. */}
       <div className="editor-corner">
         <HistoryPanel steps={d.steps} disabled={d.readOnly} onRestore={d.restore} />
-        <ProblemsPanel issues={d.issues} definition={definition} onGo={key => { setSelected([key]); if (view === 'look') setView('scene'); setFocus({ key, at: Date.now() }); }} />
+        <ProblemsPanel issues={d.issues} definition={definition} onGo={key => { setSelected([key]); if (view === 'look') setView('scene'); setFocus({ key, at: Date.now() }); }} onGame={() => openPanel('settings')} />
       </div>
     </main>
   </div>;

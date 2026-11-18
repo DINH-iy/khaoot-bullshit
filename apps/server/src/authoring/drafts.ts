@@ -40,7 +40,7 @@ export function inspectDefinition(draft: unknown): { issues: DefinitionIssue[]; 
     const node = Array.isArray(nodes) ? nodes[nodeIndex] as { key?: unknown } | undefined : undefined;
     const nodeKey = typeof node?.key === 'string' ? node.key.slice(0, 64) : null;
     const stageIndex = nodeIndex >= 0 && path[2] === 'stages' && /^\d+$/.test(path[3] ?? '') ? Number(path[3]) : null;
-    const entry = { message: friendlyMessage(issue.message, path), code: issue.message.slice(0, 300), nodeKey, stageIndex, path: path.join('.').slice(0, 300) };
+    const entry = { message: friendlyMessage(issue.message, path, issue.code === 'custom'), code: issue.message.slice(0, 300), nodeKey, stageIndex, path: path.join('.').slice(0, 300) };
     const key = `${entry.code}|${entry.path}`; if (seen.has(key) || issues.length >= 200) continue;
     seen.add(key); issues.push(entry);
   }

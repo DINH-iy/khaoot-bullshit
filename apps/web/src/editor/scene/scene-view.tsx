@@ -56,6 +56,12 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   useEffect(() => { setPart(0); setConfirming(false); }, [current.key]);
   const index = Math.min(part, current.stages.length - 1);
   const problems = d.issues.filter(issue => issue.nodeKey === current.key);
+  // Why "Try this scene" cannot work now, said before anything opens: problems of the whole game or of this scene
+  // stop every practice room; a vote needs the round it votes on, which is not in a room of one scene.
+  const gameWide = d.issues.filter(issue => !issue.nodeKey || !definition.nodes.some(node => node.key === issue.nodeKey));
+  const stopping = [...gameWide, ...problems]; const [why, setWhy] = useState(false);
+  const cannotTry = stopping.length ? `Fix ${stopping.length === 1 ? 'the problem' : `the ${stopping.length} problems`} first (${gameWide.length ? 'in Game settings' : 'in this scene'}): ${stopping[0]!.message}`
+    : current.stages.some(stage => stage.kind === 'vote') ? 'A vote needs the round it votes on, so it cannot be tried alone. Use Rehearse from here on that earlier round.' : null;
   const problemsFor = (key: string) => d.issues.filter(issue => issue.nodeKey === key).length;
   const onChange = (next: Definition, group?: string) => change(next, undefined, group);
 
@@ -102,7 +108,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   };
   const row =(node: Node, depth: number, _via: string | null) => {
     const text = cardText(definition, node); const count = problemsFor(node.key);
-    return <li key={node.key}><button className={`scene-row${node.key === current.key ? ' current' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={node.key === current.key ? 'true' : undefined} onClick={() => setSelected([node.key])}>
+    return <li key={node.key}><button className={`scene-row${node.key === current.key ? ' current' : ''}${count ? ' has-problems' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={node.key === current.key ? 'true' : undefined} onClick={() => setSelected([node.key])}>
       <span className={`row-icon thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`}><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
       <span className="row-text"><small>{definition.startNodeKey === node.key ? 'Start · ' : ''}{text.label}</small><span>{text.banner || text.title}</span></span>
       <PeerTags peers={peersOn(peers, node.key)} className="row-peers" />
@@ -137,7 +143,12 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
     <aside className="scene-props" aria-labelledby="scene-props-heading">
       <div className="inspector-head"><h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
         {/* Try just this scene in a practice room (a minigame, a round), without playing the whole game. */}
-        <button type="button" className="small-button with-icon try-scene" disabled={d.busy || d.save !== 'saved'} title="Plays only this scene in a practice room (opens in a new tab)" onClick={() => d.rehearse(current.key, true)}><Icon name="try" size={16} />Try this scene</button>
+        {/* Greyed out when it cannot work, with a red "!" on it that shows why (click, or hover). */}
+        <span className={`try-wrap${cannotTry ? ' blocked' : ''}`} onMouseEnter={() => setWhy(true)} onMouseLeave={() => setWhy(false)}>
+          <button type="button" className="small-button with-icon try-scene" disabled={d.busy || d.save !== 'saved' || Boolean(cannotTry)} title={cannotTry ? undefined : 'Plays only this scene in a practice room (opens in a new tab)'} onClick={() => d.rehearse(current.key, true)}><Icon name="try" size={16} />Try this scene</button>
+          {cannotTry && <button type="button" className="try-alert" aria-label="Why this scene cannot be tried" aria-expanded={why} aria-describedby={why ? 'try-why' : undefined} onClick={() => setWhy(!why)} onBlur={() => setWhy(false)}>!</button>}
+          {cannotTry && why && <span id="try-why" role="tooltip" className="try-pop">{cannotTry}</span>}
+        </span>
         <ActionMenu label="Scene actions" actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: 'Start the game here', icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
           { label: 'Rehearse from here', icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
           { label: 'Change where it leads (Flow editor)', icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: 'Delete scene…', icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
@@ -215,8 +226,11 @@ function Preview({ node, index }: { node: Node; index: number }) {
     <figure className="phone"><figcaption>Phone</figcaption>
       <div className="phone-screen"><p className="phone-prompt">{stage.kind === 'info' ? String(stage.title ?? '') : String(stage.prompt ?? '')}</p>
         {['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && input?.kind !== 'order'
-          ? <div className={input?.layout === 'tiles' || stage.kind === 'route' ? 'phone-tiles' : 'phone-list'}>{options.map(option => <span key={option.key}>{option.label}</span>)}</div>
+          ? <div className={(input?.layout === 'tiles' || stage.kind === 'route') && !longOptions(options) ? 'phone-tiles' : 'phone-list'}>{options.map(option => <span key={option.key}>{option.label}</span>)}</div>
           : <p className="phone-hint">{phone}</p>}
       </div></figure>
   </div>;
 }
+
+/** Options too long for two side by side on a phone: they go below one another (as the phone itself does). */
+const longOptions = (options: { label: string }[]) => options.some(option => option.label.length > 18 || option.label.split(/\s+/).some(word => word.length > 12));

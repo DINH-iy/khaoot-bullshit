@@ -809,7 +809,11 @@ model PackSet {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String    @db.VarChar(60)
   price       Int
-  onSale      Boolean   @default(true)
+  /// Players see the set (false: hidden from players).
+  active      Boolean   @default(true)
+  /// On sale: salePercent off the price, for as long as the owner keeps it on.
+  onSale      Boolean   @default(false)
+  salePercent Int       @default(50)
   sortOrder   Int       @default(0)
   chances     Json      @db.JsonB
   godPackOdds Int       @default(0)
@@ -829,6 +833,8 @@ model PackItem {
   name      String    @db.VarChar(40)
   emoji     String    @default("") @db.VarChar(16)
   rarity    String    @db.VarChar(12)
+  /// An uploaded picture (media folder pack-items/<id>.png) shown instead of the emoji; null: the emoji.
+  imageId   String?   @db.Uuid
   flavor    String    @default("") @db.VarChar(120)
   sortOrder Int       @default(0)
   retiredAt DateTime? @db.Timestamptz(3)

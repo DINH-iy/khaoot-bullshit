@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, MINIGAMES, MINIGAME_KEYS, TEAM_MINIGAMES, type ArcadeLobbyView, type ArcadeTeams, type MinigameKey } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
+import { navigate } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
 import { Avatar } from '../players/avatar.js';
 import { savedLook } from '../players/look-builder.js';
@@ -27,7 +28,7 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
   // A round this browser plays in: straight into its room.
   useEffect(() => {
     if (!lobby?.round?.seated || entering.current) return; entering.current = true;
-    void roomApi<{ sessionId: string }>(`/api/arcade/lobbies/${lobbyId}/enter`, {}).then(result => location.assign(`/?room=${result.sessionId}`))
+    void roomApi<{ sessionId: string }>(`/api/arcade/lobbies/${lobbyId}/enter`, {}).then(result => navigate(`/?room=${result.sessionId}`))
       .catch(cause => { entering.current = false; setError(arcadeProblem(cause)); });
   }, [lobby?.round?.seated, lobby?.round?.number]);
   const act = (path: string, body: unknown = {}) => { setError(''); void roomApi(`/api/arcade/lobbies/${lobbyId}/${path}`, body).then(refresh).catch(cause => setError(arcadeProblem(cause))); };
@@ -62,7 +63,7 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
     {lobby.totals.length > 0 && <section className="arcade-card" aria-labelledby="totals-heading"><h2 id="totals-heading">Total in this lobby</h2>
       <ol className="arcade-board">{lobby.totals.map(row => <li key={row.memberId}><span><Avatar look={row.look} size={28} /> {row.displayName}</span><span>{points(row.pointsMilli)} · {row.wins} {row.wins === 1 ? 'win' : 'wins'} · {row.rounds} played</span></li>)}</ol></section>}
     <InviteCard url={url} locked={lobby.locked} />
-    <p><button type="button" className="ghost" onClick={() => { void roomApi(`/api/arcade/lobbies/${lobbyId}/leave`, {}).then(() => location.assign('/?arcade')).catch(cause => setError(arcadeProblem(cause))); }}>Leave this lobby</button></p>
+    <p><button type="button" className="ghost" onClick={() => { void roomApi(`/api/arcade/lobbies/${lobbyId}/leave`, {}).then(() => navigate('/?arcade')).catch(cause => setError(arcadeProblem(cause))); }}>Leave this lobby</button></p>
   </>);
 }
 

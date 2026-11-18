@@ -22,3 +22,38 @@
 /* In the top bar every button is at least 40 px tall: the ring follows, so it stays a circle. */
 .editor .editor-actions .peer-me-button { width: 40px; height: 40px; min-height: 40px; flex: none; }
 .editor .editor-actions .peer-me-button .peer-dot { width: 30px; height: 30px; }
+/* Who else is here, said in words: a quiet pill with "Also here" and a named chip per person, evenly spaced. */
+.peer-others { display: inline-flex; align-items: center; gap: 8px; height: 40px; box-sizing: border-box; padding: 0 4px 0 12px; border-radius: 999px; border: 1px solid var(--e-border); }
+.peer-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--e-muted); white-space: nowrap; line-height: 1; }
+.peer-others .peer-list { display: flex; align-items: center; gap: 4px; }
+.peer-others .peer-chip { margin-left: 0; display: inline-flex; align-items: center; gap: 6px; height: 30px; box-sizing: border-box; padding: 0 10px 0 3px; border-radius: 999px; box-shadow: none; background: color-mix(in srgb, var(--peer) 22%, transparent); }
+.peer-name { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; font-weight: 600; line-height: 1; }
+.peer-more { position: relative; display: flex; }
+.editor .peer-more-button { height: 30px; min-height: 0; padding: 0 10px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-bg); color: var(--e-text); font-size: .85rem; font-weight: 700; }
+.peer-more-list { position: absolute; right: 0; top: calc(100% + 10px); z-index: 12; min-width: 14rem; margin: 0; padding: 8px; list-style: none; display: grid; gap: 4px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
+.peer-more-list li { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; padding: 4px; font-weight: 600; }
+.peer-more-list small { grid-column: 2; color: var(--e-muted); font-weight: 400; }
+/* Your own circle carries a small "You" under it. */
+.peer-me { display: grid; justify-items: center; }
+.peer-you { position: absolute; bottom: -9px; padding: 0 5px; border-radius: 999px; background: var(--e-panel); color: var(--e-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; pointer-events: none; }
+@media (max-width: 720px) { .peer-label, .peer-name { display: none; } .peer-others { padding: 0 4px; } .peer-others .peer-chip { padding: 0 3px; } }
+/* Three or more: initials overlapping, then the count. */
+.peer-others.crowd .peer-list { gap: 0; }
+.peer-others.crowd .peer-chip { padding: 0; height: auto; background: none; margin-left: -8px; border-radius: 50%; box-shadow: 0 0 0 2px var(--e-panel); }
+.peer-others.crowd .peer-chip:first-child { margin-left: 0; }
+.peer-others.crowd .peer-more { margin-left: 6px; }
+/* Inside the top bar (where every button is at least 40 px tall) the count stays a small 28 px pill, centred in the
+   "Also here" pill, with the same space on every side. */
+.peer-others { gap: 10px; padding: 0 5px 0 14px; }
+.peer-others .peer-list, .peer-more { align-items: center; }
+.editor .editor-actions .peer-more-button { height: 28px; min-height: 28px; min-width: 28px; padding: 0 9px; display: inline-grid; place-items: center; line-height: 1; font-size: .8rem; }
+.peer-others .peer-chip { height: 28px; }
+.peer-others.crowd .peer-chip { margin-left: -6px; }
+.peer-others.crowd .peer-chip:first-child { margin-left: 0; }
+.peer-others.crowd .peer-more { margin-left: 8px; }
+.peer-others.crowd .peer-chip { margin-left: -4px; } .peer-others.crowd .peer-chip:first-child { margin-left: 0; }
+.peer-others.crowd .peer-dot { width: 26px; height: 26px; font-size: .75rem; }
+/* The page's own list spacing (12 px under every item) is not for this pill: everything sits on its centre line. */
+.peer-others .peer-list { align-self: center; height: 30px; }
+.peer-others li { margin-top: 0; margin-bottom: 0; }
+.peer-others .peer-more { display: flex; align-items: center; height: 30px; }

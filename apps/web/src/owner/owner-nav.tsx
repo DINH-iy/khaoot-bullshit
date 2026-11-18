@@ -6,7 +6,7 @@ import { openFeedback } from '../feedback/open-feedback.js';
 import { FEEDBACK_UI } from '../feedback/describe-element.js';
 import './owner-nav.css';
 
-export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people' | 'packs';
+export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people' | 'packs' | 'look';
 /** Who is working here: the owner, a person with editor rights, or nobody (null). */
 export type HostRole = 'owner' | 'editor';
 // The editor opens per game, so "Editor" leads to the list of games on the host menu.
@@ -17,6 +17,7 @@ const LINKS: { key: OwnerSection; label: string; href: string; editor: boolean }
   { key: 'admin', label: 'Admin', href: '/?admin', editor: false },
   { key: 'people', label: 'People', href: '/?admin=people', editor: false },
   { key: 'packs', label: 'Chips & packs', href: '/?admin=packs', editor: false },
+  { key: 'look', label: 'Join screen', href: '/?admin=look', editor: false },
 ];
 
 /** Asks the host endpoint once who this browser is. Never used on the player screen. */

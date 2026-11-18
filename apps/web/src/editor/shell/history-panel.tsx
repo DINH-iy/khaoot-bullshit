@@ -1,9 +1,7 @@
-import { useState } from 'react';
+import { useCornerPanel } from './corner-panels.js';
 import { Icon } from '../controls/icons.js';
 
 const KEY = 'party.editor.historyOpen';
-const remembered = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
-const remember = (open: boolean) => { try { localStorage.setItem(KEY, open ? '1' : '0'); } catch { /* only for this page */ } };
 const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
 interface Entry { label: string; at: number }
@@ -14,8 +12,8 @@ interface Entry { label: string; at: number }
  * Undo or Redo that many times, so other people's changes stay. Folded, it is a small "History" button.
  */
 export function HistoryPanel({ steps, disabled, onRestore }: { steps: { undo: Entry[]; redo: Entry[] }; disabled: boolean; onRestore: (kind: 'undo' | 'redo', count: number) => void }) {
-  const [open, setOpen] = useState(remembered);
-  const toggle = () => { setOpen(!open); remember(!open); };
+  const [open, setOpen] = useCornerPanel('history', KEY);
+  const toggle = () => setOpen(!open);
   const { undo, redo } = steps; const total = undo.length + redo.length;
   const row = (entry: Entry, kind: 'undo' | 'redo', count: number, undone: boolean) => <li key={`${kind}-${count}`} className={undone ? 'undone' : undefined}>
     <button type="button" disabled={disabled || count === 0} onClick={() => onRestore(kind, count)} title={count === 0 ? 'This is where you are' : undone ? 'Redo up to here' : 'Undo back to just after this'}>

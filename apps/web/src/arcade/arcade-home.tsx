@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { navigate } from '../navigation.js';
 import { ArcadeLeaderboardSchema, ArcadeListSchema, MINIGAMES, type ArcadeLeaderboard, type ArcadeList } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { savedLook } from '../players/look-builder.js';
@@ -9,7 +10,7 @@ import { arcadeProblem, arcadeResult, points } from './arcade-text.js';
 const NAME_KEY = 'party_arcade_name';
 const rememberedName = () => { try { return localStorage.getItem(NAME_KEY) ?? ''; } catch { return ''; } };
 export const rememberName = (name: string) => { try { localStorage.setItem(NAME_KEY, name); } catch { /* only a convenience */ } };
-export const openLobby = (lobbyId: string) => { location.assign(`/?arcade=${lobbyId}`); };
+export const openLobby = (lobbyId: string) => { navigate(`/?arcade=${lobbyId}`); };
 
 /** The arcade's front page: open lobbies to join, opening your own, and the all-time leaderboards. */
 export function ArcadeHome() {

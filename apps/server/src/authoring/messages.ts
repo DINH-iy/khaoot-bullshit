@@ -40,6 +40,9 @@ const RULES: Record<string, string> = {
   'This minigame needs teams': 'Pass the pencil is played in teams. Set this round (or the game) to play in teams.',
   'Minigame settings are not valid': 'The minigame settings do not fit together. Check the times and points.',
   'Duel game settings are not valid': 'The settings of the duel’s game do not fit. Check them in the scene settings.',
+  'An award is about a scene that does not exist': 'An end-of-game award is about a scene that was removed or renamed. Choose another scene for that award, or remove it.',
+  'Write the explanation for this scene, or switch it off': 'The explanation is switched on but empty. Write it, or switch the explanation off.',
+  'Scene names must be unique': 'Two scenes have the same name.',
   'Give the minigame either points per place or places, not both': 'This minigame has two sets of points by place. Set its points by place again in the scene settings.',
 };
 const FIELDS: Record<string, string> = {
@@ -49,8 +52,15 @@ const FIELDS: Record<string, string> = {
   awardMilli: 'The points are not a valid number.', maxAwardMilli: 'The points are not a valid number.', awardPerVoteMilli: 'The points are not a valid number.',
   game: 'Choose which minigame this is.', stages: 'A scene needs at least one part.', nodes: 'A game needs at least one scene.', edges: 'There are too many connections.',
 };
-export function friendlyMessage(code: string, path: string[]): string {
+const words = (field: string) => field.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/Milli$|Ms$/, '').toLowerCase().trim();
+/**
+ * The message for one problem: a known rule; a check of our own (`custom`, already a plain sentence); a known
+ * field; or, last, which setting it is and what the check said, so the author always learns what is wrong.
+ */
+export function friendlyMessage(code: string, path: string[], custom = false): string {
   if (RULES[code]) return RULES[code];
+  if (custom && code.trim()) return /[.!?]$/.test(code.trim()) ? code.trim() : `${code.trim()}.`;
   const field = [...path].reverse().find(part => !/^\d+$/.test(part));
-  return (field && FIELDS[field]) ?? 'Something in this scene is not filled in correctly.';
+  if (field && FIELDS[field]) return FIELDS[field];
+  return field ? `The setting “${words(field)}” is not valid: ${code.replace(/\.$/, '')}.` : `Something is not filled in correctly: ${code.replace(/\.$/, '')}.`;
 }

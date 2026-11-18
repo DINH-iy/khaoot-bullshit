@@ -24,8 +24,8 @@ describe('slot machine', () => {
 });
 
 describe('packs', () => {
-  const item = (key: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => ({ key, name: key, emoji: '', rarity, flavor: '', retired: false });
-  const set: PackSetView = { id: '7a0c3f1e-5b1d-4c39-9d7e-0a1b2c3d4e01', name: 'Test', price: 100, chances: { common: 70, rare: 22, epic: 7, legendary: 1 }, godPackOdds: 500,
+  const item = (key: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => ({ key, name: key, emoji: '', image: null, rarity, flavor: '', retired: false });
+  const set: PackSetView = { id: '7a0c3f1e-5b1d-4c39-9d7e-0a1b2c3d4e01', name: 'Test', price: 100, sale: null, chances: { common: 70, rare: 22, epic: 7, legendary: 1 }, godPackOdds: 500,
     items: [item('c1', 'common'), item('c2', 'common'), item('r1', 'rare'), item('l1', 'legendary')] };
   it('draws the right number of items by the set\'s chances', () => {
     // 1 of 500 is not a god pack; then 99 of 100 is in the legendary 1 %, 0 is common, 70 is rare.

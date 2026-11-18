@@ -85,7 +85,7 @@ Sources: Nielsen Norman Group ([Dropdowns: when to use them](https://www.nngroup
 ### J. Side games
 
 - J1: pack opening with a real animation (like trading-card packs).
-- J2: "chips cannot be disabled and the minigames take too much space": chips can be switched off now; what "the minigames take too much space" means is still open; if it was the add-scene menu, the tabs (F3) may have solved it.
+- J2: chips can be switched off now. "The minigames take too much space": closed, nobody knows what was meant (owner, 18 November 2026).
 
 ### K. Editor structure (UX designer, 17 November 2026)
 
@@ -253,7 +253,6 @@ Side games:
 
 ### Open questions
 
-- "You're far away" (host screen on an iPhone): that text is not in this app; what was on screen?
 - Roulette: not built; a new side game if wanted.
 
 ## Known limits and test notes
@@ -268,3 +267,23 @@ Side games:
 - After pulling: `npm run db:migrate:deploy` (the challenge stakes migration is new).
 - Run tests from an uppercase `C:\Projects\khaoot-bullshit` path: from `c:\…` Vitest loads twice and every database suite fails with "failed to find the current suite".
 - `npm run check`, `npm run db:test:up` then `npm run db:test`, and `npm run test:e2e` (after a build) as in the README.
+
+## Owner's follow-ups, 18 November 2026
+
+**Built, waiting for the owner's review; no new tests yet.**
+
+- X1: **Chips & packs** (Admin → Chips & packs, owner only): the chip amounts (to start, per point, 1st/2nd/3rd place, everyone else, minigame or duel won, arcade win) and the pack sets. A set has a name, price, chance per rarity (adds up to 100), god pack odds (1 in N, 0 = never) and items (emoji, name, rarity, a line on the card). Each set row has an **Active** button (players see it, or it is hidden), an **On sale** button (a percentage off, 50% by default, set per set) and edit and remove. Removing a set or item never takes it from a collection. Players pick which set to open on their phone; a sale shows the old price struck through.
+- X2: the arcade moves between its lobby and a round **without reloading the page** (a reload went black on phones and could swallow a tap mid-round). Parts of the app that load when opened (editor, admin, arcade) are tried again when a download fails and never leave the page black; the server now serves a new build's files at once, and keeps built files in the browser's cache.
+- X3: editor: the right-click add menu stays on screen; a problem of the whole game says what is wrong (for example an end-of-game award about a removed scene) and clicking it opens the game settings (the ☰ menu then shows a red *!*, *Game settings* a red count, and in the panel the group with the problem has a red line, its title and *1 problem* in red, opens by itself and shows the problem in red at its top); scenes with a problem have a red border in the map and the scene list; History and Problems open one at a time without pushing each other aside; the people editing now are named (*Also here*), your own circle says *You*; the phone preview wraps long questions and puts long answers below one another.
+- X5: **item pictures**: in a set's items, the picture button takes any picture, makes it square (cut to the middle) and 256 pixels on this device, and the server keeps only its image (as with players' photos). It shows instead of the emoji everywhere on the phone; the small × on it goes back to the emoji.
+- X8: **Join screen** (Admin → Join screen, owner only): the look of the first screen players see (room code and name), with the editor's own style controls (styles, colours, text, shapes and background, answer marks) and a live phone preview. Once a code is typed the screen takes that room's game look; rooms and scenes always use their game's look.
+- X10: side games: one button with the game being played (*🎰 Slots ▾*) opens all games as a grid over the screen (it pushes nothing down; Escape or a tap outside closes it), so there is room for many more games.
+- X11: editing together: *Also here* with one other person shows their name; with two or more their initials (at most three, overlapping) and a count that lists everyone and where they are, so the top bar stays one line.
+- X12: **Try this scene** is greyed out when it cannot work, with a red *!* on its corner; hovering or clicking the *!* shows why in a small bubble: a problem of the whole game or of this scene (*Fix the problem first …*), or a vote (it needs the round it votes on). It used to open a tab that closed at once.
+- X4: a person's page uses the full width on a computer (stats left, rights, key and account right).
+
+**Still to do (owner's list):**
+
+- X6: tests for the owner's pack pages and pack odds, once the owner approves the look.
+- X7: **editor in other languages**: the editor (and the host and admin screens) in Dutch, German, Romanian and more, chosen per person. Today only the players' screen texts can be changed, per game (Look & feel → texts).
+- X9: a new style for the owner's top bar (Play, Host, Editor, Admin, People, Chips & packs, Feedback).

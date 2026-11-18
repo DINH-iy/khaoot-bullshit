@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -13,8 +14,11 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     await ann.page.getByRole('link', { name: 'Arcade: play minigames with friends' }).click();
     await ann.page.getByLabel('Your name').fill('Ann');
     expect((await new AxeBuilder({ page: ann.page }).analyze()).violations).toEqual([]);
+    // A name of its own per run: lobbies of other runs (the other browser project) may still be listed.
+    const title = `Ann's lobby ${randomUUID().slice(0, 6)}`;
+    await ann.page.getByLabel('Lobby name (optional)').fill(title);
     await ann.page.getByRole('button', { name: 'Open a lobby' }).click();
-    await expect(ann.page.getByRole('heading', { name: "Ann's lobby" })).toBeVisible();
+    await expect(ann.page.getByRole('heading', { name: title })).toBeVisible();
     const link = (await ann.page.getByRole('region', { name: 'Invite players' }).getByRole('link').textContent())!;
     expect(link).toMatch(/\/\?arcade=[0-9a-f-]{36}$/);
 
@@ -28,7 +32,7 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     // Locked: Cy cannot get in until Ann unlocks.
     await ann.page.getByRole('button', { name: 'Open: lock' }).click();
     await cy.page.goto(`${baseURL}/?arcade`);
-    const card = cy.page.getByRole('listitem').filter({ hasText: "Ann's lobby" });
+    const card = cy.page.getByRole('listitem').filter({ hasText: title });
     await expect(card.getByRole('button', { name: 'Locked' })).toBeDisabled();
     await ann.page.getByRole('button', { name: 'Locked: unlock' }).click();
     await expect(card.getByRole('button', { name: 'Join' })).toBeEnabled({ timeout: 10_000 });

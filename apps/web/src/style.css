@@ -81,3 +81,7 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 .join-qr img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
 @media (max-width: 480px) { main { margin: 12px auto; padding: 12px; } section { padding: 16px; } .actions button { flex: 1 1 140px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+
+/* A part of the app that could not load (lazy-page.tsx). */
+.load-problem { max-width: 28rem; margin: 15vh auto; padding: 0 16px; display: grid; gap: 12px; justify-items: start; }
+.load-problem h1 { margin: 0; font-size: 1.5rem; } .load-problem p { margin: 0; }
