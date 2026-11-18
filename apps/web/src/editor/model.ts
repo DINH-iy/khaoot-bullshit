@@ -13,6 +13,8 @@ export type Positions = Record<string, Point>;
 // Card geometry, in canvas units. Ports sit at fixed offsets so lines line up exactly.
 export const GRID = 24;
 export const CARD_WIDTH = 264;
+/** From one column of scenes to the next when tidying (a card and the gap after it). */
+export const COLUMN_STEP = CARD_WIDTH + GRID * 4;
 export const PORT_Y = 72;
 export const OPTION_GAP = 32;
 // A party choice lists its routes as rows under the title, each with its own output port.
@@ -288,13 +290,17 @@ export function autoLayout(definition: Definition, { oneRow = false }: { oneRow?
   const tallest = Math.max(...[...columns.values()].map(heightOf));
   // A long game wraps into rows of columns, as many per row as keeps the whole game about screen-shaped (16:10);
   // a short one stays on one row. The arrow from the end of a row runs back to the start of the next (see `curve`).
-  const count = Math.max(...columns.keys()) + 1; const step = CARD_WIDTH + GRID * 6; const rowHeight = tallest + GRID * 8;
+  // Each row is only as tall as its own tallest column, with a gap the arrows back can run through.
+  const count = Math.max(...columns.keys()) + 1; const step = COLUMN_STEP; const rowGap = GRID * 4; const rowHeight = tallest + rowGap;
   const perRow = oneRow || count <= 6 ? count : [...Array(count).keys()].map(index => index + 1).filter(size => size >= 4)
     .reduce((best, size) => Math.abs((size * step) / (Math.ceil(count / size) * rowHeight) - 1.6) < Math.abs((best * step) / (Math.ceil(count / best) * rowHeight) - 1.6) ? size : best, count);
+  const rows = Math.ceil(count / perRow); const rowTallest = Array.from({ length: rows }, () => 0);
+  for (const [column, nodes] of columns) { const row = Math.floor(column / perRow); rowTallest[row] = Math.max(rowTallest[row]!, heightOf(nodes)); }
+  const rowTop = rowTallest.reduce<number[]>((tops, _height, row) => [...tops, row ? tops[row - 1]! + rowTallest[row - 1]! + rowGap : 0], []);
   const positions: Positions = {};
   for (const [column, nodes] of columns) {
     const row = Math.floor(column / perRow); const place = column % perRow;
-    let y = snap(row * rowHeight + (tallest - heightOf(nodes)) / 2);
+    let y = snap(rowTop[row]! + (rowTallest[row]! - heightOf(nodes)) / 2);
     for (const node of nodes) { positions[node.key] = { x: place * step, y }; y += snap(cardHeight(node) + GRID * 2); }
   }
   return positions;
@@ -312,7 +318,7 @@ export function lineUp(definition: Definition, positions: Positions, keys: strin
   for (const key of placed) {
     next[key] = direction === 'row' ? { x: cursor, y: first.y } : { x: first.x, y: cursor };
     const node = definition.nodes.find(entry => entry.key === key);
-    cursor += direction === 'row' ? CARD_WIDTH + GRID * 6 : snap((node ? cardHeight(node) : 192) + GRID * 2);
+    cursor += direction === 'row' ? COLUMN_STEP : snap((node ? cardHeight(node) : 192) + GRID * 2);
   }
   return next;
 }

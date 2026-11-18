@@ -420,3 +420,6 @@
   .lobby-band { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 20px 16px; } .lobby-band-text { justify-items: center; }
   .lobby-stage { padding: 0 16px 20px; } .lobby-seats { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); } .seat { min-height: 120px; }
 }
+/* The people picker's ticks fill the row (the player list's chip style must not reach them). */
+.host-sheet.players .people-picker li { display: block; padding: 0; background: none; border-radius: 0; }
+.people-picker .choice { width: 100%; box-sizing: border-box; }

@@ -19,3 +19,6 @@
 .peer-cursor svg { flex: none; fill: var(--peer); stroke: #fff; stroke-width: 1.5; }
 .peer-cursor span { margin-top: 14px; padding: 1px 8px; border-radius: 999px; background: var(--peer); color: #fff; font-size: .75rem; font-weight: 600; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .peer-cursor { transition: none; } }
+/* In the top bar every button is at least 40 px tall: the ring follows, so it stays a circle. */
+.editor .editor-actions .peer-me-button { width: 40px; height: 40px; min-height: 40px; flex: none; }
+.editor .editor-actions .peer-me-button .peer-dot { width: 30px; height: 30px; }

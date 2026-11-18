@@ -98,7 +98,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
           ...(role === 'owner' ? [{ label: draft.published ? 'Play the published version ↗' : 'Play (publish first)', disabled: d.busy || !draft.published, onSelect: d.play }] : []),
         ]} />
-        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', onSelect: () => openPanel('settings') }, { label: 'Invite people', onSelect: () => openPanel('invite') }, { label: 'Export as text', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
+        <ActionMenu label="Game menu" actions={[{ label: 'Game settings', icon: 'gear', onSelect: () => openPanel('settings') }, { label: 'Invite people', icon: 'invite', onSelect: () => openPanel('invite') }, { label: 'Export as text', icon: 'export', onSelect: () => openPanel('export') }, { label: 'Help & shortcuts', icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
           { label: theme === 'dark' ? 'Light mode' : 'Dark mode', icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}
         <PeerBar live={live} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routedPath, withBends, duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routedPath, withBends, duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, COLUMN_STEP, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
 import { toDoc } from '../../src/editor/live/document.js';
 
 const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] });
@@ -180,7 +180,7 @@ describe('tidying a long game', () => {
     const positions = withBends({ s0: { x: 480, y: 96 }, s1: { x: 0, y: 240 }, s2: { x: 960, y: 0 }, s3: { x: 24, y: 24 } }, 'e0', [{ x: 5, y: 5 }]);
     const row = lineUp(definition, positions, ['s0', 's1', 's2'], 'row');
     // Left to right as they were (s1, s0, s2), starting where the leftmost was, level with it.
-    expect([row['s1'], row['s0'], row['s2']]).toEqual([{ x: 0, y: 240 }, { x: CARD_WIDTH + GRID * 6, y: 240 }, { x: 2 * (CARD_WIDTH + GRID * 6), y: 240 }]);
+    expect([row['s1'], row['s0'], row['s2']]).toEqual([{ x: 0, y: 240 }, { x: COLUMN_STEP, y: 240 }, { x: 2 * COLUMN_STEP, y: 240 }]);
     expect(row['s3']).toEqual({ x: 24, y: 24 }); expect(bendsOf(row, 'e0')).toEqual([{ x: 5, y: 5 }]);
     const column = lineUp(definition, positions, ['s0', 's1', 's2'], 'column');
     expect([column['s2'], column['s0'], column['s1']].map(point => point!.x)).toEqual([960, 960, 960]);

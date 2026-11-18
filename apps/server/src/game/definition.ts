@@ -152,13 +152,15 @@ export const GameDefinitionSchema = z.object({
   for (const award of definition.finale?.awards ?? []) {
     if (award.rule === 'scene' && !definition.nodes.some(node => node.key === award.nodeKey)) ctx.addIssue({ code: 'custom', message: 'An award is about a scene that does not exist', path: ['finale'] });
   }
-  for (const node of definition.nodes) {
+  for (const [nodeIndex, node] of definition.nodes.entries()) {
     count += node.stages.length;
-    if (new Set(node.stages.map(stage => stage.key)).size !== node.stages.length) fail('Duplicate stage key');
-    for (const stage of node.stages) {
+    // Problems of one scene (or one part) carry its path: each is counted and shown on its own scene, never merged with another's.
+    const at = (message: string, stageIndex?: number) => ctx.addIssue({ code: 'custom', message, path: stageIndex === undefined ? ['nodes', nodeIndex] : ['nodes', nodeIndex, 'stages', stageIndex] });
+    if (new Set(node.stages.map(stage => stage.key)).size !== node.stages.length) at('Duplicate stage key');
+    for (const [stageIndex, stage] of node.stages.entries()) {
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-choice') {
         const rule = stage.scoring;
-        if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) fail('Invalid correct choice');
+        if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) at('Invalid correct choice', stageIndex);
       }
       // Only a minigame has a standard explanation (its “how to play”); other scenes need their own text.
       if (stage.explain && !stage.explain.text && stage.kind !== 'minigame') ctx.addIssue({ code: 'custom', message: 'Write the explanation for this scene, or switch it off', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
@@ -170,7 +172,7 @@ export const GameDefinitionSchema = z.object({
       if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-order') {
         const rule = stage.scoring; const keys = stage.input.kind === 'order' ? stage.input.items.map(item => item.key) : [];
-        if (keys.length !== rule.correctOrder.length || new Set(rule.correctOrder).size !== keys.length || !keys.every(key => rule.correctOrder.includes(key))) fail('Invalid correct order');
+        if (keys.length !== rule.correctOrder.length || new Set(rule.correctOrder).size !== keys.length || !keys.every(key => rule.correctOrder.includes(key))) at('Invalid correct order', stageIndex);
       }
     }
   }

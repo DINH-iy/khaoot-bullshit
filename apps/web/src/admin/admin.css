@@ -48,11 +48,11 @@ main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
 .person-name { display: inline-flex; align-items: center; gap: 10px; }
 .person-name > span:last-child { display: grid; }
 .person-name-text { font-weight: 700; white-space: normal; }
-.person-name small { font-weight: 400; font-size: .8rem; opacity: .7; }
+.person-name small { font-weight: 400; font-size: .8rem; color: light-dark(#5f5873, #b3acc8); }
 .person-initials { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: light-dark(#eeeaf7, #2c2840); font-size: .8rem; font-weight: 800; }
 .person-initials.editor { background: #6d3fd6; color: #fff; }
 .seen-recent::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #1f9d55; vertical-align: middle; }
-.seen-never { opacity: .6; }
+.seen-never { color: light-dark(#5f5873, #b3acc8); }
 .person-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
 .person-actions button { min-height: 36px; padding: 6px 12px; font-weight: 600; }
 /* A switch for "can edit games": the real checkbox, drawn as a track and knob. */
@@ -66,7 +66,7 @@ main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
 .people-summary li { margin: 0; display: grid; gap: 2px; padding: 14px 16px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
 .people-summary-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: light-dark(#5f5873, #b3acc8); }
 .people-summary strong { font-size: 1.8rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.people-summary small { font-size: .82rem; opacity: .75; }
+.people-summary small { font-size: .82rem; color: light-dark(#5f5873, #b3acc8); }
 .person-key code { display: inline-block; padding: 10px 16px; border-radius: 12px; background: light-dark(#f1edfb, #2c2840); font: 800 1.6rem/1.2 ui-monospace, monospace; letter-spacing: .12em; }
 .person-check { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-weight: 600; white-space: nowrap; }
 .person-check input { width: 20px; height: 20px; margin: 0; }
@@ -74,7 +74,7 @@ main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
 .people-search { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
 .people-search label { flex: 1; max-width: 26rem; }
 .people-search input { min-height: 44px; }
-.people-search [role=status] { font-size: .9rem; opacity: .75; }
+.people-search [role=status] { font-size: .9rem; color: light-dark(#5f5873, #b3acc8); }
 /* The name opens the person's page; on phones the whole line does. */
 a.person-name { color: inherit; text-decoration: none; }
 a.person-name:hover .person-name-text { text-decoration: underline; }
@@ -97,11 +97,11 @@ a.person-name:hover .person-name-text { text-decoration: underline; }
 .person-back { margin: 16px 0 8px; } .person-back a { font-weight: 600; text-decoration: none; }
 .person-page { display: grid; gap: 16px; max-width: 46rem; }
 .person-page-head { display: flex; align-items: center; gap: 16px; }
-.person-page-head h2 { margin: 0; font-size: 1.6rem; overflow-wrap: anywhere; } .person-page-head p { margin: 2px 0 0; opacity: .75; }
+.person-page-head h2 { margin: 0; font-size: 1.6rem; overflow-wrap: anywhere; } .person-page-head p { margin: 2px 0 0; color: light-dark(#5f5873, #b3acc8); }
 .person-initials.large { width: 56px; height: 56px; font-size: 1.2rem; }
 .admin-page .person-card { display: grid; gap: 10px; margin: 0; padding: 18px 20px; border-radius: 16px; border-color: light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
 .person-card h3 { margin: 0; font-size: 1rem; }
-.person-hint { margin: 0; font-size: .9rem; opacity: .75; }
+.person-hint { margin: 0; font-size: .9rem; color: light-dark(#5f5873, #b3acc8); }
 .person-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .person-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0; }
 .person-stats div { display: grid; gap: 2px; } .person-stats dt { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: light-dark(#5f5873, #b3acc8); }
@@ -115,11 +115,11 @@ a.person-name:hover .person-name-text { text-decoration: underline; }
 .hall-of-fame { list-style: none; margin: 20px 0 24px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
 .fame-card { margin: 0; display: grid; align-content: start; gap: 2px; padding: 14px 16px; border-radius: 16px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
 .fame-icon { font-size: 1.6rem; line-height: 1.2; }
-.fame-title { font-weight: 800; } .fame-what { font-size: .8rem; opacity: .7; margin-bottom: 6px; }
+.fame-title { font-weight: 800; } .fame-what { font-size: .8rem; color: light-dark(#5f5873, #b3acc8); margin-bottom: 6px; }
 .admin-page button.fame-winner { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-height: 0; padding: 8px 10px; border-radius: 10px; border: 0; background: light-dark(#f1edfb, #2c2840); color: inherit; font-size: 1.05rem; font-weight: 800; text-align: left; }
 .fame-winner span { flex: none; white-space: nowrap; font-size: .9rem; font-weight: 700; color: light-dark(#6d3fd6, #b9a2ff); }
-.fame-rest { margin: 6px 0 0; padding: 0 10px 0 28px; font-size: .88rem; } .fame-rest li { margin: 2px 0; } .fame-rest span { opacity: .7; }
-.fame-nobody { padding: 8px 10px; opacity: .6; font-size: .9rem; }
+.fame-rest { margin: 6px 0 0; padding: 0 10px 0 28px; font-size: .88rem; } .fame-rest li { margin: 2px 0; } .fame-rest span { color: light-dark(#5f5873, #b3acc8); }
+.fame-nobody { padding: 8px 10px; color: light-dark(#5f5873, #b3acc8); font-size: .9rem; }
 /* The full table: sorts by the clicked column; scrolls sideways on narrow screens with the names kept in view. */
 .leaderboard-wrap { overflow-x: auto; border-radius: 16px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
 .leaderboard { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -136,7 +136,7 @@ a.person-name:hover .person-name-text { text-decoration: underline; }
 /* A person's stats: facts in a row, then groups of numbers with their rank. */
 .person-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 16px; margin: 0; }
 .person-facts div { display: grid; gap: 2px; } .person-facts dt { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: light-dark(#5f5873, #b3acc8); }
-.person-facts dd { margin: 0; font-weight: 600; } .person-facts small { opacity: .7; font-weight: 400; }
+.person-facts dd { margin: 0; font-weight: 600; } .person-facts small { color: light-dark(#5f5873, #b3acc8); font-weight: 400; }
 .person-stat-group { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid light-dark(#eeeaf7, #2c2840); }
 .person-stat-group h4 { margin: 0; font-size: .9rem; }
 .person-rank { font-size: .78rem; font-weight: 700; color: light-dark(#6d3fd6, #b9a2ff); }
@@ -148,5 +148,5 @@ a.person-name:hover .person-name-text { text-decoration: underline; }
   .fame-rest { padding-left: 22px; font-size: .78rem; }
 }
 .admin-page button.person-link-button { min-height: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; }
-.person-stats dd small { display: block; font-size: .8rem; font-weight: 500; opacity: .75; }
+.person-stats dd small { display: block; font-size: .8rem; font-weight: 500; color: light-dark(#5f5873, #b3acc8); }
 .person-stats dd:has(small) { white-space: normal; }

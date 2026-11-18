@@ -35,7 +35,9 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
       <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} /></div>
       <div className="my-game-actions">
         <a className="button-link primary" href={`/?edit=${game.gameId}`} aria-label={`Edit ${game.title}`}>Edit</a>
-        {game.issueCount > 0 && <button type="button" onClick={() => showProblems(game.gameId)} aria-label={`Show problems in ${game.title}`}>Show problems</button>}
+        {game.issueCount > 0 && (problems[game.gameId]
+          ? <button type="button" aria-expanded="true" onClick={() => setProblems(({ [game.gameId]: _hidden, ...rest }) => rest)} aria-label={`Hide problems in ${game.title}`}>Hide problems</button>
+          : <button type="button" aria-expanded="false" onClick={() => showProblems(game.gameId)} aria-label={`Show problems in ${game.title}`}>Show problems</button>)}
         {game.issueCount === 0 && !game.published?.matchesDraft && <button type="button" disabled={busy} onClick={() => run(roomApi(`/api/host/games/${game.gameId}/publish`, { expectedRevision: game.revision }))} aria-label={`Publish ${game.title}`}>Publish</button>}
         {game.published && openRoom && <button type="button" disabled={busy} onClick={() => openRoom(game.gameId)} aria-label={`Open room for ${game.title}`}>Open room</button>}
         {removing === game.gameId

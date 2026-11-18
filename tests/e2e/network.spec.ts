@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import jsQR from 'jsqr';
 import { createDatabase } from '../../apps/server/src/database/client.js';
 import { provisionRehearsal } from '../../apps/server/src/rooms/rehearsal.js';
-import { connectionStatus, openHostFold } from './helpers.js';
+import { closeHostFold, connectionStatus, openHostFold } from './helpers.js';
 
 const url = process.env['DATABASE_URL'];
 if (!url || !new URL(url).pathname.endsWith('_test') || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E test database required');
@@ -69,6 +69,7 @@ test('display stays read-only without replacing host credentials in another tab'
     await openHostFold(host, 'Shared screen');
     await host.getByRole('button', { name: 'Create display link' }).click();
     const href = await host.getByRole('link', { name: 'Open shared display' }).getAttribute('href'); expect(href).toBeTruthy();
+    await closeHostFold(host);
     const display = await context.newPage(); await display.goto(href!);
     await expect(display.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
     await expect(display.getByRole('button', { name: 'Start the game' })).toHaveCount(0);

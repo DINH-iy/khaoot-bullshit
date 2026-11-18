@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { openHostFold, openPhoneMenu } from './helpers.js';
+import { closeHostFold, openHostFold, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -31,6 +31,7 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     const chips = host.getByRole('switch', { name: 'Chips', exact: true });
     await expect(chips).toHaveAttribute('aria-checked', 'false');
     await chips.click(); await expect(chips).toHaveAttribute('aria-checked', 'true');
+    await closeHostFold(host);
 
     // The phone opens its personal link once; the key leaves the address bar at once.
     await page.goto(link);

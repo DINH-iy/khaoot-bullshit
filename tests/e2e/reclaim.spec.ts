@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { closeRoundsByHand, openHostFold, openPhoneMenu } from './helpers.js';
+import { closeHostFold, closeRoundsByHand, openHostFold, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -15,11 +15,13 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
+    await openHostFold(host, 'Room settings');
     const ask = host.getByRole('checkbox', { name: 'Ask me before a new phone takes over a seat' });
     await expect(ask).not.toBeChecked();
     // The box reflects the saved room setting, so it ticks once the server has stored it.
     await ask.click();
     await expect(ask).toBeChecked();
+    await closeHostFold(host);
 
     await oldPhone.goto(`${baseURL}/?code=${roomCode}`);
     await oldPhone.getByLabel('Your name').fill('Sam');
@@ -38,6 +40,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await oldContext.close();
     await openHostFold(host, 'Players');
     await expect(host.getByText('Sam · disconnected', { exact: false })).toBeVisible();
+    await closeHostFold(host);
     await newPhone.getByRole('button', { name: 'Refresh seats' }).click();
     await newPhone.getByRole('button', { name: 'I am Sam' }).click();
     await expect(newPhone.getByText('Waiting for the host to approve taking over Sam’s seat…')).toBeVisible();
@@ -55,6 +58,7 @@ test('a player whose phone dies continues on a new phone, after the host approve
     await expect(newPhone.getByRole('dialog', { name: /^Players/ })).toContainText('Sam (you)');
     await newPhone.keyboard.press('Escape');
     await expect(newPhone.getByText('Your answer is in!')).toBeVisible();
+    await openHostFold(host, 'Players');
     await expect(host.getByText('Sam · connected', { exact: false })).toBeVisible();
     await newPhone.reload();
     await expect(newPhone.getByText('Your answer is in!')).toBeVisible();

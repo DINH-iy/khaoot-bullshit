@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { openHostFold, openPhoneMenu } from './helpers.js';
+import { closeHostFold, openHostFold, openPhoneMenu } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -12,7 +12,7 @@ test('the host keeps scores secret, players react on the big screen, and a round
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await expect(host.getByText('about', { exact: false }).first()).toBeVisible();
     await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await expect(host.getByRole('heading', { name: 'Timed quiz', level: 3 })).toBeVisible();
+    await expect(host.locator('.game-detail').getByRole('heading', { name: 'Timed quiz', level: 3 })).toBeVisible();
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
@@ -38,6 +38,7 @@ test('the host keeps scores secret, players react on the big screen, and a round
     await page.keyboard.press('Escape');
 
     // The only player answers: the round ends about 3 seconds later, without waiting for its 20 seconds.
+    await closeHostFold(host);
     await host.getByRole('button', { name: 'Start the game' }).click();
     await expect(page.getByText('Answer now')).toBeVisible();
     await page.locator('fieldset').getByRole('radio').first().check();

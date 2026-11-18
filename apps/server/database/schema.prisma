@@ -91,6 +91,9 @@ model Game {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   creatorId  String    @db.Uuid
   title      String    @db.VarChar(160)
+  // The owner's own version of a built-in game (its key in game/templates.ts): edited and published like any
+  // game, and used instead of the built-in once published. Restoring the original archives it and clears this.
+  builtInKey String?   @db.VarChar(64)
   archivedAt DateTime? @db.Timestamptz(3)
   createdAt  DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
@@ -99,6 +102,7 @@ model Game {
   draft    GameDraft?
   versions GameVersion[]
 
+  @@unique([creatorId, builtInKey])
   @@index([creatorId, archivedAt])
   @@map("games")
 }

@@ -31,7 +31,7 @@
 .flow-tools label { display: flex; gap: 8px; align-items: center; }
 .flow-tools select, .inspector select { min-height: 44px; border-radius: 8px; border: 1px solid var(--e-border); background: var(--e-panel); color: inherit; padding: 6px 10px; font: inherit; }
 .tool-gap { flex: 1 1 0; } .flow-hint { color: var(--e-muted); font-size: .85rem; align-self: center; }
-.flow-notice { margin: 0 20px 8px; color: var(--e-danger); }
+.flow-notice { justify-self: start; margin: 0 20px 8px; padding: 4px 12px; border-radius: 999px; background: var(--e-accent-soft); color: var(--e-text); font-size: .92rem; }
 .flow-canvas { position: relative; overflow: hidden; touch-action: none; cursor: grab; min-height: 420px;
   background-color: var(--e-bg); background-image: radial-gradient(var(--e-dot) 1.2px, transparent 1.2px); background-size: 24px 24px; }
 .flow-canvas:active { cursor: grabbing; }
@@ -627,3 +627,6 @@
 .editor .wheel-hit:active { transform: scale(.98); }
 .editor .wheel-hit:focus-visible { outline: 3px solid var(--r-accent, var(--e-accent)); outline-offset: 6px; }
 @media (prefers-reduced-motion: reduce) { .editor .wheel-hit { transition: none; } }
+/* The map's toolbar: every button the same height and weight (Add a scene, Tidy up, the zoom menu, Tips). */
+.flow-tools { align-items: center; }
+.editor .flow-tools > button, .editor .flow-tools .action-menu-text, .editor .flow-tools .info-tip.with-text .info-tip-button { display: inline-flex; align-items: center; gap: 8px; height: 44px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-weight: 600; font-size: 1rem; }

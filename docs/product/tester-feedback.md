@@ -230,6 +230,18 @@ Side games:
 - U6: the connection button is a square box (44 px) with the round dot in the middle: green when connected, **orange when slow** (the last three round trips took more than 400 ms on average; its menu says so), red when not connected.
 - U7: host menu, *Your open rooms*: the room code and its copy icon stay together on one line (on a narrow screen they move down as one).
 
+### V. Editor and menu polish (owner, 18 November 2026)
+
+**Done; no new tests** (the existing ones were updated where they relied on the old behaviour). Screenshots in `screenshots/editor-polish/`.
+
+- V1: **Light mode / Dark mode did not work** in the built app: the build rewrites `light-dark()` into two helper variables that follow the device, not the chosen mode. `applyTheme` now sets those too (`apps/web/src/theme.ts`).
+- V2: the ring around your initials in the editor's top bar was an oval (the bar's 40 px minimum height stretched the 36 px circle): now a 40 px circle.
+- V3: **problem count**: problems of one scene that carried no scene path (a quiz's correct answer that is not one of its options, a wrong correct order, a duplicate part) were merged into one when several scenes had the same mistake; they now carry their scene and part, so each counts and shows on its own card. Note: problems found only after the basic checks pass (such as unreachable scenes) still appear once the earlier ones are fixed.
+- V4: *Your games*: **Show problems** becomes **Hide problems** while they are shown.
+- V5: Flow toolbar: *Add a scene*, *Tidy up*, the zoom menu and *Tips* are one height (44 px) and weight. The ☰ menu has icons: a cog (Game settings), a person with a plus (Invite people), an arrow out of a tray (Export as text), next to Help and Light/Dark mode.
+- V6: **Tidy up** is tighter: 96 px between columns (was 144), each row only as tall as its own tallest column, 96 px between rows (was the tallest column of the whole game plus 192). *Line up in a row* uses the same spacing. The map's messages (*Tidied up into rows.*) are a neutral pill instead of red text.
+- V7: host room, *Add people…*: the ticks fill the row (the player list's chip style no longer reaches them).
+
 ### Open questions
 
 - "You're far away" (host screen on an iPhone): that text is not in this app; what was on screen?

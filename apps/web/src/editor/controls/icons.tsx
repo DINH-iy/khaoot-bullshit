@@ -22,6 +22,10 @@ const paths: Record<string, string> = {
   duel: 'M4 4l9 9 M20 4l-9 9 M7 14l3 3 M17 14l-3 3 M5 16l-2 2 2 2 2-2 M19 16l2 2-2 2-2-2',
   // A menu of more actions: three lines.
   menu: 'M4 7h16 M4 12h16 M4 17h16',
+  // The game menu: settings (a gear), inviting people (a person with a plus), exporting (an arrow out of a tray).
+  gear: 'M19.1 9.8 L21.9 10.3 L21.9 13.7 L19.1 14.2 L18.5 15.5 L20.2 17.8 L17.8 20.2 L15.5 18.5 L14.2 19.1 L13.7 21.9 L10.3 21.9 L9.8 19.1 L8.5 18.5 L6.2 20.2 L3.8 17.8 L5.5 15.5 L4.9 14.2 L2.1 13.7 L2.1 10.3 L4.9 9.8 L5.5 8.5 L3.8 6.2 L6.2 3.8 L8.5 5.5 L9.8 4.9 L10.3 2.1 L13.7 2.1 L14.2 4.9 L15.5 5.5 L17.8 3.8 L20.2 6.2 L18.5 8.5z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  invite: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3 20a6 6 0 0 1 12 0 M19 8v6 M16 11h6',
+  export: 'M4 14v6h16v-6 M12 3v12 M8 7l4-4 4 4',
   // Copy: two overlapping sheets; Copied: a tick.
   copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
   check: 'M5 12l5 5L20 7',
