@@ -19,7 +19,7 @@ const problems: Record<string, string> = {
   INVALID_COMMAND: 'Give it a title of at least 3 characters.',
 };
 
-export function FeedbackPanel({ onClose }: { onClose: () => void }) {
+export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent?: (sent: boolean) => void }) {
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [title, setTitle] = useState(''); const [details, setDetails] = useState(''); const [name, setName] = useState(remembered);
   const [elements, setElements] = useState<PickedElement[]>([]);
@@ -40,11 +40,12 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
   const send = async (event: React.FormEvent) => {
     event.preventDefault(); setSending(true); setError('');
     const report: NewFeedback = { id, kind, title, details, reporterName: name.trim() || null, context: pageContext(elements) };
-    try { await roomApi('/api/feedback', report); remember(name.trim()); setSent(true); }
+    try { await roomApi('/api/feedback', report); remember(name.trim()); setSent(true); onSent?.(true); }
     catch (cause) { setError(problems[cause instanceof Error ? cause.message : ''] ?? 'It could not be sent. Check the connection and try again.'); }
     finally { setSending(false); }
   };
-  const again = () => { setId(newId()); setTitle(''); setDetails(''); setElements([]); setSent(false); };
+  // "Send another" is a fresh form too: pressing Feedback again then keeps what is being written.
+  const again = () => { setId(newId()); setTitle(''); setDetails(''); setElements([]); setSent(false); onSent?.(false); };
 
   if (picking) return <ElementPicker onPick={picked} onCancel={cancel} />;
   return <section className="feedback-panel" role="dialog" aria-labelledby="feedback-heading" {...{ [FEEDBACK_UI]: '' }}>

@@ -7,6 +7,7 @@ import { authorize } from '../game/model.js';
 import type { TrustedActor, Transaction } from '../game/model.js';
 import { assertExecutable, contentHash, parseDefinition } from '../game/definition.js';
 import { cookieToken, joinToken, roomAssert, tokenHash } from './security.js';
+import { readRoomState } from './reclaim.js';
 
 export interface Principal { id: string; sessionId: string; role: 'host' | 'player' | 'display'; expiresAt: Date; actor: TrustedActor; source: 'OIDC' | 'LOCAL_REHEARSAL' }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -58,7 +59,7 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
       return { expiresAt: credential.expiresAt, display: credential.role === 'DISPLAY' };
     },
     /** Joins a room. A person (signed-in phone) joins under their own name, and a second phone of theirs continues their seat. */
-    async join(input: unknown, person: { id: string; name: string; look: unknown } | null = null) {
+    async join(input: unknown, person: { id: string; name: string; look: unknown } | null = null, testSeat = false) {
       const parsed = JoinRoomSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE'); const data = parsed.data;
       const room = await client.gameSession.findUnique({ where: { roomCode: data.roomCode }, select: { id: true } });
@@ -70,6 +71,8 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
         roomAssert(current.status !== 'FINISHED' && (config.NODE_ENV !== 'production' || current.mode !== 'REHEARSAL'), 'ROOM_NOT_AVAILABLE');
         // An arcade round's seats come only from its lobby (which may be locked), never from the room code.
         roomAssert(await tx.arcadeRound.count({ where: { sessionId: room.id } }) === 0, 'ROOM_NOT_AVAILABLE');
+        // A test bench phone joins only a room whose host allows it (opening the test bench does).
+        roomAssert(!testSeat || readRoomState(current.state).testBench, 'FORBIDDEN');
         const joinKeyHash = tokenHash(`${room.id}:${data.joinId}`);
         const existing = await tx.sessionPlayer.findUnique({ where: { joinKeyHash } });
         if (existing) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { handTotal, PACK_ITEMS, PACK_SIZE, RARITIES, slotMultiplier } from '@party/contracts';
-import { deal, handView, move, openPack, outcomeOf, payoutFor, slotReturn, spinReels, type Draw } from '../../src/side-games/rules.js';
+import { handTotal, PACK_SIZE, slotMultiplier, type PackSetView } from '@party/contracts';
+import { drawPack } from '../../src/side-games/pack-sets.js';
+import { deal, handView, move, outcomeOf, payoutFor, slotReturn, spinReels, type Draw } from '../../src/side-games/rules.js';
 
 // Cards: rank = card % 13 (0 ace … 9 ten, 12 king). A fixed sequence of draws makes a hand predictable.
 const draws = (...values: number[]): Draw => { let at = 0; return () => { if (at >= values.length) throw new Error('No more prepared draws'); return values[at++]!; }; };
@@ -23,14 +24,25 @@ describe('slot machine', () => {
 });
 
 describe('packs', () => {
-  it('draws the right number of items, by rarity', () => {
-    // Draw 99 of 100 is in the legendary 1 %, then the first legendary item; 0 is common.
-    const items = openPack(draws(99, 0, 0, 0, 0, 0, 0, 0));
-    expect(items).toHaveLength(PACK_SIZE);
-    expect(PACK_ITEMS.find(item => item.key === items[0])!.rarity).toBe('legendary');
-    expect(items.slice(1).every(key => PACK_ITEMS.find(item => item.key === key)!.rarity === 'common')).toBe(true);
-    expect(RARITIES.reduce((sum, rarity) => sum + rarity.percent, 0)).toBe(100);
-    for (const rarity of RARITIES) expect(PACK_ITEMS.some(item => item.rarity === rarity.key)).toBe(true);
+  const item = (key: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => ({ key, name: key, emoji: '', rarity, flavor: '', retired: false });
+  const set: PackSetView = { id: '7a0c3f1e-5b1d-4c39-9d7e-0a1b2c3d4e01', name: 'Test', price: 100, chances: { common: 70, rare: 22, epic: 7, legendary: 1 }, godPackOdds: 500,
+    items: [item('c1', 'common'), item('c2', 'common'), item('r1', 'rare'), item('l1', 'legendary')] };
+  it('draws the right number of items by the set\'s chances', () => {
+    // 1 of 500 is not a god pack; then 99 of 100 is in the legendary 1 %, 0 is common, 70 is rare.
+    const { items, god } = drawPack(set, draws(1, 99, 0, 0, 1, 70, 0, 0, 0));
+    expect(god).toBe(false); expect(items).toHaveLength(PACK_SIZE);
+    expect(items).toEqual(['l1', 'c2', 'r1', 'c1']);
+  });
+  it('falls back to the nearest rarity the set has, and uses the owner\'s chances', () => {
+    // The set has no epic items: an epic draw becomes the nearest rarer one first (legendary).
+    expect(drawPack(set, draws(1, 95, 0, 0, 0, 0, 0, 0, 0)).items[0]).toBe('l1');
+    const allRare = { ...set, chances: { common: 0, rare: 100, epic: 0, legendary: 0 }, godPackOdds: 0 };
+    expect(drawPack(allRare, draws(0, 0, 50, 0, 99, 0, 10, 0)).items).toEqual(['r1', 'r1', 'r1', 'r1']);
+  });
+  it('makes a god pack 1 in godPackOdds: epic or legendary only, the last legendary', () => {
+    const rich = { ...set, items: [...set.items, item('e1', 'epic')] };
+    const { items, god } = drawPack(rich, draws(0, 1, 0, 0, 0, 1, 0, 0));
+    expect(god).toBe(true); expect(items).toEqual(['e1', 'l1', 'e1', 'l1']);
   });
 });
 

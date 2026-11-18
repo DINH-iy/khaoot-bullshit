@@ -1,0 +1,20 @@
+/* Test bench: a bar on top, the host screen on the left, phones (scaled down) on the right. */
+.bench { display: flex; flex-direction: column; height: 100dvh; margin: 0; padding: 0; max-width: none; background: #14131c; color: #f4f3fa; font-family: system-ui, sans-serif; }
+.bench-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 16px; border-bottom: 1px solid #2c2a3a; }
+.bench-bar p { margin: 0; } .bench-title code { font-weight: 800; letter-spacing: .08em; }
+.bench-hint { flex: 1; min-width: 16rem; font-size: .88rem; color: #b8b4cc; }
+.bench-real { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; white-space: nowrap; cursor: pointer; } .bench-real input { width: 18px; height: 18px; margin: 0; }
+.bench-count { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; }
+.bench .bench-icon { display: inline-grid; place-items: center; width: 30px; height: 30px; min-height: 0; padding: 0; font-size: .85rem; border-radius: 8px; border: 1px solid #3a3750; background: #22202e; color: inherit; }
+.bench .bench-icon:disabled { opacity: .4; }
+.bench-error { margin: 16px; color: #ff9a9a; }
+.bench-stage { flex: 1; display: grid; grid-template-columns: minmax(560px, 1fr) auto; gap: 12px; min-height: 0; padding: 12px; }
+.bench-host { width: 100%; height: 100%; border: 1px solid #2c2a3a; border-radius: 12px; background: #000; }
+/* Phones at 62% of a 390 × 844 screen, side by side, scrolling when there are many. */
+.bench-phones { display: grid; grid-template-columns: repeat(auto-fill, 242px); grid-auto-rows: min-content; gap: 12px; max-width: calc(242px * 3 + 24px); overflow: auto; min-height: 0; }
+.bench-phone { display: grid; gap: 4px; margin: 0; }
+.bench-phone figcaption { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; font-weight: 700; }
+.bench-screen { width: 242px; height: 523px; overflow: hidden; border-radius: 18px; border: 2px solid #3a3750; background: #000; }
+.bench-screen iframe { width: 390px; height: 844px; border: 0; transform: scale(.62); transform-origin: top left; }
+@media (max-width: 1100px) { .bench-stage { grid-template-columns: 1fr; } .bench-host { height: 60vh; } .bench-phones { max-width: none; } }
+.bench .fa-icon { width: 1em; height: 1em; display: block; }

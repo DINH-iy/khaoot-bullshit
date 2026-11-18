@@ -10,6 +10,7 @@ import './style.css';
 const EditorShell = lazy(() => import('./editor/shell/editor-shell.js').then(module => ({ default: module.EditorShell })));
 const ArcadePage = lazy(() => import('./arcade/arcade-page.js').then(module => ({ default: module.ArcadePage })));
 const AdminPage = lazy(() => import('./admin/admin-page.js').then(module => ({ default: module.AdminPage })));
+const TestBench = lazy(() => import('./room/test-bench.js').then(module => ({ default: module.TestBench })));
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing application root');
 const params = new URLSearchParams(location.search);
@@ -21,5 +22,6 @@ createRoot(root).render(<StrictMode>{editing && /^[0-9a-f-]{36}$/i.test(editing)
   ? <Suspense fallback={opening('editor')}><EditorShell gameId={editing} /></Suspense>
   : params.has('admin') ? <Suspense fallback={opening('admin menu')}><AdminPage /></Suspense>
   : params.has('host') ? <HostMenu />
+  : /^[0-9a-f-]{36}$/i.test(params.get('bench') ?? '') ? <Suspense fallback={opening('test bench')}><TestBench sessionId={params.get('bench')!} /></Suspense>
   : params.has('arcade') ? <Suspense fallback={opening('arcade')}><ArcadePage lobbyId={params.get('arcade') || null} /></Suspense> : <RoomScreen />}
   <FeedbackButton /></StrictMode>);

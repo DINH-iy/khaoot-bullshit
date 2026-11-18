@@ -9,6 +9,7 @@ export * from './players.js';
 export * from './drawing.js';
 export * from './feedback.js';
 export * from './people.js';
+export * from './packs.js';
 export * from './side-games.js';
 export * from './prefabs.js';
 export * from './head-to-head.js';

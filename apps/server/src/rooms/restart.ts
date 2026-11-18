@@ -11,7 +11,7 @@ import { joinToken, newToken, roomAssert, tokenHash } from './security.js';
 // personal account, the shared screen keeps showing the room.
 
 /** Host settings that carry over to the next room (not breaks, seat requests or the pointer itself). */
-const CARRIED = ['reclaimApproval', 'showScores', 'reactions', 'autoClose', 'autoCloseSeconds', 'breakVotes', 'breakPercent', 'reactionLimit', 'reactionChoices', 'sideGames', 'chips', 'openInvites', 'quickTimeSeconds', 'confirmLooks', 'signup', 'expected'] as const;
+const CARRIED = ['reclaimApproval', 'showScores', 'reactions', 'autoClose', 'autoCloseSeconds', 'breakVotes', 'breakPercent', 'reactionLimit', 'reactionChoices', 'sideGames', 'chips', 'openInvites', 'quickTimeSeconds', 'confirmLooks', 'signup', 'expected', 'testBench'] as const;
 
 /**
  * Ends `fromId` and points it at `toId`, which was just opened for the same game. Any running round is

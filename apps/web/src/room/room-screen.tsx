@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { testSeat } from './test-seat.js';
 import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
@@ -10,7 +11,7 @@ import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
 import { JudgePanel, leaderLine, Scoreboard, StageResults } from './results.js';
 import { VoteBallot } from './vote.js';
 import { SeatApprovalSetting, SeatReclaim, SeatRequests } from './seat-reclaim.js';
-import { ExpectedPeople, NameRequests, NewKeyCard, PickYourName, SignupSetting } from './room-people.js';
+import { ExpectedPeople, NameRequests, NewKeyCard, PickYourName, SignupSetting, TestBenchSetting } from './room-people.js';
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
 import { ExplainPanel } from './explain-panel.js';
@@ -138,7 +139,8 @@ export function RoomScreen() {
         const made = await roomApi<{ name: string; key: string }>('/api/rooms/signup', { roomCode, name });
         await account.refresh(); setMakeAccount(false); setNewKey(made); return;
       }
-      const key = `party_join_${roomCode.trim().toUpperCase()}`; let joinId: string | null = null;
+      // Each test bench phone (seat) joins as its own player.
+      const key = `party_join_${roomCode.trim().toUpperCase()}${testSeat ? `_seat${testSeat}` : ''}`; let joinId: string | null = null;
       try { joinId = localStorage.getItem(key); } catch { /* Online join can still work. */ }
       if (!joinId) { joinId = newId(); try { localStorage.setItem(key, joinId); } catch { /* optional recovery */ } }
       const look = savedLook();
@@ -147,6 +149,14 @@ export function RoomScreen() {
       history.replaceState(null, '', `/?room=${result.sessionId}`); setReady(true); setSessionId(result.sessionId); setNewKey(null);
     } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error && cause.message === 'NAME_TAKEN' ? 'Someone already has that name. Pick another, or tap your name under “Played with us before?”.' : cause instanceof Error ? cause.message : 'Joining failed. Please retry.'); } finally { setBusy(false); }
   };
+  // A test bench phone joins by itself under the name it was opened with (Player 1, Player 2…).
+  const autoJoined = useRef(false);
+  useEffect(() => {
+    const preset = initial.searchParams.get('name')?.trim().slice(0, 40);
+    if (!testSeat || !preset || sessionId || autoJoined.current || roomCode.length !== ROOM_CODE_LENGTH) return;
+    autoJoined.current = true; setName(preset); void join(preset);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomCode, sessionId]);
   const command = (type: string, extra: Record<string, unknown> = {}) => {
     if (!state) return; const base = { formatVersion: 1, commandId: newId(), sessionId: state.view.sessionId, type };
     room.send(GameCommandSchema.parse({ ...base, ...((PLAYER_COMMANDS as readonly string[]).includes(type) ? {} : { expectedRevision: state.view.revision }), ...extra }));
@@ -264,11 +274,13 @@ export function RoomScreen() {
           {role === 'player' ? <><h2 id="lobby-heading">{t('lobby.playerTitle')}</h2><p>{t('lobby.playerText')}</p>
             {me && <div className="my-look"><Avatar look={me.look} size={96} /><button className="ghost" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button></div>}</>
             : <>{/* Like a party game's lobby: how to join across the top, then a stage of seats that fill up as people join. */}
-              <div className="lobby-band">
-                <div className="lobby-band-text"><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2><p className="lobby-go">{t('lobby.screenGo', { host: location.host })}</p><BigCode roomCode={state.roomCode} copy={role !== 'display'} /></div>
+              {/* On the test bench the phones are added with its + and the room code is in its bar: no join strip there. */}
+              {!onBench && <div className="lobby-band">
+                <div className="lobby-band-text"><div className="lobby-band-head"><h2 id="lobby-heading">{t('lobby.screenTitle')}</h2>
+                    {role !== 'display' && <CopyIcon text={publicJoinUrl(location.origin, state.roomCode)} label="Copy join link" icon="link" />}</div>
+                  <p className="lobby-go">{t('lobby.screenGo', { host: location.host })}</p><BigCode roomCode={state.roomCode} copy={role !== 'display'} /></div>
                 <JoinQr origin={location.origin} roomCode={state.roomCode} link={false} />
-                {role !== 'display' && <div className="lobby-band-link"><CopyIcon text={publicJoinUrl(location.origin, state.roomCode)} label="Copy join link" icon="link" /></div>}
-              </div>
+              </div>}
               <div className="lobby-stage">
                 <p className="lobby-count" aria-label={`${state.players.length} ${state.players.length === 1 ? 'player' : 'players'} joined`}><FaIcon name="users" /> {state.players.length}</p>
                 <ul ref={playersRef} className="lobby-seats" aria-label="Players who joined">
@@ -348,12 +360,15 @@ export function RoomScreen() {
         </div>
         {sheet === 'settings' && <HostDialog title="Room settings" icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
           <div className="settings-col"><h3>Phones while waiting</h3><SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
-            <h3>Joining</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} />
+            <h3>Joining</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} /><TestBenchSetting state={state} sessionId={state.view.sessionId} onError={setError} />
             <p className="control-back"><a href="/?host=1">Back to the host menu</a></p></div>
           <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} /></div></HostDialog>}
         {sheet === 'invite' && <HostDialog title="Shared screen & invite" icon="tv" size="compact" onClose={() => setSheet(null)}>
           <div className="invite-join"><JoinQr origin={location.origin} roomCode={state.roomCode} link={false} />
             <div className="invite-code"><h3>Invite players</h3><BigCode roomCode={state.roomCode} copy /><JoinLink url={publicJoinUrl(location.origin, state.roomCode)} copy /></div></div>
+          {/* Testing alone: the host screen with phones next to it, each its own player (virtual phones; real ones can join too). */}
+          <div className="invite-display"><FaIcon name="users" /><p><strong>Test with phones</strong> The host screen with virtual phones next to it, each its own player; real phones can join too.</p>
+            <a className="invite-bench" href={`/?bench=${sessionId}`} target="_blank" rel="noreferrer">Open test bench ↗</a></div>
           <div className="invite-display"><FaIcon name="tv" /><p><strong>Shared screen</strong> Questions and scores on a TV or second screen.</p>
             {displayUrl ? <span className="invite-display-open"><a href={displayUrl} target="_blank" rel="noreferrer">Open shared display</a><CopyIcon text={displayUrl} label="Copy display link" icon="link" /></span>
               : <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError('Display access could not be created.')); }}>Create display link</button>}</div>
@@ -402,6 +417,10 @@ function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>
   return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} style={answerFit(entries.map(entry => entry.label))} aria-label={input.kind === 'order' ? 'Items to put in order' : 'Answers'}>
     {entries.map((entry, index) => { const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route); return <li key={entry.key}>{mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}{entry.label}</li>; })}</ol>;
 }
+
+/** The host screen inside the test bench (its frame is opened with `&bench=1`). */
+const onBench = initial.searchParams.get('bench') === '1' && typeof window !== 'undefined' && window.top !== window.self;
+// (`&bench=real`: on the bench with real phones joining too, so the join strip stays.)
 
 /** Slow: the last three round trips took more than 400 ms on average (the connection dot turns orange). */
 const slowConnection = (samples: number[]) => { const recent = samples.slice(-3); return recent.length > 0 && recent.reduce((sum, ms) => sum + ms, 0) / recent.length > 400; };

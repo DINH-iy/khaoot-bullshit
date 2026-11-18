@@ -577,6 +577,8 @@ enum ChipReason {
   REFILL
   BET
   PAYOUT
+  // Chips won by playing: points, place and wins of a finished game, a won arcade round (side-games/earnings.ts).
+  EARNED
 }
 
 // Play chips (never money) as an append-only ledger. The wallet is the
@@ -798,4 +800,52 @@ model ArcadeResult {
   @@index([personId, game])
   @@index([game, bestKey])
   @@map("arcade_results")
+}
+
+// Pack sets the owner makes and changes (Admin → Chips & packs; side-games/pack-sets.ts): a name, a price, the
+// chance of each rarity (percent, adding up to 100) and of a god pack (1 in godPackOdds, 0 = never), and items.
+// Removing a set or an item never takes it from whoever has one: it is archived (set) or retired (item).
+model PackSet {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String    @db.VarChar(60)
+  price       Int
+  onSale      Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  chances     Json      @db.JsonB
+  godPackOdds Int       @default(0)
+  archivedAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  items PackItem[]
+
+  @@map("pack_sets")
+}
+
+// One item of a pack set. `key` is what collections store (collected_items.itemKey), so it never changes.
+model PackItem {
+  key       String    @id @db.VarChar(40)
+  setId     String    @db.Uuid
+  name      String    @db.VarChar(40)
+  emoji     String    @default("") @db.VarChar(16)
+  rarity    String    @db.VarChar(12)
+  flavor    String    @default("") @db.VarChar(120)
+  sortOrder Int       @default(0)
+  retiredAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  set PackSet @relation(fields: [setId], references: [id], onDelete: Restrict)
+
+  @@index([setId])
+  @@map("pack_items")
+}
+
+// Site-wide settings the owner changes, one JSON value per key, validated by the contracts
+// (for now 'economy': start chips and what playing earns; side-games/economy.ts).
+model SiteSetting {
+  key       String   @id @db.VarChar(40)
+  value     Json     @db.JsonB
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@map("site_settings")
 }

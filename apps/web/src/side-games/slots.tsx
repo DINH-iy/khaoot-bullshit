@@ -6,6 +6,12 @@ import { calm, chips, sideApi, sideProblem } from './side-api.js';
 const emoji = (key: string) => SLOT_SYMBOLS.find(symbol => symbol.key === key)?.emoji ?? '❔';
 const name = (key: string) => SLOT_SYMBOLS.find(symbol => symbol.key === key)?.key ?? key;
 
+/** What the slot machine pays (shown in the side games' (i) while the slot machine is open). */
+export function SlotPays() {
+  return <ul className="slot-pays">{SLOT_SYMBOLS.map(symbol => <li key={symbol.key}><span aria-hidden="true">{symbol.emoji.repeat(3)}</span><span className="visually-hidden">three {symbol.key}</span><strong>×{symbol.pays}</strong></li>)}
+    <li><span aria-hidden="true">🍒🍒</span><span className="visually-hidden">two cherries</span><strong>{TWO_CHERRIES_PAYS === 1 ? 'bet back' : `×${TWO_CHERRIES_PAYS}`}</strong></li></ul>;
+}
+
 /** Slot machine: choose a bet, spin; the server spins the reels and pays. Without chips (`chips` false) it just spins for fun. */
 export function Slots({ sessionId, balance, onBalance, chips: forChips }: { sessionId: string; balance: number; onBalance: (balance: number) => void; chips: boolean }) {
   const [bet, setBet] = useState<typeof BETS[number]>(10);
@@ -31,10 +37,5 @@ export function Slots({ sessionId, balance, onBalance, chips: forChips }: { sess
     </fieldset>}
     {error && <p role="alert" className="error">{error}</p>}
     <button type="button" className="primary big" disabled={spinning || (forChips && balance < bet)} onClick={() => void spin()}>{forChips ? `Spin for ${chips(bet)}` : 'Spin'}</button>
-    <details className="odds"><summary>What pays</summary>
-      <ul>{SLOT_SYMBOLS.map(symbol => <li key={symbol.key}><span aria-hidden="true">{symbol.emoji.repeat(3)}</span> <span className="visually-hidden">three {symbol.key}</span> pays {symbol.pays}× your bet</li>)}
-        <li><span aria-hidden="true">🍒🍒</span><span className="visually-hidden">two cherries</span> anywhere gives your bet back{TWO_CHERRIES_PAYS === 1 ? '' : ` ×${TWO_CHERRIES_PAYS}`}</li></ul>
-      <p>On average the machine pays back about 94 of every 100 chips bet.</p>
-    </details>
   </div>;
 }

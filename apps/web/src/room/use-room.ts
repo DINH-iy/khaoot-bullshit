@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { testSeat } from './test-seat.js';
 import { io, type Socket } from 'socket.io-client';
 import { createLiveStrokes } from '../drawing/live-strokes.js';
 import { createReactionStore } from '../room-extras/reactions.js';
@@ -30,7 +31,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     try { const saved = localStorage.getItem(storageKey); if (saved && saved.length < 6000) { const parsed = GameCommandSchema.safeParse(JSON.parse(saved)); if (parsed.success && parsed.data.sessionId === sessionId) { pendingRef.current = parsed.data; setPending(parsed.data); } } } catch { /* Online submission remains available. */ }
     let mounted = true; let syncing = false; let syncAgain = false; let reconciled = false; let connections = 0; let debounce: ReturnType<typeof setTimeout> | undefined;
     let admissionRetries = 0; let admissionTimer: ReturnType<typeof setTimeout> | undefined;
-    const socket = io({ autoConnect: false, auth: { sessionId, ...(display ? { display: true } : {}) }, reconnectionAttempts: 20, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 }); socketRef.current = socket;
+    const socket = io({ autoConnect: false, auth: { sessionId, ...(display ? { display: true } : {}), ...(testSeat ? { seat: testSeat } : {}) }, reconnectionAttempts: 20, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 }); socketRef.current = socket;
     const emit = <T,>(event: string, input: unknown): Promise<T> => new Promise((resolve, reject) => {
       if (!socket.connected) { reject(new Error('Not connected')); return; }
       socket.timeout(5000).emit(event, input, (error: Error | null, reply: RoomReply<T>) => {

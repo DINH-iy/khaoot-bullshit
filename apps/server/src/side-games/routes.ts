@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  BLACKJACK_OUTCOMES, BlackjackMoveSchema, PACK_PRICE, BlackjackResultSchema, BlackjackStartSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
+  BLACKJACK_OUTCOMES, BlackjackMoveSchema, BlackjackResultSchema, BlackjackStartSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
   REFILL_BELOW, REFILL_CHIPS, SlotResultSchema, SlotSpinSchema, slotMultiplier, WalletSchema, type GamblerRow, type RoomReply, type SlotSymbol,
 } from '@party/contracts';
 import type { Config } from '../config.js';
@@ -12,7 +12,9 @@ import { readSessionView } from '../game/views.js';
 import type { createRoomGateway } from '../rooms/gateway.js';
 import { readRoomState } from '../rooms/reclaim.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
-import { deal, handView, HandStateSchema, move, openPack, outcomeOf, payoutFor, spinReels, type HandState, type Outcome } from './rules.js';
+import { deal, handView, HandStateSchema, move, outcomeOf, payoutFor, spinReels, type HandState, type Outcome } from './rules.js';
+import { readEconomy } from './economy.js';
+import { drawPack, itemsByKey, saleSet, setsOnSale } from './pack-sets.js';
 import { balanceOf, entryFor, lockWallet, startWallet, walletWhere, type Seat } from './wallet.js';
 import { registerChallenges } from './challenges.js';
 import type { Server } from 'socket.io';
@@ -83,8 +85,12 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
           tx.collectedItem.groupBy({ by: ['itemKey'], where: walletWhere(seat), _count: { _all: true } }),
           tx.sideRound.findFirst({ where: { playerId: seat.id, game: 'blackjack', finished: false } }),
         ]);
-        return WalletSchema.parse({ enabled, chips, paused, account: seat.personId ? 'person' : 'guest', balance: money, canRefill: chips && money < REFILL_BELOW, refills,
-          collection: collection.map(item => ({ itemKey: item.itemKey, count: item._count._all })), blackjack: open ? await handOf(tx, seat, open) : null });
+        // The sets on sale, and anything owned from elsewhere (an archived set, a retired item) for the collection.
+        const [packSets, economy] = await Promise.all([setsOnSale(tx), readEconomy(tx)]);
+        const forSale = new Set(packSets.flatMap(set => set.items.map(item => item.key)));
+        const otherItems = await itemsByKey(tx, collection.map(item => item.itemKey).filter(key => !forSale.has(key)));
+        return WalletSchema.parse({ enabled, chips, paused, account: seat.personId ? 'person' : 'guest', balance: money, canRefill: false, refills,
+          collection: collection.map(item => ({ itemKey: item.itemKey, count: item._count._all })), blackjack: open ? await handOf(tx, seat, open) : null, packSets, otherItems, economy });
       });
       return { ok: true, data };
     } catch (error) { return fail(reply, error); }
@@ -93,7 +99,8 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
   app.post('/api/rooms/:sessionId/side/refill', async (request, reply) => {
     try {
       return { ok: true, data: await play(request, async (tx, seat, chips) => {
-        roomAssert(chips, 'CHIPS_OFF'); roomAssert(await balance(tx, seat) < REFILL_BELOW, 'INVALID_COMMAND');
+        // No free refills any more: chips are earned by playing (side-games/earnings.ts).
+        roomAssert(chips, 'CHIPS_OFF'); roomAssert(false, 'INVALID_STATE'); roomAssert(await balance(tx, seat) < REFILL_BELOW, 'INVALID_COMMAND');
         await tx.chipEntry.create({ data: { ...entryFor(seat), reason: 'REFILL', amount: REFILL_CHIPS } });
         return { balance: await balance(tx, seat) };
       }) };
@@ -119,18 +126,20 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
 
   app.post('/api/rooms/:sessionId/side/packs', async (request, reply) => {
     try {
-      const parsed = PackOpenSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId } = parsed.data;
+      const parsed = PackOpenSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId, setId } = parsed.data;
       return { ok: true, data: await play(request, async (tx, seat, chips) => {
         const before = await earlier(tx, seat, roundId, 'packs');
-        if (before) return PackResultSchema.parse({ roundId, items: (before.state as { items: string[] }).items, balance: await balance(tx, seat) });
-        // Without chips a pack is free.
-        const price = chips ? PACK_PRICE : 0;
-        roomAssert(await balance(tx, seat) >= price, 'NOT_ENOUGH_CHIPS');
-        const items = openPack();
-        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: price, state: { items } } });
-        if (chips) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -PACK_PRICE } });
+        if (before) { const state = before.state as { items: string[]; god?: boolean }; return PackResultSchema.parse({ roundId, items: state.items, balance: await balance(tx, seat), god: state.god === true }); }
+        // Packs are bought with chips: without chips in the room there is nothing to collect.
+        roomAssert(chips, 'CHIPS_OFF');
+        // The set the player chose, at its price now (the owner may change it, or take it off sale).
+        const set = await saleSet(tx, setId); roomAssert(set !== null && set.items.length > 0, 'NOT_FOUND');
+        roomAssert(await balance(tx, seat) >= set.price, 'NOT_ENOUGH_CHIPS');
+        const { items, god } = drawPack(set);
+        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: set.price, state: { items, god, setId } } });
+        if (set.price > 0) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -set.price } });
         await tx.collectedItem.createMany({ data: items.map(itemKey => ({ ...entryFor(seat), roundId, itemKey })) });
-        return PackResultSchema.parse({ roundId, items, balance: await balance(tx, seat) });
+        return PackResultSchema.parse({ roundId, items, balance: await balance(tx, seat), god });
       }) };
     } catch (error) { return fail(reply, error); }
   });

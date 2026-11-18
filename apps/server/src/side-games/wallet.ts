@@ -1,4 +1,4 @@
-import { START_CHIPS } from '@party/contracts';
+import { readEconomy } from './economy.js';
 import type { Transaction } from '../game/model.js';
 
 /**
@@ -22,5 +22,5 @@ export async function balanceOf(tx: Transaction, seat: Seat) {
 /** A wallet's first use gives it the starting chips, once. Call with the lock held. */
 export async function startWallet(tx: Transaction, seat: Seat) {
   const { entries } = await balanceOf(tx, seat);
-  if (entries === 0) await tx.chipEntry.create({ data: { ...entryFor(seat), reason: 'START', amount: START_CHIPS } });
+  if (entries === 0) await tx.chipEntry.create({ data: { ...entryFor(seat), reason: 'START', amount: (await readEconomy(tx)).startChips } });
 }

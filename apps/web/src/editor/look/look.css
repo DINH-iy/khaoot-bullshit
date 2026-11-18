@@ -106,8 +106,8 @@
 .look-panel label.choice input { width: 20px; height: 20px; min-height: 0; margin: 0; flex: none; accent-color: var(--e-accent); }
 /* R13: import and export as quiet links under the colours they change. */
 .look-panel .palette-actions { gap: 4px 18px; margin: 0; }
-.look-panel .palette-actions .link-button { min-height: 32px; padding: 4px 0; border: 0; background: none; color: var(--e-accent); font-weight: 600; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
-.look-panel .palette-actions .link-button:hover, .look-panel .palette-actions .link-button:focus-visible { text-decoration-color: currentColor; }
+.look-panel .palette-actions .link-button { min-height: 32px; padding: 4px 12px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 600; text-decoration: none; }
+.look-panel .palette-actions .link-button:hover, .look-panel .palette-actions .link-button:focus-visible { border-color: var(--e-accent); }
 /* R16: one card per moment: its name, the animation chosen, then the sample to play and the builder's button. */
 .look-panel fieldset.moment { display: block; padding: 12px 14px 14px; background: var(--e-panel); }
 .look-panel .moment > legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-weight: 700; font-size: .95rem; }
@@ -123,7 +123,7 @@
 .anim-stage.list .tile { width: 40px; height: 18px; border-radius: 5px; font-size: .7rem; }
 .anim-sample-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .anim-what { flex: 1 1 10rem; min-width: 0; font-size: .82rem; color: var(--e-muted); }
-.look-panel .moment .moment-build { display: inline-block; margin-top: 6px; min-height: 32px; padding: 4px 0; border: 0; background: none; color: var(--e-accent); font-weight: 600; }
+.look-panel .moment .moment-build { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; min-height: 32px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 600; text-decoration: none; }
 /* The timeline: a track per item, a hatched wait, the bar with a diamond at every block, and a play head. */
 .timeline { display: grid; gap: 4px; min-width: 0; }
 .timeline-tracks { position: relative; display: grid; gap: 4px; }

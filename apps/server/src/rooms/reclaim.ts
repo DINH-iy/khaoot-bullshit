@@ -36,6 +36,9 @@ export const RoomStateSchema = z.object({
   // People in the room (room-people.ts): guests may make their own account while joining; the people the host
   // added to this room, and phones asking to sign in as one of them (the host approves each).
   signup: z.boolean().default(false),
+  // Phones on the test bench (several in one browser, rooms/test-seats.ts) may join only when the host allows it;
+  // opening the test bench switches it on.
+  testBench: z.boolean().default(false),
   expected: z.array(GameIdSchema).max(100).default([]),
   nameRequests: z.array(z.object({ id: GameIdSchema, personId: GameIdSchema, status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'USED']), requestedAt: z.string().datetime() }).strict()).max(50).default([]),
 }).strict();
@@ -120,7 +123,7 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'signup'>>) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'signup' | 'testBench'>>) {
       roomAssert(principal.role === 'host', 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);

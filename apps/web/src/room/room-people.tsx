@@ -41,7 +41,7 @@ export function PickYourName({ roomCode, people, onSignedIn }: { roomCode: strin
     <h2 id="pick-name-heading">Played with us before?</h2>
     {error && <p role="alert" className="join-error">{error}</p>}
     {waiting ? <><p role="status">Asking the host to let you in as <strong>{waiting.name}</strong>…</p>
-      <button type="button" className="link-button" onClick={() => { forget(); setWaiting(undefined); }}>Stop asking</button></>
+      <button type="button" className="link-button" onClick={() => { forget(); setWaiting(undefined); }}><FaIcon name="xmark" />Stop asking</button></>
       : <><p className="pick-name-hint">Tap your name. The host lets you in, and this phone stays you from now on.</p>
         <ul className="pick-name-list">{people.map(person => <li key={person.id}><button type="button" onClick={() => pick(person)}>{person.name}</button></li>)}</ul></>}
   </div>;
@@ -70,6 +70,13 @@ export function SignupSetting({ state, sessionId, onError }: { state: RoomSnapsh
   const { busy, act } = useHostAction(onError);
   return <label className="choice"><input type="checkbox" checked={state.settings.signup} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { signup: event.target.checked })} />
     Players can make an account when joining</label>;
+}
+
+/** Room settings: phones on the test bench (several players in one browser) may join; the test bench switches it on. */
+export function TestBenchSetting({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
+  const { busy, act } = useHostAction(onError);
+  return <label className="choice"><input type="checkbox" checked={state.settings.testBench} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { testBench: event.target.checked })} />
+    Test bench phones may join</label>;
 }
 
 /** Phones asking to sign in as one of the added people, in the host panel (nothing when there are none). */

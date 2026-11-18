@@ -3,6 +3,7 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
 import { rankValue } from '../minigames/rules.js';
 import { lookOf } from './lobbies.js';
+import { payArcadeWins } from '../side-games/earnings.js';
 
 // What a round leaves behind: one row per member who played it, from the
 // round's revealed results (the host's view of the room). The lobby's running
@@ -34,7 +35,13 @@ export function roundResults(view: SessionView, game: MinigameKey, seats: Seat[]
 
 /** Records a round's results once; a second call for the same round adds nothing. */
 export async function recordResults(tx: Transaction, roundId: string, game: MinigameKey, rows: ResultRow[]) {
-  if (rows.length) await tx.arcadeResult.createMany({ data: rows.map(row => ({ roundId, game, ...row })), skipDuplicates: true });
+  if (!rows.length) return;
+  await tx.arcadeResult.createMany({ data: rows.map(row => ({ roundId, game, ...row })), skipDuplicates: true });
+  // Winning a round earns chips (people with an account), once per seat.
+  const winners = rows.filter(row => row.place === 1 && row.personId);
+  if (!winners.length) return;
+  const round = await tx.arcadeRound.findUniqueOrThrow({ where: { id: roundId }, select: { sessionId: true, seats: { where: { memberId: { in: winners.map(row => row.memberId) } }, select: { playerId: true, memberId: true } } } });
+  await payArcadeWins(tx, round.sessionId, round.seats.map(seat => ({ playerId: seat.playerId, personId: winners.find(row => row.memberId === seat.memberId)!.personId })));
 }
 
 /** The lobby's running total (everyone who played a round here) and its last round's results. */

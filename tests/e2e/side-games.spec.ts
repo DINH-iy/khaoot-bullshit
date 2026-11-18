@@ -45,7 +45,8 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     const dock = await openPhoneMenu(page);
     await dock.getByRole('button', { name: 'Games' }).click();
     const sheet = page.getByRole('dialog', { name: 'Side games' });
-    await expect(sheet.getByText('1,000 chips')).toBeVisible();
+    // Everyone starts with 200 chips (more are earned by playing).
+    await expect(sheet.getByTitle('200 chips')).toBeVisible();
     await sheet.getByRole('button', { name: 'Spin for 10 chips' }).click();
     await expect(sheet.getByRole('status').filter({ hasText: /You win|No luck/ })).toBeVisible();
     expect((await new AxeBuilder({ page }).include('.bottom-sheet').analyze()).violations).toEqual([]);

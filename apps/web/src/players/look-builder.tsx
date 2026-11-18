@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { seatHeaders } from '../room/test-seat.js';
 import { defaultLook, emptyDrawing, LOOK_COLORS, LOOK_PART_NAMES, LOOK_PARTS, PlayerLookSchema, type LookPart, type PlayerLook, type RoomReply } from '@party/contracts';
 import { DrawingPad } from '../drawing/drawing-pad.js';
 import { uploadDrawing } from '../drawing/drawing-view.js';
@@ -30,7 +31,7 @@ async function squarePhoto(file: File): Promise<Blob> {
   if (!blob) throw new Error('UNSUPPORTED_MEDIA'); return blob;
 }
 async function sendPhoto(sessionId: string, file: File): Promise<string> {
-  const response = await fetch(`/api/rooms/${sessionId}/picture`, { method: 'POST', credentials: 'same-origin', headers: { 'x-party-request': '1', 'content-type': 'image/png' }, body: await squarePhoto(file) });
+  const response = await fetch(`/api/rooms/${sessionId}/picture`, { method: 'POST', credentials: 'same-origin', headers: { 'x-party-request': '1', ...seatHeaders(), 'content-type': 'image/png' }, body: await squarePhoto(file) });
   const reply = await response.json() as RoomReply<{ assetId: string }>; if (!reply.ok) throw new Error(reply.error.code); return reply.data.assetId;
 }
 

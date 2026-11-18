@@ -14,6 +14,7 @@ import { createOwnerAccess } from './hosting/owner-access.js';
 import { registerFeedbackRoutes } from './feedback/routes.js';
 import { registerPeopleRoutes } from './people/routes.js';
 import { registerSideGames } from './side-games/routes.js';
+import { registerPackAdminRoutes } from './side-games/pack-admin-routes.js';
 import { registerArcade } from './arcade/routes.js';
 import { createLobbies } from './arcade/lobbies.js';
 import { createRounds } from './arcade/rounds.js';
@@ -21,6 +22,7 @@ import { registerPrefabRoutes } from './authoring/prefabs.js';
 import { createEditorLive } from './authoring/live.js';
 import { registerAssetRoutes } from './assets/routes.js';
 import { registerClientAddress } from './http/client-address.js';
+import { registerTestSeats } from './rooms/test-seats.js';
 import staticFiles from '@fastify/static';
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +45,8 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   });
   // First, so every limit below sees the visitor's address (only changes anything when TRUST_CLOUDFLARE_LOCAL is on).
   registerClientAddress(app, config.TRUST_CLOUDFLARE_LOCAL);
+  // The test bench's phones (several players in one browser): rooms/test-seats.ts.
+  registerTestSeats(app);
   const verifier = options.verifyToken ?? createTokenVerifier(config);
   const metrics = new RequestMetrics();
   const requests = new WeakMap<FastifyRequest, { start: number; span: Span }>();
@@ -126,6 +130,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerFeedbackRoutes(app, options.database.client, config, owner);
     registerPeopleRoutes(app, options.database.client, config, owner, live);
     registerPrefabRoutes(app, options.database.client, owner);
+    registerPackAdminRoutes(app, options.database.client, owner);
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway, rooms.io);
     if (rooms) { const lobbies = createLobbies(options.database.client); registerArcade(app, options.database.client, config, rooms.gateway, createRounds(options.database.client, config, rooms.service, lobbies), lobbies); }
   }

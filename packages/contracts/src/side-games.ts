@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { SessionView } from './game.js';
+import { EconomySchema, PackItemViewSchema, PackSetViewSchema } from './packs.js';
 
 /**
  * Side games: played on a player's own phone while waiting (lobby, between
@@ -11,7 +12,6 @@ export const SIDE_GAMES = ['slots', 'blackjack', 'packs'] as const;
 export type SideGame = typeof SIDE_GAMES[number];
 export const SIDE_GAME_NAMES: Record<SideGame, string> = { slots: 'Slot machine', blackjack: 'Blackjack', packs: 'Packs' };
 
-export const START_CHIPS = 1000;
 /** A broke player can take a refill; refills are counted on the leaderboard. */
 export const REFILL_CHIPS = 500;
 export const REFILL_BELOW = 10;
@@ -36,27 +36,9 @@ export function slotMultiplier(reels: readonly SlotSymbol[]): number {
   return reels.filter(reel => reel === 'cherry').length === 2 ? TWO_CHERRIES_PAYS : 0;
 }
 
-// Packs: each pack holds PACK_SIZE items drawn by rarity; the chances are shown to players.
-export const PACK_PRICE = 100;
+// Packs: each pack holds PACK_SIZE items drawn by rarity. The sets, their prices, items and chances are the
+// owner's settings (packs.ts; Admin → Chips & packs).
 export const PACK_SIZE = 4;
-export const RARITIES = [
-  { key: 'common', name: 'Common', percent: 70 },
-  { key: 'rare', name: 'Rare', percent: 22 },
-  { key: 'epic', name: 'Epic', percent: 7 },
-  { key: 'legendary', name: 'Legendary', percent: 1 },
-] as const;
-export type Rarity = typeof RARITIES[number]['key'];
-export const PACK_ITEMS = [
-  { key: 'party-hat', name: 'Party hat', emoji: '🥳', rarity: 'common' }, { key: 'balloon', name: 'Balloon', emoji: '🎈', rarity: 'common' },
-  { key: 'pizza', name: 'Cold pizza', emoji: '🍕', rarity: 'common' }, { key: 'sock', name: 'Lost sock', emoji: '🧦', rarity: 'common' },
-  { key: 'rubber-duck', name: 'Rubber duck', emoji: '🦆', rarity: 'common' }, { key: 'cactus', name: 'Office cactus', emoji: '🌵', rarity: 'common' },
-  { key: 'disco-ball', name: 'Disco ball', emoji: '🪩', rarity: 'rare' }, { key: 'microphone', name: 'Karaoke mic', emoji: '🎤', rarity: 'rare' },
-  { key: 'dice', name: 'Lucky dice', emoji: '🎲', rarity: 'rare' }, { key: 'ufo', name: 'UFO', emoji: '🛸', rarity: 'rare' },
-  { key: 'crown', name: 'Party crown', emoji: '👑', rarity: 'epic' }, { key: 'dragon', name: 'Dragon', emoji: '🐉', rarity: 'epic' },
-  { key: 'unicorn', name: 'Unicorn', emoji: '🦄', rarity: 'epic' },
-  { key: 'golden-trophy', name: 'Golden trophy', emoji: '🏆', rarity: 'legendary' }, { key: 'rocket', name: 'Moon rocket', emoji: '🚀', rarity: 'legendary' },
-] as const satisfies readonly { key: string; name: string; emoji: string; rarity: Rarity }[];
-export type PackItemKey = typeof PACK_ITEMS[number]['key'];
 
 // Blackjack: against the dealer, an endless shuffled shoe, dealer stands on all 17s,
 // blackjack pays 3 to 2, doubling on the first two cards. No splitting or insurance.
@@ -80,14 +62,15 @@ export type BlackjackView = z.infer<typeof BlackjackViewSchema>;
 
 // Requests. Every go carries an id chosen by the phone: a retried request is the same go.
 export const SlotSpinSchema = z.object({ roundId: z.uuid(), bet: BetSchema }).strict();
-export const PackOpenSchema = z.object({ roundId: z.uuid() }).strict();
+/** Opening a pack of one set (`setId`); the round ID makes a retried open count once. */
+export const PackOpenSchema = z.object({ roundId: z.uuid(), setId: z.uuid() }).strict();
 export const BlackjackStartSchema = z.object({ roundId: z.uuid(), bet: BetSchema }).strict();
 /** `step` is the hand's step the phone saw: a repeated move does nothing twice. */
 export const BlackjackMoveSchema = z.object({ roundId: z.uuid(), step: z.number().int().min(0).max(100), move: z.enum(['hit', 'stand', 'double']) }).strict();
 
 export const SlotResultSchema = z.object({ roundId: z.uuid(), reels: z.array(z.enum(SLOT_SYMBOLS.map(symbol => symbol.key) as [SlotSymbol, ...SlotSymbol[]])).length(3), bet: z.number().int(), payout: z.number().int().min(0), balance: z.number().int() }).strict();
 export type SlotResult = z.infer<typeof SlotResultSchema>;
-export const PackResultSchema = z.object({ roundId: z.uuid(), items: z.array(z.string()).length(PACK_SIZE), balance: z.number().int() }).strict();
+export const PackResultSchema = z.object({ roundId: z.uuid(), items: z.array(z.string()).length(PACK_SIZE), balance: z.number().int(), god: z.boolean().optional() }).strict();
 export type PackResult = z.infer<typeof PackResultSchema>;
 export const BlackjackResultSchema = z.object({ hand: BlackjackViewSchema, balance: z.number().int() }).strict();
 
@@ -96,6 +79,8 @@ export const WalletSchema = z.object({
   enabled: z.boolean(), chips: z.boolean(), paused: z.boolean(),
   account: z.enum(['person', 'guest']), balance: z.number().int(), canRefill: z.boolean(), refills: z.number().int().min(0),
   collection: z.array(z.object({ itemKey: z.string(), count: z.number().int().min(1) }).strict()),
+  // The pack sets on sale, the items this wallet has from elsewhere (other or retired sets), and the chip settings.
+  packSets: z.array(PackSetViewSchema), otherItems: z.array(PackItemViewSchema), economy: EconomySchema,
   blackjack: BlackjackViewSchema.nullable(),
 }).strict();
 export type Wallet = z.infer<typeof WalletSchema>;

@@ -15,6 +15,7 @@ import { parseDefinition } from '../game/definition.js';
 import { createRoomGateway, lockRoom, type Principal } from './gateway.js';
 import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js';
 import { createRoomPeople } from './room-people.js';
+import { connectionCookies, SEAT_HEADER, seatOf } from './test-seats.js';
 import { followRoom } from './restart.js';
 import { createLiveSignals } from '../minigames/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
@@ -77,7 +78,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const roomPeople = principal.role === 'host' ? await people.hostView(principal.sessionId, state) : { expected: [], nameRequests: [] };
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, signup: state.signup },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, signup: state.signup, testBench: state.testBench },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], ...roomPeople, nextRoom: state.nextRoom, arcade });
   };
@@ -86,7 +87,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     try {
       requireOrigin(request); roomAssert(limiter.allow(`join:${request.ip}`, 120), 'RATE_LIMITED');
       const signedIn = await personFromCookie(client, request.headers.cookie);
-      const joined = await gateway.join(request.body, signedIn ? { id: signedIn.person.id, name: signedIn.person.name, look: signedIn.person.look } : null);
+      const joined = await gateway.join(request.body, signedIn ? { id: signedIn.person.id, name: signedIn.person.name, look: signedIn.person.look } : null, Boolean(seatOf(request.headers[SEAT_HEADER])));
       reply.header('set-cookie', roomCookie(config, joined.sessionId, joined.token, joined.expiresAt));
       return { ok: true, data: { sessionId: joined.sessionId } };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
@@ -243,6 +244,8 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   io.use((socket, next) => {
     void (async () => {
       const parsed = ConnectRoomSchema.safeParse(socket.handshake.auth); roomAssert(parsed.success, 'UNAUTHORIZED');
+      // A test bench phone reads its own seat's cookies, for this and every later check.
+      socket.handshake.headers.cookie = connectionCookies(socket.handshake.headers.cookie, parsed.data.seat);
       roomAssert(limiter.allow(`connect:${clientAddress(socket.handshake.address, socket.handshake.headers, config.TRUST_CLOUDFLARE_LOCAL)}`, 240), 'RATE_LIMITED');
       const principal = await gateway.authenticate(parsed.data.sessionId, socket.handshake.headers.cookie, parsed.data.display);
       const peers = [...io.sockets.sockets.values()].filter(peer => (peer.data['principal'] as Principal | undefined)?.id === principal.id).length;

@@ -77,7 +77,7 @@ main.admin-page { max-width: 1100px; padding: 24px 28px 48px; }
 .people-search [role=status] { font-size: .9rem; color: light-dark(#5f5873, #b3acc8); }
 /* The name opens the person's page; on phones the whole line does. */
 a.person-name { color: inherit; text-decoration: none; }
-a.person-name:hover .person-name-text { text-decoration: underline; }
+a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .person-chevron { display: none; }
 /* Phones: one short line per person (initials, name, last seen, ›); tapping it opens their page. */
 @media (max-width: 760px) {
@@ -132,7 +132,7 @@ a.person-name:hover .person-name-text { text-decoration: underline; }
 .leaderboard td.sorted { font-weight: 800; background: light-dark(#faf8ff, #221f2c); }
 .leaderboard tbody th { position: sticky; left: 0; background: light-dark(#fff, #1e1c28); }
 .admin-page button.leaderboard-name { min-height: 0; padding: 0; border: 0; background: none; color: inherit; font-weight: 700; }
-.leaderboard-name:hover { text-decoration: underline; }
+.leaderboard-name:hover { color: light-dark(#5b31bf, #c9b6ff); }
 /* A person's stats: facts in a row, then groups of numbers with their rank. */
 .person-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 16px; margin: 0; }
 .person-facts div { display: grid; gap: 2px; } .person-facts dt { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: light-dark(#5f5873, #b3acc8); }
@@ -147,6 +147,6 @@ a.person-name:hover .person-name-text { text-decoration: underline; }
   .admin-page button.fame-winner { flex-wrap: wrap; padding: 6px 8px; font-size: .95rem; }
   .fame-rest { padding-left: 22px; font-size: .78rem; }
 }
-.admin-page button.person-link-button { min-height: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; }
+.admin-page button.person-link-button { display: inline-flex; align-items: center; min-height: 0; padding: 2px 10px; border-radius: 999px; border: 1px solid light-dark(#cfc7e6, #4a4466); background: light-dark(#f1edfb, #2c2840); color: inherit; font: inherit; font-weight: 700; text-decoration: none; }
 .person-stats dd small { display: block; font-size: .8rem; font-weight: 500; color: light-dark(#5f5873, #b3acc8); }
 .person-stats dd:has(small) { white-space: normal; }

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { seatHeaders } from './test-seat.js';
 import { UploadedAssetSchema, type MediaKind, type RoomReply } from '@party/contracts';
 
 export interface UploadedMedia { assetId: string; mediaKind: MediaKind }
@@ -34,6 +35,7 @@ function send(sessionId: string, body: Blob, onProgress: (fraction: number) => v
     // XMLHttpRequest reports upload progress; fetch cannot.
     const request = new XMLHttpRequest(); request.open('POST', `/api/rooms/${sessionId}/assets`); request.timeout = 115_000;
     request.setRequestHeader('x-party-request', '1'); request.setRequestHeader('content-type', body.type);
+    for (const [name, value] of Object.entries(seatHeaders())) request.setRequestHeader(name, value);
     request.upload.onprogress = event => { if (event.lengthComputable) onProgress(event.loaded / event.total); };
     request.onerror = request.ontimeout = () => reject(new Error('NETWORK'));
     request.onload = () => {

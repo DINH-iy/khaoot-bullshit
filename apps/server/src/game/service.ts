@@ -8,6 +8,7 @@ import { assertExecutable, contentHash, parseDefinition } from './definition.js'
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
 import { actorKey, authorize, checkRevision, requireHost, TrustedActorSchema, type TrustedActor } from './model.js';
+import { payGameChips } from '../side-games/earnings.js';
 
 export interface CommandObservation { type: string; outcome: 'COMMITTED' | 'REPLAYED' | GameErrorCode; durationMs: number }
 
@@ -72,6 +73,8 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
           if (effect.awards?.length) await tx.scoreEntry.createMany({ data: effect.awards.map(award => ({ sessionId: session.id, commandId: saved.id,
             recipientPlayerId: award.playerId ?? null, recipientTeamId: award.teamId ?? null, lineupId: award.lineupId ?? null,
             stageRunId: award.stageRunId, amountMilli: award.amountMilli, awardKey: award.awardKey, reason: award.reason, kind: award.kind ?? 'AWARD' })) });
+          // The game just ended: players earn their chips (rooms with chips on), now that the last points are saved.
+          if (command.type === 'stage.advance' && (await tx.gameSession.findUniqueOrThrow({ where: { id: session.id }, select: { status: true } })).status === 'FINISHED') await payGameChips(tx, session.id, definition);
           await tx.gameSession.update({ where: { id: session.id }, data: { revision } });
           // Audit stores references, not jokes, answers or correct-choice data.
           await tx.auditEvent.create({ data: { sessionId: session.id, commandId: saved.id, revision, kind: type, details: { stageRunId: effect.stageRunId, submissionId: effect.submissionId, ...(effect.decision ? { routeDecision: { optionKey: effect.decision.voteSnapshot.optionKey, reason: effect.decision.reason } } : {}) } } });

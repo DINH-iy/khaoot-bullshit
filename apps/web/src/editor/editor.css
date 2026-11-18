@@ -672,3 +672,7 @@
 .menu-warning { display: flex; align-items: center; gap: 6px; color: var(--e-danger); font-weight: 700; font-size: .9rem; white-space: nowrap; }
 .editor .history-latest button { color: var(--e-accent); font-weight: 700; }
 .editor .history-latest button > span { display: inline-flex; align-items: center; gap: 6px; }
+/* Secondary actions in the editor: real buttons in the editor's colours (never underlined text); a part in the list stays a row. */
+.editor .link-button { border-color: var(--e-border); background: var(--e-panel); color: var(--e-text); }
+.editor .link-button:hover:not(:disabled) { border-color: var(--e-accent); }
+.editor .part-list .link-button { justify-content: flex-start; border-radius: 8px; }

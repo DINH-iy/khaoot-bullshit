@@ -58,7 +58,10 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 .ballot { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
 .ballot-entry { display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid light-dark(#bbb, #777); border-radius: 10px; }
 .ballot-text { font-weight: 600; white-space: pre-wrap; }
-.link-button { min-height: 44px; padding: 0 4px; border: 0; background: none; color: light-dark(#174e9b, #a1c6ff); text-decoration: underline; }
+/* A small secondary action: always a real button (outlined pill, often with an icon), never underlined text. */
+.link-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 6px 14px; border-radius: 999px; border: 1px solid light-dark(#c9c4d8, #4a4466); background: light-dark(#fff, #24212f); color: inherit; font: inherit; font-size: .95rem; font-weight: 600; text-decoration: none; cursor: pointer; }
+.link-button:hover:not(:disabled) { border-color: currentColor; }
+.link-button .fa-icon, .link-button svg { width: 1em; height: 1em; flex: none; }
 .seat-requests { margin: 16px 0; }
 .team-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 12px; }
 .team-card { margin: 0; padding: 12px; border: 1px solid light-dark(#bbb, #777); border-radius: 12px; }

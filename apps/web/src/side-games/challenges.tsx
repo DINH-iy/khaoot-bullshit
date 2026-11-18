@@ -3,6 +3,7 @@ import { ChallengeListSchema, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HE
 import { newId } from '../room/api.js';
 import { chips, sideApi, sideProblem, isMyTurn } from './side-api.js';
 import './side-games.css';
+import { FaIcon } from '../presentation/icons.js';
 
 // The boards (and chess) load only when a game is opened.
 const HeadToHead = lazy(() => import('../head-to-head/boards.js').then(module => ({ default: module.HeadToHead })));
@@ -70,7 +71,7 @@ function NewChallenge({ players, balance, busy, onSend, onCancel, withChips }: {
   const [stake, setStake] = useState('0'); const [firstTo, setFirstTo] = useState(String(HEAD_TO_HEAD_DEFAULTS.rps.firstTo));
   // Without chips in the room a challenge is always for fun.
   const amount = withChips ? Math.max(0, Math.round(Number(stake) || 0)) : 0;
-  if (!players.length) return <p className="hint">Nobody else is in the room yet. <button type="button" className="link-button" onClick={onCancel}>Back</button></p>;
+  if (!players.length) return <p className="hint">Nobody else is in the room yet. <button type="button" className="link-button" onClick={onCancel}><FaIcon name="arrow-rotate-left" />Back</button></p>;
   return <form className="challenge-form" onSubmit={event => { event.preventDefault(); onSend({ challengeId: newId(), opponentId, game, stake: amount, ...(game === 'rps' ? { settings: { firstTo: Number(firstTo) } } : {}) }); }}>
     <label>Who<select value={opponentId} onChange={event => setOpponent(event.target.value)}>{players.map(player => <option key={player.id} value={player.id}>{player.displayName}</option>)}</select></label>
     <label>Game<select value={game} onChange={event => setGame(event.target.value as HeadToHeadKey)}>{HEAD_TO_HEAD_KEYS.map(key => <option key={key} value={key}>{HEAD_TO_HEAD_GAMES[key].name}</option>)}</select></label>

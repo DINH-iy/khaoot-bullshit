@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { START_CHIPS } from '@party/contracts';
+import { DEFAULT_ECONOMY } from '@party/contracts';
+
+const START_CHIPS = DEFAULT_ECONOMY.startChips;
 import { buildApp } from '../../../src/app.js';
 import { readConfig } from '../../../src/config.js';
 import { cleanUpChallenges } from '../../../src/side-games/challenges.js';

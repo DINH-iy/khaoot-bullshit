@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PACK_PRICE, START_CHIPS } from '@party/contracts';
+import { DEFAULT_ECONOMY } from '@party/contracts';
+
+// The pack set and chip amounts the migrations start with.
+const START_CHIPS = DEFAULT_ECONOMY.startChips; const PACK_PRICE = 100; const setId = '7a0c3f1e-5b1d-4c39-9d7e-0a1b2c3d4e01';
 import { buildApp } from '../../../src/app.js';
 import { readConfig } from '../../../src/config.js';
 import { createGameService } from '../../../src/game/service.js';
@@ -91,7 +94,7 @@ describe('side games and chips', () => {
     const guest = await join(roomA.roomCode, 'Guest');
     const wallet = await call('GET', `/api/rooms/${roomA.sessionId}/side`, undefined, phone);
     expect(wallet.json().data).toMatchObject({ enabled: true, paused: false, account: 'person', balance: START_CHIPS });
-    const pack = await call('POST', `/api/rooms/${roomA.sessionId}/side/packs`, { roundId: randomUUID() }, phone);
+    const pack = await call('POST', `/api/rooms/${roomA.sessionId}/side/packs`, { roundId: randomUUID(), setId }, phone);
     expect(pack.statusCode).toBe(200); expect(pack.json().data.balance).toBe(START_CHIPS - PACK_PRICE);
     expect((await call('GET', `/api/rooms/${roomA.sessionId}/side`, undefined, guest)).json().data).toMatchObject({ account: 'guest', balance: START_CHIPS });
 
@@ -117,15 +120,15 @@ describe('side games and chips', () => {
     expect((await call('POST', `/api/rooms/${room.sessionId}/side/slots`, { roundId, bet: 100 }, other)).statusCode).toBe(400);
     expect((await call('POST', `/api/rooms/${room.sessionId}/side/slots`, { roundId: randomUUID(), bet: 7 }, phone)).statusCode).toBe(400);
 
-    // Packs never pay chips back: 1000 chips buy exactly ten, however many arrive at once.
+    // Packs never pay chips back: the 200 starting chips buy exactly two, however many arrive at once.
     const packer = await join(room.roomCode, 'Packer');
-    const tries = await Promise.all(Array.from({ length: 13 }, () => call('POST', `/api/rooms/${room.sessionId}/side/packs`, { roundId: randomUUID() }, packer)));
-    expect(tries.filter(reply => reply.statusCode === 200)).toHaveLength(10);
+    const tries = await Promise.all(Array.from({ length: 5 }, () => call('POST', `/api/rooms/${room.sessionId}/side/packs`, { roundId: randomUUID(), setId }, packer)));
+    expect(tries.filter(reply => reply.statusCode === 200)).toHaveLength(2);
     expect(tries.filter(reply => reply.statusCode === 409).every(reply => reply.json().error.code === 'NOT_ENOUGH_CHIPS')).toBe(true);
     const broke = (await call('GET', `/api/rooms/${room.sessionId}/side`, undefined, packer)).json().data;
-    expect(broke).toMatchObject({ balance: 0, canRefill: true });
-    expect((await call('POST', `/api/rooms/${room.sessionId}/side/refill`, {}, packer)).json().data.balance).toBe(500);
-    expect((await call('POST', `/api/rooms/${room.sessionId}/side/refill`, {}, packer)).statusCode).toBe(400);
+    // No free refills: chips are earned by playing.
+    expect(broke).toMatchObject({ balance: 0, canRefill: false });
+    expect((await call('POST', `/api/rooms/${room.sessionId}/side/refill`, {}, packer)).json().error.code).toBe('INVALID_STATE');
     // The ledger is history: it cannot be rewritten.
     await expect(prisma.chipEntry.updateMany({ where: { sessionId: room.sessionId }, data: { amount: 1 } })).rejects.toThrow();
   });
@@ -161,15 +164,15 @@ describe('side games and chips', () => {
     expect(await opened({ openInvites: 6 })).toMatchObject({ openInvites: 6 });
   });
 
-  it('plays every side game just for fun without chips: no bets, free packs, the wallet untouched', async () => {
+  it('plays the side games just for fun without chips: no bets, no packs, the wallet untouched', async () => {
     const room = await openRoom({ chips: false }); const phone = await join(room.roomCode, 'Just fun');
     const wallet = (await call('GET', `/api/rooms/${room.sessionId}/side`, undefined, phone)).json().data;
     expect(wallet).toMatchObject({ enabled: true, chips: false, balance: 0, canRefill: false });
     // The phone may still send a bet; without chips it counts for nothing.
     const spin = (await call('POST', `/api/rooms/${room.sessionId}/side/slots`, { roundId: randomUUID(), bet: 100 }, phone)).json().data;
     expect(spin).toMatchObject({ bet: 0, payout: 0, balance: 0 }); expect(spin.reels).toHaveLength(3);
-    const pack = (await call('POST', `/api/rooms/${room.sessionId}/side/packs`, { roundId: randomUUID() }, phone)).json().data;
-    expect(pack.items.length).toBeGreaterThan(0); expect(pack.balance).toBe(0);
+    // Packs are bought with chips: without chips there is nothing to collect.
+    expect((await call('POST', `/api/rooms/${room.sessionId}/side/packs`, { roundId: randomUUID(), setId }, phone)).json().error.code).toBe('CHIPS_OFF');
     const hand = (await call('POST', `/api/rooms/${room.sessionId}/side/blackjack`, { roundId: randomUUID(), bet: 50 }, phone)).json().data.hand;
     expect(hand.bet).toBe(0);
     const player = await prisma.sessionPlayer.findFirstOrThrow({ where: { sessionId: room.sessionId, displayName: 'Just fun' } });

@@ -1,11 +1,11 @@
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
-import { handTotal, PACK_ITEMS, PACK_SIZE, RARITIES, SLOT_SYMBOLS, SLOT_WEIGHT_TOTAL, slotMultiplier, type BlackjackView, type SlotSymbol } from '@party/contracts';
+import { handTotal, SLOT_SYMBOLS, SLOT_WEIGHT_TOTAL, slotMultiplier, type BlackjackView, type SlotSymbol } from '@party/contracts';
 
 // Every bit of chance in the side games is drawn here, on the server, with a
 // cryptographic random source. `draw` is replaceable only so tests can fix outcomes.
 export type Draw = (below: number) => number;
-const secure: Draw = below => randomInt(below);
+export const secure: Draw = below => randomInt(below);
 
 function weighted<T>(items: readonly T[], weight: (item: T) => number, draw: Draw): T {
   const total = items.reduce((sum, item) => sum + weight(item), 0);
@@ -25,13 +25,7 @@ export function slotReturn(): number {
   return expected;
 }
 
-export function openPack(draw: Draw = secure): string[] {
-  return Array.from({ length: PACK_SIZE }, () => {
-    const rarity = weighted(RARITIES, entry => entry.percent, draw).key;
-    const choices = PACK_ITEMS.filter(item => item.rarity === rarity);
-    return choices[draw(choices.length)]!.key;
-  });
-}
+// Packs are drawn in pack-sets.ts (drawPack), from the set the player chose.
 
 // Blackjack. Cards come from an endless shuffled shoe (every card drawn fresh),
 // so nothing about future cards is stored. The dealer's hidden card lives only in

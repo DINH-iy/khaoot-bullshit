@@ -403,9 +403,12 @@
 .lobby-band-text { display: grid; gap: 6px; justify-items: start; }
 .room .lobby-band h2 { margin: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: .1em; color: var(--r-muted); }
 .lobby-go { margin: 0; font-size: 1.3rem; font-weight: 700; }
-.room .lobby-band .big-code { font-size: clamp(3rem, 6vw, 6rem); white-space: nowrap; line-height: 1; }
-.room .lobby-band .join-qr img { width: clamp(150px, 13vw, 210px); height: auto; border-radius: 16px; background: #fff; padding: 8px; }
-.lobby-band-link { position: absolute; top: 14px; right: 14px; }
+.room .lobby-band .big-code { font-size: clamp(2.2rem, 11cqi, 6rem); white-space: nowrap; line-height: 1; }
+.room .lobby-band .join-qr img { width: clamp(140px, 22cqi, 210px); height: auto; border-radius: 16px; background: #fff; padding: 8px; }
+.lobby-band-head { display: flex; align-items: center; gap: 10px; }
+/* The band sizes itself to its own width (the host screen can be narrow, as on the test bench): narrow, the QR code goes under the code. */
+.room .lobby:has(.lobby-band) { container-type: inline-size; }
+@container (max-width: 620px) { .lobby-band { grid-template-columns: 1fr; justify-items: start; } }
 .lobby-stage { display: grid; gap: 16px; padding: 0 28px 28px; }
 .lobby-count { justify-self: center; display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 8px 20px; border-radius: 999px; background: var(--r-card-strong); font-size: 1.6rem; font-weight: 900; font-variant-numeric: tabular-nums; }
 .lobby-seats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 14px; }
@@ -423,3 +426,8 @@
 /* The people picker's ticks fill the row (the player list's chip style must not reach them). */
 .host-sheet.players .people-picker li { display: block; padding: 0; background: none; border-radius: 0; }
 .people-picker .choice { width: 100%; box-sizing: border-box; }
+.invite-bench { flex: none; font-weight: 700; white-space: nowrap; }
+
+/* Small secondary actions in the room: real buttons in the game's colours (never underlined text). */
+.room .link-button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font-size: .95rem; font-weight: 700; text-decoration: none; }
+.room .link-button:hover:not(:disabled) { border-color: var(--r-accent); }
