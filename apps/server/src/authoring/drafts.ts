@@ -66,9 +66,11 @@ export function createAuthoring(client: PrismaClient) {
     return { gameId: game.id, title: game.title, revision: draft.revision, updatedAt: draft.updatedAt.toISOString(), issueCount: inspected.issues.length,
       published: latest ? { number: latest.number, publishedAt: latest.createdAt.toISOString(), matchesDraft: inspected.definition !== null && contentHash(inspected.definition) === latest.contentHash } : null };
   }
-  const draftView = (game: { id: string; title: string }, draft: { revision: number; updatedAt: Date; definition: unknown }, latest: Parameters<typeof summary>[2]): Draft => {
+  const draftView = (game: { id: string; title: string; builtInKey?: string | null }, draft: { revision: number; updatedAt: Date; definition: unknown }, latest: Parameters<typeof summary>[2]): Draft => {
     const inspected = inspectDefinition(draft.definition);
-    return { ...summary(game, draft, latest, inspected), definition: draft.definition, issues: inspected.issues };
+    // The owner's own version of a built-in game says which one, so the editor can show it.
+    const original = game.builtInKey ? builtInGames.find(entry => entry.key === game.builtInKey) : undefined;
+    return { ...summary(game, draft, latest, inspected), definition: draft.definition, issues: inspected.issues, builtIn: original ? { key: original.key, title: original.definition.title } : null };
   };
   const api = {
     async list(creatorId: string): Promise<GameSummary[]> {

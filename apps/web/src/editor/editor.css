@@ -630,3 +630,4 @@
 /* The map's toolbar: every button the same height and weight (Add a scene, Tidy up, the zoom menu, Tips). */
 .flow-tools { align-items: center; }
 .editor .flow-tools > button, .editor .flow-tools .action-menu-text, .editor .flow-tools .info-tip.with-text .info-tip-button { display: inline-flex; align-items: center; gap: 8px; height: 44px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-weight: 600; font-size: 1rem; }
+.crumb-builtin { display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--e-accent-soft); color: var(--e-text); font-weight: 600; }

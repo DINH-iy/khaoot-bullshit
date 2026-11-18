@@ -19,7 +19,9 @@ export const GameSummarySchema = z.object({
   issueCount: z.number().int().min(0), published: Published,
 }).strict();
 export type GameSummary = z.infer<typeof GameSummarySchema>;
-export const DraftSchema = GameSummarySchema.extend({ definition: z.unknown(), issues: z.array(DefinitionIssueSchema) }).strict();
+export const DraftSchema = GameSummarySchema.extend({ definition: z.unknown(), issues: z.array(DefinitionIssueSchema),
+  // Set when this is the owner's own version of a built-in game: which one (its key and original title).
+  builtIn: z.object({ key: z.string(), title: z.string() }).strict().nullable().optional() }).strict();
 export type Draft = z.infer<typeof DraftSchema>;
 export const CreateGameSchema = z.object({
   gameId: GameIdSchema, title: z.string().trim().min(1).max(160),
