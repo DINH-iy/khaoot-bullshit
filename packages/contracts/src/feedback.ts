@@ -40,6 +40,12 @@ export const FeedbackContextSchema = z.object({
 }).strict();
 export type FeedbackContext = z.infer<typeof FeedbackContextSchema>;
 
+export const FEEDBACK_IMAGE_MAX = 2 * 1024 * 1024;
+export const FEEDBACK_VIDEO_MAX = 5 * 1024 * 1024;
+export const FEEDBACK_ATTACHMENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'] as const;
+export const FeedbackAttachmentTypeSchema = z.enum(FEEDBACK_ATTACHMENT_TYPES);
+export const FEEDBACK_BASE64_MAX = 4 * Math.ceil(FEEDBACK_VIDEO_MAX / 3);
+
 export const FEEDBACK_TITLE_MAX = 140;
 export const FEEDBACK_DETAILS_MAX = 4000;
 export const NewFeedbackSchema = z.object({
@@ -50,6 +56,7 @@ export const NewFeedbackSchema = z.object({
   details: text(FEEDBACK_DETAILS_MAX).pipe(z.string().trim()),
   reporterName: text(60).pipe(z.string().trim()).nullable(),
   context: FeedbackContextSchema,
+  attachment: z.string().min(16).max(FEEDBACK_BASE64_MAX).pipe(z.base64()).optional(),
 }).strict();
 export type NewFeedback = z.input<typeof NewFeedbackSchema>;
 
@@ -62,6 +69,7 @@ export const FeedbackItemSchema = z.object({
   reporterName: z.string().nullable(),
   context: FeedbackContextSchema,
   ownerNote: z.string().nullable(),
+  attachmentType: FeedbackAttachmentTypeSchema.nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 }).strict();

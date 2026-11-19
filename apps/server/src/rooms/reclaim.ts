@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { GameIdSchema, MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT, ReclaimSeatSchema, REACTIONS, MUSIC_VOLUME_DEFAULT } from '@party/contracts';
+import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, GameIdSchema, MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT, ReclaimSeatSchema, REACTIONS, MUSIC_VOLUME_DEFAULT } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
-import { authorize, type Transaction } from '../game/model.js';
+import { authorize, type Transaction, type TrustedActor } from '../game/model.js';
 import { lockRoom, recordRoomChange, type Principal } from './gateway.js';
 import { joinToken, roomAssert, tokenHash } from './security.js';
 
@@ -14,6 +14,11 @@ const REQUEST_MS = 10 * 60 * 1000;
 const PLAYER_ACCESS_MS = 4 * 60 * 60 * 1000;
 const RequestSchema = z.object({ id: GameIdSchema, playerId: GameIdSchema, status: z.enum(['PENDING', 'APPROVED', 'DENIED']), requestedAt: z.string().datetime() }).strict();
 export const RoomStateSchema = z.object({
+  idleCloseMinutes: IdleCloseMinutesSchema.default(0), keepOpen: z.boolean().default(false),
+  autoRevealSeconds: AutoRevealSecondsSchema.nullable().default(null), hostPhonePlayerId: GameIdSchema.nullable().default(null),
+  hostPhoneCredentialId: GameIdSchema.nullable().default(null),
+  birthdayVote: z.boolean().default(false), birthdayVoters: z.array(GameIdSchema).default([]), birthdayReady: z.boolean().default(false),
+  bannedPeople: z.array(GameIdSchema).default([]),
   reclaimApproval: z.boolean().default(false),
   // Host settings (see RoomSettingsSchema). Rooms saved before they existed get these defaults.
   showScores: z.boolean().default(true), reactions: z.boolean().default(true), autoClose: z.boolean().default(true), autoCloseSeconds: z.number().int().min(1).max(30).default(3),
@@ -46,6 +51,10 @@ export const RoomStateSchema = z.object({
 }).strict();
 export type RoomState = z.infer<typeof RoomStateSchema>;
 export const readRoomState = (value: unknown): RoomState => { const parsed = RoomStateSchema.safeParse(value); return parsed.success ? parsed.data : RoomStateSchema.parse({}); };
+export function isHostPhone(state: RoomState, actor: TrustedActor): boolean {
+  return actor.role === 'player' && state.hostPhonePlayerId === actor.playerId
+    && actor.credentialProof?.kind === 'player' && state.hostPhoneCredentialId === actor.credentialProof.id;
+}
 const live = (state: RoomState, now: number) => state.seatRequests.filter(request => now - Date.parse(request.requestedAt) < REQUEST_MS);
 export const pendingRequests = (state: RoomState, now = Date.now()) => live(state, now).filter(request => request.status === 'PENDING');
 
@@ -54,6 +63,9 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
   async function grant(tx: Transaction, sessionId: string, playerId: string, token: string) {
     await tx.playerCredential.updateMany({ where: { sessionId, playerId, revokedAt: null }, data: { revokedAt: new Date() } });
     await tx.playerCredential.create({ data: { sessionId, playerId, tokenHash: tokenHash(token), expiresAt: new Date(Date.now() + PLAYER_ACCESS_MS) } });
+    const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId }, select: { state: true } });
+    const state = readRoomState(session.state);
+    if (state.hostPhonePlayerId === playerId) await save(tx, sessionId, { ...state, hostPhonePlayerId: null, hostPhoneCredentialId: null });
     await recordRoomChange(tx, sessionId, 'seat.reclaimed');
   }
   return {
@@ -125,14 +137,18 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
       });
       if (playerId) kick(sessionId, playerId);
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'signup' | 'testBench'>>) {
-      roomAssert(principal.role === 'host', 'FORBIDDEN');
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'signup' | 'testBench' | 'keepOpen' | 'autoRevealSeconds'>>) {
+      const updated = Object.keys(settings);
+      const onlyReveal = updated.length === 1 && updated[0] === 'autoRevealSeconds';
+      roomAssert(principal.role === 'host' || (principal.role === 'player' && onlyReveal), 'FORBIDDEN');
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);
         const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId } }); await authorize(tx, session, principal.actor);
         const state = readRoomState(session.state);
+        if (principal.role !== 'host') roomAssert(isHostPhone(state, principal.actor), 'FORBIDDEN');
         // Turning approval off does not silently grant waiting requests; the host still answers those.
         await save(tx, sessionId, { ...state, ...settings });
+        if (settings.keepOpen !== undefined) await tx.gameSession.update({ where: { id: sessionId }, data: { idleCloseAt: null } });
         await recordRoomChange(tx, sessionId, 'room.settings');
       });
     },

@@ -26,8 +26,8 @@ export const readMinigameRun = (presentation: unknown): MinigameRun | null => {
 };
 
 /** Starts play after the countdown: picks the hidden GO moment or shuffles the doors. */
-export function startMinigame(game: MinigameKey, settings: MinigameSettings, now: Date, random: (max: number) => number = randomInt): MinigameRun {
-  const startsAt = now.getTime() + MINIGAME_COUNTDOWN_MS;
+export function startMinigame(game: MinigameKey, settings: MinigameSettings, now: Date, random: (max: number) => number = randomInt, countdownMs = MINIGAME_COUNTDOWN_MS): MinigameRun {
+  const startsAt = now.getTime() + countdownMs;
   if (game === 'reaction') {
     const { minWaitMs, maxWaitMs } = settings as MinigameSettings<'reaction'>;
     return { startsAt: new Date(startsAt).toISOString(), goAt: new Date(startsAt + minWaitMs + random(maxWaitMs - minWaitMs + 1)).toISOString(), doorsMilli: null };

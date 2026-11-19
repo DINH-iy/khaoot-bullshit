@@ -29,6 +29,7 @@
 .feedback-elements ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .feedback-elements li { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; font-size: .85rem; }
 .feedback-elements li span { display: grid; min-width: 0; } .feedback-elements li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-elements li > button { flex: none; width: auto; }
 .feedback-elements code { font-size: .75rem; opacity: .75; overflow-wrap: anywhere; }
 .feedback-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .feedback-note { margin: 0; font-size: .78rem; opacity: .7; line-height: 1.4; }
@@ -43,3 +44,7 @@
 @media (prefers-reduced-motion: reduce) { .feedback-tab { transition: none; } }
 /* Pages with the owner bar have Feedback in the bar instead of the edge tab. */
 body:has(.owner-nav) .feedback-tab { display: none; }
+
+.feedback-file { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 6px; }
+.feedback-file span { min-width: 0; overflow-wrap: anywhere; }
+.feedback-file button { flex: none; width: auto; }

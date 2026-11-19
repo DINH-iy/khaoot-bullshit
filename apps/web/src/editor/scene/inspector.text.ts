@@ -2,6 +2,7 @@ import { defineTexts } from '../../i18n/texts.js';
 
 // The scene panel (inspector.tsx): content, points, who plays, teams, routes, where next, and the Flow editor's side panel.
 export const INSPECTOR_TEXTS = defineTexts('editor-inspector', {
+    writingStarters: 'Prompt starters',
   noPoints: 'No points', pointsN: '{count} points', withPlaces: '{main} · {label} {list}', fastestL: 'fastest', placesL: 'places', mostVotesL: 'most votes',
   upTo: 'Up to {count}', perVote: '{count} per vote', placesList: 'Places {list}', duelSummary: 'Winner {winner} · right bet {bet}',
   solo: 'Everyone for themselves', inTeams: 'In the teams', roundTeams: 'Special teams for this round', reform: 'New teams from here on', teams: 'Teams',
@@ -36,6 +37,7 @@ export const INSPECTOR_TEXTS = defineTexts('editor-inspector', {
   routes: 'Routes', routeName: 'Route {number} name', removeRoute: 'Remove route {number}', routeN: 'Route {number}', addRoute: '+ Route',
 }, {
   nl: {
+    writingStarters: 'Voorbeeldopdrachten',
     noPoints: 'Geen punten', pointsN: '{count} punten', withPlaces: '{main} · {label} {list}', fastestL: 'snelste', placesL: 'plaatsen', mostVotesL: 'meeste stemmen',
     upTo: 'Tot {count}', perVote: '{count} per stem', placesList: 'Plaatsen {list}', duelSummary: 'Winnaar {winner} · goede gok {bet}',
     solo: 'Iedereen voor zich', inTeams: 'In de teams', roundTeams: 'Speciale teams voor deze ronde', reform: 'Vanaf hier nieuwe teams', teams: 'Teams',
@@ -70,6 +72,7 @@ export const INSPECTOR_TEXTS = defineTexts('editor-inspector', {
     routes: 'Routes', routeName: 'Naam van route {number}', removeRoute: 'Route {number} weghalen', routeN: 'Route {number}', addRoute: '+ Route',
   },
   de: {
+    writingStarters: 'Textvorlagen',
     noPoints: 'Keine Punkte', pointsN: '{count} Punkte', withPlaces: '{main} · {label} {list}', fastestL: 'Schnellste', placesL: 'Plätze', mostVotesL: 'meiste Stimmen',
     upTo: 'Bis zu {count}', perVote: '{count} pro Stimme', placesList: 'Plätze {list}', duelSummary: 'Sieger {winner} · richtige Wette {bet}',
     solo: 'Jeder für sich', inTeams: 'In den Teams', roundTeams: 'Besondere Teams für diese Runde', reform: 'Ab hier neue Teams', teams: 'Teams',
@@ -104,6 +107,7 @@ export const INSPECTOR_TEXTS = defineTexts('editor-inspector', {
     routes: 'Wege', routeName: 'Name von Weg {number}', removeRoute: 'Weg {number} entfernen', routeN: 'Weg {number}', addRoute: '+ Weg',
   },
   ro: {
+    writingStarters: 'Idei de enunțuri',
     noPoints: 'Fără puncte', pointsN: '{count} puncte', withPlaces: '{main} · {label} {list}', fastestL: 'cei mai rapizi', placesL: 'locuri', mostVotesL: 'cele mai multe voturi',
     upTo: 'Până la {count}', perVote: '{count} pe vot', placesList: 'Locuri {list}', duelSummary: 'Câștigătorul {winner} · pariu corect {bet}',
     solo: 'Fiecare pentru el', inTeams: 'În echipe', roundTeams: 'Echipe speciale pentru această rundă', reform: 'Echipe noi de aici înainte', teams: 'Echipe',

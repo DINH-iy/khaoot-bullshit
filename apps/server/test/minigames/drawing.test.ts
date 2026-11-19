@@ -30,6 +30,15 @@ describe('drawings', () => {
     expect(circleScore([500, 500, 510, 510])).toBe(0);
   });
 
+  it('scores a short oval without being biased by repeated points on one side', () => {
+    const oval = ring(9, () => 350).map((coordinate, index) => index % 2 ? Math.round(435 + (coordinate - 500) * 275 / 350) : coordinate + 40);
+    const score = circleScore(oval);
+    expect(score).toBeGreaterThan(600);
+    expect(score).toBeLessThan(circleScore(ring(120, () => 300)));
+    expect(circleScore([...Array.from({ length: 50 }, () => oval.slice(0, 2)).flat(), ...oval])).toBe(score);
+    expect(circleScore([100, 500, 900, 500, 100, 500])).toBe(0);
+  });
+
   it('accepts only bounded strokes on the 1000 × 1000 square', () => {
     expect(DrawingSchema.safeParse({ v: 1, strokes: [{ c: 0, w: 10, p: [0, 0, 1000, 1000] }] }).success).toBe(true);
     expect(DrawingSchema.safeParse({ v: 1, strokes: [{ c: 0, w: 10, p: [0, 0, 1001, 5] }] }).success).toBe(false);

@@ -33,8 +33,8 @@ export function DrawingAnswer({ sessionId, stageRunId, input, disabled, timeUp, 
   useEffect(() => { if (timeUp) setAutoSend(current => current === 'no' ? 'due' : current); }, [timeUp]);
   useEffect(() => { if (autoSend === 'due' && !sending) { setAutoSend('done'); if (drawing.strokes.length) void send(); } }, [autoSend, drawing]);
   return <div className="drawing-answer">
-    <DrawingPad value={drawing} onChange={setDrawing} under={input.start ? [input.start] : []} blind={input.blind ?? false} maxStrokes={input.maxStrokes} disabled={timeUp || sending} label={d('yours')} />
+    <button type="button" className="primary drawing-submit" disabled={disabled || sending || timeUp || !drawing.strokes.length} onClick={() => { void send(); }}>{timeUp ? t('timer.up') : t('drawing.submit')}</button>
     {error && <p role="alert" className="error">{error}</p>}
-    <button type="button" className="primary" disabled={disabled || sending || timeUp || !drawing.strokes.length} onClick={() => { void send(); }}>{timeUp ? t('timer.up') : t('drawing.submit')}</button>
+    <DrawingPad value={drawing} onChange={setDrawing} under={input.start ? [input.start] : []} blind={input.blind ?? false} maxStrokes={input.maxStrokes} disabled={timeUp || sending} label={d('yours')} />
   </div>;
 }

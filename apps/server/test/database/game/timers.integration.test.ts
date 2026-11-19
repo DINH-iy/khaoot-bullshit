@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { parseDefinition } from '../../../src/game/definition.js';
+import { revealDueStages } from '../../../src/game/auto-reveal.js';
 import { createGameService } from '../../../src/game/service.js';
 import { ACCEPTANCE_GRACE_MS, SETTLE_MS, closeExpiredStages } from '../../../src/game/timing.js';
 import { readSessionView } from '../../../src/game/views.js';
@@ -18,11 +19,11 @@ const timed = parseDefinition({
   edges: [{ key: 'quiz-to-challenge', from: 'quiz', to: 'challenge' }],
 });
 // A controlled server clock: deadline rules are exercised at exact milliseconds.
-async function world(players = 2) {
+async function world(players = 2, definition = timed) {
   let now = Date.now();
   const clock = () => new Date(now);
   const service = createGameService(prisma, undefined, clock);
-  const f = await fixture(players, timed);
+  const f = await fixture(players, definition);
   const host = async (type: string, extra: Record<string, unknown> = {}) => {
     const session = await prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } });
     return service.execute(f.host, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, expectedRevision: session.revision, type, ...extra });
@@ -38,6 +39,53 @@ async function world(players = 2) {
 afterAll(async () => { await db.close(); });
 
 describe('timed stages', () => {
+  it('waits for each challenge judgment before auto-reveal', async () => {
+    const w = await world(2, { ...timed, autoRevealSeconds: 0 });
+    await w.host('stage.close', { stageRunId: w.stageRunId });
+    const stageRunId = (await w.host('stage.advance', { stageRunId: w.stageRunId })).stageRunId!;
+    await w.host('stage.close', { stageRunId });
+    const revealed = async () => (await readSessionView(prisma, w.player(0), w.f.sessionId, w.clock)).stage?.revealed;
+    const backoff = new Map<string, number>();
+    const sweep = () => revealDueStages(prisma, w.service, backoff, w.clock());
+    await sweep();
+    expect(await revealed()).toBe(false);
+    await w.host('stage.judge', { stageRunId, playerId: w.f.players[0]!.id, amountMilli: '5000' });
+    w.advance(1100);
+    await sweep();
+    expect(await revealed()).toBe(false);
+    await w.host('stage.judge', { stageRunId, playerId: w.f.players[1]!.id, amountMilli: '0' });
+    w.advance(1100);
+    await sweep();
+    expect(await revealed()).toBe(true);
+  });
+
+  it('starts the drawing countdown after the explanation and preserves it across pause', async () => {
+    const definition = parseDefinition({
+      formatVersion: 1, title: 'Countdown', startNodeKey: 'draw', edges: [],
+      nodes: [{ key: 'draw', stages: [{ key: 'pic', kind: 'collect', prompt: 'Draw', durationMs: DURATION,
+        input: { kind: 'drawing', maxStrokes: 50 }, scoring: { kind: 'none' }, explain: { text: 'Draw a tree' }, countdownSeconds: 5,
+      }] }],
+    });
+    const w = await world(1, definition);
+    const playerView = async () => (await readSessionView(prisma, w.player(0), w.f.sessionId, w.clock)).stage!;
+    expect((await playerView()).countdownUntil).toBeUndefined();
+    expect((await w.stage()).deadlineAt).toBeNull();
+    w.advance(7000);
+    await w.host('stage.explained', { stageRunId: w.stageRunId });
+    expect((await playerView()).countdownUntil).toBe(new Date(w.at() + 5000).toISOString());
+    expect((await w.stage()).deadlineAt?.getTime()).toBe(w.at() + 5000 + DURATION);
+    await expect(w.service.execute(w.player(0), {
+      formatVersion: 1, type: 'submission.submit', sessionId: w.f.sessionId, commandId: randomUUID(),
+      stageRunId: w.stageRunId, value: { kind: 'drawing', assetId: randomUUID() },
+    })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    w.advance(2000);
+    await w.host('session.pause');
+    w.advance(14000);
+    await w.host('session.resume');
+    expect((await playerView()).countdownUntil).toBe(new Date(w.at() + 3000).toISOString());
+    expect((await w.stage()).deadlineAt?.getTime()).toBe(w.at() + 3000 + DURATION);
+  });
+
   it('gives a drawing round more grace, so a drawing sent when time runs out still counts', async () => {
     let now = Date.now(); const clock = () => new Date(now); const service = createGameService(prisma, undefined, clock);
     const f = await fixture(1, parseDefinition({ formatVersion: 1, title: 'Draw', startNodeKey: 'draw', nodes: [{ key: 'draw', stages: [{ key: 'pic', kind: 'collect', prompt: 'Draw', durationMs: DURATION, input: { kind: 'drawing', maxStrokes: 50 }, scoring: { kind: 'none' } }] }], edges: [] }));

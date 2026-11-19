@@ -151,7 +151,7 @@ export const DoorsViewSchema = z.object({ picked: z.number().int().min(0).nullab
 // `stroke`: the circle drawn in Perfect circle (scored by the server); `teamId`: the team voted for in Pass the pencil.
 // `rainbow`: Drive the bus, the team's cards made a rainbow (the other teams drink).
 export const MinigameValueSchema = z.object({ kind: z.literal('minigame'), value: z.number().int().min(0).max(600_000), early: z.literal(true).optional(), rainbow: z.literal(true).optional(),
-  stroke: z.array(z.number().int().min(0).max(1000)).min(24).max(800).optional(), teamId: z.string().uuid().optional() }).strict();
+  stroke: z.array(z.number().int().min(0).max(1000)).min(2).max(800).optional(), teamId: z.string().uuid().optional() }).strict();
 
 /** The minigame as a screen sees it while it runs. Never contains secret parts (which door hides what). */
 export const PublicMinigameSchema = z.object({

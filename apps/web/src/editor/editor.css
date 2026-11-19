@@ -409,19 +409,7 @@
 .ed-chosen .small-button { justify-self: start; margin-top: 4px; }
 @media (max-width: 520px) { .choice-cards { grid-template-columns: 1fr; } }
 /* The editor's own dropdown: a button showing the choice, and a list drawn over the page. */
-.editor .ed-dropdown, .ed-dropdown { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; min-height: 44px; padding: 6px 10px 6px 12px; border-radius: 8px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
-.ed-dropdown > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ed-dropdown svg { flex: none; color: var(--e-muted); transition: transform .15s; }
-.ed-dropdown[aria-expanded=true] { border-color: var(--e-accent); box-shadow: 0 0 0 1px var(--e-accent); } .ed-dropdown[aria-expanded=true] svg { transform: rotate(180deg); }
-.ed-dropdown-placeholder { color: var(--e-muted); }
-.ed-dropdown-list { position: fixed; z-index: 80; overflow: auto; display: grid; align-content: start; gap: 1px; padding: 6px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); box-shadow: 0 12px 32px rgb(0 0 0 / .3); }
-.ed-dropdown-option { padding: 9px 12px 9px 30px; border-radius: 8px; cursor: pointer; position: relative; line-height: 1.3; overflow-wrap: anywhere; }
-.ed-dropdown-option.active { background: var(--e-accent-soft); }
-.ed-dropdown-option[aria-selected=true] { font-weight: 600; }
-.ed-dropdown-check { position: absolute; left: 10px; color: var(--e-accent); }
-.ed-dropdown-option[aria-disabled=true] { color: var(--e-muted); cursor: default; }
-.ed-dropdown-group { padding: 8px 12px 4px; font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--e-muted); }
-@media (pointer: coarse) { .ed-dropdown-option { padding-top: 12px; padding-bottom: 12px; } }
+
 /* The Flow editor's panel shows what a scene is, not its settings: a summary and a way into the Scene editor. */
 .flow-summary { display: grid; gap: 4px; padding: 12px; border-radius: 12px; background: var(--e-accent-soft); }
 .flow-summary p { margin: 0; } .flow-summary-banner { font-size: .75rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--e-muted); }
@@ -847,3 +835,27 @@
 .layout-left, .layout-right { grid-template-columns: 1fr 1fr; }
 .layout-left b { grid-column: 1; grid-row: 1; }
 .layout-left i { grid-column: 2; grid-row: 1; }
+
+.writing-starters > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.writing-starters summary { cursor: pointer; }
+
+.editor-tour { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--e-border); }
+.editor-tour p { margin: 0; flex: 1 1 300px; font-size: .9rem; }
+.editor-tour > div { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.replace-scene-dialog { max-width: calc(100% - 24px); max-height: calc(100% - 24px); overflow: auto; }
+.replace-scene-dialog:not([open]) { display: none; }
+.replace-scene-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.replace-scene-dialog .add-menu { box-shadow: none; width: 100%; }
+
+.zoom-bindings { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 16px; }
+.zoom-bindings label { display: grid; gap: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .scene-editor .scene-canvas, .scene-preview-dialog[open], .replace-scene-dialog[open] { animation: editor-panel-enter 150ms ease-out both; }
+}
+@keyframes editor-panel-enter { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+.editor:has(> .editor-tour) { grid-template-rows: auto auto minmax(0, 1fr); }
+.scene-next-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+
+.scene-next-destinations { display: grid; gap: 6px; }

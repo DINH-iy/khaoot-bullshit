@@ -3,6 +3,7 @@ import { defineTexts } from '../../i18n/texts.js';
 // Help & shortcuts (help-panel.tsx). Marks: **bold**, *emphasis*, [[Key]]; {mod} is ⌘ on a Mac, Ctrl elsewhere.
 // Gesture and key names in the tables (k…) are what the reader presses; the descriptions (d…) say what happens.
 export const HELP_TEXTS = defineTexts('editor-help', {
+    zoomBindings: 'Map zoom shortcuts', resetBindings: 'Restore default shortcuts',
   title: 'Help & shortcuts', close: 'Close', around: 'Getting around', map: 'On the map (mouse and touch)', keys: 'Keyboard shortcuts', menus: 'Menus, lists and popups',
   a1: '**Flow editor** is the map: add, connect, move and delete scenes, and choose where each leads.',
   a2: '**Scene editor** is the content: questions, answers, parts, points and who plays. Double-click a card (or *Edit this scene →*) to open it there.',
@@ -14,7 +15,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
   kScroll: 'Scroll', dScroll: 'Zoom in and out around the pointer (pinch on a trackpad or phone).',
   kShiftScroll: 'Shift + Scroll', dShiftScroll: 'Move the map. Dragging an empty spot moves it too. The zoom menu (showing the zoom, such as 100%) zooms and shows the whole game.',
   kClick: 'Click', dClick: 'Select a scene. Click an empty spot to deselect.', kShiftClick: 'Shift + Click', dShiftClick: 'Add a scene to the selection (or {mod} + Click).',
-  kShiftDrag: 'Shift + Drag', dShiftDrag: 'Draw a box to select several scenes.', kDrag: 'Drag', dDrag: 'Move the selected scenes; they snap to the grid and line up with each other.',
+  kShiftDrag: 'Shift/Ctrl + Drag', dShiftDrag: 'Draw a box to select several scenes.', kDrag: 'Drag', dDrag: 'Move the selected scenes; they snap to the grid and line up with each other.',
   kDouble: 'Double-click', dDouble: 'Open the scene in the Scene editor.', kDragPort: 'Drag ○', dDragPort: 'Connect: drag from a scene\'s ○ on its right edge to another scene (or tap the ○, then tap the scene).',
   dPlus: 'Add a scene connected to that output.', kRight: 'Right-click', dRight: 'Add a scene on an empty spot.',
   kArrow: 'Click an arrow', dArrow: 'Select it: its actions appear at the top of the map (add a scene on it, straighten it, remove it). Drag an arrow\'s end to move it to another scene.',
@@ -30,6 +31,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
   m3: 'Settings are in small groups that open and close; they stay as you leave them, also on the next scene.',
 }, {
   nl: {
+    zoomBindings: 'Sneltoetsen voor kaartzoom', resetBindings: 'Standaardsneltoetsen herstellen',
     title: 'Hulp & sneltoetsen', close: 'Sluiten', around: 'Je weg vinden', map: 'Op de kaart (muis en touch)', keys: 'Sneltoetsen', menus: 'Menu’s, lijsten en pop-ups',
     a1: '**Flow-editor** is de kaart: scènes toevoegen, verbinden, verplaatsen en verwijderen, en kiezen waar elke scène heen leidt.',
     a2: '**Scène-editor** is de inhoud: vragen, antwoorden, delen, punten en wie er speelt. Dubbelklik op een kaart (of *Deze scène bewerken →*) om hem daar te openen.',
@@ -41,7 +43,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
     kScroll: 'Scrollen', dScroll: 'In- en uitzoomen rond de aanwijzer (knijpen op een trackpad of telefoon).',
     kShiftScroll: 'Shift + Scrollen', dShiftScroll: 'De kaart verschuiven. Een lege plek slepen verschuift hem ook. Het zoommenu (met de zoom, zoals 100%) zoomt en toont het hele spel.',
     kClick: 'Klikken', dClick: 'Een scène kiezen. Klik op een lege plek om niets te kiezen.', kShiftClick: 'Shift + Klikken', dShiftClick: 'Een scène aan de keuze toevoegen (of {mod} + Klikken).',
-    kShiftDrag: 'Shift + Slepen', dShiftDrag: 'Een kader trekken om meerdere scènes te kiezen.', kDrag: 'Slepen', dDrag: 'De gekozen scènes verplaatsen; ze klikken vast op het raster en lijnen uit met elkaar.',
+    kShiftDrag: 'Shift/Ctrl + Slepen', dShiftDrag: 'Een kader trekken om meerdere scènes te kiezen.', kDrag: 'Slepen', dDrag: 'De gekozen scènes verplaatsen; ze klikken vast op het raster en lijnen uit met elkaar.',
     kDouble: 'Dubbelklikken', dDouble: 'De scène openen in de Scène-editor.', kDragPort: '○ slepen', dDragPort: 'Verbinden: sleep van het ○ aan de rechterkant van een scène naar een andere scène (of tik op het ○ en dan op de scène).',
     dPlus: 'Een scène toevoegen die aan die uitgang vastzit.', kRight: 'Rechtsklikken', dRight: 'Een scène toevoegen op een lege plek.',
     kArrow: 'Op een pijl klikken', dArrow: 'Hem kiezen: zijn acties verschijnen bovenaan de kaart (er een scène op zetten, rechttrekken, weghalen). Sleep het eind van een pijl om hem naar een andere scène te verplaatsen.',
@@ -57,6 +59,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
     m3: 'Instellingen staan in kleine groepen die open en dicht gaan; ze blijven zoals je ze achterlaat, ook bij de volgende scène.',
   },
   de: {
+    zoomBindings: 'Tastenkürzel für Kartenzoom', resetBindings: 'Standardkürzel wiederherstellen',
     title: 'Hilfe & Tastenkürzel', close: 'Schließen', around: 'Zurechtfinden', map: 'Auf der Karte (Maus und Touch)', keys: 'Tastenkürzel', menus: 'Menüs, Listen und Pop-ups',
     a1: '**Ablauf-Editor** ist die Karte: Szenen hinzufügen, verbinden, verschieben und löschen und festlegen, wohin jede führt.',
     a2: '**Szenen-Editor** ist der Inhalt: Fragen, Antworten, Teile, Punkte und wer spielt. Doppelklicke auf eine Karte (oder *Diese Szene bearbeiten →*), um sie dort zu öffnen.',
@@ -68,7 +71,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
     kScroll: 'Scrollen', dScroll: 'Um den Zeiger herum hinein- und herauszoomen (auf Trackpad oder Handy mit zwei Fingern).',
     kShiftScroll: 'Umschalt + Scrollen', dShiftScroll: 'Die Karte verschieben. Eine leere Stelle zu ziehen verschiebt sie auch. Das Zoommenü (mit dem Zoom, etwa 100 %) zoomt und zeigt das ganze Spiel.',
     kClick: 'Klicken', dClick: 'Eine Szene auswählen. Klicke auf eine leere Stelle, um die Auswahl aufzuheben.', kShiftClick: 'Umschalt + Klicken', dShiftClick: 'Eine Szene zur Auswahl hinzufügen (oder {mod} + Klicken).',
-    kShiftDrag: 'Umschalt + Ziehen', dShiftDrag: 'Einen Rahmen ziehen, um mehrere Szenen auszuwählen.', kDrag: 'Ziehen', dDrag: 'Die gewählten Szenen verschieben; sie rasten am Raster ein und richten sich aneinander aus.',
+    kShiftDrag: 'Umschalt/Strg + Ziehen', dShiftDrag: 'Einen Rahmen ziehen, um mehrere Szenen auszuwählen.', kDrag: 'Ziehen', dDrag: 'Die gewählten Szenen verschieben; sie rasten am Raster ein und richten sich aneinander aus.',
     kDouble: 'Doppelklicken', dDouble: 'Die Szene im Szenen-Editor öffnen.', kDragPort: '○ ziehen', dDragPort: 'Verbinden: vom ○ am rechten Rand einer Szene zu einer anderen Szene ziehen (oder das ○ antippen, dann die Szene).',
     dPlus: 'Eine Szene hinzufügen, die mit diesem Ausgang verbunden ist.', kRight: 'Rechtsklick', dRight: 'Eine Szene an einer leeren Stelle hinzufügen.',
     kArrow: 'Auf einen Pfeil klicken', dArrow: 'Ihn auswählen: Seine Aktionen erscheinen oben auf der Karte (eine Szene darauf setzen, begradigen, entfernen). Ziehe das Ende eines Pfeils, um ihn zu einer anderen Szene zu verschieben.',
@@ -84,6 +87,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
     m3: 'Einstellungen stehen in kleinen Gruppen, die auf- und zugehen; sie bleiben so, wie du sie verlässt, auch bei der nächsten Szene.',
   },
   ro: {
+    zoomBindings: 'Scurtături pentru zoom', resetBindings: 'Restabilește scurtăturile implicite',
     title: 'Ajutor și scurtături', close: 'Închide', around: 'Cum te orientezi', map: 'Pe hartă (mouse și atingere)', keys: 'Scurtături de tastatură', menus: 'Meniuri, liste și ferestre',
     a1: '**Editorul de flux** este harta: adaugi, conectezi, muți și ștergi scene și alegi unde duce fiecare.',
     a2: '**Editorul de scene** este conținutul: întrebări, răspunsuri, părți, puncte și cine joacă. Dă dublu clic pe un card (sau *Editează această scenă →*) ca să-l deschizi acolo.',
@@ -95,7 +99,7 @@ export const HELP_TEXTS = defineTexts('editor-help', {
     kScroll: 'Derulare', dScroll: 'Mărește și micșorează în jurul cursorului (ciupire pe trackpad sau telefon).',
     kShiftScroll: 'Shift + Derulare', dShiftScroll: 'Mută harta. Și tragerea unui loc gol o mută. Meniul de zoom (care arată zoomul, de ex. 100%) mărește și arată tot jocul.',
     kClick: 'Clic', dClick: 'Alege o scenă. Clic pe un loc gol ca să anulezi alegerea.', kShiftClick: 'Shift + Clic', dShiftClick: 'Adaugă o scenă la selecție (sau {mod} + Clic).',
-    kShiftDrag: 'Shift + Tragere', dShiftDrag: 'Desenează un chenar ca să alegi mai multe scene.', kDrag: 'Tragere', dDrag: 'Mută scenele alese; se prind de grilă și se aliniază între ele.',
+    kShiftDrag: 'Shift/Ctrl + Tragere', dShiftDrag: 'Desenează un chenar ca să alegi mai multe scene.', kDrag: 'Tragere', dDrag: 'Mută scenele alese; se prind de grilă și se aliniază între ele.',
     kDouble: 'Dublu clic', dDouble: 'Deschide scena în Editorul de scene.', kDragPort: 'Trage ○', dDragPort: 'Conectare: trage de la ○ de pe marginea dreaptă a unei scene la altă scenă (sau atinge ○, apoi scena).',
     dPlus: 'Adaugă o scenă conectată la acea ieșire.', kRight: 'Clic dreapta', dRight: 'Adaugă o scenă într-un loc gol.',
     kArrow: 'Clic pe o săgeată', dArrow: 'O alegi: acțiunile ei apar sus pe hartă (pune o scenă pe ea, îndreapt-o, elimin-o). Trage capătul unei săgeți ca s-o muți la altă scenă.',

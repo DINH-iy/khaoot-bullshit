@@ -1,3 +1,4 @@
+import { IdleCloseMinutesSchema } from '@party/contracts';
 import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
@@ -84,7 +85,7 @@ function stageFrom(raw: Json, key: string): Json {
   const media = SceneMediaSchema.safeParse(raw['media']);
   // `music`: what the scene does with the game's music; "keep", "quiet" and "stop" can be written as text, a song of its own only from the library.
   const music = SceneMusicSchema.safeParse(typeof raw['music'] === 'string' ? { mode: raw['music'] } : raw['music']);
-  const extras = { ...spun, ...explain, ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
+  const extras = { ...spun, ...explain, ...Object.fromEntries(['resultCards', 'countdownSeconds', 'voteMode', 'voteLimit'].filter(field => raw[field] !== undefined).map(field => [field, raw[field]])), ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
   return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
 }
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
@@ -223,7 +224,10 @@ export function importDefinition(input: string): Json | null {
       : { stats: raw['awards'].map(entry => text(entry)) } } : isObject(raw['finale']) ? { finale: raw['finale'] } : {}),
     // Side games on the phones are on unless switched off; chips only with an explicit true.
     ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
+    ...(raw['autoRevealSeconds'] !== undefined ? { autoRevealSeconds: raw['autoRevealSeconds'] } : {}),
+    ...(raw['birthdayVote'] === true ? { birthdayVote: true } : {}),
     // The host's quick time button in seconds (default 30).
+    ...(IdleCloseMinutesSchema.safeParse(raw['idleCloseMinutes']).success ? { idleCloseMinutes: raw['idleCloseMinutes'] } : {}),
     ...(Number.isFinite(Number(raw['quickTime'])) && raw['quickTime'] !== undefined ? { quickTimeSeconds: Math.max(5, Math.min(600, Math.round(Number(raw['quickTime'])))) } : {}),
     // `music`: a background playlist of library songs, as exported games carry it (an AI cannot upload songs).
     ...(GameMusicSchema.safeParse(raw['music']).success ? { music: raw['music'] } : {}),

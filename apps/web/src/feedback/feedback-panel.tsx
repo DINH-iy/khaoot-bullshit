@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FEEDBACK_DETAILS_MAX, FEEDBACK_TITLE_MAX, type FeedbackKind, type NewFeedback, type PickedElement } from '@party/contracts';
+import { FEEDBACK_ATTACHMENT_TYPES, FEEDBACK_DETAILS_MAX, FEEDBACK_IMAGE_MAX, FEEDBACK_TITLE_MAX, FEEDBACK_VIDEO_MAX, type FeedbackKind, type NewFeedback, type PickedElement } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { FEEDBACK_UI, pageContext } from './describe-element.js';
 import { ElementPicker } from './element-picker.js';
@@ -16,12 +16,24 @@ export const KINDS: Record<FeedbackKind, { label: string; title: string; details
 const problems: Record<string, string> = {
   RATE_LIMITED: 'Many reports were sent from here just now. Wait a minute and try again.',
   STORAGE_FULL: 'The inbox is full for now. Tell the organiser directly.',
-  INVALID_COMMAND: 'Give it a title of at least 3 characters.',
+  INVALID_COMMAND: 'Check the report title and attachment, then try again.',
+  UNSUPPORTED_MEDIA: 'Choose a PNG, JPEG, WebP, MP4, WebM or MOV file.',
+  FILE_TOO_LARGE: 'Images can be up to 2 MB and videos up to 5 MB.',
 };
+
+function readAttachment(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(String(reader.result).split(',', 2)[1]!);
+    reader.readAsDataURL(file);
+  });
+}
 
 export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent?: (sent: boolean) => void }) {
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [title, setTitle] = useState(''); const [details, setDetails] = useState(''); const [name, setName] = useState(remembered);
+  const [file, setFile] = useState<File>();
   const [elements, setElements] = useState<PickedElement[]>([]);
   const [picking, setPicking] = useState(false); const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false); const [error, setError] = useState('');
@@ -39,13 +51,17 @@ export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault(); setSending(true); setError('');
-    const report: NewFeedback = { id, kind, title, details, reporterName: name.trim() || null, context: pageContext(elements) };
-    try { await roomApi('/api/feedback', report); remember(name.trim()); setSent(true); onSent?.(true); }
+    try {
+      const report: NewFeedback = { id, kind, title, details, reporterName: name.trim() || null, context: pageContext(elements),
+        ...(file ? { attachment: await readAttachment(file) } : {}) };
+      await roomApi('/api/feedback', report, 'POST', file ? 60_000 : undefined);
+      remember(name.trim()); setSent(true); onSent?.(true);
+    }
     catch (cause) { setError(problems[cause instanceof Error ? cause.message : ''] ?? 'It could not be sent. Check the connection and try again.'); }
     finally { setSending(false); }
   };
   // "Send another" is a fresh form too: pressing Feedback again then keeps what is being written.
-  const again = () => { setId(newId()); setTitle(''); setDetails(''); setElements([]); setSent(false); onSent?.(false); };
+  const again = () => { setId(newId()); setTitle(''); setDetails(''); setElements([]); setFile(undefined); setSent(false); onSent?.(false); };
 
   if (picking) return <ElementPicker onPick={picked} onCancel={cancel} />;
   return <section className="feedback-panel" role="dialog" aria-labelledby="feedback-heading" {...{ [FEEDBACK_UI]: '' }}>
@@ -67,10 +83,23 @@ export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent
           <button type="button" className="quiet" aria-label={`Remove pointed element ${index + 1}`} onClick={() => setElements(list => list.filter((_, at) => at !== index))}>Remove</button></li>)}</ul>}
         {elements.length < 5 && <button type="button" className="quiet" onClick={() => setPicking(true)}>{elements.length ? 'Point at another thing' : 'Point at something'}</button>}
       </div>
+      <div className="feedback-attachment">
+        <label>Image or short video <small>(optional, 2 MB for images or 5 MB for videos)</small>
+          <input type="file" accept={[...FEEDBACK_ATTACHMENT_TYPES, '.mov'].join(',')} disabled={sending} onChange={event => {
+            const selected = event.currentTarget.files?.[0];
+            if (!selected) return;
+            event.currentTarget.value = '';
+            const video = selected.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(selected.name);
+            if (selected.size > (video ? FEEDBACK_VIDEO_MAX : FEEDBACK_IMAGE_MAX)) { setError(problems['FILE_TOO_LARGE']!); return; }
+            setFile(selected); setError('');
+          }} />
+        </label>
+        {file && <div className="feedback-file"><span>{file.name}</span><button type="button" className="quiet" disabled={sending} onClick={() => setFile(undefined)}>Remove attachment</button></div>}
+      </div>
       <label>Your name <small>(optional)</small><input maxLength={60} autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} /></label>
       {error && <p role="alert" className="error">{error}</p>}
       <button type="submit" disabled={sending || title.trim().length < 3}>{sending ? 'Sending…' : 'Send'}</button>
-      <p className="feedback-note">Sent with it: this page's address (without keys), the screen size and the browser. Nothing you typed into the game.</p>
+      <p className="feedback-note">Sent with it: this page's address (without keys), the screen size and the browser. When you choose an attachment, the selected file is sent with the report.</p>
     </form>}
   </section>;
 }

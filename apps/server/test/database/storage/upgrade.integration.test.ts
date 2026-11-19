@@ -17,7 +17,7 @@ it('upgrades populated initial tables without losing existing game data', async 
   try {
     const directory = new URL('../../../database/migrations/', import.meta.url);
     const migrations = (await readdir(directory, { withFileTypes: true })).filter(item => item.isDirectory()).map(item => item.name).sort();
-    expect(migrations).toHaveLength(26);
+    expect(migrations).toContain('20261119222000_idle_room_closing');
     await pool.query(await readFile(new URL(`${migrations[0]}/migration.sql`, directory), 'utf8'));
     const { rows: creators } = await pool.query('INSERT INTO creators (issuer, subject) VALUES ($1, $2) RETURNING id', ['https://identity.example/', randomUUID()]);
     const { rows: games } = await pool.query('INSERT INTO games ("creatorId", title) VALUES ($1, $2) RETURNING id', [creators[0].id, 'Preserved game']);
@@ -27,6 +27,9 @@ it('upgrades populated initial tables without losing existing game data', async 
     expect(rows).toEqual([{ title: 'Preserved game', definition: { schemaVersion: 1, nodes: [] } }]);
     await expect(pool.query('UPDATE game_drafts SET revision = -1 WHERE "gameId" = $1', [games[0].id])).rejects.toThrow();
     expect((await pool.query("SELECT to_regclass('stage_judgments') AS name")).rows).toEqual([{ name: 'stage_judgments' }]);
+    // Existing rooms start with no pending idle closure.
+    expect((await pool.query("SELECT is_nullable, column_default FROM information_schema.columns WHERE table_name = 'game_sessions' AND column_name = 'idleCloseAt'")).rows)
+      .toEqual([{ is_nullable: 'YES', column_default: null }]);
     // Player looks are optional: earlier players keep the default look made from their ID.
     expect((await pool.query("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'session_players' AND column_name = 'look'")).rows).toEqual([{ is_nullable: 'YES' }]);
     // Feedback is a table of its own: adding it leaves every game table as it was.

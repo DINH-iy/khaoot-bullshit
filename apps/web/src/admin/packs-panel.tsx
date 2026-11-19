@@ -1,3 +1,4 @@
+import { Dropdown } from '../ui/dropdown.js';
 import { useEffect, useState } from 'react';
 import { PACK_PICTURE_SIDE, PackAdminSchema, packPrice, RARITY_KEYS, RARITY_NAMES, type Chances, type Economy, type PackAdmin, type PackItemView, type PackSetAdmin, type RarityKey } from '@party/contracts';
 import { roomApi } from '../room/api.js';
@@ -138,7 +139,8 @@ function ItemRow({ item, onSave, onRemove, onPicture, onRemovePicture }: { item?
       {onRemovePicture && <button type="button" className="packs-picture-remove" aria-label={`Remove the picture of ${label}`} title="Remove the picture (shows the emoji again)" onClick={onRemovePicture}>×</button>}</span>
       : <input className="packs-emoji" aria-label={`Emoji of ${label}`} placeholder="🙂" value={draft.emoji} maxLength={16} onChange={event => setDraft({ ...draft, emoji: event.target.value })} />}
     <input aria-label={`Name of ${label}`} placeholder={item ? 'Name' : 'New item name'} value={draft.name} maxLength={40} onChange={event => setDraft({ ...draft, name: event.target.value })} />
-    <select aria-label={`Rarity of ${label}`} value={draft.rarity} onChange={event => setDraft({ ...draft, rarity: event.target.value as RarityKey })}>{RARITY_KEYS.map(key => <option key={key} value={key}>{RARITY_NAMES[key]}</option>)}</select>
+    <Dropdown label={`Rarity of ${label}`} value={draft.rarity} onChange={value => setDraft({ ...draft, rarity: value as RarityKey })}
+      options={RARITY_KEYS.map(value => ({ value, label: RARITY_NAMES[value] }))} />
     <input aria-label={`Line on the card of ${label}`} placeholder="A line on the card" value={draft.flavor} maxLength={120} onChange={event => setDraft({ ...draft, flavor: event.target.value })} />
     <span className="packs-item-actions">
       {/* An item's save button shows only once it is changed; the empty row always has its add button. */}

@@ -103,9 +103,10 @@ export function pointOnRoute(segments: Point[][], fraction: number): Point {
 }
 
 // ---------- scene types ----------
-export type SceneType = 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel';
+export type SceneType = 'intro' | 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel';
 // `name` and `hint` are read in the current language each time.
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
+  { type: 'intro', icon: 'start', get name() { return t('tIntro'); }, get hint() { return t('hIntro'); } },
   { type: 'info', icon: 'info', get name() { return t('tInfo'); }, get hint() { return t('hInfo'); } },
   { type: 'quiz', icon: 'quiz', get name() { return t('tQuiz'); }, get hint() { return t('hQuiz'); } },
   { type: 'writing', icon: 'writing', get name() { return t('tWriting'); }, get hint() { return t('hWriting'); } },
@@ -125,7 +126,7 @@ export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: s
 export const SCENE_GROUPS: { key: string; name: string; types: SceneType[] }[] = [
   { key: 'rounds', get name() { return t('gRounds'); }, types: ['quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote'] },
   { key: 'games', get name() { return t('gGames'); }, types: ['minigame', 'duel', 'wheel'] },
-  { key: 'between', get name() { return t('gBetween'); }, types: ['info', 'scoreboard', 'route', 'teams'] },
+  { key: 'between', get name() { return t('gBetween'); }, types: ['intro', 'info', 'scoreboard', 'route', 'teams'] },
 ];
 /** A Wheel of fortune scene: a show scene whose purpose is spinning one of the game's wheels. */
 export const isWheelScene = (stage: Stage | undefined) => stage?.kind === 'info' && Boolean((stage['spin'] as { wheel?: string } | undefined)?.wheel);
@@ -138,12 +139,6 @@ const wheelEntries = () => (['w1', 'w2', 'w3', 'w4', 'w5', 'w6'] as const).map(k
  */
 export interface SceneVariant { key: string; name: string; hint: string }
 export const SCENE_VARIANTS: Partial<Record<SceneType, SceneVariant[]>> = {
-  writing: [
-    { key: 'free', get name() { return t('vFree'); }, get hint() { return t('vFreeHint'); } },
-    { key: 'joke', get name() { return t('vJoke'); }, get hint() { return t('vJokeHint'); } },
-    { key: 'caption', get name() { return t('vCaption'); }, get hint() { return t('vCaptionHint'); } },
-    { key: 'excuse', get name() { return t('vExcuse'); }, get hint() { return t('vExcuseHint'); } },
-  ],
   minigame: MINIGAME_KEYS.map(key => ({ key, get name() { return gameName(key); }, get hint() { return gameDescription(key); } })),
   // How a duel is won: any contest in the room (the host names the winner), or a head-to-head game on the two phones.
   duel: [{ key: 'host', get name() { return t('vHost'); }, get hint() { return t('vHostHint'); } },
@@ -151,7 +146,11 @@ export const SCENE_VARIANTS: Partial<Record<SceneType, SceneVariant[]>> = {
 };
 /** Round-only teams of two, for a team minigame in a game without teams; the host can change it. */
 export const ROUND_TEAMS_PLAY = { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }, answers: 'everyone', points: 'members' } as const;
-const WRITING_PROMPTS = { joke: 'pJoke', caption: 'pCaption', excuse: 'pExcuse' } as const;
+export const WRITING_STARTERS = [
+  { key: 'joke', get name() { return t('vJoke'); }, get prompt() { return t('pJoke'); } },
+  { key: 'caption', get name() { return t('vCaption'); }, get prompt() { return t('pCaption'); } },
+  { key: 'excuse', get name() { return t('vExcuse'); }, get prompt() { return t('pExcuse'); } },
+];
 /** A minigame scene for one game, with its own timer; a team game gets round-only teams unless the game already plays in teams. */
 export function minigameStage(game: MinigameKey, definition: Definition): Stage {
   const stage: Stage = { key: 'main', kind: 'minigame', prompt: `${gameName(game)}!`, game, durationMs: MINIGAMES[game].defaultSeconds * 1000 };
@@ -184,13 +183,13 @@ export function withDuelContest(stage: Stage, choice: string): Stage {
 /** A new scene's first part: the type's standard start, adjusted for the chosen kind (variant). */
 export function newStage(type: SceneType, definition: Definition, variant?: string): Stage {
   const stage = baseStage(type, definition);
-  if (type === 'writing' && variant && variant in WRITING_PROMPTS) return { ...stage, prompt: t(WRITING_PROMPTS[variant as keyof typeof WRITING_PROMPTS]) };
   if (type === 'minigame' && variant && isMinigameKey(variant)) return minigameStage(variant, definition);
   if (type === 'duel' && variant && isHeadToHeadKey(variant)) return withDuelContest(stage, variant);
   return stage;
 }
 function baseStage(type: SceneType, definition: Definition): Stage {
   switch (type) {
+    case 'intro': return { key: 'main', kind: 'info', title: definition.title.slice(0, 120), prompt: t('nIntro'), durationMs: null };
     case 'info': return { key: 'main', kind: 'info', title: t('nInfoTitle'), prompt: t('nInfo'), durationMs: null };
     case 'quiz': return { key: 'main', kind: 'collect', prompt: t('nQuiz'), durationMs: 20_000,
       input: { kind: 'choice', layout: 'tiles', options: [{ key: 'a', label: t('answerA') }, { key: 'b', label: t('answerB') }] },

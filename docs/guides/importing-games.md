@@ -43,6 +43,9 @@ Top level:
 | `wheels` | Optional wheels of fortune: `[{ "title": "Forfeits", "entries": ["Sing a song", "Tell a joke"], "removePicked": true, "spinSeconds": 5 }]`, optionally with its own slice colours, `"colors": ["#f39200", "#7ac6b6"]` (2–8; otherwise the game's answer colours). A scene with `"spin": "Forfeits"` lets the host spin it there; `"wheelClear": true` stops showing the last result. |
 | `awards` | The end-of-game awards in order, from `winner`, `mostCorrect`, `mostWrong`, `fastest`, `slowest`, `mostVotes`, `minigameChamp`, `luckiest`, `mostReactions`, `fewest` (the wooden spoon: fewest points) and `scene` (most points in one scene). Leave out for all of them; `[]` for none. An entry can also be an object with its own title, and `scene` needs one: `{ "award": "scene", "scene": "karaoke", "title": "Karaoke champion" }` (`"scene"` is a scene's `id`). |
 | `sideGames` | `false` to leave out the side games on the phones (slot machine, blackjack, packs, challenges). Default: on, just for fun. |
+| `autoRevealSeconds` | Reveal ready results automatically after 0–120 seconds. 0 means as soon as ready. Omit for manual reveal. |
+| `birthdayVote` | Set to `true` to enable the private birthday vote for players. |
+| `idleCloseMinutes` | Close an empty party room after this many minutes (0 to 1440). Default: 0. A host or player connection resets the countdown. |
 | `quickTime` | Seconds the host's quick time button adds to a running round. Default: 30. The host can change it in the room. |
 | `chips` | `true` to play the side games with chips (play money): bets, stakes in challenges and a leaderboard. Default: off. The host can still switch both in the room. |
 | `openInvites` | How many challenges a player can have waiting for an answer at once (1 to 10). Default: 3. The host can change it in the room. |
@@ -57,6 +60,8 @@ Every scene can have:
 | `next` | `id` of the scene that follows, or `"end"` to end the game there. Default: the next scene in the list. |
 | `look` | Optional look for this scene only, see "Look & feel". |
 | `explain` | Show an explanation before the round starts, until the host continues (players tap *Got it!*): the text, or `true` on a minigame for its standard "how to play" (which the game's look can change, see "Look & feel"). For quiz, poll, order, writing, upload, drawing, challenge, vote and minigame scenes. |
+| `countdownSeconds` | Pre-start countdown for a drawing round or minigame (0–15 seconds), after any explanation. |
+| `resultCards` | On a vote, upload or drawing round, use `"manual"` for host-stepped results or a number (1–60) for seconds per card. Omit to show results together. |
 | `parts` | Instead of one scene, several parts that play one after another, each written like a scene (for example a question followed by a scoreboard). |
 
 Scene types:
@@ -122,7 +127,7 @@ Leave `look` out for the standard look. Everything in it is optional, and a scen
 }
 ```
 
-- `theme.preset`: `party`, `neon`, `pub`, `clean`, `retro`, `kids`, `elegant`, `ocean`, `christmas`, `birthday` or `mbou` (MBO Utrecht's colours); then any of `colors` (`background`, `background2`, `surface`, `text`, `muted`, `accent`, `accentText`, `success`, `danger`, `answerText` as `#rrggbb`, and `answers` as a list of 2–8 colours), `font` and `headingFont` (`system`, `rounded`, `serif`, `slab`, `mono`, `condensed`, `playful`, `elegant`), `radius` (0–40), `textScale` (0.8–1.6), `background` (`gradient`, `solid`, `dots`, `stripes`, `glow`, `grid`), `tiles` (`filled`, `outline`, `glass`, `flat`), `gradients` (true: a gradient effect on answer tiles and main buttons; off unless set), `markers` (`letters`, `numbers`, `shapes`, `custom` with `customMarks`: up to 8 short marks such as emoji, or `none`), `markerShape` (`circle`, `square`, `rounded`, `plain`), `markerPlace` (`start`, `end`, `top`), `routeMarkers` (`arrows` or `answers`) and `uppercaseHeadings`.
+- `theme.preset`: `party`, `neon`, `pub`, `clean`, `retro`, `kids`, `elegant`, `space`, `ocean`, `christmas`, `birthday` or `mbou` (MBO Utrecht's colours); then any of `colors` (`background`, `background2`, `surface`, `text`, `muted`, `accent`, `accentText`, `success`, `danger`, `answerText` as `#rrggbb`, and `answers` as a list of 2–8 colours), `font` and `headingFont` (`system`, `rounded`, `serif`, `slab`, `mono`, `condensed`, `playful`, `elegant`), `radius` (0–40), `textScale` (0.8–1.6), `background` (`gradient`, `solid`, `dots`, `stripes`, `glow`, `grid`), `tiles` (`filled`, `outline`, `glass`, `flat`), `gradients` (true: a gradient effect on answer tiles and main buttons; off unless set), `markers` (`letters`, `numbers`, `shapes`, `custom` with `customMarks`: up to 8 short marks such as emoji, or `none`), `markerShape` (`circle`, `square`, `rounded`, `plain`), `markerPlace` (`start`, `end`, `top`), `routeMarkers` (`arrows` or `answers`) and `uppercaseHeadings`.
 - `texts`: the names of the texts are listed in the editor's Look & feel tab and in `packages/contracts/src/presentation.ts`; words in curly brackets such as `{time}` are filled in during the game.
 - A minigame's "how to play" is a text too, for example `"minigame.how.bus": "Guess together; wrong costs sips."`; the screen before a round uses `explain.title`, `explain.ok`, `explain.waiting`, `explain.ready` and `explain.start`.
 - `animations`: for the moments `sceneEnter`, `answersEnter`, `answerSaved`, `timerEnding`, `reveal`, `scoreboard`, `cutscene` and `lobbyJoin`, a ready-made `preset` (`none`, `fade`, `rise`, `drop`, `zoom`, `pop`, `slideLeft`, `slideRight`, `flip`, `spin`, `blur`, `bounce`, `wobble`, `shake`, `pulse`, `cascade`), or your own `custom` animation built in the editor.
@@ -154,7 +159,7 @@ If the user says "just make it" or has already answered, do not ask; choose sens
   - `"quiz"`: `"question"`, `"answers"` (2–12 short strings), `"correct"` (exactly one of the answers), `"points"` (number, default 10), optional `"layout"`: `"tiles"` or `"list"`.
   - `"poll"`: `"question"`, `"answers"`. No correct answer, no points.
   - `"order"`: `"question"`, `"items"` (2–8 strings, listed in the CORRECT order), `"points"`.
-  - `"writing"`: `"question"`, optional `"maxLength"` (characters, default 240). For jokes, captions, excuses.
+  - `"writing"`: `"question"`, optional `"maxLength"` (characters, default 240). For jokes, captions, excuses. Write the prompt in `"question"`. The editor also offers Prompt starters inside Writing.
   - `"upload"`: `"question"`, `"accept"`: any of `"pictures"`, `"gifs"`, `"videos"`.
   - `"vote"`: `"question"`, `"votesOn"` (id of an earlier writing or upload scene), `"pointsPerVote"`.
   - `"challenge"`: `"question"` (something people do in the room), `"maxPoints"`. The host judges.
@@ -176,15 +181,22 @@ If the user says "just make it" or has already answered, do not ask; choose sens
 - When reusing a known library item, its `"media"` reference can include a scene-only picture crop, `"crop": { "ratio": "landscape", "x": 50, "y": 50 }`, or a video or song cut, `"trim": { "startSeconds": 2, "endSeconds": 8 }`. Crop ratios are `"square"`, `"landscape"` and `"portrait"`, with focus coordinates from 0 to 100. The end time is optional. For a song, include `"waveform": false` in its media reference to hide the waveform in that scene while keeping playback controls.
 - Scene translations: `"translations": { "nl": { "prompt": "Welke dag is het?", "labels": { "friday": "Vrijdag" } } }`. The language keys are `en`, `nl`, `de` and `ro`. Use `prompt` for the question or scene text, `title` for a cutscene title, `explanation` for its explanation and `labels` for choices, routes or ordering items. Give options explicit `key` and `label` fields when translating them. Omitted values use the original. Custom standard texts can also be translated in `look.translations` using the same language keys and standard text keys such as `"answer.saved"`.
 - Music (`"music"`): the background playlist is made of library songs, added in the editor (Game settings → Music), so leave it out. A scene can still say what the music does there: `"music": "quiet"` (softer, for example under a speech or a tense question) or `"music": "stop"` (silence, for example for a minute of concentration); without it the music plays on.
+- Optional `"autoRevealSeconds": 0` lets results appear as soon as they are ready. Use a delay from 0 to 120 seconds, or omit the setting for manual reveal. The app waits for judging and keeps vote source answers anonymous.
+- On a vote scene, use `"voteMode": "single"`, `"multi"` or `"ranked"`. Single choice is the default. Use `"voteLimit": 3` to cap multiple or ranked selections (2–8). Multi gives each choice one vote. Ranked gives the first choice the limit in ranking points, then one less per rank. Equal totals share a place.
+- On vote, upload and drawing scenes, `"resultCards": "manual"` shows one result card at a time, advanced by the host. A number such as `"resultCards": 5` sets the seconds per card. Omit it to show results together.
+- For a birthday game, `"birthdayVote": true` enables a private prompt if a majority of eligible players vote to sing. The host and assigned host phone do not see the ballot.
+- On a drawing round or minigame, `"countdownSeconds": 5` adds a countdown after any explanation and before play. Use 0–15 seconds. Omit it for the normal start.
+- Use `"idleCloseMinutes": 30` to close an empty room after 30 minutes. Use 0 to keep rooms open by default. The host can keep the current room open in Room settings.
 - The host's quick time button adds 30 seconds to a running round; `"quickTime": 60` makes it a minute (5 to 600 seconds).
 - Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Only add a look if the user asks for a style or colours.
-  - Theme presets: `"party"`, `"neon"`, `"pub"`, `"clean"`, `"retro"`, `"terminal"`, `"kids"`, `"elegant"`, `"ocean"`, `"christmas"`, `"birthday"`, `"mbou"` (MBO Utrecht's colours). Anything in `"theme"` changes the preset:
+  - Theme presets: `"party"`, `"neon"`, `"pub"`, `"clean"`, `"retro"`, `"terminal"`, `"kids"`, `"elegant"`, `"space"`, `"ocean"`, `"christmas"`, `"birthday"`, `"mbou"` (MBO Utrecht's colours). Anything in `"theme"` changes the preset:
   - `"colors"`: `"background"`, `"background2"`, `"surface"` (cards), `"text"`, `"muted"`, `"accent"` (main buttons), `"accentText"`, `"success"`, `"danger"`, `"answerText"` as `"#rrggbb"`, and `"answers"`: 2–8 answer colours. Keep text readable: strong contrast between each text colour and what it sits on.
   - `"font"` and `"headingFont"`: `"system"`, `"rounded"`, `"serif"`, `"slab"`, `"mono"`, `"condensed"`, `"playful"`, `"elegant"`; `"radius"` (corner roundness 0–40); `"textScale"` (0.8–1.6); `"uppercaseHeadings"` (true/false).
   - `"background"`: `"gradient"`, `"solid"`, `"dots"`, `"stripes"`, `"glow"`, `"grid"`; `"tiles"` (answer tiles): `"filled"`, `"outline"`, `"glass"`, `"flat"`; `"gradients": true` adds a gradient effect to answer tiles and main buttons.
   - `"backgroundMotion"`: `"none"`, `"starlight"` or `"light-lines"` for subtle movement. Follows the device’s reduced-motion preference.
   - Answer marks: `"markers"`: `"letters"`, `"numbers"`, `"shapes"`, `"custom"` (then `"customMarks"`: up to 8 short marks such as emoji) or `"none"`; `"markerShape"`: `"circle"`, `"square"`, `"rounded"`, `"plain"`; `"markerPlace"`: `"start"`, `"end"`, `"top"`; `"routeMarkers"`: `"arrows"` or `"answers"` (party choices).
   - Animation presets: `"none"`, `"fade"`, `"rise"`, `"drop"`, `"zoom"`, `"pop"`, `"slideLeft"`, `"slideRight"`, `"flip"`, `"spin"`, `"blur"`, `"bounce"`, `"wobble"`, `"shake"`, `"pulse"`, `"cascade"`.
+- To open with an intro, use a cutscene with a welcome title and text. In the editor, **Between rounds → Intro** inserts this template.
 - Use timers on quiz questions (15–30 seconds), writing (45–90 seconds) and votes (30–45 seconds). Keep phone texts short; answers fit on a small screen.
 
 Example:
@@ -192,12 +204,14 @@ Example:
 ```json
 {
   "title": "Friday Night Chaos",
-  "look": { "theme": { "preset": "terminal", "backgroundMotion": "starlight" }, "translations": { "nl": { "answer.saved": "Je antwoord is binnen!" } } },
+  "idleCloseMinutes": 30,
+  "autoRevealSeconds": 2,
+  "look": { "theme": { "preset": "space" }, "translations": { "nl": { "answer.saved": "Je antwoord is binnen!" } } },
   "scenes": [
     { "id": "welcome", "type": "cutscene", "title": "FRIDAY NIGHT.", "text": "Grab your phone. Three rounds, one winner.", "youtube": { "videoId": "M7lc1UVf-VE", "startSeconds": 5, "endSeconds": 15 }, "mediaLayout": { "position": "left", "size": "wide" }, "seconds": 20 },
     { "id": "warmup", "type": "quiz", "question": "What day is it?", "answers": [{ "key": "friday", "label": "Friday" }, { "key": "monday", "label": "Monday" }, { "key": "sunday", "label": "Sunday" }], "correct": "friday", "points": 5, "seconds": 15, "translations": { "nl": { "prompt": "Welke dag is het?", "labels": { "friday": "Vrijdag", "monday": "Maandag", "sunday": "Zondag" } } } },
     { "id": "excuse", "type": "writing", "question": "Write the worst excuse for being late tonight.", "seconds": 60 },
-    { "id": "excuse-vote", "type": "vote", "question": "Vote for the best excuse!", "votesOn": "excuse", "pointsPerVote": 5, "seconds": 40 },
+    { "id": "excuse-vote", "type": "vote", "question": "Vote for the best excuse!", "votesOn": "excuse", "pointsPerVote": 5, "voteMode": "ranked", "voteLimit": 3, "resultCards": "manual", "seconds": 40 },
     { "id": "choose", "type": "party-choice", "question": "Choose your challenge!", "options": [{ "label": "Music", "to": "music" }, { "label": "Physical", "to": "sculpture" }], "seconds": 20 },
     { "id": "music", "type": "quiz", "question": "Which instrument is playing in this clip?", "answers": ["Piano", "Organ", "Harp"], "correct": "Piano", "music": "stop", "seconds": 20, "next": "finale" },
     { "id": "sculpture", "type": "challenge", "question": "Build the Eiffel Tower out of people!", "maxPoints": 10, "seconds": 120, "next": "finale" },

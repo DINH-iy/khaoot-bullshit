@@ -125,10 +125,15 @@ export function registerAssetRoutes(app: FastifyInstance, client: PrismaClient, 
         const { sessionId } = ids(request);
         roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
         const principal = await gateway.authenticate(sessionId, request.headers.cookie);
-        roomAssert(principal.actor.role === 'player', 'FORBIDDEN');
+        const query = z.object({ playerId: GameIdSchema.optional() }).strict().safeParse(request.query);
+        roomAssert(query.success, 'INVALID_COMMAND');
+        const target = query.data.playerId;
+        const playerId = principal.actor.role === 'player' && !target ? principal.actor.playerId : principal.role === 'host' ? target : undefined;
+        roomAssert(playerId, 'FORBIDDEN');
+        roomAssert(await client.sessionPlayer.count({ where: { id: playerId, sessionId, leftAt: null } }) === 1, 'NOT_FOUND');
         roomAssert(limiter.allow(`picture:${principal.id}`, 10), 'RATE_LIMITED');
         const clean = Buffer.isBuffer(request.body) ? cleanPicture(request.body) : null; roomAssert(clean, 'UNSUPPORTED_MEDIA');
-        const assetId = await keep(sessionId, principal.actor.playerId, clean, { kind: 'IMAGE', contentType: 'image/png', stageRunId: null });
+        const assetId = await keep(sessionId, playerId, clean, { kind: 'IMAGE', contentType: 'image/png', stageRunId: null });
         return { ok: true, data: { assetId } };
       } catch (error) { return fail(reply, error); }
     });

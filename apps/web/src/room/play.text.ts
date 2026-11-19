@@ -8,6 +8,7 @@ export const PLAY_TEXTS = defineTexts('play', {
   placeFor: 'Place for {name}', judgeTeams: 'Judge teams', judgeEachTeam: 'Judge each team (0 to {max} points)', judged: '{name} · judged', pointsFor: 'Points for {name}', award: 'Award',
   judgmentFinal: 'A judgment is final once given. Use “Correct score” on the scoreboard to fix a mistake.', judgePlayers: 'Judge players', judgeEachPlayer: 'Judge each player (0 to {max} points)', scores: 'Scores',
   noTeams: 'No teams have been made yet.', you: ' (you)', correctFor: 'Correct score for {name} (+ or −)', correctScore: 'Correct score', doneCorrecting: 'Done correcting', correctScores: 'Correct scores',
+  scorePlayer: "Player",
   // teams.tsx
   nobodyYet: 'nobody yet', tRandom: 'Teams were drawn at random. The host can still change them.', tHost: 'The host is making the teams.', tPlayers: 'Pick your team.',
   pTeam: 'Points go to the team.', pMembers: 'Points go to each player.', pBoth: 'Points go to the team and to each player.', teamForming: 'Team forming', forGame: 'Teams for the game', forRound: 'Teams for this round',
@@ -27,6 +28,8 @@ export const PLAY_TEXTS = defineTexts('play', {
   first: 'First', second: 'Second', different: 'Pick two different players.', startBetting: 'Start betting', twoRandom: 'Two at random', keepPair: 'Keep the pair',
   // vote.tsx and answer-input.tsx
   nothingBallot: 'There is nothing to vote on: nobody answered that round.', entryN: 'Entry {number}', privateOrder: 'Your private order, first at the top', moveUp: 'Move {item} up', moveDown: 'Move {item} down',
+  savedVote: 'Saved vote',
+  orderDrag: 'Drag an item to move it, or use the arrows.',
   noDrawing: 'Drawing is not enabled in this checkpoint.',
 }, {
   nl: {
@@ -35,6 +38,7 @@ export const PLAY_TEXTS = defineTexts('play', {
     placeFor: 'Plaats voor {name}', judgeTeams: 'Teams beoordelen', judgeEachTeam: 'Beoordeel elk team (0 tot {max} punten)', judged: '{name} · beoordeeld', pointsFor: 'Punten voor {name}', award: 'Toekennen',
     judgmentFinal: 'Een beoordeling staat vast zodra hij gegeven is. Gebruik “Score corrigeren” op het scorebord om een fout te herstellen.', judgePlayers: 'Spelers beoordelen', judgeEachPlayer: 'Beoordeel elke speler (0 tot {max} punten)', scores: 'Scores',
     noTeams: 'Er zijn nog geen teams gemaakt.', you: ' (jij)', correctFor: 'Score van {name} corrigeren (+ of −)', correctScore: 'Score corrigeren', doneCorrecting: 'Klaar met corrigeren', correctScores: 'Scores corrigeren',
+    scorePlayer: "Speler",
     nobodyYet: 'nog niemand', tRandom: 'De teams zijn willekeurig getrokken. De host kan ze nog veranderen.', tHost: 'De host maakt de teams.', tPlayers: 'Kies je team.',
     pTeam: 'Punten gaan naar het team.', pMembers: 'Punten gaan naar elke speler.', pBoth: 'Punten gaan naar het team en naar elke speler.', teamForming: 'Teams maken', forGame: 'Teams voor het spel', forRound: 'Teams voor deze ronde',
     tapTeamFor: 'Tik nu op het team voor {name}.', tapTeamOrCaptain: 'Tik nu op het team voor {name}, of maak hem of haar aanvoerder.', tapPlayer: 'Tik op een speler en dan op het team (of sleep). Start daarna de ronde.',
@@ -50,6 +54,8 @@ export const PLAY_TEXTS = defineTexts('play', {
     draw: 'Gelijkspel: wijs zelf de winnaar aan, of ga door zonder punten.', changePair: 'Het tweetal veranderen', needTwo: 'Voor een duel zijn minstens twee spelers in de kamer nodig.', pickTwo: 'Kies de twee duellisten',
     first: 'Eerste', second: 'Tweede', different: 'Kies twee verschillende spelers.', startBetting: 'Wedden starten', twoRandom: 'Twee willekeurig', keepPair: 'Tweetal houden',
     nothingBallot: 'Er is niets om op te stemmen: niemand antwoordde in die ronde.', entryN: 'Inzending {number}', privateOrder: 'Je geheime volgorde, de eerste bovenaan', moveUp: '{item} omhoog', moveDown: '{item} omlaag',
+    savedVote: 'Opgeslagen stem',
+    orderDrag: 'Sleep een item of gebruik de pijltjes.',
     noDrawing: 'Tekenen staat in deze versie niet aan.',
   },
   de: {
@@ -58,6 +64,7 @@ export const PLAY_TEXTS = defineTexts('play', {
     placeFor: 'Platz für {name}', judgeTeams: 'Teams bewerten', judgeEachTeam: 'Bewerte jedes Team (0 bis {max} Punkte)', judged: '{name} · bewertet', pointsFor: 'Punkte für {name}', award: 'Vergeben',
     judgmentFinal: 'Eine Bewertung gilt, sobald sie vergeben ist. Nutze „Punkte korrigieren“ beim Punktestand, um einen Fehler zu beheben.', judgePlayers: 'Spieler bewerten', judgeEachPlayer: 'Bewerte jeden Spieler (0 bis {max} Punkte)', scores: 'Punkte',
     noTeams: 'Es wurden noch keine Teams gebildet.', you: ' (du)', correctFor: 'Punkte von {name} korrigieren (+ oder −)', correctScore: 'Punkte korrigieren', doneCorrecting: 'Fertig mit Korrigieren', correctScores: 'Punkte korrigieren',
+    scorePlayer: "Spieler",
     nobodyYet: 'noch niemand', tRandom: 'Die Teams wurden zufällig gelost. Der Host kann sie noch ändern.', tHost: 'Der Host bildet die Teams.', tPlayers: 'Wähle dein Team.',
     pTeam: 'Punkte gehen an das Team.', pMembers: 'Punkte gehen an jeden Spieler.', pBoth: 'Punkte gehen an das Team und an jeden Spieler.', teamForming: 'Teams bilden', forGame: 'Teams für das Spiel', forRound: 'Teams für diese Runde',
     tapTeamFor: 'Tippe jetzt auf das Team für {name}.', tapTeamOrCaptain: 'Tippe jetzt auf das Team für {name} oder mach die Person zum Kapitän.', tapPlayer: 'Tippe auf einen Spieler, dann auf sein Team (oder ziehe ihn). Starte dann die Runde.',
@@ -73,6 +80,8 @@ export const PLAY_TEXTS = defineTexts('play', {
     draw: 'Unentschieden: nenne den Sieger selbst oder mach ohne Punkte weiter.', changePair: 'Das Paar ändern', needTwo: 'Ein Duell braucht mindestens zwei Spieler im Raum.', pickTwo: 'Wähle die zwei Duellanten',
     first: 'Erster', second: 'Zweiter', different: 'Wähle zwei verschiedene Spieler.', startBetting: 'Wetten starten', twoRandom: 'Zwei zufällig', keepPair: 'Paar behalten',
     nothingBallot: 'Es gibt nichts zum Abstimmen: In dieser Runde hat niemand geantwortet.', entryN: 'Beitrag {number}', privateOrder: 'Deine geheime Reihenfolge, das Erste oben', moveUp: '{item} nach oben', moveDown: '{item} nach unten',
+    savedVote: 'Gespeicherte Stimme',
+    orderDrag: 'Ziehe einen Eintrag oder verwende die Pfeile.',
     noDrawing: 'Zeichnen ist in dieser Version nicht aktiviert.',
   },
   ro: {
@@ -81,6 +90,7 @@ export const PLAY_TEXTS = defineTexts('play', {
     placeFor: 'Locul pentru {name}', judgeTeams: 'Jurizează echipele', judgeEachTeam: 'Jurizează fiecare echipă (0 până la {max} puncte)', judged: '{name} · jurizat', pointsFor: 'Puncte pentru {name}', award: 'Acordă',
     judgmentFinal: 'O jurizare este definitivă odată dată. Folosește „Corectează scorul” în clasament ca să repari o greșeală.', judgePlayers: 'Jurizează jucătorii', judgeEachPlayer: 'Jurizează fiecare jucător (0 până la {max} puncte)', scores: 'Scoruri',
     noTeams: 'Încă nu s-au format echipe.', you: ' (tu)', correctFor: 'Corectează scorul lui {name} (+ sau −)', correctScore: 'Corectează scorul', doneCorrecting: 'Gata cu corectările', correctScores: 'Corectează scorurile',
+    scorePlayer: "Jucător",
     nobodyYet: 'încă nimeni', tRandom: 'Echipele au fost trase la sorți. Gazda le mai poate schimba.', tHost: 'Gazda face echipele.', tPlayers: 'Alege-ți echipa.',
     pTeam: 'Punctele merg la echipă.', pMembers: 'Punctele merg la fiecare jucător.', pBoth: 'Punctele merg la echipă și la fiecare jucător.', teamForming: 'Formarea echipelor', forGame: 'Echipe pentru joc', forRound: 'Echipe pentru această rundă',
     tapTeamFor: 'Acum atinge echipa pentru {name}.', tapTeamOrCaptain: 'Acum atinge echipa pentru {name} sau fă-l căpitan.', tapPlayer: 'Atinge un jucător, apoi echipa lui (sau trage-l). Apoi pornește runda.',
@@ -96,6 +106,8 @@ export const PLAY_TEXTS = defineTexts('play', {
     draw: 'Egalitate: numește tu câștigătorul sau mergi mai departe fără puncte.', changePair: 'Schimbă perechea', needTwo: 'Un duel are nevoie de cel puțin doi jucători în cameră.', pickTwo: 'Alege cei doi dueliști',
     first: 'Primul', second: 'Al doilea', different: 'Alege doi jucători diferiți.', startBetting: 'Pornește pariurile', twoRandom: 'Doi la întâmplare', keepPair: 'Păstrează perechea',
     nothingBallot: 'Nu e nimic de votat: nimeni n-a răspuns în acea rundă.', entryN: 'Contribuția {number}', privateOrder: 'Ordinea ta secretă, primul sus', moveUp: 'Mută {item} mai sus', moveDown: 'Mută {item} mai jos',
+    savedVote: 'Vot salvat',
+    orderDrag: 'Trage un element sau folosește săgețile.',
     noDrawing: 'Desenul nu este activat în această versiune.',
   },
 });

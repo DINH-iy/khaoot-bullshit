@@ -1,6 +1,8 @@
+import { Dropdown } from '../../ui/dropdown.js';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTexts } from '../../i18n/texts.js';
 import { marked } from '../../i18n/rich.js';
+import { defaultZoomShortcuts, zoomKeys, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
 import { HELP_TEXTS } from './help.text.js';
 
 // ⌘ on a Mac, Ctrl elsewhere: the key the shortcuts are written with.
@@ -13,7 +15,7 @@ type Key = keyof typeof HELP_TEXTS.en;
 const MAP: [Key | '+', Key][] = [['kScroll', 'dScroll'], ['kShiftScroll', 'dShiftScroll'], ['kClick', 'dClick'], ['kShiftClick', 'dShiftClick'], ['kShiftDrag', 'dShiftDrag'], ['kDrag', 'dDrag'],
   ['kDouble', 'dDouble'], ['kDragPort', 'dDragPort'], ['+', 'dPlus'], ['kRight', 'dRight'], ['kArrow', 'dArrow'], ['kBend', 'dBend'], ['kBendPoint', 'dBendPoint']];
 const KEYS: [string | Key, Key][] = [[`${mod} + Z`, 'dUndo'], [`${mod} + Shift + Z`, 'dRedo'], [`${mod} + A`, 'dAll'], [`${mod} + C`, 'dCopy'], [`${mod} + V`, 'dPaste'], [`${mod} + D`, 'dDuplicate'],
-  ['kDelete', 'dDelete'], ['kArrows', 'dArrows'], [`${mod} + Shift + L`, 'dTidy'], ['Alt + Shift + H', 'dRow'], ['Alt + Shift + V', 'dColumn'], ['Shift + 1', 'dWhole'], ['Shift + 2', 'dZoomSel'],
+  ['kDelete', 'dDelete'], ['kArrows', 'dArrows'], [`${mod} + Shift + L`, 'dTidy'], ['Alt + Shift + H', 'dRow'], ['Alt + Shift + V', 'dColumn'],
   ['Tab', 'dTab'], ['Esc', 'dEsc'], ['?', 'dHelp']];
 
 /**
@@ -21,7 +23,7 @@ const KEYS: [string | Key, Key][] = [[`${mod} + Z`, 'dUndo'], [`${mod} + Shift +
  * Opened from the ☰ menu, the map's Tips or the ? key. Keep it in step with the editor:
  * a new shortcut or gesture belongs here too (help.text.ts, in every language).
  */
-export function HelpPanel({ onClose }: { onClose: () => void }) {
+export function HelpPanel({ onClose, zoomShortcuts, onZoomShortcuts }: { onClose: () => void; zoomShortcuts: ZoomShortcuts; onZoomShortcuts: (value: ZoomShortcuts) => void }) {
   const box = useRef<HTMLDivElement>(null); const id = useId(); const t = useTexts(HELP_TEXTS);
   const text = (key: Key) => marked(t(key, { mod }));
   const keysOf = (keys: string) => keys in HELP_TEXTS.en ? t(keys as Key, { mod }) : keys;
@@ -36,7 +38,20 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
         <table className="help-table"><tbody>{MAP.map(([keys, what]) => <Row key={what} keys={keys === '+' ? '+' : keysOf(keys)}>{text(what)}</Row>)}</tbody></table>
       </section>
       <section aria-labelledby={`${id}-keys`}><h3 id={`${id}-keys`}>{t('keys')}</h3>
-        <table className="help-table"><tbody>{KEYS.map(([keys, what]) => <Row key={what} keys={keysOf(keys)}>{text(what)}</Row>)}</tbody></table>
+        <table className="help-table"><tbody>{KEYS.map(([keys, what]) => <Row key={what} keys={keysOf(keys)}>{text(what)}</Row>)}
+          <Row keys={`Shift + ${zoomShortcuts.all}`}>{text('dWhole')}</Row>
+          <Row keys={`Shift + ${zoomShortcuts.selection}`}>{text('dZoomSel')}</Row></tbody></table>
+      </section>
+      <section aria-labelledby={`${id}-binding`}><h3 id={`${id}-binding`}>{t('zoomBindings')}</h3>
+        <div className="zoom-bindings">
+          {(['all', 'selection'] as const).map(action => <label key={action}>{t(action === 'all' ? 'dWhole' : 'dZoomSel')}
+            <Dropdown value={zoomShortcuts[action]} onChange={value => {
+              const key = zoomKeys.find(option => option === value);
+              if (key) onZoomShortcuts({ ...zoomShortcuts, [action]: key });
+            }} options={zoomKeys.map(key => ({ value: key, label: `Shift + ${key}`, disabled: key === zoomShortcuts[action === 'all' ? 'selection' : 'all'] }))} />
+          </label>)}
+          <button type="button" onClick={() => onZoomShortcuts(defaultZoomShortcuts)}>{t('resetBindings')}</button>
+        </div>
       </section>
       <section aria-labelledby={`${id}-menus`}><h3 id={`${id}-menus`}>{t('menus')}</h3>
         <ul>{(['m1', 'm2', 'm3'] as const).map(key => <li key={key}>{text(key)}</li>)}</ul>

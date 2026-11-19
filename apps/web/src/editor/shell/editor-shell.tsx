@@ -12,6 +12,8 @@ import { InvitePanel } from './invite-panel.js';
 import { FieldLimit } from '../controls/field-limit.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { readMemory, rememberPlace } from './editor-memory.js';
+import { EditorTour, finishEditorTour, needsEditorTour, TOUR_TEXTS } from './editor-tour.js';
+import { readZoomShortcuts, rememberZoomShortcuts, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
 import { HelpPanel } from './help-panel.js';
 import { Icon } from '../controls/icons.js';
 import { pendingClaim } from '../../people/use-me.js';
@@ -49,7 +51,10 @@ function EditorPage({ gameId }: { gameId: string }) {
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
 function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
   const d = useDraft(gameId); const t = useTexts(SHELL_TEXTS);
-  const mediaText = useTexts(MEDIA_TEXTS);
+  const mediaText = useTexts(MEDIA_TEXTS); const tourText = useTexts(TOUR_TEXTS);
+  const [tour, setTour] = useState(needsEditorTour);
+  const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
+  const changeZoomShortcuts = (shortcuts: ZoomShortcuts) => { setZoomShortcuts(shortcuts); rememberZoomShortcuts(shortcuts); };
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [compactHeader, setCompactHeader] = useState(() => matchMedia(COMPACT_HEADER).matches);
   useEffect(() => {
@@ -78,8 +83,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       // ? opens Help & shortcuts (not while typing).
-      if (event.key === '?' && !(event.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) { event.preventDefault(); setHelping(true); return; }
-      if ((event.target as HTMLElement).closest('input, textarea, select') || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y') return;
+      if (event.key === '?' && !(event.target as HTMLElement).closest('input, textarea, select, dialog, [aria-modal=true], [contenteditable]')) { event.preventDefault(); setHelping(true); return; }
+      if ((event.target as HTMLElement).closest('input, textarea, select, dialog, [aria-modal=true], [contenteditable]') || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y') return;
       event.preventDefault(); if (event.key.toLowerCase() === 'y' || event.shiftKey) d.redo(); else d.undo();
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
@@ -143,18 +148,20 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
             { label: modeLabel, icon: d.readOnly ? 'eye' : 'edit', onSelect: toggleMode },
           ] : []),
           { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
+          { label: tourText('title'), icon: 'help', onSelect: () => setTour(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}
         <PeerBar live={live} />
       </div>
     </header>
-    {helping && <HelpPanel onClose={() => setHelping(false)} />}
+    {tour && <EditorTour onClose={() => { finishEditorTour(); setTour(false); }} />}
+    {helping && <HelpPanel zoomShortcuts={zoomShortcuts} onZoomShortcuts={changeZoomShortcuts} onClose={() => setHelping(false)} />}
     {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly} onClose={() => setLibraryOpen(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}
     <main className="editor-main">
-      {view === 'flow' ? <FlowView d={d} selected={selected} setSelected={setSelected} focus={focus} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
+      {view === 'flow' ? <FlowView zoomShortcuts={zoomShortcuts} d={d} selected={selected} setSelected={setSelected} focus={focus} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
         : view === 'scene' ? <SceneView d={d} selected={selected} setSelected={setSelected} peers={live.peers} onOpenFlow={key => { setSelected([key]); setView('flow'); }} /> : <LookView d={d} selected={selected} gameId={gameId} />}
       {/* Bottom left: your edits (History) and every problem of the game; each folds into a small button. A problem goes to its scene. */}
       <div className="editor-corner">

@@ -1,5 +1,5 @@
 import { contrast, FONTS, resolveTheme, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
-import { Dropdown } from '../controls/dropdown.js';
+import { Dropdown } from '../../ui/dropdown.js';
 import { Section } from '../controls/section.js';
 import { Swatches } from '../controls/swatches.js';
 import { useState } from 'react';

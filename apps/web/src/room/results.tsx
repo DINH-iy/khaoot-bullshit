@@ -1,17 +1,18 @@
 import { useText } from '../presentation/look.js';
-import { useState } from 'react';
+import { cloneElement, isValidElement, useEffect, useState, type ReactNode } from 'react';
 import type { RoomSnapshot } from '@party/contracts';
 import { MediaView } from './media-upload.js';
-import { BallotContent } from './vote.js';
+import { BallotContent, SavedVoteBadge, savedVote } from './vote.js';
 import { TeamStandings, teamName } from './teams.js';
 import { MinigameResults } from '../minigames/minigame-stage.js';
 import { StoredDrawing } from '../drawing/drawing-view.js';
 import { Avatar } from '../players/avatar.js';
-import { translate } from '../i18n/texts.js';
+import { translate, useTexts } from '../i18n/texts.js';
+import { ROUND_CONTROL_TEXTS } from './round-control.text.js';
 import { PLAY_TEXTS } from './play.text.js';
 import { ordinal } from '../i18n/ordinal.js';
 const p = (key: keyof typeof PLAY_TEXTS.en, values?: Record<string, string | number>) => translate(PLAY_TEXTS, key, values);
-import { defaultLook } from '@party/contracts';
+import { defaultLook, voteChoices } from '@party/contracts';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
@@ -35,10 +36,43 @@ function PointsFold({ folded, label, children }: { folded: boolean; label: strin
   return folded ? <details className="results-more"><summary>{label}</summary>{children}</details> : <>{children}</>;
 }
 
-export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Stage }) {
+function ResultSequence({ mode, items, offset, canAdvance, onNext, disabled }: {
+  mode: Stage['resultCards']; items: ReactNode[]; offset: number; canAdvance: boolean; onNext?: () => void; disabled: boolean;
+}) {
+  const t = useTexts(ROUND_CONTROL_TEXTS);
+  const [time, setTime] = useState(() => Date.now());
+  useEffect(() => {
+    if (!mode || typeof mode.mode !== 'number') return;
+    const start = Date.parse(mode.revealedAt);
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const now = Date.now();
+      setTime(now);
+      const elapsed = Math.max(0, now + offset - start);
+      const interval = Number(mode.mode) * 1000;
+      const next = (Math.floor(elapsed / interval) + 1) * interval;
+      if (next < items.length * interval) timer = setTimeout(schedule, Math.max(30, start + next - now - offset));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [mode?.mode, mode?.revealedAt, offset, items.length]);
+  if (!mode || !items.length) return items;
+  const index = Math.min(items.length - 1, mode.mode === 'manual' ? mode.index
+    : Math.max(0, Math.floor((time + offset - Date.parse(mode.revealedAt)) / (mode.mode * 1000))));
+  const active = items[index];
+  const card = isValidElement<{ className?: string }>(active) ? cloneElement(active, { className: [active.props.className, 'result-card-current'].filter(Boolean).join(' ') }) : active;
+  return <>{card}<li className="result-card-controls">
+    <span role="status">{t('cardNumber', { current: index + 1, total: items.length })}</span>
+    {mode.mode === 'manual' && canAdvance && index + 1 < items.length && <button type="button" disabled={disabled} onClick={onNext}>{t('nextCard')}</button>}
+  </li></>;
+}
+
+export function StageResults({ state, stage, offset = 0, onNext, disabled = false }: { state: RoomSnapshot; stage: Stage; offset?: number; onNext?: (() => void) | undefined; disabled?: boolean }) {
   const t = useText();
   const reveal = stage.reveal; if (!reveal) return null;
   const answer = reveal.answer; const input = stage.input;
+  const saved = voteChoices(savedVote(state));
+  const cards = (items: ReactNode[]) => <ResultSequence mode={stage.resultCards} items={items} offset={offset} canAdvance={Boolean(onNext && state.view.status === 'RUNNING' && (state.role === 'host' || state.hostPhone))} {...(onNext ? { onNext } : {})} disabled={disabled} />;
   const label = (key: string) => input?.kind === 'choice' ? input.options.find(option => option.key === key)?.label ?? key : input?.kind === 'order' ? input.items.find(item => item.key === key)?.label ?? key : key;
   const own = state.selfPlayerId ? reveal.awards.find(award => award.playerId === state.selfPlayerId) : undefined;
   return <div className="results" role="region" aria-label={p('roundResults')}>
@@ -52,14 +86,15 @@ export function StageResults({ state, stage }: { state: RoomSnapshot; stage: Sta
           <span className="bar" aria-hidden="true" />{label(row.choiceKey)}{row.choiceKey === answer.correctChoiceKey ? ' ✓' : ''} · {p(row.count === 1 ? 'answerOne' : 'answerMany', { count: row.count })}</li>; })}</ul>
     </>}
     {answer?.kind === 'minigame' && <MinigameResults state={state} answer={answer} />}
-    {answer?.kind === 'drawing' && (answer.entries.length ? <ul className="drawing-gallery">{answer.entries.map(entry => { const author = entry.teamId ? teamName(state, entry.teamId) : nameOf(state, entry.playerId ?? '');
-      return <li key={entry.assetId}><StoredDrawing sessionId={state.view.sessionId} assetIds={[entry.assetId]} label={p('drawingBy', { name: author })} /><span>{author}</span></li>; })}</ul> : <p>{p('nobodyDrew')}</p>)}
+    {answer?.kind === 'drawing' && (answer.entries.length ? <ul className="drawing-gallery">{cards(answer.entries.map(entry => { const author = entry.teamId ? teamName(state, entry.teamId) : nameOf(state, entry.playerId ?? '');
+      return <li key={entry.assetId}><StoredDrawing sessionId={state.view.sessionId} assetIds={[entry.assetId]} label={p('drawingBy', { name: author })} /><span>{author}</span></li>; }))}</ul> : <p>{p('nobodyDrew')}</p>)}
     {answer?.kind === 'order' && answer.correctOrder && <><p>{p('correctOrder')}</p><ol>{answer.correctOrder.map(key => <li key={key}>{label(key)}</li>)}</ol></>}
-    {answer?.kind === 'vote' && (answer.entries.length ? <ol className="ballot">{answer.entries.map(row => {
+    {answer?.kind === 'vote' && (answer.entries.length ? <ol className="ballot">{cards(answer.entries.map(row => {
       const entry = stage.ballot?.find(candidate => candidate.submissionId === row.submissionId); const author = row.teamId ? teamName(state, row.teamId) : row.playerId ? nameOf(state, row.playerId) : p('formerPlayer');
-      return <li key={row.submissionId} className="ballot-entry"><strong>{author} · {p(row.votes === 1 ? 'voteOne' : 'voteMany', { count: row.votes })}</strong>{entry && <BallotContent sessionId={state.view.sessionId} entry={entry} label={p('entryFrom', { name: author })} />}</li>;
-    })}</ol> : <p>{p('nothingToVote')}</p>)}
-    {answer?.kind === 'media' && (answer.entries.length ? <ul className="gallery">{answer.entries.map(entry => <li key={entry.assetId}><MediaView sessionId={state.view.sessionId} media={entry} label={p('uploadFrom', { name: nameOf(state, entry.playerId) })} /><span>{nameOf(state, entry.playerId)}</span></li>)}</ul> : <p>{p('nobodyUploaded')}</p>)}
+      const selected = saved.includes(row.submissionId);
+      return <li key={row.submissionId} className={`ballot-entry${selected ? ' saved-vote' : ''}`}><strong>{author} · {stage.voteMode === 'ranked' ? formatPoints(String(row.votes * 1000)) + ' pts' : p(row.votes === 1 ? 'voteOne' : 'voteMany', { count: row.votes })}</strong>{entry && <BallotContent sessionId={state.view.sessionId} entry={entry} label={p('entryFrom', { name: author })} />}{selected && <SavedVoteBadge />}</li>;
+    }))}</ol> : <p>{p('nothingToVote')}</p>)}
+    {answer?.kind === 'media' && (answer.entries.length ? <ul className="gallery">{cards(answer.entries.map(entry => <li key={entry.assetId}><MediaView sessionId={state.view.sessionId} media={entry} label={p('uploadFrom', { name: nameOf(state, entry.playerId) })} /><span>{nameOf(state, entry.playerId)}</span></li>))}</ul> : <p>{p('nobodyUploaded')}</p>)}
     {/* Everyone's points: folded on phones so the round fits on one screen; open on the host and shared screens. */}
     <PointsFold folded={state.role === 'player'} label={t('results.points')}>
       {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
@@ -111,10 +146,13 @@ export function leaderLine(state: RoomSnapshot): string {
 /** The standings. `compact`: the small floating card (no heading or note, small faces). */
 export function Scoreboard({ state, disabled, send, compact = false }: { state: RoomSnapshot; disabled: boolean; send: Send; compact?: boolean }) {
   const t = useText();
-  const [edit, setEdit] = useState<Record<string, string>>({}); const [correcting, setCorrecting] = useState(false);
+  const [edit, setEdit] = useState(''); const [correcting, setCorrecting] = useState(false);
+  const [playerId, setPlayerId] = useState('');
   const totals = new Map(state.view.standings.map(row => [row.playerId, row.amountMilli]));
   const rows = [...new Set([...state.players.map(player => player.id), ...totals.keys()])].map(id => ({ id, name: nameOf(state, id), milli: totals.get(id) ?? '0' }))
     .sort((a, b) => { const difference = BigInt(b.milli) - BigInt(a.milli); return difference > 0n ? 1 : difference < 0n ? -1 : a.name.localeCompare(b.name); });
+  const selected = rows.find(row => row.id === playerId) ?? rows[0];
+  const milli = pointsToMilli(edit, true);
   const finished = state.view.status === 'FINISHED';
   // A scoreboard scene puts the standings centre stage, with its own heading and selection.
   const scene = state.view.stage?.status === 'ACTIVE' ? state.view.stage.scoreboard : null;
@@ -122,15 +160,23 @@ export function Scoreboard({ state, disabled, send, compact = false }: { state: 
   if (state.view.status === 'LOBBY' || (!rows.length && !state.view.teamStandings.length)) return null;
   return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : compact ? 'scoreboard-compact' : undefined}><h2 id="scores-heading" className={compact ? 'visually-hidden' : undefined}>{scene ? state.view.stage!.prompt : finished ? t('scores.final') : t('scores.title')}</h2>
     {scene && teams && !state.view.teamStandings.length && scene.show === 'teams' && <p>{p('noTeams')}</p>}
-    {players && <ol className="scoreboard">{rows.map(row => {
-      const milli = pointsToMilli(edit[row.id] ?? '', true); const valid = milli !== null && milli !== '0';
-      return <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={compact ? 22 : 32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? p('you') : ''}</span><span className="score-points">{formatPoints(row.milli)}</span>
-        {state.role === 'host' && correcting && <form className="inline-form" onSubmit={event => { event.preventDefault(); if (valid) { send('score.adjust', { playerId: row.id, amountMilli: milli, reason: 'Host correction' }); setEdit({ ...edit, [row.id]: '' }); } }}>
-          <label>{p('correctFor', { name: row.name })}<input type="number" inputMode="numeric" step={1} value={edit[row.id] ?? ''} onChange={event => setEdit({ ...edit, [row.id]: event.target.value })} /></label>
-          <button disabled={disabled || !valid}>{p('correctScore')}</button></form>}</li>;
-    })}</ol>}
+    {players && <ol className="scoreboard">{rows.map(row =>
+      <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={compact ? 22 : 32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? p('you') : ''}</span><span className="score-points">{formatPoints(row.milli)}</span></li>
+    )}</ol>}
     {teams && <TeamStandings state={state} />}
-    {state.role === 'host' && players && <button className="small-button ghost" aria-expanded={correcting} onClick={() => setCorrecting(!correcting)}>{p(correcting ? 'doneCorrecting' : 'correctScores')}</button>}
+    {state.role === 'host' && players && rows.length > 0 && <>
+      <button className="small-button ghost" aria-expanded={correcting} onClick={() => { if (!correcting && selected) setPlayerId(selected.id); setCorrecting(!correcting); }}>{p(correcting ? 'doneCorrecting' : 'correctScores')}</button>
+      {correcting && selected && <form className="score-correction" onSubmit={event => {
+        event.preventDefault();
+        if (!disabled && milli && milli !== '0') { send('score.adjust', { playerId: selected.id, amountMilli: milli, reason: 'Host correction' }); setEdit(''); }
+      }}>
+        <label>{p('scorePlayer')}<select value={selected.id} onChange={event => { setPlayerId(event.target.value); setEdit(''); }}>
+          {rows.map(row => <option key={row.id} value={row.id}>{row.name} · {formatPoints(row.milli)}</option>)}
+        </select></label>
+        <label>{p('correctFor', { name: selected.name })}<input type="number" step={1} value={edit} onChange={event => setEdit(event.target.value)} /></label>
+        <button className="primary" disabled={disabled || !milli || milli === '0'}>{p('correctScore')}</button>
+      </form>}
+    </>}
     {!finished && !compact && <p>{t('scores.note')}</p>}
   </section>;
 }

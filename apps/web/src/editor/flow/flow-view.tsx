@@ -1,3 +1,4 @@
+import type { ZoomShortcuts } from './zoom-shortcuts.js';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from '../controls/icons.js';
@@ -34,7 +35,7 @@ const t = (key: keyof typeof FLOW_TEXTS.en, values?: Record<string, string | num
 const BLOCKED = { self: 'bSelf', circle: 'bCircle', 'same-scene': 'bSame' } as const;
 const blockedText = (reason: string) => reason in BLOCKED ? t(BLOCKED[reason as keyof typeof BLOCKED]) : '';
 
-export function FlowView({ d, selected, setSelected, focus = null, live, onOpenScene, onHelp }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; focus?: { key: string; at: number } | null; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
+export function FlowView({ d, selected, setSelected, focus = null, live, onOpenScene, onHelp, zoomShortcuts }: { zoomShortcuts: ZoomShortcuts; d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; focus?: { key: string; at: number } | null; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
   const readOnly = d.readOnly;
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -168,17 +169,22 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     if (event.button === 2) return;
     setAdding(null); if (pending) { setPending(null); setNotice(''); }
     const element = event.currentTarget; element.setPointerCapture(event.pointerId);
-    if (event.shiftKey) {
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
       const from = toCanvas(event.clientX, event.clientY); let current: Box = { from, to: from }; setBox(current);
       const move = (moveEvent: PointerEvent) => { current = { from, to: toCanvas(moveEvent.clientX, moveEvent.clientY) }; setBox(current); };
+      const finish = () => {
+        element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', up);
+        element.removeEventListener('pointercancel', finish); setBox(null);
+      };
       const up = () => {
-        element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', up); setBox(null);
+        finish();
         const left = Math.min(current.from.x, current.to.x); const right = Math.max(current.from.x, current.to.x);
         const top = Math.min(current.from.y, current.to.y); const bottom = Math.max(current.from.y, current.to.y);
         const inside = definition.nodes.filter(node => { const at = positions[node.key]; return at && at.x < right && at.x + CARD_WIDTH > left && at.y < bottom && at.y + cardHeight(node) > top; }).map(node => node.key);
         select([...new Set([...selected, ...inside])]);
       };
-      element.addEventListener('pointermove', move); element.addEventListener('pointerup', up); return;
+      element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
+      element.addEventListener('pointercancel', finish); return;
     }
     select([]);
     const origin = { x: event.clientX - view.x, y: event.clientY - view.y };
@@ -290,7 +296,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
   const contextMenu = (event: React.MouseEvent) => {
     if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button, input, textarea, select')) return;
-    event.preventDefault(); if (readOnly) return; setPending(null); setConnecting(null);
+    event.preventDefault(); if (readOnly || event.ctrlKey) return; setPending(null); setConnecting(null);
     const rect = canvas.current?.getBoundingClientRect();
     // From the keyboard there is no pointer position: use the same spot as the toolbar button.
     const fromKeyboard = event.clientX === 0 && event.clientY === 0;
@@ -324,11 +330,12 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).closest('input, textarea, select, [contenteditable=true]')) return;
+      if ((event.target as HTMLElement).closest('input, textarea, select, dialog, [aria-modal=true], [contenteditable=true]')) return;
       if (askDelete) return;
-      // Looking around works in View too: Shift + 1 shows the whole game, Shift + 2 the selected scenes (as in design tools).
-      if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (event.code === 'Digit1' || event.code === 'Digit2')) {
-        event.preventDefault(); if (event.code === 'Digit1') fit(); else if (selected.length) fitTo(selected); return;
+      const fitAll = event.code === `Digit${zoomShortcuts.all}`;
+      const fitSelection = event.code === `Digit${zoomShortcuts.selection}`;
+      if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (fitAll || fitSelection)) {
+        event.preventDefault(); if (fitAll) fit(); else if (selected.length) fitTo(selected); return;
       }
       if (readOnly) return;
       // Tidying: Ctrl/⌘ + Shift + L tidies into rows; Alt + Shift + H / V lines up the selected scenes (by key position, so any layout and a Mac's Option work).
@@ -380,8 +387,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
         { label: t('zoomIn'), icon: 'zoom-in', onSelect: () => zoomBy(1.2) },
         { label: t('zoomOut'), icon: 'zoom-out', onSelect: () => zoomBy(1 / 1.2) },
         { label: t('zoom100'), icon: 'actual-size', onSelect: () => zoomBy(1 / view.zoom) },
-        { label: t('showAll'), icon: 'fit', shortcut: 'Shift + 1', onSelect: fit },
-        { label: t('zoomSelected'), icon: 'zoom', shortcut: 'Shift + 2', disabled: !selected.length, onSelect: () => fitTo(selected) },
+        { label: t('showAll'), icon: 'fit', shortcut: `Shift + ${zoomShortcuts.all}`, onSelect: fit },
+        { label: t('zoomSelected'), icon: 'zoom', shortcut: `Shift + ${zoomShortcuts.selection}`, disabled: !selected.length, onSelect: () => fitTo(selected) },
       ]} />
       {/* The ways to work the map, behind one ⓘ instead of a line of text (A selected arrow's actions are on the arrow itself). */}
       <InfoTip label={t('tipsLabel')} icon="tips" text={t('tips')} align="start" clickOnly>

@@ -59,10 +59,16 @@ test('a player answers with a picture, the room votes on it without names, then 
     await other.getByRole('radio', { name: /^Entry 1/ }).check();
     await other.getByRole('button', { name: 'Save vote' }).click();
     await expect(other.getByText('Your vote is in!')).toBeVisible();
+    await expect(other.locator('.ballot-entry.saved-vote').getByRole('img', { name: 'Entry 1' })).toBeVisible();
+    await other.reload();
+    await expect(other.locator('.ballot-entry.saved-vote')).toContainText('Saved vote');
+    await expect(host.locator('.saved-vote-badge')).toHaveCount(0);
+    await expect(page.locator('.saved-vote-badge')).toHaveCount(0);
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
     const results = other.getByRole('region', { name: 'Round results' });
     await expect(results).toContainText('Uploader · 1 vote');
+    await expect(results.locator('.ballot-entry.saved-vote')).toContainText('Uploader · 1 vote');
     const shown = results.getByRole('img', { name: 'Entry from Uploader' });
     await expect(shown).toBeVisible();
     await expect.poll(() => shown.evaluate(loaded)).toBe(true);

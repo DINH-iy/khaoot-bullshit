@@ -6,7 +6,7 @@ import { requireGame } from './errors.js';
 // Internal authorization context ONLY. A future credential gateway must derive
 // this from verified credentials; no HTTP/socket route accepts it from a client.
 export const TrustedActorSchema = z.discriminatedUnion('role', [
-  z.object({ role: z.literal('host'), creatorId: GameIdSchema, credentialProof: proofSchema().optional() }).strict(),
+  z.object({ role: z.literal('host'), creatorId: GameIdSchema, actingPlayerId: GameIdSchema.optional(), credentialProof: proofSchema().optional() }).strict(),
   z.object({ role: z.literal('player'), playerId: GameIdSchema, credentialProof: proofSchema().optional() }).strict(),
   z.object({ role: z.literal('display'), sessionId: GameIdSchema, credentialProof: proofSchema().optional() }).strict(),
 ]);
@@ -14,8 +14,15 @@ function proofSchema() { return z.object({ kind: z.enum(['room', 'player']), id:
 export type TrustedActor = z.infer<typeof TrustedActorSchema>;
 export type Transaction = Prisma.TransactionClient;
 
-export function actorKey(actor: TrustedActor): string { return actor.role === 'host' ? `host:${actor.creatorId}` : actor.role === 'player' ? `player:${actor.playerId}` : `display:${actor.sessionId}`; }
+export function actorKey(actor: TrustedActor): string { return actor.role === 'host' ? (actor.actingPlayerId ? `host-phone:${actor.credentialProof?.id}` : `host:${actor.creatorId}`) : actor.role === 'player' ? `player:${actor.playerId}` : `display:${actor.sessionId}`; }
 export async function authorize(tx: Transaction, session: GameSession, actor: TrustedActor): Promise<void> {
+  if (actor.role === 'host' && actor.actingPlayerId) {
+    const state = session.state as { hostPhonePlayerId?: unknown; hostPhoneCredentialId?: unknown } | null;
+    requireGame(session.hostId === actor.creatorId && state?.hostPhonePlayerId === actor.actingPlayerId && actor.credentialProof?.kind === 'player'
+      && state.hostPhoneCredentialId === actor.credentialProof.id, 'FORBIDDEN');
+    await authorize(tx, session, { role: 'player', playerId: actor.actingPlayerId, credentialProof: actor.credentialProof });
+    return;
+  }
   if (actor.credentialProof) {
     const proof = actor.credentialProof;
     if (proof.kind === 'player') {

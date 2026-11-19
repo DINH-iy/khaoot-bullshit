@@ -151,6 +151,7 @@ model GameSession {
   createdAt      DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
   endedAt        DateTime?     @db.Timestamptz(3)
+  idleCloseAt    DateTime?     @db.Timestamptz(3)
 
   gameVersion GameVersion     @relation(fields: [gameVersionId], references: [id], onDelete: Restrict)
   host        Creator         @relation(fields: [hostId], references: [id], onDelete: Restrict)
@@ -165,6 +166,7 @@ model GameSession {
   arcadeRound     ArcadeRound?
 
   @@index([hostId, status])
+  @@index([idleCloseAt])
   @@index([gameVersionId])
   @@map("game_sessions")
 }
@@ -524,8 +526,19 @@ model FeedbackItem {
   createdAt    DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
 
+  attachment FeedbackAttachment?
+
   @@index([status, createdAt])
   @@map("feedback_items")
+}
+
+model FeedbackAttachment {
+  feedbackId  String       @id @db.Uuid
+  contentType String       @db.VarChar(24)
+  data        Bytes
+  feedback    FeedbackItem @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@map("feedback_attachments")
 }
 
 // People: accounts the owner makes so a phone always joins as the same person
@@ -762,6 +775,7 @@ model ArcadeLobby {
   title        String    @db.VarChar(60)
   // Locked: nobody new may join; members can still come back.
   locked       Boolean   @default(false)
+  passwordHash String?   @db.VarChar(100)
   leaderId     String?   @db.Uuid
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
   // The last time any member was seen; the lobby closes after 15 quiet minutes.

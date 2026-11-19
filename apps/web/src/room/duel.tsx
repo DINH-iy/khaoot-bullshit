@@ -1,3 +1,4 @@
+import { Dropdown } from '../ui/dropdown.js';
 import { lazy, Suspense, useState } from 'react';
 import { HEAD_TO_HEAD_GAMES, type HeadToHeadMove, type RoomSnapshot } from '@party/contracts';
 import { useText } from '../presentation/look.js';
@@ -71,8 +72,8 @@ function PickPair({ players, disabled, onPick, onCancel }: { players: RoomSnapsh
   return <form className="duel-pick" onSubmit={event => { event.preventDefault(); if (a && b && a !== b) onPick([a, b]); }}>
     <p className="field-title">{p('pickTwo')}</p>
     <div className="duel-pick-row">
-      <label>{p('first')}<select value={a} onChange={event => setA(event.target.value)}>{players.map(entry => <option key={entry.id} value={entry.id}>{entry.displayName}</option>)}</select></label>
-      <label>{p('second')}<select value={b} onChange={event => setB(event.target.value)}>{players.map(entry => <option key={entry.id} value={entry.id}>{entry.displayName}</option>)}</select></label>
+      <label>{p('first')}<Dropdown value={a} onChange={setA} options={players.map(entry => ({ value: entry.id, label: entry.displayName }))} /></label>
+      <label>{p('second')}<Dropdown value={b} onChange={setB} options={players.map(entry => ({ value: entry.id, label: entry.displayName }))} /></label>
     </div>
     {a === b && <p className="hint">{p('different')}</p>}
     <div className="actions"><button type="submit" className="primary" disabled={disabled || !a || !b || a === b}>{p('startBetting')}</button>

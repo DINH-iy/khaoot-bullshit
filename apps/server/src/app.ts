@@ -56,6 +56,8 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   const identities = new WeakMap<FastifyRequest, Identity>();
   void app.register(helmet, { contentSecurityPolicy: { directives: {
     'upgrade-insecure-requests': config.PUBLIC_ORIGIN.startsWith('https:') ? [] : null,
+    'img-src': ["'self'", 'data:', 'blob:'],
+    'media-src': ["'self'", 'blob:'],
     'frame-src': ["'self'", 'https://www.youtube-nocookie.com'],
     'connect-src': ["'self'", config.PUBLIC_ORIGIN.replace(/^http/, 'ws')],
   } } });

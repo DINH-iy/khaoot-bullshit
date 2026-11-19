@@ -1,3 +1,4 @@
+import { Countdown } from '../minigames/controllers.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
 import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
@@ -42,10 +43,14 @@ import { useLanguage } from '../i18n/language.js';
 import { localizeStage } from '../presentation/scene-translations.js';
 import { LanguagePicker } from '../i18n/language-picker.js';
 import { rich } from '../i18n/rich.js';
+import { EXTRAS_TEXTS } from './extras.text.js';
 import { PHONE_TEXTS } from './phone.text.js';
 import { ROOM_TEXTS } from './room.text.js';
 // The room's own words in this device's language (the game's texts are `t`, the host's controls `h`).
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
+import { ROUND_CONTROL_TEXTS } from './round-control.text.js';
+import { ROOM_MANAGEMENT_TEXTS } from './room-management.text.js';
+import { HostPlayerList } from './host-player-list.js';
 import { HOST_TEXTS } from './host.text.js';
 import { answerFit } from './answer-fit.js';
 import { Mark } from '../presentation/mark-icons.js';
@@ -171,9 +176,16 @@ export function RoomScreen() {
       if (!joinId) { joinId = newId(); try { localStorage.setItem(key, joinId); } catch { /* optional recovery */ } }
       const look = savedLook();
       // A person joins under their own name (the server decides), with the look they had last time unless this phone has its own.
-      const result = await roomApi<{ sessionId: string }>('/api/rooms/join', { roomCode, displayName: displayName ?? account.person?.name ?? name, joinId, ...(look ? { look } : {}) });
+      const admission = { roomCode, displayName: displayName ?? account.person?.name ?? name, ...(look ? { look } : {}) };
+      const result = await roomApi<{ sessionId: string }>('/api/rooms/join', { ...admission, joinId }).catch(cause => {
+        // A host kick revokes the previous credential. An explicit join starts with a fresh one.
+        if (!(cause instanceof Error) || !['UNAUTHORIZED', 'CREDENTIAL_EXPIRED'].includes(cause.message)) throw cause;
+        const next = newId();
+        try { localStorage.setItem(key, next); } catch { /* optional recovery */ }
+        return roomApi<{ sessionId: string }>('/api/rooms/join', { ...admission, joinId: next });
+      });
       history.replaceState(null, '', `/?room=${result.sessionId}`); setReady(true); setSessionId(result.sessionId); setNewKey(null);
-    } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error && cause.message === 'NAME_TAKEN' ? r('nameTaken') : cause instanceof Error ? cause.message : r('joinFailed')); } finally { setBusy(false); }
+    } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error && cause.message === 'NAME_TAKEN' ? r('nameTaken') : cause instanceof Error && cause.message === 'SEAT_DENIED' ? management('banDenied') : cause instanceof Error ? cause.message : r('joinFailed')); } finally { setBusy(false); }
   };
   // A test bench phone joins by itself under the name it was opened with (Player 1, Player 2…).
   const autoJoined = useRef(false);
@@ -218,7 +230,7 @@ export function RoomScreen() {
   }, [presentation, inArcade, siteTheme, joinLook]);
   const look = useBuiltLook(lookInput); const t = look.text;
   // The host's own controls follow the language chosen in this browser; players' words stay the game's texts (t).
-  const h = useTexts(HOST_TEXTS);
+  const h = useTexts(HOST_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const lookStyle = themeStyle(look.theme); const lookClass = themeClass(look.theme);
   // Animation moments.
   const stageRef = useRef<HTMLElement>(null); const answersRef = useRef<HTMLDivElement>(null); const savedRef = useRef<HTMLParagraphElement>(null);
@@ -251,6 +263,9 @@ export function RoomScreen() {
   const timer = (change: Record<string, unknown>) => { if (stage) command('stage.timer', { stageRunId: stage.id, change }); };
   const role = state?.role ?? (initial.searchParams.get('display') === '1' ? 'display' : 'player');
   const host = role === 'host'; const running = state?.view.status === 'RUNNING';
+  const changeAutoReveal = (seconds: number | null) => {
+    void roomApi(`/api/rooms/${sessionId}/settings`, { autoRevealSeconds: seconds }).catch(() => setError(h('settingFailed')));
+  };
   const connected = room.connection === 'Connected';
   const me = state?.players.find(player => player.id === state.selfPlayerId);
   const minigameLive = { go: room.go, progress: room.progress, sendTaps: room.sendTaps, strokes: room.liveStrokes, sendStroke: room.sendStroke };
@@ -294,6 +309,20 @@ export function RoomScreen() {
           <div><dt>{r('p95', { count: room.samples.length })}</dt><dd>{p95 === undefined ? r('measuring') : `${Math.round(p95)} ms`}</dd></div><div><dt>{r('reconnects')}</dt><dd>{room.reconnects}</dd></div><div><dt>{r('lastSaved')}</dt><dd>{room.confirmMs === null ? '—' : `${room.confirmMs} ms`}</dd></div></dl>
         <p>{r('roundTripNote')}</p></details>} />
     </header>
+    {state?.hostPhone && role === 'player' && state.view.status !== 'FINISHED' && <div className="host-phone-controls">
+      <Popover label={rounds('controls')} text={rounds('controls')} closeOnAction>
+        {primary && !forming && <button type="button" className="primary" disabled={disabled} onClick={primary.run}>{primary.label}</button>}
+        {running && <button type="button" disabled={disabled} onClick={() => command('session.pause')}>{t('host.pause')}</button>}
+        <label className="choice"><input type="checkbox" checked={state.settings.autoRevealSeconds != null} disabled={disabled}
+          onChange={event => changeAutoReveal(event.target.checked ? 0 : null)} />{rounds('autoReveal')}</label>
+        {state.settings.autoRevealSeconds != null && <label>{rounds('delay')}<input type="number" min={0} max={120} disabled={disabled}
+          key={state.settings.autoRevealSeconds} defaultValue={state.settings.autoRevealSeconds} onBlur={event => {
+            const seconds = event.currentTarget.valueAsNumber;
+            if (!Number.isInteger(seconds) || seconds < 0 || seconds > 120) event.currentTarget.value = String(state.settings.autoRevealSeconds);
+            else if (seconds !== state.settings.autoRevealSeconds) changeAutoReveal(seconds);
+          }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>}
+      </Popover>
+    </div>}
     {stage && state && <RoundBar state={state} stage={stage} phase={phase} remaining={remaining} timerRef={timerRef} tools={state.arcade?.leader && role === 'player' && state.view.status !== 'FINISHED' ? <ArcadeLeaderMenu state={state} disabled={disabled} /> : undefined} />}
     {/* Messages float over the page instead of pushing it down. An action still being sent only shows the spinner above;
         the retry choice appears once it is really stuck (sending stopped without a confirmation). */}
@@ -342,10 +371,11 @@ export function RoomScreen() {
           <TeamSummary state={state} stage={stage} />
           {explaining && <ExplainPanel state={state} stage={stage} disabled={disabled} send={command} />}
           {!forming && !explaining && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
-          {stage.kind === 'vote' && !stage.revealed && <VoteBallot state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
-            onVote={submissionId => command('submission.submit', { stageRunId: stage.id, value: { kind: 'vote', submissionId } })} />}
+          {stage.kind === 'vote' && !stage.revealed && <VoteBallot key={stage.id} state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
+            onVote={value => command('submission.submit', { stageRunId: stage.id, value })} />}
           {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
           {host && stage.kind === 'challenge' && stage.status === 'CLOSED' && !stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
+          {stage.countdownUntil && role !== 'player' && <Countdown startsAt={stage.countdownUntil} offset={room.clockOffset}>{null}</Countdown>}
           {stage.kind === 'minigame' && <MinigameStage state={state} stage={stage} offset={room.clockOffset} disabled={disabled}
             canPlay={role === 'player' && !answerBlock && stage.status === 'ACTIVE' && running}
             onResult={result => command('submission.submit', { stageRunId: stage.id, value: { kind: 'minigame', ...result } })}
@@ -353,13 +383,13 @@ export function RoomScreen() {
             onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} />}
           <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />
           <DuelPanel state={state} stage={stage} disabled={disabled} send={command} />
-          {stage.kind !== 'route' && <div ref={resultsRef}><StageResults state={state} stage={stage} /></div>}
+          {stage.kind !== 'route' && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })} disabled={disabled} /></div>}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>{r('shownWithoutNames')}</p>}
           {stage.kind === 'minigame' ? (role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p> : null)
             : role === 'player' && state.view.ownSubmission ? <p ref={savedRef} role="status" className="answer-in">{saved}</p>
             : role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p>
-            : role === 'player' && stage.input?.kind === 'drawing' && stage.status === 'ACTIVE' && running ? <DrawingAnswer sessionId={state.view.sessionId} stageRunId={stage.id} input={stage.input} disabled={disabled} timeUp={timeUp}
-              onSubmit={assetId => command('submission.submit', { stageRunId: stage.id, value: { kind: 'drawing', assetId } })} />
+            : role === 'player' && stage.input?.kind === 'drawing' && stage.status === 'ACTIVE' && running ? <Countdown startsAt={stage.countdownUntil} offset={room.clockOffset}><DrawingAnswer sessionId={state.view.sessionId} stageRunId={stage.id} input={stage.input} disabled={disabled} timeUp={timeUp}
+              onSubmit={assetId => command('submission.submit', { stageRunId: stage.id, value: { kind: 'drawing', assetId } })} /></Countdown>
             : role === 'player' && stage.input && stage.status === 'ACTIVE' && running ? <form className="answer-form" onSubmit={event => {
               event.preventDefault(); const value = stage.input && draftValue(stage.input, draft); if (value) command('submission.submit', { stageRunId: stage.id, value });
             }}>
@@ -371,6 +401,7 @@ export function RoomScreen() {
         {state.view.status === 'FINISHED' && <FinaleShow state={state} />}
         {/* Phones keep the scores one tap away (the dock). The shared screen shows them with the results of a round, at scoreboard scenes and at the end: nothing it does not need. */}
         {scoreMoment && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command} /></div>}
+        {state.view.status === 'FINISHED' && role === 'player' && !state.arcade && <div className="actions"><a className="room-exit" href="/">{translate(EXTRAS_TEXTS, 'leaveRoom')}</a></div>}
       </div>
 
       {host && <aside className="room-controls" aria-label={h('hostControls')}>
@@ -404,7 +435,12 @@ export function RoomScreen() {
         {sheet === 'settings' && <HostDialog title={h('roomSettings')} icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
           <div className="settings-col"><h3>{h('phonesWaiting')}</h3><SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
             <h3>{h('joining')}</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} /><TestBenchSetting state={state} sessionId={state.view.sessionId} onError={setError} />
-            <p className="control-back"><a href="/?host=1">{h('backToHostMenu')}</a></p></div>
+            <p className="control-back"><a href="/?host=1">{h('backToHostMenu')}</a></p>
+            {state.view.status !== 'FINISHED' && <button type="button" className="danger" disabled={disabled || busy} onClick={() => {
+              if (!confirm(management('closeAsk'))) return;
+              setBusy(true);
+              void roomApi(`/api/rooms/${sessionId}/close`, {}).then(() => setSheet(null)).catch(() => setError(management('closeFailed'))).finally(() => setBusy(false));
+            }}>{management('closeRoom')}</button>}</div>
           <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} /></div></HostDialog>}
         {sheet === 'invite' && <HostDialog title={h('sharedAndInvite')} icon="tv" size="compact" onClose={() => setSheet(null)}>
           <div className="invite-join"><JoinQr origin={location.origin} roomCode={state.roomCode} link={false} />
@@ -417,16 +453,11 @@ export function RoomScreen() {
               : <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError(h('displayFailed'))); }}>{h('createDisplayLink')}</button>}</div>
         </HostDialog>}
         {state.view.status === 'LOBBY' && <section className="host-sheet players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
-
-          <ul>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? h('you') : ''}<span className="visually-hidden"> · </span><span className="player-state">{h(player.connected ? 'connected' : 'disconnected')}</span>
-            {player.look.picture && <button className="small-button ghost" aria-label={h('removePictureOf', { name: player.displayName })} onClick={() => command('player.removePicture', { playerId: player.id })}>{h('removePicture')}</button>}
-            <button className="icon-button player-revoke" aria-label={h('revokeFor', { name: player.displayName })} title={h('kickOut', { name: player.displayName })} onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError(h('revokeFailed'))); }}><FaIcon name="boot" /></button></li>)}</ul>
+          <HostPlayerList state={state} disabled={disabled} send={command} onError={setError} />
           <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section>}
         {sheet === 'players' && state.view.status !== 'LOBBY' && <HostDialog title={t('players.title', { count: state.players.length })} icon="users" onClose={() => setSheet(null)}><section className="host-sheet players in-dialog" aria-label={h('players')}>
           {me && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
-          <ul ref={playersRef}>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}><span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}{player.id === state.selfPlayerId ? h('you') : ''}<span className="visually-hidden"> · </span><span className="player-state">{h(player.connected ? 'connected' : 'disconnected')}</span>
-            {player.look.picture && <button className="small-button ghost" aria-label={h('removePictureOf', { name: player.displayName })} onClick={() => command('player.removePicture', { playerId: player.id })}>{h('removePicture')}</button>}
-            <button className="icon-button player-revoke" aria-label={h('revokeFor', { name: player.displayName })} title={h('kickOut', { name: player.displayName })} onClick={() => { void roomApi(`/api/rooms/${sessionId}/revoke`, { playerId: player.id }).catch(() => setError(h('revokeFailed'))); }}><FaIcon name="boot" /></button></li>)}</ul>
+          <HostPlayerList state={state} disabled={disabled} send={command} onError={setError} listRef={playersRef} />
           <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section></HostDialog>}
         {sheet === 'lobby' && <div className="host-sheet reset-confirm" role="group" aria-label={h('backToLobby')}>
           <p>{h('lobbyAsk')}</p>

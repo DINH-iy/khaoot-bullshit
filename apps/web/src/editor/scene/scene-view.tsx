@@ -5,6 +5,7 @@ import { peersOn, PeerTags } from '../live/presence.js';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { nextSummary, StageFields } from './inspector.js';
 import { ActionMenu } from '../controls/action-menu.js';
+import { ReplaceSceneDialog, REPLACE_TEXTS } from './replace-scene.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
@@ -64,6 +65,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   const problems = d.issues.filter(issue => issue.nodeKey === current.key);
   const canRehearseOnly = !d.issues.some(issue => !issue.nodeKey || issue.nodeKey === current.key)
     && !current.stages.some(stage => stage.kind === 'vote');
+  const replacement = useTexts(REPLACE_TEXTS); const [replacing, setReplacing] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'sharedScreen' | 'phone'>();
   const [mediaKey, setMediaKey] = useState<string>();
   const scenePart = `${current.key}:${index}`;
@@ -146,7 +148,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       <div className="scene-canvas-tools">
         <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => setPreviewDevice('phone')}>{labels('phonePreview')}</button>
       </div>
-      <ScenePreview definition={definition} node={current} index={index} device="sharedScreen" canvas={{
+      <ScenePreview key={scenePart} definition={definition} node={current} index={index} device="sharedScreen" canvas={{
         readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
       }} />
       {previewDevice && <ScenePreviewDialog definition={definition} node={current} index={index} initialDevice={previewDevice} onClose={() => setPreviewDevice(undefined)} />}
@@ -158,7 +160,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         <ActionMenu label={t('sceneActions')} actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
           { label: t('rehearseHere'), icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
           { label: labels('rehearseOnly'), icon: 'try', disabled: d.busy || d.save !== 'saved' || !canRehearseOnly, onSelect: () => d.rehearse(current.key, true) },
-          { label: t('changeLeads'), icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
+          { label: t('changeLeads'), icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: replacement('action'), icon: 'edit', onSelect: () => setReplacing(true) }, { label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
+      {replacing && !readOnly && <ReplaceSceneDialog key={current.key} definition={definition} node={current} onChange={next => { change(next); setPart(0); }} onClose={() => setReplacing(false)} />}
       {definition.startNodeKey === current.key && <p className="start-note">{t('startsHere')}</p>}
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
       {/* A small named group (K4), like the scene's settings: open as left last time. */}
@@ -174,7 +177,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
       <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
       {/* Where it leads: a button to go there (changing it is the Flow editor's business, in the ☰ menu). */}
-      <NextScenes definition={definition} node={current} onGo={key => setSelected([key])} />
+      <NextScenes definition={definition} node={current} onGo={key => setSelected([key])} onEdit={readOnly ? undefined : () => onOpenFlow(current.key)} />
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
       {confirming && <ConfirmDialog title={t('deleteAsk', { title: cardText(definition, current).title })} text={t('deleteText')} confirm={t('deleteConfirm')}
         onConfirm={() => { const kept = { ...positions }; delete kept[current.key]; setConfirming(false); change(deleteScene(definition, current.key), kept); setSelected([]); }} onCancel={() => setConfirming(false)} />}
@@ -183,15 +186,17 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
 }
 
 /** Where this scene leads, one button per way out (a party choice has one per route), to go there. */
-function NextScenes({ definition, node, onGo }: { definition: Definition; node: Node; onGo: (key: string) => void }) {
+function NextScenes({ definition, node, onGo, onEdit }: { definition: Definition; node: Node; onGo: (key: string) => void; onEdit: (() => void) | undefined }) {
   const out = definition.edges.filter(edge => edge.from === node.key);
   const name = (key: string) => { const target = definition.nodes.find(entry => entry.key === key); if (!target) return key; const text = cardText(definition, target); return text.banner || text.title; };
   const via = (option: string | undefined) => option ? optionsOf(node).find(entry => entry.key === option)?.label : undefined;
-  return <div className="scene-next" role="group" aria-label={t('next')}>
-    <span className="scene-next-title">{t('next')}</span>
-    {out.length === 0 ? <span className="scene-next-end">{nextSummary(definition, node)}</span>
-      : out.map(edge => <button key={edge.key} type="button" className="scene-next-go" onClick={() => onGo(edge.to)}>
-        <span>{via(edge.option) && <small>{via(edge.option)}</small>}{name(edge.to)}</span><Icon name="next" size={16} /></button>)}
+  return <div className="scene-next">
+    <div className="scene-next-head"><span className="scene-next-title">{t('next')}</span>{onEdit && <button type="button" className="small-button" onClick={onEdit}>{t('changeLeads')}</button>}</div>
+    <div className="scene-next-destinations" role="group" aria-label={t('next')}>
+      {out.length === 0 ? <span className="scene-next-end">{nextSummary(definition, node)}</span>
+        : out.map(edge => <button key={edge.key} type="button" className="scene-next-go" onClick={() => onGo(edge.to)}>
+          <span>{via(edge.option) && <small>{via(edge.option)}</small>}{name(edge.to)}</span><Icon name="next" size={16} /></button>)}
+    </div>
   </div>;
 }
 

@@ -5,6 +5,7 @@ import { defineTexts } from '../i18n/texts.js';
 // added; after that they are the author's own text.
 export const MODEL_TEXTS = defineTexts('editor-model', {
   tInfo: 'Cutscene or info', hInfo: 'Text on every screen', tQuiz: 'Quiz question', hQuiz: 'One correct answer; tiles, a list or true/false',
+  tIntro: 'Intro', hIntro: 'Welcome players before the first round', nIntro: 'Welcome! Get ready to play.',
   tWriting: 'Writing round', hWriting: 'Jokes, captions, excuses', tUpload: 'Picture or video round', hUpload: 'Photos, GIFs, short videos',
   tDrawing: 'Drawing round', hDrawing: 'Draw on the phone, then vote', tOrder: 'Put in order', hOrder: 'Arrange items correctly',
   tChallenge: 'Host-judged challenge', hChallenge: 'The host gives points', tVote: 'Vote on answers', hVote: 'Vote for a writing or upload round',
@@ -30,6 +31,7 @@ export const MODEL_TEXTS = defineTexts('editor-model', {
 }, {
   nl: {
     tInfo: 'Tussenscène of info', hInfo: 'Tekst op elk scherm', tQuiz: 'Quizvraag', hQuiz: 'Eén goed antwoord; tegels, een lijst of waar/niet waar',
+    tIntro: 'Intro', hIntro: 'Verwelkom spelers voor de eerste ronde', nIntro: 'Welkom! Maak je klaar om te spelen.',
     tWriting: 'Schrijfronde', hWriting: 'Grappen, onderschriften, smoesjes', tUpload: 'Foto- of videoronde', hUpload: 'Foto’s, GIF’s, korte video’s',
     tDrawing: 'Tekenronde', hDrawing: 'Teken op de telefoon, daarna stemmen', tOrder: 'Op volgorde zetten', hOrder: 'Zet dingen in de goede volgorde',
     tChallenge: 'Uitdaging, de host beoordeelt', hChallenge: 'De host geeft punten', tVote: 'Stemmen op antwoorden', hVote: 'Stemmen op een schrijf- of uploadronde',
@@ -55,6 +57,7 @@ export const MODEL_TEXTS = defineTexts('editor-model', {
   },
   de: {
     tInfo: 'Zwischenszene oder Info', hInfo: 'Text auf jedem Bildschirm', tQuiz: 'Quizfrage', hQuiz: 'Eine richtige Antwort; Kacheln, eine Liste oder wahr/falsch',
+    tIntro: 'Intro', hIntro: 'Begrüße die Spieler vor der ersten Runde', nIntro: 'Willkommen! Gleich geht’s los.',
     tWriting: 'Schreibrunde', hWriting: 'Witze, Bildunterschriften, Ausreden', tUpload: 'Foto- oder Videorunde', hUpload: 'Fotos, GIFs, kurze Videos',
     tDrawing: 'Zeichenrunde', hDrawing: 'Auf dem Handy zeichnen, dann abstimmen', tOrder: 'In Reihenfolge bringen', hOrder: 'Dinge richtig ordnen',
     tChallenge: 'Herausforderung, vom Host bewertet', hChallenge: 'Der Host vergibt Punkte', tVote: 'Über Antworten abstimmen', hVote: 'Über eine Schreib- oder Upload-Runde abstimmen',
@@ -80,6 +83,7 @@ export const MODEL_TEXTS = defineTexts('editor-model', {
   },
   ro: {
     tInfo: 'Scenă intermediară sau info', hInfo: 'Text pe fiecare ecran', tQuiz: 'Întrebare de quiz', hQuiz: 'Un singur răspuns corect; plăci, o listă sau adevărat/fals',
+    tIntro: 'Introducere', hIntro: 'Întâmpină jucătorii înainte de prima rundă', nIntro: 'Bun venit! Pregătiți-vă de joc.',
     tWriting: 'Rundă de scris', hWriting: 'Glume, descrieri, scuze', tUpload: 'Rundă cu poze sau video', hUpload: 'Poze, GIF-uri, videoclipuri scurte',
     tDrawing: 'Rundă de desen', hDrawing: 'Desenează pe telefon, apoi votați', tOrder: 'Pune în ordine', hOrder: 'Aranjează elementele corect',
     tChallenge: 'Provocare jurizată de gazdă', hChallenge: 'Gazda dă punctele', tVote: 'Vot pe răspunsuri', hVote: 'Votați o rundă de scris sau de încărcare',

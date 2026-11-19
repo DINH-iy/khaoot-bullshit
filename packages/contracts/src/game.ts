@@ -61,6 +61,9 @@ export const InputSchema = z.discriminatedUnion('kind', [
   // `start`: a doodle everyone gets to finish. Both optional, so earlier definitions keep their hash.
   z.object({ kind: z.literal('drawing'), maxStrokes: z.number().int().min(1).max(600), blind: z.boolean().optional(), start: DrawingSchema.optional() }).strict(),
 ]);
+export const ResultCardsSchema = z.union([z.literal('manual'), z.number().int().min(1).max(60)]);
+export const VotingModeSchema = z.enum(['single', 'multi', 'ranked']);
+export const MAX_BALLOT_SELECTIONS = 8;
 export const SubmissionValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('choice'), choiceKey: GameKeySchema }).strict(),
   z.object({ kind: z.literal('order'), keys: z.array(GameKeySchema).min(2).max(8) }).strict(),
@@ -69,12 +72,16 @@ export const SubmissionValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('media'), assetId: GameIdSchema }).strict(),
   // A vote names one entry of the ballot shown for this stage.
   z.object({ kind: z.literal('vote'), submissionId: GameIdSchema }).strict(),
+  z.object({ kind: z.literal('vote-list'), submissionIds: z.array(GameIdSchema).min(1).max(MAX_BALLOT_SELECTIONS).refine(ids => new Set(ids).size === ids.length) }).strict(),
   // A minigame result, measured on the phone and checked by the server.
   MinigameValueSchema,
   // A bet in a duel: the duelist this player thinks will win.
   z.object({ kind: z.literal('bet'), playerId: GameIdSchema }).strict(),
 ]);
 export type SubmissionValue = z.infer<typeof SubmissionValueSchema>;
+export function voteChoices(value: SubmissionValue | undefined): readonly string[] {
+  return value?.kind === 'vote' ? [value.submissionId] : value?.kind === 'vote-list' ? value.submissionIds : [];
+}
 
 const envelope = { formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema };
 const hostEnvelope = { ...envelope, expectedRevision: RevisionSchema };
@@ -96,6 +103,8 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('stage.reopen'), stageRunId: GameIdSchema, durationMs: StageDurationSchema.nullable() }).strict(),
   // Shows the closed stage's answer, awards and updated scores to everyone.
   z.object({ ...hostEnvelope, type: z.literal('stage.reveal'), stageRunId: GameIdSchema }).strict(),
+  z.object({ ...envelope, type: z.literal('stage.autoReveal'), stageRunId: GameIdSchema }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('stage.nextResult'), stageRunId: GameIdSchema }).strict(),
   // A correction is a new ledger entry; earlier awards and judgments are never edited.
   z.object({ ...hostEnvelope, type: z.literal('score.adjust'), playerId: GameIdSchema, amountMilli: AdjustmentMilliSchema, reason: z.string().trim().min(1).max(120) }).strict(),
   // Team forming before a team round starts. The host can always change the
@@ -126,6 +135,8 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('player.look'), look: PlayerLookSchema }).strict(),
   // The host takes away a player's photo or drawn picture (the character stays).
   z.object({ ...hostEnvelope, type: z.literal('player.removePicture'), playerId: GameIdSchema }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('player.moderate'), playerId: GameIdSchema, displayName: z.string().trim().min(1).max(40).optional(),
+    photoId: GameIdSchema.optional() }).strict().refine(command => command.displayName !== undefined || command.photoId !== undefined, 'Choose a name or photo'),
   // The host spins the wheel of fortune set on this scene (again, if they like); the server picks the entry.
   z.object({ ...hostEnvelope, type: z.literal('wheel.spin'), stageRunId: GameIdSchema }).strict(),
   // A duel: the host picks the two duelists (when the scene lets the host pick, or again before anyone bets),
@@ -144,7 +155,9 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('minigame.decide'), stageRunId: GameIdSchema, side: z.string().min(1).max(80), step: z.number().int().min(0).max(63), now: z.literal(true).optional() }).strict(),
 ]);
 export type GameCommand = z.infer<typeof GameCommandSchema>;
-/** Commands a player may send; every other command is the host's. */
+/** Round commands available to the phone holding delegated host controls. */
+export const HOST_PHONE_COMMANDS = ['session.start', 'session.pause', 'session.resume', 'stage.close', 'stage.advance', 'stage.explained', 'stage.reveal', 'stage.nextResult'] as const;
+/** Commands available to an ordinary player. */
 export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
@@ -247,6 +260,9 @@ export const PublicStageSchema = z.object({
   info: z.object({ title: z.string().min(1).max(120) }).strict().nullable(),
   scoreboard: z.object({ show: z.enum(['players', 'teams', 'both']) }).strict().nullable(),
   ballot: z.array(BallotEntrySchema).nullable(),
+  countdownUntil: z.string().datetime().optional(),
+  voteMode: VotingModeSchema.optional(), voteLimit: z.number().int().min(1).max(MAX_BALLOT_SELECTIONS).optional(),
+  resultCards: z.object({ mode: ResultCardsSchema, revealedAt: z.string().datetime(), index: z.number().int().min(0) }).strict().optional(),
   minigame: PublicMinigameSchema.nullable(),
   duel: PublicDuelSchema.nullable(),
   // True when a later vote shows these answers without names; they are revealed by that vote.

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ANIMATION_PRESETS, DEFAULT_ANIMATIONS, EASINGS, MOMENTS, resolveAnimation, type AnimationChoice, type CustomAnimation, type Moment } from '@party/contracts';
 import { play } from '../../presentation/look.js';
-import { Dropdown } from '../controls/dropdown.js';
+import { Dropdown } from '../../ui/dropdown.js';
 import { Icon } from '../controls/icons.js';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';

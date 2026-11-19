@@ -11,7 +11,7 @@ import { AnimationPanel } from './animation-panel.js';
 import { LookPreview } from './look-preview.js';
 import '../../room/room.css';
 import './look.css';
-import { Dropdown } from '../controls/dropdown.js';
+import { Dropdown } from '../../ui/dropdown.js';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
 const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);

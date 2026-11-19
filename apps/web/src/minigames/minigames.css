@@ -12,6 +12,11 @@
   touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; border: 0; }
 .room .mg-pad.wait { background: var(--r-bad); color: #1a0505; }
 .room .mg-pad.go { background: var(--r-ok); color: #04170e; }
+.room .reaction-pad { display: grid; place-items: center; min-height: clamp(8rem, 34svh, 17rem); padding: 20px; }
+.room .reaction-pad.wait { background: var(--r-card-strong); color: var(--r-text); box-shadow: inset 0 0 0 2px var(--r-line); }
+.reaction-cue { display: grid; gap: 8px; text-align: center; line-height: 1.1; }
+.reaction-cue small { font-size: clamp(.95rem, 4vw, 1.2rem); font-weight: 650; }
+.mg-done.reaction-early .mg-big { color: var(--r-bad); font-size: clamp(2rem, 9vw, 4rem); }
 .room .mg-pad.stop { background: var(--r-accent); color: var(--r-accent-ink); min-height: 10rem; }
 .room .mg-pad:active { transform: scale(.98); }
 .mg-clock { letter-spacing: .02em; }

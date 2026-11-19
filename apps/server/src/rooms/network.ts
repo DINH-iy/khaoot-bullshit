@@ -1,21 +1,24 @@
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
+import { HOST_PHONE_COMMANDS, ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenVerifier } from '../auth/auth.js';
 import { AuthenticationUnavailable } from '../auth/auth.js';
 import { GameError } from '../game/errors.js';
+import { revealDueStages } from '../game/auto-reveal.js';
 import { createGameService } from '../game/service.js';
 import { readSessionView } from '../game/views.js';
 import { actorKey, authorize } from '../game/model.js';
 import { closeExpiredStages } from '../game/timing.js';
 import { parseDefinition } from '../game/definition.js';
-import { createRoomGateway, lockRoom, type Principal } from './gateway.js';
-import { createSeatReclaim, pendingRequests, readRoomState } from './reclaim.js';
+import { createRoomGateway, lockRoom, recordRoomChange, type Principal } from './gateway.js';
+import { createSeatReclaim, isHostPhone, pendingRequests, readRoomState } from './reclaim.js';
 import { createRoomPeople } from './room-people.js';
 import { connectionCookies, SEAT_HEADER, seatOf } from './test-seats.js';
+import { closeRoom } from './close.js';
+import { reconcileEmptyRooms } from './idle-close.js';
 import { followRoom } from './restart.js';
 import { createLiveSignals } from '../minigames/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
@@ -59,17 +62,28 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   };
   // Whether a shared screen of this room is connected to this process: it plays the videos and songs.
   const displayConnected = (id: string) => [...io.sockets.sockets.values()].some(socket => { const peer = socket.data['principal'] as Principal | undefined; return peer?.sessionId === id && peer.role === 'display'; });
+  const hasPresence = (id: string) => Boolean(io.sockets.adapter.rooms.get(`host:${id}`)?.size || io.sockets.adapter.rooms.get(`player:${id}`)?.size);
+  const occupiedRooms = () => new Set([...io.sockets.sockets.values()].flatMap(socket => {
+    const peer = socket.data['principal'] as Principal;
+    return peer.role === 'display' ? [] : [peer.sessionId];
+  }));
+  const hostPhoneActor = async (principal: Principal) => {
+    if (principal.actor.role !== 'player') return principal.actor;
+    const room = await client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { hostId: true } });
+    return { role: 'host' as const, creatorId: room.hostId, actingPlayerId: principal.actor.playerId, credentialProof: principal.actor.credentialProof };
+  };
   const people = createRoomPeople(client, config);
   const seats = createSeatReclaim(client, config, connectedPlayers, (id, playerId) => { io.in(`player:${id}:${playerId}`).disconnectSockets(true); });
   const snapshot = async (principal: Principal) => {
     const selfId = principal.actor.role === 'player' ? principal.actor.playerId : null;
     const [view, players, session, arcade] = await Promise.all([
       readSessionView(client, principal.actor, principal.sessionId),
-      client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true, look: true }, orderBy: { joinedAt: 'asc' } }),
+      client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true, look: true, personId: true }, orderBy: { joinedAt: 'asc' } }),
       client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true, state: true } }),
       arcadeLink(client, principal.sessionId, selfId),
     ]);
     const connected = connectedPlayers(principal.sessionId); const state = readRoomState(session.state);
+    const hostPhone = isHostPhone(state, principal.actor);
     // Secret scores: phones and the shared screen get no standings during the game, only at a scoreboard scene and at the end. The host always sees them.
     const scoresOpen = state.showScores || principal.role === 'host' || view.status === 'FINISHED' || (view.stage?.kind === 'scoreboard' && view.stage.status === 'ACTIVE');
     // "Most reactions" comes from the room's own count; without one, the slide is left out.
@@ -78,9 +92,12 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), awards };
     // The host also sees the people added to the room and the phones asking to sign in as one of them.
     const roomPeople = principal.role === 'host' ? await people.hostView(principal.sessionId, state) : { expected: [], nameRequests: [] };
-    return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, displayConnected: displayConnected(principal.sessionId), selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
+    return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, displayConnected: displayConnected(principal.sessionId), ...(selfId && state.hostPhonePlayerId !== selfId && state.birthdayVote && ['RUNNING', 'PAUSED'].includes(view.status)
+        ? { birthdayVote: { voted: state.birthdayVoters.includes(selfId), ready: state.birthdayReady } } : {}),
+      hostPhone, ...(principal.role === 'host' ? { hostPhonePlayerId: state.hostPhonePlayerId } : {}), selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench },
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
+        ...(principal.role === 'host' || hostPhone ? { autoRevealSeconds: state.autoRevealSeconds } : {}) },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], ...roomPeople, nextRoom: state.nextRoom, arcade });
   };
@@ -226,11 +243,80 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       return { ok: true, data: { token } };
     } catch (error) { return reply.code(403).send(failure(error)); }
   });
+  app.post('/api/rooms/:sessionId/birthday-vote', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      const input = z.object({ vote: z.boolean() }).strict().safeParse(request.body);
+      roomAssert(input.success && principal.actor.role === 'player', 'FORBIDDEN');
+      const actor = principal.actor;
+      await client.$transaction(async tx => {
+        await lockRoom(tx, id);
+        const room = await tx.gameSession.findUniqueOrThrow({ where: { id } }); await authorize(tx, room, actor);
+        const state = readRoomState(room.state);
+        roomAssert(state.birthdayVote && state.hostPhonePlayerId !== actor.playerId && ['RUNNING', 'PAUSED'].includes(room.status), 'FORBIDDEN');
+        if (state.birthdayReady || state.birthdayVoters.includes(actor.playerId) === input.data.vote) return;
+        const players = await tx.sessionPlayer.findMany({ where: { sessionId: id, leftAt: null, ...(state.hostPhonePlayerId ? { id: { not: state.hostPhonePlayerId } } : {}) }, select: { id: true } });
+        const eligible = new Set(players.map(player => player.id));
+        const votes = new Set(state.birthdayVoters.filter(playerId => eligible.has(playerId)));
+        if (input.data.vote) votes.add(actor.playerId); else votes.delete(actor.playerId);
+        await tx.gameSession.update({ where: { id }, data: { state: { ...state, birthdayVoters: [...votes], birthdayReady: votes.size > players.length / 2 } } });
+        // Only player snapshots carry the vote. The public event does not identify the action.
+        await recordRoomChange(tx, id, 'room.updated');
+      });
+      return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+
+  app.post('/api/rooms/:sessionId/host-phone', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      roomAssert(principal.role === 'host', 'FORBIDDEN');
+      const input = z.object({ playerId: GameIdSchema.nullable() }).strict().safeParse(request.body);
+      roomAssert(input.success, 'INVALID_COMMAND');
+      await client.$transaction(async tx => {
+        await lockRoom(tx, id);
+        const room = await tx.gameSession.findUniqueOrThrow({ where: { id } });
+        await authorize(tx, room, principal.actor);
+        const playerId = input.data.playerId;
+        let credentialId: string | null = null;
+        if (playerId) {
+          for (const socket of io.sockets.sockets.values()) {
+            const peer = socket.data['principal'] as Principal | undefined;
+            if (peer?.sessionId === id && peer.actor.role === 'player' && peer.actor.playerId === playerId
+                && peer.actor.credentialProof?.kind === 'player') credentialId = peer.actor.credentialProof.id;
+          }
+          roomAssert(credentialId && await tx.playerCredential.count({ where: {
+            id: credentialId, sessionId: id, playerId, revokedAt: null, expiresAt: { gt: new Date() }, player: { leftAt: null },
+          } }) === 1, 'INELIGIBLE');
+        }
+        await tx.gameSession.update({ where: { id }, data: { state: {
+          ...readRoomState(room.state), hostPhonePlayerId: playerId, hostPhoneCredentialId: credentialId,
+        } } });
+        await recordRoomChange(tx, id, 'room.hostPhone');
+      });
+      return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+
+  app.post('/api/rooms/:sessionId/close', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      roomAssert(principal.role === 'host', 'FORBIDDEN');
+      await client.$transaction(async tx => {
+        await lockRoom(tx, id);
+        const room = await tx.gameSession.findUniqueOrThrow({ where: { id } });
+        await authorize(tx, room, principal.actor);
+        await closeRoom(tx, id);
+      });
+      return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+
   app.post('/api/rooms/:sessionId/revoke', async (request, reply) => {
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
-      const body = z.object({ playerId: GameIdSchema }).strict().safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
-      await gateway.revoke(id, principal, body.data.playerId);
+      const body = z.object({ playerId: GameIdSchema, ban: z.boolean().optional() }).strict().safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await gateway.revoke(id, principal, body.data.playerId, body.data.ban);
       io.in(`player:${id}:${body.data.playerId}`).disconnectSockets(true); return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error)); }
   });
@@ -258,6 +344,9 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const original = socket.data['principal'] as Principal; const id = original.sessionId;
     void socket.join([`session:${id}`, `${original.role}:${id}`, `credential:${original.id}`]);
     if (original.actor.role === 'player') void socket.join(`player:${id}:${original.actor.playerId}`);
+    if (original.role !== 'display') void client.gameSession.updateMany({
+      where: { id, idleCloseAt: { not: null } }, data: { idleCloseAt: null },
+    }).catch(() => app.log.warn({ event: 'idle_room_reset_failed' }, 'Could not reset empty room timer'));
     const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original);
     const expiry = setTimeout(() => { socket.emit('room.error', { code: 'CREDENTIAL_EXPIRED' }); socket.disconnect(true); }, Math.max(1, original.expiresAt.getTime() - Date.now())); expiry.unref();
     let syncing = false; let commanding = false; let heartbeating = false; let receipting = false;
@@ -274,7 +363,9 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     socket.on('room.command', (input: unknown, ack: unknown) => {
       if (typeof ack !== 'function') return;
       if (commanding) { ack({ ok: false, error: { code: 'RATE_LIMITED' } }); return; } commanding = true;
-      void (async () => { const principal = await current(); roomAssert(input && typeof input === 'object' && (input as { sessionId?: string }).sessionId === id, 'FORBIDDEN'); return service.execute(principal.actor, input); })()
+      void (async () => { const principal = await current(); roomAssert(input && typeof input === 'object' && (input as { sessionId?: string }).sessionId === id, 'FORBIDDEN'); const type = (input as { type?: string }).type;
+        const delegated = principal.role === 'player' && (HOST_PHONE_COMMANDS as readonly string[]).includes(type ?? '');
+        return service.execute(delegated ? await hostPhoneActor(principal) : principal.actor, input); })()
         .then(data => ack({ ok: true, data })).catch(error => ack(failure(error))).finally(() => { commanding = false; });
     });
     socket.on('room.receipt', (input: unknown, ack: unknown) => {
@@ -285,7 +376,9 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         const principal = await current();
         return client.$transaction(async tx => {
           const session = await tx.gameSession.findUniqueOrThrow({ where: { id } }); await authorize(tx, session, principal.actor);
-          const saved = await tx.gameCommand.findUnique({ where: { sessionId_actorKey_commandKey: { sessionId: id, actorKey: actorKey(principal.actor), commandKey: parsed.data.commandId } } });
+          const owner = principal.actor.role === 'player' && isHostPhone(readRoomState(session.state), principal.actor)
+            ? [actorKey(principal.actor), `host-phone:${principal.actor.credentialProof!.id}`] : [actorKey(principal.actor)];
+          const saved = await tx.gameCommand.findFirst({ where: { sessionId: id, actorKey: { in: owner }, commandKey: parsed.data.commandId } });
           return { receipt: saved ? CommandReceiptSchema.parse(saved.result) : null };
         });
       })().then(data => ack({ ok: true, data })).catch(error => ack(failure(error))).finally(() => { receipting = false; });
@@ -326,14 +419,27 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const ticker = setInterval(() => { if (!publishing) publishTask = publish(); }, 250); ticker.unref();
   // Deadlines are durable rows, so automatic closing needs no per-room timer
   // and continues for rooms with nobody connected.
-  let closing = false; let closeTask: Promise<void> | undefined; const timeoutBackoff = new Map<string, number>(); let voteTicks = 0;
+  let closing = false; let closeTask: Promise<void> | undefined; const timeoutBackoff = new Map<string, number>(); let voteTicks = 0; const revealBackoff = new Map<string, number>();
+  let idleTask: Promise<void> | undefined;
+  const idleReadyAt = Date.now() + 30_000; // Let phones reconnect after a backend restart.
+  const idleTicker = setInterval(() => {
+    if (idleTask || shuttingDown || Date.now() < idleReadyAt) return;
+    idleTask = reconcileEmptyRooms(client, occupiedRooms(), hasPresence).then(({ closed, failed }) => {
+      if (closed) app.log.info({ event: 'idle_rooms_closed', count: closed }, 'Closed empty rooms');
+      if (failed) app.log.warn({ event: 'idle_room_closing_failed', count: failed }, 'Empty rooms will be retried');
+    }).catch(() => app.log.warn({ event: 'idle_room_check_failed' }, 'Could not check empty rooms')).finally(() => { idleTask = undefined; });
+  }, 5000);
+  idleTicker.unref();
   const closeDue = async () => {
     if (closing || shuttingDown) return; closing = true;
     // Team votes in step games whose time ran out are decided too, about once a second.
     if (++voteTicks % 4 === 0) await decideDueVotes(client as never, service).catch(() => app.log.warn({ event: 'step_votes_unavailable' }, 'Deciding team votes unavailable'));
     try { const { closed, failed } = await closeExpiredStages(client, service, undefined, timeoutBackoff); if (closed) app.log.info({ event: 'stages_timed_out', count: closed }, 'Timed stages closed'); if (failed) app.log.warn({ event: 'stage_timeout_failed', count: failed }, 'Some timed stages could not be closed; retrying later'); }
     catch { app.log.warn({ event: 'stage_timeout_unavailable' }, 'Timed stage closing unavailable'); }
-    finally { closing = false; }
+    finally {
+      if (voteTicks % 2 === 0) await revealDueStages(client, service, revealBackoff).catch(() => app.log.warn({ event: 'auto_reveal_failed' }, 'Automatic result reveal unavailable'));
+      closing = false;
+    }
   };
   const timeoutTicker = setInterval(() => { if (!closing) closeTask = closeDue(); }, 250); timeoutTicker.unref();
   app.addHook('onReady', async () => {
@@ -344,6 +450,6 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     for (const session of running) await service.execute({ role: 'host', creatorId: session.hostId }, { formatVersion: 1, type: 'session.pause', sessionId: session.id, commandId: crypto.randomUUID(), expectedRevision: session.revision });
     if (running.length) app.log.info({ event: 'rooms_recovered', count: running.length }, 'Recovered rooms paused for host review');
   });
-  app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); minigames.close(); await publishTask; await closeTask; await io.close(); });
+  app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); clearInterval(idleTicker); minigames.close(); await publishTask; await closeTask; await idleTask; await io.close(); });
   return { io, gateway, snapshot, service };
 }

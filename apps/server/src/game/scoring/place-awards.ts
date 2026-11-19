@@ -1,3 +1,4 @@
+import { ballotTally } from './ballot.js';
 import { SubmissionValueSchema, type SubmissionValue } from '@party/contracts';
 import type { StageRun } from '../../generated/prisma/client.js';
 import { minigameRules, stagePlaces, type StageDefinition } from '../definition.js';
@@ -41,9 +42,9 @@ export async function revealAwards(tx: Transaction, stage: StageRun, definition:
     if (!ballot.success) return [];
     const candidates = await tx.submission.findMany({ where: { stageRunId: ballot.data.sourceStageRunId, slotKey: 'answer' }, select: { id: true, playerId: true, teamId: true } });
     const votes = await tx.submission.findMany({ where: { stageRunId: stage.id, slotKey: 'answer' }, select: { value: true } });
-    const votesFor = (submissionId: string) => votes.filter(row => { const value = SubmissionValueSchema.safeParse(row.value); return value.success && value.data.kind === 'vote' && value.data.submissionId === submissionId; }).length;
+    const totalsByAnswer = ballotTally(definition, votes);
     // Only answers with at least one vote take a place.
-    const tally = candidates.map(candidate => ({ ...candidate, votes: votesFor(candidate.id) })).filter(entry => entry.votes > 0);
+    const tally = candidates.map(candidate => ({ ...candidate, votes: totalsByAnswer.get(candidate.id) ?? 0 })).filter(entry => entry.votes > 0);
     const placed = places(tally, entry => -entry.votes);
     const sourceTeams = await teamContext(tx, await tx.stageRun.findUniqueOrThrow({ where: { id: ballot.data.sourceStageRunId } }));
     return tally.flatMap(entry => route({ amountMilli: pointsFor(placed.get(entry)), stageRunId: stage.id, awardKey: `place:${stage.id}:${entry.id}`, reason: `Most votes: place ${placed.get(entry)}` }, { playerId: entry.playerId, teamId: entry.teamId }, sourceTeams));

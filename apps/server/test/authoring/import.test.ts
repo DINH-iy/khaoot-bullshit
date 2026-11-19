@@ -16,12 +16,12 @@ describe('importing a game from text', () => {
     expect(issues).toEqual([]);
     const game = definition as { formatVersion: number; nodes: { key: string; stages: Record<string, unknown>[] }[]; edges: { from: string; to: string; option?: string }[] };
     expect(game.formatVersion).toBe(2);
-    expect(game).toMatchObject({ presentation: { theme: { backgroundMotion: 'starlight' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
+    expect(game).toMatchObject({ idleCloseMinutes: 30, autoRevealSeconds: 2, presentation: { theme: { preset: 'space' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
     const stage = (key: string) => game.nodes.find(node => node.key === key)!.stages[0]!;
     expect(stage('welcome')).toMatchObject({ youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 5, endSeconds: 15 }, mediaLayout: { position: 'left', size: 'wide' } });
     expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
     expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
-    expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', durationMs: 40000 });
+    expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', voteMode: 'ranked', voteLimit: 3, resultCards: 'manual', durationMs: 40000 });
     expect(stage('finale')).toMatchObject({ input: { kind: 'order', items: [{ label: 'Walkman' }, { label: 'Discman' }, { label: 'iPod' }, { label: 'Smartphone' }] }, scoring: { kind: 'correct-order', correctOrder: ['walkman', 'discman', 'ipod', 'smartphone'], awardMilli: '15000' } });
     expect(game.edges.filter(edge => edge.from === 'choose')).toEqual([expect.objectContaining({ to: 'music', option: 'music' }), expect.objectContaining({ to: 'sculpture', option: 'physical' })]);
     expect(game.edges.filter(edge => edge.to === 'finale').map(edge => edge.from).sort()).toEqual(['music', 'sculpture']);

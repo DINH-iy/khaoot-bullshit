@@ -32,8 +32,8 @@ async function squarePhoto(file: File): Promise<Blob> {
   const blob = await new Promise<Blob | null>(done => canvas.toBlob(done, 'image/png'));
   if (!blob) throw new Error('UNSUPPORTED_MEDIA'); return blob;
 }
-async function sendPhoto(sessionId: string, file: File): Promise<string> {
-  const response = await fetch(`/api/rooms/${sessionId}/picture`, { method: 'POST', credentials: 'same-origin', headers: { 'x-party-request': '1', ...seatHeaders(), 'content-type': 'image/png' }, body: await squarePhoto(file) });
+export async function sendPhoto(sessionId: string, file: File, playerId?: string): Promise<string> {
+  const response = await fetch(`/api/rooms/${sessionId}/picture${playerId ? `?playerId=${playerId}` : ''}`, { method: 'POST', credentials: 'same-origin', headers: { 'x-party-request': '1', ...seatHeaders(), 'content-type': 'image/png' }, body: await squarePhoto(file) });
   const reply = await response.json() as RoomReply<{ assetId: string }>; if (!reply.ok) throw new Error(reply.error.code); return reply.data.assetId;
 }
 
@@ -45,6 +45,7 @@ async function sendPhoto(sessionId: string, file: File): Promise<string> {
 export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, confirm = true, onApply, finishSignal = 0 }: { initial: PlayerLook; name: string; busy: boolean; sessionId: string; onSave: (look: PlayerLook) => void; onCancel: () => void; confirm?: boolean; onApply?: (look: PlayerLook) => void; finishSignal?: number }) {
   const t = useTexts(BUILDER_TEXTS);
   const [look, setLookState] = useState(initial); const [tab, setTab] = useState<Tab>('body');
+  const [draftPhoto, setDraftPhoto] = useState<PlayerLook['picture']>();
   const [drawing, setDrawingState] = useState(emptyDrawing()); const [working, setWorking] = useState(false); const [error, setError] = useState('');
   // Used at once (debounced, so tapping through options sends one change), unless the room wants a confirmation.
   const applyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -54,30 +55,47 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, 
   const [drawn, setDrawn] = useState(false); const setDrawing = (next: typeof drawing) => { setDrawingState(next); setDrawn(true); };
   const heading = useRef<HTMLHeadingElement>(null); useEffect(() => { heading.current?.focus(); }, []);
   const character = withoutPicture(look);
+  const shown = tab === 'photo' && draftPhoto ? { ...look, picture: draftPhoto } : look;
   const options: { key: string; label: string; look: PlayerLook }[] = tab === 'photo' || tab === 'draw' ? [] : tab === 'color'
     ? LOOK_COLORS.map((_, index) => ({ key: String(index), label: t('colorNumber', { number: index + 1 }), look: { ...character, color: index } }))
     : LOOK_PARTS[tab].map(value => ({ key: value, label: partName(tab, value), look: { ...character, [tab]: value } as PlayerLook }));
   const chosen = tab === 'color' ? String(look.color) : tab === 'photo' || tab === 'draw' ? '' : look[tab];
   const attempt = async (work: () => Promise<string>, kind: 'photo' | 'drawing') => {
     setWorking(true); setError('');
-    try { const assetId = await work(); setLook({ ...look, picture: { assetId, kind } }); if (kind === 'drawing') setDrawn(false); return { ...look, picture: { assetId, kind } } as PlayerLook; }
+    try {
+      const assetId = await work();
+      const next: PlayerLook = { ...look, picture: { assetId, kind } };
+      if (kind === 'photo' && confirm) setDraftPhoto(next.picture);
+      else setLook(next);
+      if (kind === 'drawing') setDrawn(false);
+      return next;
+    }
     catch (cause) { setError(cause instanceof Error && cause.message === 'UNSUPPORTED_MEDIA' ? t('unsupported') : cause instanceof Error && cause.message === 'RATE_LIMITED' ? t('limited') : t('failed')); }
     finally { setWorking(false); }
     return null;
   };
-  // Done: without confirmation a drawing still in progress is sent and used first.
+  // Finish the active tab. A draft on another tab does not take over the selected look.
   const finish = async () => {
     clearTimeout(applyTimer.current);
-    const sent = !confirm && drawn && drawing.strokes.length ? await attempt(async () => (await uploadDrawing(sessionId, 'avatar', drawing)).assetId, 'drawing') : null;
-    onSave(sent ?? look);
+    if (working) return;
+    if (tab === 'draw' && drawn && drawing.strokes.length) {
+      const sent = await attempt(async () => (await uploadDrawing(sessionId, 'avatar', drawing)).assetId, 'drawing');
+      if (sent) onSave(sent);
+      return;
+    }
+    onSave(tab === 'photo' && draftPhoto ? { ...look, picture: draftPhoto } : look);
   };
   // The game starts while the look is open: use what there is and close.
   const firstSignal = useRef(finishSignal);
-  useEffect(() => { if (finishSignal !== firstSignal.current && !confirm) void finish(); }, [finishSignal]);
+  useEffect(() => {
+    if (finishSignal === firstSignal.current || confirm || working) return;
+    firstSignal.current = finishSignal;
+    void finish();
+  }, [finishSignal, confirm, working]);
   return <section className="look-builder" aria-labelledby="look-builder-heading">
     <h2 id="look-builder-heading" tabIndex={-1} ref={heading}>{t('yourLook')}</h2>
-    <div className="look-hero"><Avatar look={look} size={132} label={`${name}: ${describeLook(look)}`} />
-      <div className="actions">{look.picture ? <button type="button" className="ghost" onClick={() => setLook(character)}>{t('character')}</button>
+    <div className="look-hero"><Avatar look={shown} size={132} label={`${name}: ${describeLook(shown)}`} />
+      <div className="actions">{shown.picture ? <button type="button" className="ghost" onClick={() => { setDraftPhoto(undefined); setLook(character); }}>{t('character')}</button>
         : <button type="button" className="ghost" onClick={() => setLook(defaultLook(`${Date.now()}-${Math.random()}`))}>{t('surprise')}</button>}</div></div>
     <div className="look-tabs" role="tablist" aria-label={t('part')}>{TABS.map(entry => <button key={entry} type="button" role="tab" aria-selected={tab === entry} onClick={() => setTab(entry)}>{t(entry)}</button>)}</div>
     {options.length > 0 && <div className={`look-options${tab === 'color' ? ' colors' : ''}`} role="radiogroup" aria-label={t(tab)}>
@@ -97,7 +115,7 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, 
     </div>}
     {working && <p role="status">{t('sending')}</p>}
     {error && <p role="alert" className="error">{error}</p>}
-    <div className="actions">{confirm ? <><button type="button" className="primary" disabled={busy || working} onClick={() => onSave(look)}>{t('save')}</button><button type="button" className="ghost" onClick={onCancel}>{t('cancel')}</button></>
+    <div className="actions">{confirm ? <><button type="button" className="primary" disabled={busy || working} onClick={() => void finish()}>{t('save')}</button><button type="button" className="ghost" onClick={onCancel}>{t('cancel')}</button></>
       : <button type="button" className="primary" disabled={working} onClick={() => void finish()}>{t('done')}</button>}</div>
   </section>;
 }

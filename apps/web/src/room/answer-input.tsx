@@ -1,3 +1,4 @@
+import { useRef, useState, type PointerEvent } from 'react';
 import type { RoomSnapshot, SubmissionValue } from '@party/contracts';
 import { MediaUpload, type UploadedMedia } from './media-upload.js';
 import { answerFit } from './answer-fit.js';
@@ -33,18 +34,61 @@ export function AnswerInput({ sessionId, input, draft, onChange, legend, route =
   if (input.kind === 'text') return <><label>{legend}<textarea value={draft.text} onChange={event => onChange({ ...draft, text: event.target.value })} maxLength={input.maxLength} /></label>
     {/* How much room is left, so the limit never comes as a surprise. */}
     <span className={`char-count${draft.text.length >= input.maxLength ? ' full' : ''}`} aria-live={draft.text.length >= input.maxLength * 0.8 ? 'polite' : 'off'}>{draft.text.length} / {input.maxLength}</span></>;
-  if (input.kind === 'order') {
-    const labels = new Map(input.items.map(item => [item.key, item.label]));
-    const move = (index: number, by: -1 | 1) => {
-      const order = [...draft.order]; const [key] = order.splice(index, 1); order.splice(index + by, 0, key!); onChange({ ...draft, order });
-    };
-    // Buttons rather than dragging: works with touch, keyboard and screen readers alike.
-    return <fieldset><legend>{p('privateOrder')}</legend><ol className="order-list">{draft.order.map((key, index) => <li key={key}>
-      <span className="order-label">{labels.get(key)}</span>
-      <button type="button" className="order-move" disabled={index === 0} aria-label={p('moveUp', { item: labels.get(key) ?? key })} onClick={() => move(index, -1)}>↑</button>
-      <button type="button" className="order-move" disabled={index === draft.order.length - 1} aria-label={p('moveDown', { item: labels.get(key) ?? key })} onClick={() => move(index, 1)}>↓</button>
-    </li>)}</ol><span className="visually-hidden" role="status">{draft.order.map(key => labels.get(key)).join(', ')}</span></fieldset>;
-  }
+  if (input.kind === 'order') return <OrderInput order={draft.order} items={input.items} onChange={order => onChange({ ...draft, order })} />;
   if (input.kind === 'media') return <MediaUpload sessionId={sessionId} accept={input.accept} value={draft.media} onChange={media => onChange({ ...draft, media })} />;
   return <p>{p('noDrawing')}</p>;
+}
+
+function OrderInput({ order, items, onChange }: { order: string[]; items: Extract<Input, { kind: 'order' }>['items']; onChange: (order: string[]) => void }) {
+  const labels = new Map(items.map(item => [item.key, item.label]));
+  const list = useRef<HTMLOListElement>(null);
+  const active = useRef<{ pointer: number; from: number } | null>(null);
+  const [preview, setPreview] = useState<{ from: number; to: number } | null>(null);
+
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...order];
+    const [key] = next.splice(from, 1);
+    next.splice(to, 0, key!);
+    onChange(next);
+  };
+  const target = ({ clientX, clientY }: PointerEvent) => {
+    const element = list.current;
+    if (!element) return null;
+    const bounds = element.getBoundingClientRect();
+    if (clientX < bounds.left || clientX > bounds.right || clientY < bounds.top || clientY > bounds.bottom) return null;
+    const rows = Array.from(element.children);
+    const at = rows.findIndex(row => clientY <= row.getBoundingClientRect().bottom);
+    return at < 0 ? rows.length - 1 : at;
+  };
+  const start = (event: PointerEvent<HTMLSpanElement>, from: number) => {
+    if (active.current || !event.isPrimary || event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    active.current = { pointer: event.pointerId, from };
+    setPreview({ from, to: from });
+  };
+  const track = (event: PointerEvent) => {
+    const drag = active.current;
+    if (drag?.pointer !== event.pointerId) return;
+    setPreview({ from: drag.from, to: target(event) ?? drag.from });
+  };
+  const finish = (event: PointerEvent, drop = false) => {
+    const drag = active.current;
+    if (drag?.pointer !== event.pointerId) return;
+    active.current = null;
+    setPreview(null);
+    const to = drop ? target(event) : null;
+    if (to !== null) move(drag.from, to);
+  };
+
+  return <fieldset><legend>{p('privateOrder')}</legend><p className="order-hint">{p('orderDrag')}</p>
+    <ol ref={list} className="order-list">{order.map((key, index) => <li key={key} data-dragging={preview?.from === index || undefined}
+      data-drop={preview?.to === index && preview.from !== index ? index < preview.from ? 'before' : 'after' : undefined}>
+      <span className="order-label" onPointerDown={event => start(event, index)} onPointerMove={track}
+        onPointerUp={event => finish(event, true)} onPointerCancel={event => finish(event)} onLostPointerCapture={event => finish(event)}>
+        <span className="order-grip" aria-hidden="true" />{labels.get(key)}
+      </span>
+      <button type="button" className="order-move" disabled={index === 0} aria-label={p('moveUp', { item: labels.get(key) ?? key })} onClick={() => move(index, index - 1)}>↑</button>
+      <button type="button" className="order-move" disabled={index === order.length - 1} aria-label={p('moveDown', { item: labels.get(key) ?? key })} onClick={() => move(index, index + 1)}>↓</button>
+    </li>)}</ol><span className="visually-hidden" role="status">{order.map(key => labels.get(key)).join(', ')}</span></fieldset>;
 }

@@ -63,6 +63,36 @@ describe('feedback from testers', () => {
     expect((await call('POST', `/api/host/feedback/${body.id}/delete`, {}, { cookie })).statusCode).toBe(404);
   });
 
+  it('stores attachments privately, preserves the first upload on retry, and deletes it with the report', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const video = Buffer.from('00000018667479706d70343200000000', 'hex');
+    const first = { ...report(), attachment: png.toString('base64') };
+    const second = { ...report(), attachment: video.toString('base64') };
+    expect((await call('POST', '/api/feedback', first)).statusCode).toBe(200);
+    expect((await call('POST', '/api/feedback', { ...first, attachment: second.attachment })).statusCode).toBe(200);
+    expect((await call('POST', '/api/feedback', second)).statusCode).toBe(200);
+    expect((await call('POST', '/api/feedback', report({ attachment: Buffer.from('<svg onload="alert(1)"></svg>').toString('base64') }))).statusCode).toBe(415);
+    const oversized = Buffer.alloc(2 * 1024 * 1024 + 1);
+    png.copy(oversized);
+    expect((await call('POST', '/api/feedback', report({ attachment: oversized.toString('base64') }))).statusCode).toBe(413);
+
+    const path = (id: string) => `/api/host/feedback/${id}/attachment`;
+    expect((await call('GET', path(first.id))).statusCode).toBe(401);
+    const access = await owner();
+    const photo = await call('GET', path(first.id), undefined, access);
+    expect(photo.headers['content-type']).toBe('image/png');
+    expect(photo.headers['cache-control']).toBe('private, no-store');
+    expect(photo.rawPayload).toEqual(png);
+    const clip = await call('GET', path(second.id), undefined, access);
+    expect(clip.headers['content-type']).toBe('video/mp4');
+    expect(clip.rawPayload).toEqual(video);
+    const list = (await call('GET', '/api/host/feedback', undefined, access)).json().data.items;
+    expect(list).toContainEqual(expect.objectContaining({ id: first.id, attachmentType: 'image/png' }));
+    expect(JSON.stringify(list)).not.toContain(first.attachment);
+    expect((await call('POST', `/api/host/feedback/${first.id}/delete`, {}, access)).statusCode).toBe(200);
+    expect((await call('GET', path(first.id), undefined, access)).statusCode).toBe(404);
+  });
+
   it('marks exactly the listed reports as done, for the owner only', async () => {
     const bug = report(); const idea = report({ kind: 'minigame', title: 'Galgje' }); const done = report();
     for (const body of [bug, idea, done]) await call('POST', '/api/feedback', body);

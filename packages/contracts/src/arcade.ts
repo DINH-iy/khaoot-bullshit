@@ -9,6 +9,9 @@ import { PlayerLookSchema } from './players.js';
  * round is a room with one minigame that the lobby's members are seated in.
  */
 const MinigameKeySchema = z.enum(MINIGAME_KEYS as [MinigameKey, ...MinigameKey[]]);
+export const ARCADE_PASSWORD_MIN = 4;
+export const ARCADE_PASSWORD_MAX = 64;
+const PasswordSchema = z.string().min(ARCADE_PASSWORD_MIN).max(ARCADE_PASSWORD_MAX).refine(password => password.trim().length > 0);
 const NameSchema = z.string().trim().min(1).max(40);
 const MilliSchema = z.string().regex(/^(0|[1-9][0-9]*)$/);
 export const ARCADE_MAX_MEMBERS = 24;
@@ -19,8 +22,9 @@ export const ArcadeTeamsSchema = z.object({ count: z.number().int().min(2).max(A
 export type ArcadeTeams = z.infer<typeof ArcadeTeamsSchema>;
 
 // Requests. Ids are made by the browser, so a retried request is the same lobby or round.
-export const CreateArcadeSchema = z.object({ lobbyId: GameIdSchema, title: z.string().trim().min(1).max(60).optional(), displayName: NameSchema, look: PlayerLookSchema.optional() }).strict();
-export const JoinArcadeSchema = z.object({ displayName: NameSchema, look: PlayerLookSchema.optional() }).strict();
+export const CreateArcadeSchema = z.object({ lobbyId: GameIdSchema, title: z.string().trim().min(1).max(60).optional(), displayName: NameSchema, look: PlayerLookSchema.optional(), password: PasswordSchema.optional() }).strict();
+export const JoinArcadeSchema = z.object({ displayName: NameSchema, look: PlayerLookSchema.optional(), password: z.string().max(ARCADE_PASSWORD_MAX).optional() }).strict();
+export const ArcadePasswordUpdateSchema = z.object({ password: PasswordSchema.nullable() }).strict();
 export const ArcadeLockSchema = z.object({ locked: z.boolean() }).strict();
 export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: MinigameKeySchema, teams: ArcadeTeamsSchema.nullable() }).strict();
 /** What the leader does in a round's room. `stageRunId` binds the action to the round step the leader saw. */
@@ -30,7 +34,7 @@ export const ArcadeActSchema = z.object({ action: z.enum(ARCADE_ACTIONS), stageR
 
 // Views.
 export const ArcadeLobbyCardSchema = z.object({
-  id: GameIdSchema, title: z.string(), locked: z.boolean(), players: z.number().int().min(0),
+  id: GameIdSchema, title: z.string(), locked: z.boolean(), protected: z.boolean().default(false), players: z.number().int().min(0),
   leaderName: z.string().nullable(), playing: MinigameKeySchema.nullable(), member: z.boolean(),
 }).strict();
 export const ArcadeListSchema = z.object({ lobbies: z.array(ArcadeLobbyCardSchema) }).strict();
@@ -38,7 +42,7 @@ export type ArcadeList = z.infer<typeof ArcadeListSchema>;
 
 const ResultRowSchema = z.object({ memberId: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, place: z.number().int().min(1).nullable(), pointsMilli: MilliSchema, value: z.number().int().nullable() }).strict();
 export const ArcadeLobbyViewSchema = z.object({
-  id: GameIdSchema, title: z.string(), locked: z.boolean(), closed: z.boolean(),
+  id: GameIdSchema, title: z.string(), locked: z.boolean(), protected: z.boolean().default(false), closed: z.boolean(),
   // Null: this browser is not a member (it sees the join form).
   me: z.object({ memberId: GameIdSchema, leader: z.boolean() }).strict().nullable(),
   members: z.array(z.object({ id: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, connected: z.boolean(), leader: z.boolean(), playing: z.boolean() }).strict()),

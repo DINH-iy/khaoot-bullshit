@@ -16,6 +16,81 @@ async function fit(page: Page) {
   await page.getByRole('menu', { name: 'Zoom' }).getByRole('menuitem', { name: 'Show the whole game' }).click();
 }
 
+test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and undoable scene replacement', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Keyboard and canvas gestures use the desktop project.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  const mine = page.getByRole('region', { name: 'Your games' });
+  const name = `Space writing ${Date.now()}`;
+  await mine.getByLabel('Name of your new game').fill(name);
+  await mine.getByRole('button', { name: 'Create game' }).click();
+  await mine.getByRole('link', { name: `Edit ${name}` }).click();
+
+  const tour = page.getByRole('region', { name: 'Editor tour' });
+  await expect(tour).toBeVisible();
+  await tour.getByRole('button', { name: 'Next tip' }).click();
+  await expect(tour).toContainText('Phone preview');
+  await tour.getByRole('button', { name: 'Skip tour' }).click();
+  await page.reload();
+  await expect(page.getByRole('application', { name: 'Game flow' })).toBeVisible();
+  await expect(tour).toHaveCount(0);
+  await page.keyboard.press('?');
+  const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
+  await help.getByLabel('Show the whole game.').selectOption('3');
+  await help.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: /^\d+%$/ }).click();
+  await expect(page.getByRole('menuitem', { name: 'Show the whole game' })).toHaveAttribute('aria-keyshortcuts', 'Shift+3');
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  await page.getByRole('button', { name: 'Add after this' }).click();
+  await page.getByRole('tab', { name: 'Rounds', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Writing round/ }).click();
+  const props = page.locator('.scene-props');
+  await expect(props.getByLabel('Question or instruction')).toHaveValue('Write your answer.');
+  await props.getByText('Prompt starters', { exact: true }).click();
+  await props.getByRole('button', { name: 'Finish the joke' }).click();
+  await expect(props.getByLabel('Question or instruction')).not.toHaveValue('Write your answer.');
+
+  await page.getByRole('button', { name: 'Add after this' }).click();
+  await page.getByRole('tab', { name: 'Between rounds' }).click();
+  await page.getByRole('menuitem', { name: /^Intro/ }).click();
+  await expect(props.getByLabel('Text on every screen')).toHaveValue('Welcome! Get ready to play.');
+  await props.getByRole('button', { name: 'Scene actions' }).click();
+  await props.getByRole('menuitem', { name: 'Replace scene type' }).click();
+  const replacement = page.getByRole('dialog', { name: 'Replace scene type' });
+  await replacement.getByRole('menuitem', { name: /^Scoreboard/ }).click();
+  await replacement.getByRole('button', { name: 'Replace scene', exact: true }).click();
+  await expect(props.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(props.getByLabel('Text on every screen')).toHaveValue('Welcome! Get ready to play.');
+  await saved(page);
+
+  await props.getByRole('button', { name: 'Change where it leads (Flow editor)' }).click();
+  await expect(page.locator('.edge-line')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.keyboard.press('Shift+Digit3');
+  const boxes = await page.locator('.scene-card').evaluateAll(cards => cards.map(card => card.getBoundingClientRect().toJSON() as DOMRect));
+  const top = Math.min(...boxes.map(box => box.top)) - 7;
+  const bottom = Math.max(...boxes.map(box => box.bottom)) + 7;
+  const left = Math.min(...boxes.map(box => box.left)) - 7;
+  const right = Math.max(...boxes.map(box => box.right)) + 7;
+  await page.keyboard.down('Control');
+  try { await drag(page, { x: left, y: top }, { x: right, y: bottom }); } finally { await page.keyboard.up('Control'); }
+  await expect(page.getByText('3 scenes selected')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  await page.getByLabel('Change the look of').click();
+  await page.getByRole('option', { name: 'The whole game' }).click();
+  await page.getByRole('button', { name: 'Space', exact: true }).click();
+  await expect(page.locator('.room-preview.motion-starlight').first()).toBeVisible();
+  await saved(page);
+
+  await page.goto('/?admin=look');
+  await page.getByRole('button', { name: 'Space', exact: true }).click();
+  await expect(page.locator('.join-look-preview .room.motion-starlight')).toBeVisible();
+});
+
 test('the Flow editor moves, connects, adds and edits scenes, snapping everything into place, and saves', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'The Flow editor is desktop first; phones are checked for not breaking only.');
   await page.setViewportSize({ width: 1440, height: 900 });

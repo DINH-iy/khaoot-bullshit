@@ -32,3 +32,9 @@
 .arcade-round-label .fa-icon { color: var(--r-accent); }
 .arcade-round-confirm { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--r-line); }
 .arcade-round-confirm p { margin: 0; }
+
+.arcade .arcade-nav-button { display: inline-flex; align-items: center; gap: 8px; justify-content: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--r-line); border-radius: 12px; background: var(--r-card-strong); color: var(--r-text); text-decoration: none; font-weight: 650; }
+.arcade .arcade-nav-button:hover { border-color: var(--r-accent); }
+.arcade-password summary { cursor: pointer; font-weight: 700; }
+.arcade-password form { margin-top: 12px; }
+.arcade-password-actions { display: flex; flex-wrap: wrap; gap: 8px; }

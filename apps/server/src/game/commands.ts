@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { isStepMinigame, MINIGAME_COUNTDOWN_MS, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
+import { voteChoices, defaultLook, isStepMinigame, MINIGAME_COUNTDOWN_MS, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
@@ -67,14 +67,30 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   // A scene that explains itself first waits, untimed (and a minigame unstarted), until the host starts it.
   if (explainsFirst(entry.stage)) { presentation = { ...presentation, explain: { readyIds: [] } }; timed = false; }
   // A minigame starts (after its countdown) as soon as players can play it.
-  if (entry.stage.kind === 'minigame' && timed) presentation = { ...presentation, minigame: startOf(entry.stage, now) };
+  if (timed) presentation = { ...presentation, ...countdownPresentation(entry.stage, now) };
   const stage = await tx.stageRun.create({ data: { sessionId, number, nodeKey: entry.nodeKey, stageKey: entry.stage.key, openedAt: now, presentation, lineupId,
-    ...timerColumns(timed ? entry.stage.durationMs : null, false, now), eligibility: { formatVersion: 1, playerIds: eligible } } });
+    ...timerColumns(timed ? playableDuration(entry.stage, entry.stage.durationMs) : null, false, now), eligibility: { formatVersion: 1, playerIds: eligible } } });
   await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'RUNNING', currentNodeKey: entry.nodeKey } });
   return stage;
 }
 
-const startOf = (stage: StageDefinition, now: Date) => { const rules = minigameRules(stage as Extract<StageDefinition, { kind: 'minigame' }>); return startMinigame(rules.game, rules.settings, now); };
+const startOf = (stage: Extract<StageDefinition, { kind: 'minigame' }>, now: Date) => {
+  const rules = minigameRules(stage);
+  return startMinigame(rules.game, rules.settings, now, undefined, stage.countdownSeconds === undefined ? MINIGAME_COUNTDOWN_MS : stage.countdownSeconds * 1000);
+};
+function countdownPresentation(stage: StageDefinition, now: Date) {
+  if (stage.kind === 'minigame') return { minigame: startOf(stage, now) };
+  if (stage.kind === 'collect' && stage.input.kind === 'drawing' && stage.countdownSeconds)
+    return { drawingStartsAt: new Date(now.getTime() + stage.countdownSeconds * 1000).toISOString() };
+  return {};
+}
+function playableDuration(stage: StageDefinition, duration: number | null) {
+  return duration === null ? null : duration + ('countdownSeconds' in stage ? (stage.countdownSeconds ?? 0) * 1000 : 0);
+}
+function drawingStartsAt(presentation: unknown): string | undefined {
+  const at = (presentation as { drawingStartsAt?: unknown } | null)?.drawingStartsAt;
+  return typeof at === 'string' ? at : undefined;
+}
 
 /** Reveals a stage; revealing a vote also puts names on the answers that were voted on. */
 // Never stamped before the close, even if the server clock stepped back since.
@@ -130,6 +146,17 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     if (seat.personId) { const { picture: _picture, ...parts } = command.look; await tx.person.update({ where: { id: seat.personId }, data: { look: parts } }); }
     return empty;
   }
+  if (command.type === 'player.moderate') {
+    const player = await tx.sessionPlayer.findFirst({ where: { id: command.playerId, sessionId: session.id, leftAt: null } });
+    requireGame(player, 'INELIGIBLE');
+    const look = PlayerLookSchema.safeParse(player.look);
+    if (command.photoId) requireGame(await tx.asset.count({ where: { id: command.photoId, sessionId: session.id, playerId: player.id, purpose: 'AVATAR', kind: 'IMAGE', removedAt: null } }) === 1, 'INVALID_COMMAND');
+    await tx.sessionPlayer.update({ where: { id: player.id }, data: {
+      ...(command.displayName ? { displayName: command.displayName } : {}),
+      ...(command.photoId ? { look: { ...(look.success ? look.data : defaultLook(player.id)), picture: { assetId: command.photoId, kind: 'photo' } } } : {}),
+    } });
+    return empty;
+  }
   if (command.type === 'player.removePicture') {
     // Moderation: the host can always take a picture away; the player keeps their character.
     const player = await tx.sessionPlayer.findFirst({ where: { id: command.playerId, sessionId: session.id }, select: { id: true, look: true } });
@@ -155,10 +182,17 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       // resuming gives everyone who has not finished a fresh countdown. Lucky doors keep their secret order.
       const entry = locateStage(definition, active.nodeKey, active.stageKey); const run = readMinigameRun(active.presentation);
       let restart = {};
+      const startsAt = drawingStartsAt(active.presentation);
+      if (startsAt) {
+        const stored = active.presentation as Record<string, unknown>;
+        const remaining = pausing ? Math.max(0, Date.parse(startsAt) - now.getTime()) : Number(stored['pausedDrawingMs'] ?? 0);
+        restart = { presentation: { ...stored, drawingStartsAt: new Date(now.getTime() + remaining).toISOString(), pausedDrawingMs: pausing ? remaining : 0 } as object };
+      }
       if (!pausing && entry?.stage.kind === 'minigame' && run) {
         // Step games keep their sides; a running team vote gets its full time again.
         const rules0 = minigameRules(entry.stage);
-        const steps = run.steps ? Object.fromEntries(Object.entries(run.steps).map(([key, side]) => [key, side.voteEndsAt ? { ...side, voteEndsAt: new Date(now.getTime() + MINIGAME_COUNTDOWN_MS + rules0.voteSeconds * 1000).toISOString() } : side])) : null;
+        const countdownMs = entry.stage.countdownSeconds === undefined ? MINIGAME_COUNTDOWN_MS : entry.stage.countdownSeconds * 1000;
+        const steps = run.steps ? Object.fromEntries(Object.entries(run.steps).map(([key, side]) => [key, side.voteEndsAt ? { ...side, voteEndsAt: new Date(now.getTime() + countdownMs + rules0.voteSeconds * 1000).toISOString() } : side])) : null;
         let started = { ...startOf(entry.stage, now), doorsMilli: run.doorsMilli, ...(steps ? { steps } : {}) };
         // Pass the pencil continues at the first turn some team has not drawn yet, with a fresh countdown.
         const rules = minigameRules(entry.stage); const context = rules.game === 'relay-drawing' ? await teamContext(tx, active) : null;
@@ -273,8 +307,8 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     if ('lineupId' in result) {
       // Confirmed: the round starts now, with its timer, for the players in a team (after its explanation, if it has one).
       const explaining = Boolean(readExplain(rest));
-      const started = entry.stage.kind === 'minigame' && !explaining ? { ...rest, minigame: startOf(entry.stage, now) } : rest;
-      await tx.stageRun.update({ where: { id: stage.id }, data: { lineupId: result.lineupId, presentation: started as object, eligibility: { formatVersion: 1, playerIds: result.playerIds }, ...(explaining ? {} : timerColumns(entry.stage.durationMs, false, now)) } });
+      const started = explaining ? rest : { ...rest, ...countdownPresentation(entry.stage, now) };
+      await tx.stageRun.update({ where: { id: stage.id }, data: { lineupId: result.lineupId, presentation: started as object, eligibility: { formatVersion: 1, playerIds: result.playerIds }, ...(explaining ? {} : timerColumns(playableDuration(entry.stage, entry.stage.durationMs), false, now)) } });
     } else await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...rest, forming: result.forming } as object } });
     return { ...empty, stageRunId: stage.id };
   }
@@ -289,8 +323,8 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     // The host starts the round: its timer runs from now and a minigame starts its countdown. Teams come first.
     requireGame(stage.status === 'ACTIVE' && explaining && !forming, 'INVALID_STATE');
     const rest = withoutExplain(stage.presentation);
-    const started = entry.stage.kind === 'minigame' ? { ...rest, minigame: startOf(entry.stage, now) } : rest;
-    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: started as object, ...timerColumns(entry.stage.durationMs, false, now) } });
+    const started = { ...rest, ...countdownPresentation(entry.stage, now) };
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: started as object, ...timerColumns(playableDuration(entry.stage, entry.stage.durationMs), false, now) } });
     return { ...empty, stageRunId: stage.id };
   }
   if (command.type === 'stage.timer') {
@@ -303,13 +337,32 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     await tx.stageRun.update({ where: { id: stage.id }, data: timerColumns(next, session.status === 'PAUSED', now) });
     return { ...empty, stageRunId: stage.id };
   }
-  if (command.type === 'stage.reveal') {
+  if (command.type === 'stage.nextResult') {
+    requireGame(stage.revealedAt && 'resultCards' in entry.stage && entry.stage.resultCards === 'manual', 'INVALID_STATE');
+    const presentation = stage.presentation as Record<string, unknown>;
+    const index = typeof presentation['resultCardIndex'] === 'number' ? presentation['resultCardIndex'] : 0;
+    const source = VotePresentationSchema.safeParse(stage.presentation);
+    const total = await tx.submission.count({ where: { stageRunId: source.success ? source.data.sourceStageRunId : stage.id, slotKey: 'answer' } });
+    requireGame(index + 1 < total, 'INVALID_STATE');
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...presentation, resultCardIndex: index + 1 } as object } });
+    return { ...empty, stageRunId: stage.id };
+  }
+  if (command.type === 'stage.reveal' || command.type === 'stage.autoReveal') {
     requireGame(stage.status === 'CLOSED' && !stage.revealedAt, 'INVALID_STATE');
     // Announcing a route needs the route to be decided; a duel is shown by naming its winner.
     requireGame(!choice || decided, 'DECISION_PENDING');
     requireGame(entry.stage.kind !== 'duel', 'DECISION_PENDING');
     // Names on answers that are about to be voted on would spoil the anonymous vote.
     requireGame(!isVoteSource(definition, entry.nodeKey, entry.stage.key), 'INVALID_STATE');
+    if (command.type === 'stage.autoReveal') {
+      const delay = (session.state as { autoRevealSeconds?: number | null } | null)?.autoRevealSeconds;
+      requireGame(typeof delay === 'number' && stage.closedAt && now.getTime() >= stage.closedAt.getTime() + delay * 1000 &&
+        !isShowOnly(entry.stage) && entry.stage.kind !== 'teams' && !readExplain(stage.presentation), 'INVALID_STATE');
+      if (entry.stage.kind === 'challenge') {
+        const eligible = EligibilitySchema.parse(stage.eligibility).playerIds;
+        requireGame(await tx.stageJudgment.count({ where: { stageRunId: stage.id, playerId: { in: eligible } } }) === eligible.length, 'INVALID_STATE');
+      }
+    }
     await reveal(tx, stage, now);
     return { ...empty, stageRunId: stage.id, awards: await revealAwards(tx, stage, entry.stage) };
   }
@@ -387,6 +440,8 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(!stage.deadlineAt || now.getTime() <= acceptsUntil(stage.deadlineAt, graceFor(entry.stage)), 'TOO_LATE');
     requireGame(!forming && !explaining, 'INVALID_STATE');
     requireGame(eligible.data.playerIds.includes(actor.playerId), 'INELIGIBLE');
+    const startsAt = drawingStartsAt(stage.presentation);
+    requireGame(!startsAt || now.getTime() >= Date.parse(startsAt), 'INVALID_STATE');
     const by = answerer(actor, context);
     if (choice) {
       const value = command.value;
@@ -408,22 +463,30 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(command.value.kind !== 'bet', 'INVALID_SUBMISSION');
     if (entry.stage.kind === 'vote') {
       const ballot = VotePresentationSchema.safeParse(stage.presentation);
-      requireGame(ballot.success && command.value.kind === 'vote', 'INVALID_SUBMISSION');
-      const chosen = await tx.submission.findFirst({ where: { id: command.value.submissionId, sessionId: session.id, stageRunId: ballot.data.sourceStageRunId } });
-      requireGame(chosen && (chosen.playerId || chosen.teamId), 'INVALID_SUBMISSION');
-      // Never for your own answer, nor (in a team round) for your own team's.
+      const ids = voteChoices(command.value);
+      const { awardPerVoteMilli, voteMode, voteLimit } = entry.stage;
+      const mode = voteMode ?? 'single';
+      const limit = mode === 'single' ? 1 : voteLimit ?? 3;
+      requireGame(ballot.success && ids.length > 0 && ids.length <= limit &&
+        (mode === 'single' ? command.value.kind === 'vote' : command.value.kind === 'vote-list'), 'INVALID_SUBMISSION');
+      const chosen = await tx.submission.findMany({ where: { id: { in: [...ids] }, sessionId: session.id, stageRunId: ballot.data.sourceStageRunId, slotKey: 'answer' } });
+      requireGame(chosen.length === ids.length, 'INVALID_SUBMISSION');
       const source = await tx.stageRun.findUniqueOrThrow({ where: { id: ballot.data.sourceStageRunId } });
       const sourceTeams = await teamContext(tx, source);
-      const authorTeam = chosen.teamId ?? (chosen.playerId ? sourceTeams?.teamOf.get(chosen.playerId) : undefined);
-      requireGame(chosen.playerId !== actor.playerId && !(authorTeam && sourceTeams?.teamOf.get(actor.playerId) === authorTeam), 'INVALID_SUBMISSION');
+      const ownTeam = sourceTeams?.teamOf.get(actor.playerId);
+      for (const answer of chosen) {
+        const authorTeam = answer.teamId ?? (answer.playerId ? sourceTeams?.teamOf.get(answer.playerId) : undefined);
+        requireGame(answer.playerId !== actor.playerId && !(authorTeam && ownTeam === authorTeam), 'INVALID_SUBMISSION');
+      }
       const earlier = await tx.submission.findUnique({ where: { stageRunId_actorKey_slotKey: { stageRunId: stage.id, actorKey: by.actorKey, slotKey: 'answer' } } });
       requireGame(!earlier, 'ALREADY_SUBMITTED');
       const vote = await tx.submission.create({ data: { id: randomUUID(), sessionId: session.id, stageRunId: stage.id, actorKey: by.actorKey, playerId: by.playerId, teamId: by.teamId, value: command.value } });
-      // Votes score the way the voted-on round scores its answers.
-      return { stageRunId: stage.id, submissionId: vote.id,
-        awards: route({ amountMilli: BigInt(entry.stage.awardPerVoteMilli), stageRunId: stage.id, awardKey: `vote:${vote.id}`, reason: 'Vote received' }, { playerId: chosen.playerId, teamId: chosen.teamId }, sourceTeams) };
+      return { stageRunId: stage.id, submissionId: vote.id, awards: chosen.flatMap(answer => {
+        const weight = mode === 'ranked' ? limit - ids.indexOf(answer.id) : 1;
+        return route({ amountMilli: BigInt(awardPerVoteMilli) * BigInt(weight), stageRunId: stage.id, awardKey: `vote:${vote.id}:${answer.id}`, reason: 'Vote received' }, { playerId: answer.playerId, teamId: answer.teamId }, sourceTeams);
+      }) };
     }
-    requireGame(command.value.kind !== 'vote', 'INVALID_SUBMISSION');
+    requireGame(voteChoices(command.value).length === 0, 'INVALID_SUBMISSION');
     if (entry.stage.kind === 'minigame') {
       // One result per player (or per team when a captain plays), checked against the clock.
       const claimed = command.value; const run = readMinigameRun(stage.presentation); const rules = minigameRules(entry.stage);

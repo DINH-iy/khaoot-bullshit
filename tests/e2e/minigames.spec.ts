@@ -8,6 +8,7 @@ if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicate
 test('a player builds their own look and plays minigames on the phone; the screens rank everyone', async ({ page, baseURL, browser }) => {
   test.setTimeout(120_000);
   const hostContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' }); const host = await hostContext.newPage();
+  const earlyContext = await browser.newContext({ viewport: { width: 375, height: 667 } }); const early = await earlyContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await host.getByRole('radio', { name: /Minigame madness/ }).check();
@@ -35,12 +36,19 @@ test('a player builds their own look and plays minigames on the phone; the scree
     // The look reaches the other screens: the lobby crowd shows the player.
     await expect(host.getByRole('list', { name: 'Players who joined' })).toContainText('Speedy');
 
+    await early.goto(`${baseURL}/?code=${roomCode}`);
+    await early.getByLabel('Your name').fill('Early bird');
+    await early.getByRole('button', { name: 'Join room', exact: true }).click();
+    await expect(host.getByRole('list', { name: 'Players who joined' })).toContainText('Early bird');
     await host.getByRole('button', { name: 'Start the game' }).click();
     await host.getByRole('button', { name: 'Next', exact: true }).click();
 
     // Reaction duel: wait for GO, then tap.
     await expect(host.getByText('Reaction duel', { exact: true }).first()).toBeVisible();
-    const pad = page.getByRole('button', { name: 'GO!' });
+    await expect(page.getByRole('button', { name: /Don’t tap yet/ })).toBeVisible({ timeout: 10_000 });
+    await early.getByRole('button', { name: /Don’t tap yet/ }).click({ timeout: 5_000 });
+    await expect(early.getByRole('status').filter({ hasText: 'Too soon!' })).toBeVisible();
+    const pad = page.getByRole('button', { name: /GO! Tap now/ });
     await expect(pad).toBeVisible({ timeout: 15_000 });
     // A person needs a moment to react; faster than 80 ms counts as a false start.
     await page.waitForTimeout(200); await pad.click();
@@ -71,5 +79,5 @@ test('a player builds their own look and plays minigames on the phone; the scree
     await host.getByRole('button', { name: 'Reveal results' }).click();
     await expect(page.getByRole('heading', { name: 'Behind the doors' })).toBeVisible();
     await expect(page.locator('.mg-doors.revealed li')).toHaveCount(4);
-  } finally { await hostContext.close(); }
+  } finally { await Promise.all([hostContext.close(), earlyContext.close()]); }
 });

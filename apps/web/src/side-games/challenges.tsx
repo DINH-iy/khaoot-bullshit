@@ -1,3 +1,4 @@
+import { Dropdown } from '../ui/dropdown.js';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { ChallengeListSchema, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, type Challenge, type HeadToHeadKey, type HeadToHeadMove } from '@party/contracts';
 import { newId } from '../room/api.js';
@@ -76,10 +77,10 @@ function NewChallenge({ players, balance, busy, onSend, onCancel, withChips }: {
   const amount = withChips ? Math.max(0, Math.round(Number(stake) || 0)) : 0;
   if (!players.length) return <p className="hint">{st('nobodyElse')} <button type="button" className="small-button" onClick={onCancel}><FaIcon name="arrow-rotate-left" /> {st('back')}</button></p>;
   return <form className="challenge-form" onSubmit={event => { event.preventDefault(); onSend({ challengeId: newId(), opponentId, game, stake: amount, ...(game === 'rps' ? { settings: { firstTo: Number(firstTo) } } : {}) }); }}>
-    <label>{st('who')}<select value={opponentId} onChange={event => setOpponent(event.target.value)}>{players.map(player => <option key={player.id} value={player.id}>{player.displayName}</option>)}</select></label>
-    <label>{st('game')}<select value={game} onChange={event => setGame(event.target.value as HeadToHeadKey)}>{HEAD_TO_HEAD_KEYS.map(key => <option key={key} value={key}>{title(key)}</option>)}</select></label>
+    <label>{st('who')}<Dropdown value={opponentId} onChange={setOpponent} options={players.map(player => ({ value: player.id, label: player.displayName }))} /></label>
+    <label>{st('game')}<Dropdown value={game} onChange={value => setGame(value as HeadToHeadKey)} options={HEAD_TO_HEAD_KEYS.map(value => ({ value, label: title(value) }))} /></label>
     <p className="hint">{gameHowToPlay(game) || HEAD_TO_HEAD_GAMES[game].howToPlay}</p>
-    {game === 'rps' && <label>{st('firstTo')}<select value={firstTo} onChange={event => setFirstTo(event.target.value)}>{[1, 2, 3, 4, 5].map(count => <option key={count} value={count}>{st(count === 1 ? 'win' : 'wins', { count })}</option>)}</select></label>}
+    {game === 'rps' && <label>{st('firstTo')}<Dropdown value={firstTo} onChange={setFirstTo} options={[1, 2, 3, 4, 5].map(count => ({ value: String(count), label: st(count === 1 ? 'win' : 'wins', { count }) }))} /></label>}
     {withChips && <label>{st('stake')}<input type="number" inputMode="numeric" min={0} max={balance} value={stake} onChange={event => setStake(event.target.value)} /></label>}
     {amount > 0 && <p className="hint">{st('eachPut', { amount: chips(amount), total: chips(amount * 2) })}</p>}
     <div className="actions"><button type="submit" className="primary" disabled={busy || !opponentId || amount > balance}>{st('send')}</button><button type="button" className="ghost" onClick={onCancel}>{st('cancel')}</button></div>

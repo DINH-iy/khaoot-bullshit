@@ -1,3 +1,4 @@
+import { Dropdown } from '../ui/dropdown.js';
 import { useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
@@ -49,8 +50,8 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
     <form className="new-game" aria-labelledby="new-game-heading" onSubmit={event => { event.preventDefault(); run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: startFrom || null }).then(() => setTitle(''))); }}>
       <h3 id="new-game-heading">{t('newGame')}</h3>
       <label>{t('newGameName')}<input value={title} maxLength={160} onChange={event => setTitle(event.target.value)} required placeholder={t('newGamePlaceholder')} /></label>
-      <label>{t('startFrom')}<select value={startFrom} onChange={event => setStartFrom(event.target.value)}>
-        <option value="">{t('blankGame')}</option>{menu.games.map(game => <option key={game.key} value={game.key}>{t('copyOf', { title: game.title })}</option>)}</select></label>
+      <label>{t('startFrom')}<Dropdown value={startFrom} onChange={setStartFrom}
+        options={[{ value: '', label: t('blankGame') }, ...menu.games.map(game => ({ value: game.key, label: t('copyOf', { title: game.title }) }))]} /></label>
       <button className="primary" disabled={busy || !title.trim()}>{t('createGame')}</button>
     </form>
   </section>;

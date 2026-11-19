@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
+import { revealDueStages } from '../../../src/game/auto-reveal.js';
 import { parseDefinition } from '../../../src/game/definition.js';
 import { readSessionView } from '../../../src/game/views.js';
 import { db, fixture, hostCommand, prisma, service } from '../game-fixture.js';
@@ -18,8 +19,8 @@ const actor = (f: World, index: number) => ({ role: 'player' as const, playerId:
 const view = (f: World, index: number) => readSessionView(prisma, actor(f, index), f.sessionId);
 const submit = (f: World, index: number, stageRunId: string, value: object) => service.execute(actor(f, index), { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'submission.submit', stageRunId, value });
 
-async function toVote(players = 3) {
-  const f = await fixture(players, game);
+async function toVote(players = 3, definition = game) {
+  const f = await fixture(players, definition);
   const write = (await hostCommand(f, 'session.start')).stageRunId!;
   const jokes = ['Why did the chicken join a band? It had drumsticks.', 'I told a chemistry joke. No reaction.'];
   const ids = [];
@@ -57,6 +58,44 @@ describe('voting on answers from an earlier round', () => {
     await hostCommand(f, 'stage.close', { stageRunId: vote });
     await hostCommand(f, 'stage.reveal', { stageRunId: vote });
     expect((await prisma.stageRun.findUniqueOrThrow({ where: { id: write } })).revealedAt).not.toBeNull();
+  });
+
+  it.each([['multi', 1, 1], ['ranked', 3, 2]] as const)('scores %s ballots and persists the host’s result-card position', async (voteMode, first, second) => {
+    const definition = parseDefinition({ ...game, autoRevealSeconds: 2, nodes: [game.nodes[0], {
+      ...game.nodes[1], stages: [{ ...game.nodes[1]!.stages[0], voteMode, voteLimit: 3, resultCards: 'manual' }],
+    }] });
+    const { f, write, ids } = await toVote(3, definition);
+    const deferred = new Map<string, number>();
+    const earlier = new Date(Date.now() - 5000);
+    await prisma.stageRun.update({ where: { id: write }, data: { closedAt: earlier } });
+    await revealDueStages(prisma, service, deferred);
+    expect((await view(f, 2)).stage).toMatchObject({ revealAfterVote: true, revealed: false });
+    const vote = (await hostCommand(f, 'stage.advance', { stageRunId: write })).stageRunId!;
+    const ballot = { kind: 'vote-list', submissionIds: ids };
+    await expect(submit(f, 0, vote, ballot)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await expect(submit(f, 2, vote, { ...ballot, submissionIds: [ids[0], ids[0]] })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await submit(f, 2, vote, ballot);
+    await hostCommand(f, 'stage.close', { stageRunId: vote });
+
+    const now = new Date();
+    await prisma.stageRun.update({ where: { id: vote }, data: { closedAt: new Date(now.getTime() - 1000) } });
+    await revealDueStages(prisma, service, deferred, now);
+    expect((await view(f, 2)).stage?.reveal).toBeNull();
+    await prisma.stageRun.update({ where: { id: vote }, data: { closedAt: earlier } });
+    await revealDueStages(prisma, service, deferred);
+    const stage = (await view(f, 2)).stage!;
+    expect(stage.resultCards).toMatchObject({ mode: 'manual', index: 0 });
+    expect(stage.reveal?.answer).toMatchObject({ kind: 'vote', entries: expect.arrayContaining([
+      expect.objectContaining({ submissionId: ids[0], votes: first }),
+      expect.objectContaining({ submissionId: ids[1], votes: second }),
+    ]) });
+    const standings = (await view(f, 2)).standings;
+    expect(new Map(standings.map(row => [row.playerId, row.amountMilli]))).toEqual(new Map([
+      [f.players[0]!.id, String(first * 5000)], [f.players[1]!.id, String(second * 5000)],
+    ]));
+    await hostCommand(f, 'stage.nextResult', { stageRunId: vote });
+    expect((await view(f, 2)).stage?.resultCards?.index).toBe(1);
+    await expect(hostCommand(f, 'stage.nextResult', { stageRunId: vote })).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 
   it('accepts one vote per player for someone else, and gives each author points per vote', async () => {

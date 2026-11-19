@@ -93,6 +93,7 @@ export function createRoomPeople(client: PrismaClient, config: Config) {
       const { roomCode, personId, requestId } = parsed.data;
       return client.$transaction(async tx => {
         const room = await openRoom(tx, roomCode); const state = room.state; const now = Date.now();
+        roomAssert(!state.bannedPeople.includes(personId), 'SEAT_DENIED');
         const existing = state.nameRequests.find(request => request.id === requestId);
         const mark = (status: NameRequest['status']) => save(tx, room.id, { ...state, nameRequests: state.nameRequests.map(request => request.id === requestId ? { ...request, status } : request) });
         if (existing) {

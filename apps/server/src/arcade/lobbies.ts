@@ -1,4 +1,5 @@
 import { ARCADE_MAX_MEMBERS, CreateArcadeSchema, JoinArcadeSchema, PlayerLookSchema, defaultLook, type PlayerLook } from '@party/contracts';
+import { hashLobbyPassword, matchesLobbyPassword } from './password.js';
 import type { Config } from '../config.js';
 import type { PrismaClient, ArcadeMember } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
@@ -73,11 +74,12 @@ export function createLobbies(client: PrismaClient) {
       if (existing) return { lobbyId, token: null };
       roomAssert(await client.arcadeLobby.count({ where: { id: lobbyId } }) === 0, 'INVALID_COMMAND');
       const name = person?.name ?? parsed.data.displayName;
+      const passwordHash = parsed.data.password ? await hashLobbyPassword(parsed.data.password) : null;
       const token = newToken();
       await client.$transaction(async tx => {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('arcade-open', 0))::text AS locked`;
         roomAssert(await tx.arcadeLobby.count({ where: openWhere(now) }) < MAX_OPEN_LOBBIES, 'ARCADE_FULL');
-        await tx.arcadeLobby.create({ data: { id: lobbyId, title: parsed.data.title ?? `${name}'s lobby`, createdAt: now, lastActiveAt: now } });
+        await tx.arcadeLobby.create({ data: { id: lobbyId, title: parsed.data.title ?? `${name}'s lobby`, passwordHash, createdAt: now, lastActiveAt: now } });
         const look = partsOnly(parsed.data.look) ?? partsOnly(person?.look);
         const member = await tx.arcadeMember.create({ data: { lobbyId, tokenHash: tokenHash(token), displayName: name, personId: person?.id ?? null, joinedAt: now, lastSeenAt: now, ...(look ? { look } : {}) } });
         await tx.arcadeLobby.update({ where: { id: lobbyId }, data: { leaderId: member.id } });
@@ -91,19 +93,27 @@ export function createLobbies(client: PrismaClient) {
     async join(lobbyId: string, input: unknown, cookie: string | undefined, person: Person | null, now = new Date()) {
       const parsed = JoinArcadeSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       const own = await memberOf(lobbyId, cookie, true);
+      // Derive outside the transaction. Compare that same hash under the lobby lock before admitting anyone.
+      const candidate = !own && parsed.data.password
+        ? await client.arcadeLobby.findFirst({ where: { id: lobbyId, locked: false, ...openWhere(now) }, select: { passwordHash: true } })
+        : null;
+      const checkedHash = candidate?.passwordHash && await matchesLobbyPassword(parsed.data.password, candidate.passwordHash)
+        ? candidate.passwordHash : null;
       return client.$transaction(async tx => {
         await lockLobby(tx, lobbyId);
         const lobby = await tx.arcadeLobby.findUnique({ where: { id: lobbyId } });
         roomAssert(lobby && !lobby.closedAt && now.getTime() - lobby.lastActiveAt.getTime() < QUIET_MS, 'ROOM_NOT_AVAILABLE');
-        const returning = own ?? (person ? await tx.arcadeMember.findUnique({ where: { lobbyId_personId: { lobbyId, personId: person.id } } }) : null);
+        const verified = own ? await tx.arcadeMember.findUnique({ where: { tokenHash: own.tokenHash } }) : null;
+        const returning = verified ?? (person ? await tx.arcadeMember.findUnique({ where: { lobbyId_personId: { lobbyId, personId: person.id } } }) : null);
         if (returning) {
           // Another phone of the same person takes the membership over; this browser keeps its own key.
-          const token = own ? null : newToken();
+          const token = verified ? null : newToken();
           await tx.arcadeMember.update({ where: { id: returning.id }, data: { leftAt: null, lastSeenAt: now, ...(token ? { tokenHash: tokenHash(token) } : {}) } });
           await tx.arcadeLobby.update({ where: { id: lobbyId }, data: { lastActiveAt: now } });
           return { token };
         }
         roomAssert(!lobby.locked, 'LOBBY_LOCKED');
+        roomAssert(!lobby.passwordHash || lobby.passwordHash === checkedHash, 'LOBBY_PASSWORD_REQUIRED');
         roomAssert(await tx.arcadeMember.count({ where: { lobbyId, leftAt: null } }) < ARCADE_MAX_MEMBERS, 'LOBBY_FULL');
         const token = newToken(); const look = partsOnly(parsed.data.look) ?? partsOnly(person?.look);
         await tx.arcadeMember.create({ data: { lobbyId, tokenHash: tokenHash(token), displayName: person?.name ?? parsed.data.displayName, personId: person?.id ?? null, joinedAt: now, lastSeenAt: now, ...(look ? { look } : {}) } });
@@ -118,6 +128,19 @@ export function createLobbies(client: PrismaClient) {
         await lockLobby(tx, member.lobbyId);
         roomAssert(await ensureLeader(tx, member.lobbyId, now) === member.id, 'FORBIDDEN');
         await tx.arcadeLobby.update({ where: { id: member.lobbyId }, data: { locked } });
+      });
+    },
+    async setPassword(member: ArcadeMember, password: string | null, now = new Date()) {
+      const currentLeader = await client.arcadeLobby.findUnique({ where: { id: member.lobbyId }, select: { leaderId: true } });
+      roomAssert(currentLeader?.leaderId === member.id, 'FORBIDDEN');
+      const passwordHash = password === null ? null : await hashLobbyPassword(password);
+      await client.$transaction(async tx => {
+        await lockLobby(tx, member.lobbyId);
+        const lobby = await tx.arcadeLobby.findFirst({ where: { id: member.lobbyId, ...openWhere(now) }, select: { id: true } });
+        roomAssert(lobby, 'ROOM_NOT_AVAILABLE');
+        const verified = await tx.arcadeMember.findFirst({ where: { id: member.id, tokenHash: member.tokenHash, leftAt: null }, select: { id: true } });
+        roomAssert(verified && await ensureLeader(tx, member.lobbyId, now) === member.id, 'FORBIDDEN');
+        await tx.arcadeLobby.update({ where: { id: member.lobbyId }, data: { passwordHash } });
       });
     },
     /** Leaves the lobby; a leader who leaves hands the lobby to the next member. */

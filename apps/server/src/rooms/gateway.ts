@@ -73,6 +73,7 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
         roomAssert(await tx.arcadeRound.count({ where: { sessionId: room.id } }) === 0, 'ROOM_NOT_AVAILABLE');
         // A test bench phone joins only a room whose host allows it (opening the test bench does).
         roomAssert(!testSeat || readRoomState(current.state).testBench, 'FORBIDDEN');
+        if (person) roomAssert(!readRoomState(current.state).bannedPeople.includes(person.id), 'SEAT_DENIED');
         const joinKeyHash = tokenHash(`${room.id}:${data.joinId}`);
         const existing = await tx.sessionPlayer.findUnique({ where: { joinKeyHash } });
         if (existing) {
@@ -85,10 +86,10 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
         if (person) {
           const seat = await tx.sessionPlayer.findUnique({ where: { sessionId_personId: { sessionId: room.id, personId: person.id } } });
           if (seat) {
-            // The host removed this person from the room: they stay out.
-            roomAssert(!seat.leftAt, 'SEAT_DENIED');
+            // A kicked account can return with a fresh credential. A room ban is checked above.
             const previous = await tx.playerCredential.findUnique({ where: { tokenHash: tokenHash(token) } });
             if (previous) { roomAssert(!previous.revokedAt && previous.expiresAt.getTime() > Date.now(), 'UNAUTHORIZED'); return { sessionId: room.id, token, expiresAt: previous.expiresAt }; }
+            if (seat.leftAt) await tx.sessionPlayer.update({ where: { id: seat.id }, data: { leftAt: null } });
             await tx.playerCredential.create({ data: { sessionId: room.id, playerId: seat.id, tokenHash: tokenHash(token), expiresAt } });
             await recordRoomChange(tx, room.id, 'player.rejoined');
             return { sessionId: room.id, token, expiresAt };
@@ -123,7 +124,7 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
         return { sessionId, token, expiresAt };
       });
     },
-    async revoke(sessionId: string, principal: Principal, playerId?: string) {
+    async revoke(sessionId: string, principal: Principal, playerId?: string, ban = false) {
       await client.$transaction(async tx => {
         await lockRoom(tx, sessionId);
         // Re-check the requesting credential while holding the command lock.
@@ -131,11 +132,21 @@ export function createRoomGateway(client: PrismaClient, config: Config) {
         await authorize(tx, session, principal.actor);
         if (playerId) {
           roomAssert(principal.role === 'host', 'FORBIDDEN');
+          const player = await tx.sessionPlayer.findFirst({ where: { id: playerId, sessionId } });
+          roomAssert(player, 'NOT_FOUND');
+          const state = readRoomState(session.state);
+          if (ban) {
+            roomAssert(player.personId, 'INVALID_COMMAND');
+            state.bannedPeople = [...new Set([...state.bannedPeople, player.personId])];
+          }
+          const delegated = state.hostPhonePlayerId === playerId;
+          if (delegated) { state.hostPhonePlayerId = null; state.hostPhoneCredentialId = null; }
+          if (ban || delegated) await tx.gameSession.update({ where: { id: sessionId }, data: { state } });
           await tx.playerCredential.updateMany({ where: { sessionId, playerId }, data: { revokedAt: new Date() } });
           await tx.sessionPlayer.updateMany({ where: { id: playerId, sessionId }, data: { leftAt: new Date() } });
         } else if (principal.role === 'player') await tx.playerCredential.update({ where: { id: principal.id }, data: { revokedAt: new Date() } });
         else await tx.roomCredential.update({ where: { id: principal.id }, data: { revokedAt: new Date() } });
-        await recordRoomChange(tx, sessionId, playerId ? 'player.revoked' : 'credential.revoked');
+        await recordRoomChange(tx, sessionId, ban ? 'player.banned' : playerId ? 'player.revoked' : 'credential.revoked');
       });
     },
   };

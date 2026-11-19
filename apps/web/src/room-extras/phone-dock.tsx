@@ -6,8 +6,10 @@ import { ReactionTray } from './reactions.js';
 import { ChallengeAlert } from './challenge-alert.js';
 import { setSound, soundOn, unlockSound } from './celebrate.js';
 import { chooseLanguage, LANGUAGES, useLanguage, type Language } from '../i18n/language.js';
-import { translate } from '../i18n/texts.js';
+import { translate, useTexts } from '../i18n/texts.js';
 import { PHONE_TEXTS } from '../room/phone.text.js';
+import { ROUND_CONTROL_TEXTS } from '../room/round-control.text.js';
+import { roomApi } from '../room/api.js';
 import { EXTRAS_TEXTS } from '../room/extras.text.js';
 const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import './room-extras.css';
@@ -36,7 +38,9 @@ function BottomSheet({ title, onClose, children }: { title: string; onClose: () 
 export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak, challengeTick }: {
   state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void; onBreak: (vote: boolean) => void; challengeTick: number;
 }) {
-  const t = useText(); const language = useLanguage(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
+  const t = useText(); const rounds = useTexts(ROUND_CONTROL_TEXTS);
+  const [birthdayError, setBirthdayError] = useState(false); const [birthdayBusy, setBirthdayBusy] = useState(false);
+  const language = useLanguage(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
   // Sound needs a first tap on phones; any tap in the dock (or an answer) prepares it.
   useEffect(() => { const prepare = () => unlockSound(); window.addEventListener('pointerdown', prepare, { once: true }); return () => window.removeEventListener('pointerdown', prepare); }, []);
   const close = () => setSheet(null);
@@ -54,6 +58,7 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
   // Something changed in the challenges while they were closed: a dot on the Menu button.
   const news = state.settings.sideGames && challengeTick !== seenTick;
   return <>
+    {state.birthdayVote?.ready && <p className="side-paused-note" role="status">{rounds('birthdayReady')}</p>}
     {pausedNote && <p className="side-paused-note" role="status">{x('sidePaused')}</p>}
     {/* Being challenged (or your move) shows at the top of the screen, no menu needed. */}
     {sheet !== 'challenges' && <ChallengeAlert state={state} tick={challengeTick} needed={needed} onOpen={() => setSheet('challenges')} />}
@@ -71,6 +76,13 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
       {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('challenges'); }}>
         <span aria-hidden="true">⚔️</span><small>{x('challenge')}{challengeTick !== seenTick && <span className="dock-dot" aria-label={x('news')} />}</small></button>}
       <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>{x('sound')}</small></button>
+      {state.birthdayVote && !state.birthdayVote.ready && <button type="button" disabled={birthdayBusy} aria-pressed={state.birthdayVote.voted} onClick={() => {
+        setBirthdayBusy(true); setBirthdayError(false);
+        void roomApi(`/api/rooms/${state.view.sessionId}/birthday-vote`, { vote: !state.birthdayVote?.voted })
+          .catch(() => setBirthdayError(true)).finally(() => setBirthdayBusy(false));
+      }}><span aria-hidden="true">🎂</span><small>{rounds(state.birthdayVote.voted ? 'unsing' : 'sing')}</small></button>}
+      {birthdayError && <p role="alert">{rounds('birthdayFailed')}</p>}
+      {!state.arcade && <a href="/"><span aria-hidden="true">↪</span><small>{x('leaveRoom')}</small></a>}
       <button type="button" onClick={() => setSheet('language')}><span aria-hidden="true">🌐</span><small>{LANGUAGES[language]}</small></button>
     </nav></BottomSheet>}
     {/* The phone's language: the game's standard texts follow it; what the game's author wrote stays as written. */}

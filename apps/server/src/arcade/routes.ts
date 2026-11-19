@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, GameIdSchema, isMinigameKey, type RoomReply } from '@party/contracts';
+import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, GameIdSchema, isMinigameKey, type RoomReply } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { GameError } from '../game/errors.js';
@@ -11,7 +11,7 @@ import { leaderboard, lobbyScores } from './results.js';
 import type { Rounds } from './rounds.js';
 
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, ROOM_NOT_AVAILABLE: 404, AUTH_UNAVAILABLE: 503,
-  LOBBY_LOCKED: 409, LOBBY_FULL: 409, ARCADE_FULL: 409, ROUND_ON: 409, NOT_ENOUGH_PLAYERS: 409, INVALID_STATE: 409, REVISION_CONFLICT: 409 };
+  LOBBY_PASSWORD_REQUIRED: 403, LOBBY_LOCKED: 409, LOBBY_FULL: 409, ARCADE_FULL: 409, ROUND_ON: 409, NOT_ENOUGH_PLAYERS: 409, INVALID_STATE: 409, REVISION_CONFLICT: 409 };
 
 /**
  * The arcade's HTTP side. Anyone may open or join a lobby (a guest by typing a name, a person as themselves),
@@ -55,11 +55,15 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
       const leaderId = await client.$transaction(async tx => { await lockLobby(tx, lobbyId); return ensureLeader(tx, lobbyId, now); });
       if (leaderId !== lobby.leaderId) lobby = { ...lobby, leaderId };
     }
+    if (lobby.passwordHash && !member) return ArcadeLobbyViewSchema.parse({
+      id: lobby.id, title: lobby.title, locked: lobby.locked, protected: true, closed,
+      me: null, members: [], round: null, totals: [], lastRound: null,
+    });
     const members = await client.arcadeMember.findMany({ where: { lobbyId, leftAt: null }, orderBy: { joinedAt: 'asc' } });
     const seated = new Set(round?.seats.map(seat => seat.memberId) ?? []);
     const scores = await lobbyScores(client, lobbyId);
     return ArcadeLobbyViewSchema.parse({
-      id: lobby.id, title: lobby.title, locked: lobby.locked, closed,
+      id: lobby.id, title: lobby.title, locked: lobby.locked, protected: Boolean(lobby.passwordHash), closed,
       me: member ? { memberId: member.id, leader: lobby.leaderId === member.id } : null,
       members: members.filter(entry => present(entry, now) || seated.has(entry.id)).map(entry => ({ id: entry.id, displayName: entry.displayName, look: lookOf(entry),
         connected: now.getTime() - entry.lastSeenAt.getTime() < CONNECTED_MS, leader: entry.id === lobby!.leaderId, playing: seated.has(entry.id) })),
@@ -74,8 +78,8 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
       const found = await client.arcadeLobby.findMany({ where: lobbies.openWhere(now), orderBy: { createdAt: 'desc' }, take: 40, include: {
         members: { where: { leftAt: null }, select: { id: true, displayName: true, lastSeenAt: true, leftAt: true } }, rounds: { where: { endedAt: null }, select: { game: true } } } });
       const mine = await Promise.all(found.map(lobby => lobbies.memberOf(lobby.id, request.headers.cookie)));
-      return { ok: true, data: ArcadeListSchema.parse({ lobbies: found.map((lobby, index) => ({ id: lobby.id, title: lobby.title, locked: lobby.locked,
-        players: lobby.members.filter(member => present(member, now)).length, leaderName: lobby.members.find(member => member.id === lobby.leaderId)?.displayName ?? null,
+      return { ok: true, data: ArcadeListSchema.parse({ lobbies: found.map((lobby, index) => ({ id: lobby.id, title: lobby.title, locked: lobby.locked, protected: Boolean(lobby.passwordHash),
+        players: lobby.members.filter(member => present(member, now)).length, leaderName: lobby.passwordHash && !mine[index] ? null : lobby.members.find(member => member.id === lobby.leaderId)?.displayName ?? null,
         playing: lobby.rounds[0] && isMinigameKey(lobby.rounds[0].game) ? lobby.rounds[0].game : null, member: Boolean(mine[index]) })) }) };
     } catch (error) { return fail(reply, error); }
   });
@@ -107,6 +111,14 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
       guard(request, 'act', 240); const lobbyId = lobbyParam(request);
       const body = ArcadeLockSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       await lobbies.setLocked(await requireMember(request, lobbyId), body.data.locked); return { ok: true, data: {} };
+    } catch (error) { return fail(reply, error); }
+  });
+  app.post('/api/arcade/lobbies/:lobbyId/password', async (request, reply) => {
+    try {
+      guard(request, 'password', 10); const lobbyId = lobbyParam(request);
+      const body = ArcadePasswordUpdateSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await lobbies.setPassword(await requireMember(request, lobbyId), body.data.password);
+      return { ok: true, data: {} };
     } catch (error) { return fail(reply, error); }
   });
   app.post('/api/arcade/lobbies/:lobbyId/leave', async (request, reply) => {

@@ -1,5 +1,7 @@
+import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
+import { ROOM_MANAGEMENT_TEXTS } from '../../room/room-management.text.js';
 import { useEffect, useRef } from 'react';
-import { MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT } from '@party/contracts';
+import { MAX_IDLE_CLOSE_MINUTES, MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT } from '@party/contracts';
 import { sceneName } from '../scene/inspector.js';
 import { GameMusicFields } from '../scene/fields/music-fields.js';
 import { Section } from '../controls/section.js';
@@ -7,7 +9,7 @@ import { FinaleSettings, WheelSettings } from './show-settings.js';
 import { estimateMinutes, type Definition } from '../model.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SETTINGS_TEXTS } from './settings.text.js';
-import { Dropdown } from '../controls/dropdown.js';
+import { Dropdown } from '../../ui/dropdown.js';
 
 type Change = (next: Definition, group?: string) => void;
 
@@ -27,9 +29,9 @@ function TeamsNote({ definition }: { definition: Definition }) {
  */
 export function GameSettingsPanel({ definition, onChange, onLook, onClose, readOnly = false, problems = [] }: { definition: Definition; onChange: Change; onLook: () => void; onClose: () => void; readOnly?: boolean; problems?: { message: string; path: string }[] }) {
   // Each problem shows in the group where it is fixed (by the setting it is about); anything else under General.
-  const GROUP: Record<string, string> = { finale: 'awards', wheels: 'wheels', quickTimeSeconds: 'host', sideGames: 'side', chips: 'side' };
+  const GROUP: Record<string, string> = { finale: 'awards', wheels: 'wheels', quickTimeSeconds: 'host', idleCloseMinutes: 'host', autoRevealSeconds: 'host', birthdayVote: 'host', sideGames: 'side', chips: 'side' };
   const problemsIn = (group: string) => problems.filter(problem => (GROUP[problem.path.split('.')[0] ?? ''] ?? 'general') === group).map(problem => problem.message);
-  const heading = useRef<HTMLHeadingElement>(null); const t = useTexts(SETTINGS_TEXTS);
+  const heading = useRef<HTMLHeadingElement>(null); const t = useTexts(SETTINGS_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
   useEffect(() => { heading.current?.focus(); }, []);
   const teamGame = definition.nodes.some(node => node.stages.some(stage => stage.kind === 'teams'));
   return <div className="game-settings-layer">
@@ -67,6 +69,17 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
       <label>{t('quickTimeLabel')}<input type="number" inputMode="numeric" min={5} max={600} step={5} value={Number(definition['quickTimeSeconds'] ?? 30)}
         onChange={event => { const value = Math.round(Number(event.target.value)); if (!(value >= 5 && value <= 600)) return; const next = { ...definition }; if (value === 30) delete next['quickTimeSeconds']; else next['quickTimeSeconds'] = value; onChange(next); }} /></label>
       <p className="hint">{t('quickTimeHint')}</p>
+      <label>{management('idleClose')}<input type="number" inputMode="numeric" min={0} max={MAX_IDLE_CLOSE_MINUTES} value={Number(definition['idleCloseMinutes'] ?? 0)}
+        onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= MAX_IDLE_CLOSE_MINUTES) onChange({ ...definition, idleCloseMinutes: value }); }} /></label>
+      <p className="hint">{management('idleHelp')}</p>
+      <label className="choice"><input type="checkbox" checked={typeof definition['autoRevealSeconds'] === 'number'} onChange={event => {
+        const next = { ...definition }; if (event.target.checked) next['autoRevealSeconds'] = 0; else delete next['autoRevealSeconds']; onChange(next);
+      }} />{rounds('autoReveal')}</label>
+      {typeof definition['autoRevealSeconds'] === 'number' && <label>{rounds('delay')}<input type="number" min={0} max={120} value={definition['autoRevealSeconds']}
+        onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= 120) onChange({ ...definition, autoRevealSeconds: value }); }} /></label>}
+      <p className="hint">{rounds('autoHelp')}</p>
+      <label className="choice"><input type="checkbox" checked={definition['birthdayVote'] === true}
+        onChange={event => onChange({ ...definition, birthdayVote: event.target.checked })} />{rounds('birthday')}</label>
     </Section>
     <WheelSettings definition={definition} onChange={onChange} problems={problemsIn('wheels')} />
     <FinaleSettings definition={definition} onChange={onChange} problems={problemsIn('awards')} />

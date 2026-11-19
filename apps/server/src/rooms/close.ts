@@ -10,7 +10,7 @@ export async function closeRoom(tx: Transaction, sessionId: string, now = new Da
   const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId } });
   if (session.status === 'FINISHED') return false;
   await tx.stageRun.updateMany({ where: { sessionId, status: 'ACTIVE' }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
-  await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'FINISHED', endedAt: session.endedAt ?? now, currentNodeKey: null } });
+  await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'FINISHED', endedAt: session.endedAt ?? now, currentNodeKey: null, idleCloseAt: null } });
   await recordRoomChange(tx, sessionId, 'room.closed');
   return true;
 }

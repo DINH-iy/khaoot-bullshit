@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { navigate } from '../navigation.js';
-import { ArcadeLeaderboardSchema, ArcadeListSchema, MINIGAMES, type ArcadeLeaderboard, type ArcadeList } from '@party/contracts';
+import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ArcadeLeaderboardSchema, ArcadeListSchema, MINIGAMES, type ArcadeLeaderboard, type ArcadeList } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { savedLook } from '../players/look-builder.js';
 import { useMe } from '../people/use-me.js';
@@ -18,7 +18,7 @@ export function ArcadeHome() {
   const frame = useSiteLookFrame();
   const account = useMe();
   const [list, setList] = useState<ArcadeList | null>(null); const [board, setBoard] = useState<ArcadeLeaderboard | null>(null);
-  const [name, setName] = useState(rememberedName); const [title, setTitle] = useState('');
+  const [name, setName] = useState(rememberedName); const [title, setTitle] = useState(''); const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   useEffect(() => {
     let mounted = true;
@@ -34,13 +34,13 @@ export function ArcadeHome() {
     try {
       if (!account.person) rememberName(name.trim());
       const look = savedLook(); const lobbyId = newId();
-      await roomApi('/api/arcade', { lobbyId, displayName: account.person?.name ?? name.trim(), ...(title.trim() ? { title: title.trim() } : {}), ...(look ? { look } : {}) });
+      await roomApi('/api/arcade', { lobbyId, displayName: account.person?.name ?? name.trim(), ...(title.trim() ? { title: title.trim() } : {}), ...(password ? { password } : {}), ...(look ? { look } : {}) });
       openLobby(lobbyId);
     } catch (cause) { setError(arcadeProblem(cause)); setBusy(false); }
   };
 
   return <main className={`room arcade ${frame.className}`} style={frame.style}>
-    <header className="room-bar"><div className="room-id"><p className="brand">party<span>.</span></p><p className="room-game">Arcade</p></div><a href="/">Join a game with a code</a></header>
+    <header className="room-bar"><div className="room-id"><p className="brand">party<span>.</span></p><p className="room-game">Arcade</p></div><a className="arcade-nav-button" href="/"><FaIcon name="arrow-right" turn={180} />Join a game with a code</a></header>
     <div className="arcade-page">
       <h1>Arcade</h1>
       <p className="arcade-lead">Play the minigames with friends, without a host or a game: open a lobby and send its link, or join one below.</p>
@@ -51,6 +51,8 @@ export function ArcadeHome() {
           {account.person ? <p className="person-badge">Playing as <strong>{account.person.name}</strong></p>
             : <label>Your name<input autoComplete="nickname" maxLength={40} value={name} onChange={event => setName(event.target.value)} /></label>}
           <label>Lobby name (optional)<input maxLength={60} value={title} placeholder={account.person || name.trim() ? `${account.person?.name ?? name.trim()}'s lobby` : 'For example: Friday arcade'} onChange={event => setTitle(event.target.value)} /></label>
+          <label>Lobby password (optional)<input type="password" autoComplete="new-password" minLength={ARCADE_PASSWORD_MIN} maxLength={ARCADE_PASSWORD_MAX}
+            value={password} onChange={event => setPassword(event.target.value)} /></label>
           <button className="primary big" disabled={busy}>{busy ? 'Opening…' : 'Open a lobby'}</button>
         </form>
       </section>
@@ -59,7 +61,7 @@ export function ArcadeHome() {
         {!list ? <p role="status">Loading…</p> : !list.lobbies.length ? <p>No open lobbies right now. Open one!</p>
           : <ul className="arcade-lobbies">{list.lobbies.map(lobby => <li key={lobby.id}>
             <div><strong>{lobby.title}</strong>
-              <p className="arcade-meta">{lobby.players} {lobby.players === 1 ? 'player' : 'players'}{lobby.leaderName ? ` · led by ${lobby.leaderName}` : ''}{lobby.playing ? ` · playing ${MINIGAMES[lobby.playing].name}` : ''}{lobby.locked ? ' · locked' : ''}</p></div>
+              <p className="arcade-meta">{lobby.players} {lobby.players === 1 ? 'player' : 'players'}{lobby.leaderName ? ` · led by ${lobby.leaderName}` : ''}{lobby.playing ? ` · playing ${MINIGAMES[lobby.playing].name}` : ''}{lobby.locked ? ' · locked' : lobby.protected ? ' · password required' : ''}</p></div>
             <button type="button" className={lobby.member ? 'primary' : undefined} disabled={lobby.locked && !lobby.member} onClick={() => openLobby(lobby.id)}>{lobby.member ? 'Back in' : lobby.locked ? 'Locked' : 'Join'}</button>
           </li>)}</ul>}
       </section>

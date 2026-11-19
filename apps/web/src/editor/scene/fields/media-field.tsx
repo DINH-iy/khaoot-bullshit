@@ -1,3 +1,4 @@
+import { Dropdown } from '../../../ui/dropdown.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DEFAULT_MEDIA_LAYOUT, LIBRARY_ACCEPT, LIBRARY_LIMITS, LibraryItemSchema, MEDIA_POSITIONS, MEDIA_SIZES, MediaLibrarySchema, MediaLayoutSchema, SceneMediaSchema, sceneMediaUrl, youtubeWatchUrl, type MediaLayout, type SceneMedia, type YouTubeClip, type LibraryItem, type MediaLibrary, type SceneMediaKind } from '@party/contracts';
@@ -97,9 +98,8 @@ export function MediaField({ stage, open, onOpen, onClose, onChange }: { stage: 
           <span className={`layout-thumbnail layout-${position}`} aria-hidden="true"><i /><b /></span><span>{layoutText(`short-${position}`)}</span>
         </button>)}</div>
       </div>
-      <label>{layoutText('size')}<select value={layout.size} onChange={event => setLayout({ ...layout, size: event.target.value as MediaLayout['size'] })}>
-        {MEDIA_SIZES.map(size => <option key={size} value={size}>{layoutText(size)}</option>)}
-      </select></label>
+      <label>{layoutText('size')}<Dropdown value={layout.size} onChange={value => setLayout({ ...layout, size: value as MediaLayout['size'] })}
+        options={MEDIA_SIZES.map(value => ({ value, label: layoutText(value) }))} /></label>
       {media?.kind === 'audio' && <label className="choice"><input type="checkbox" checked={media.waveform !== false} onChange={event => {
         const { waveform: _waveform, ...source } = media;
         onChange({ ...stage, media: event.target.checked ? source : { ...source, waveform: false } });

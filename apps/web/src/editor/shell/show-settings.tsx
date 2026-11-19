@@ -6,7 +6,7 @@ import { WheelTest } from './wheel-test.js';
 import { uniqueKey, updateStage, type Definition, type Node, type Stage } from '../model.js';
 import { Section } from '../controls/section.js';
 import { ChoiceDialog } from '../controls/choice-dialog.js';
-import { Dropdown } from '../controls/dropdown.js';
+import { Dropdown } from '../../ui/dropdown.js';
 import { Swatches } from '../controls/swatches.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SETTINGS_TEXTS } from './settings.text.js';

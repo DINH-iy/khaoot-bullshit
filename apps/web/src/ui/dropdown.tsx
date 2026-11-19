@@ -1,22 +1,22 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { translate } from '../../i18n/texts.js';
-import { CONTROLS_TEXTS } from './controls.text.js';
+import { translate } from '../i18n/texts.js';
+import { CONTROLS_TEXTS } from '../editor/controls/controls.text.js';
 const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { createPortal } from 'react-dom';
+import './dropdown.css';
 
-export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; style?: CSSProperties }
+export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; lang?: string; style?: CSSProperties }
 
 /**
- * The editor's own dropdown, in its style instead of the browser's (for lists made
- * from the game: scenes, wheels, fonts…). It follows the standard "select-only
+ * A themed single-select control for the app. It follows the standard "select-only
  * combobox" pattern so it works like a real one: put it inside a <label> for its
  * name; arrows, Home/End and Page Up/Down move, Enter/Space choose, Escape closes,
  * typing jumps to a matching option; Tab chooses the highlighted option and moves on.
  * The list is drawn over the page (not clipped by a scrolling panel) and opens
  * upwards when there is no room below.
  */
-export function Dropdown({ id: buttonId, value, options, onChange, placeholder = t('choose'), className }: {
-  id?: string; value: string; options: DropdownOption[]; onChange: (value: string) => void; placeholder?: string; className?: string;
+export function Dropdown({ id: buttonId, value, options, onChange, placeholder = t('choose'), className, disabled, label, title }: {
+  id?: string; value: string; options: DropdownOption[]; onChange: (value: string) => void; placeholder?: string; className?: string; disabled?: boolean; label?: string; title?: string;
 }) {
   const id = useId(); const button = useRef<HTMLButtonElement>(null); const list = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false); const [active, setActive] = useState(-1);
@@ -36,13 +36,22 @@ export function Dropdown({ id: buttonId, value, options, onChange, placeholder =
     if (!open) return;
     const position = () => {
       const box = button.current?.getBoundingClientRect(); if (!box) return;
-      const below = window.innerHeight - box.bottom - 8; const above = box.top - 8; const up = below < 220 && above > below;
-      setPlace({ left: Math.max(8, Math.min(box.left, window.innerWidth - Math.max(box.width, 220) - 8)), width: Math.max(box.width, 220), maxHeight: Math.min(320, up ? above : below),
+      const viewport = window.visualViewport;
+      const topEdge = viewport?.offsetTop ?? 0;
+      const bottomEdge = topEdge + (viewport?.height ?? window.innerHeight);
+      const below = bottomEdge - box.bottom - 8; const above = box.top - topEdge - 8; const up = below < 220 && above > below;
+      const width = Math.min(window.innerWidth - 16, Math.max(box.width, 220));
+      setPlace({ left: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)), width, maxHeight: Math.max(0, Math.min(320, up ? above : below)),
         ...(up ? { bottom: window.innerHeight - box.top + 4 } : { top: box.bottom + 4 }) });
     };
     position();
     window.addEventListener('resize', position); window.addEventListener('scroll', position, true);
-    return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', position); viewport?.addEventListener('scroll', position);
+    return () => {
+      window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true);
+      viewport?.removeEventListener('resize', position); viewport?.removeEventListener('scroll', position);
+    };
   }, [open]);
   // The highlighted option stays in view.
   useEffect(() => { if (open && active >= 0) document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: 'nearest' }); }, [open, active, id]);
@@ -85,16 +94,16 @@ export function Dropdown({ id: buttonId, value, options, onChange, placeholder =
   // Options in their groups, in order.
   const groups: { name: string | undefined; items: number[] }[] = [];
   options.forEach((option, index) => { const lastGroup = groups.at(-1); if (lastGroup && lastGroup.name === option.group) lastGroup.items.push(index); else groups.push({ name: option.group, items: [index] }); });
-  const optionEl = (index: number) => { const option = options[index]!; return <div key={index} id={`${id}-${index}`} role="option" aria-selected={index === selected} aria-disabled={option.disabled || undefined}
+  const optionEl = (index: number) => { const option = options[index]!; return <div key={index} id={`${id}-${index}`} role="option" data-value={option.value} lang={option.lang} aria-selected={index === selected} aria-disabled={option.disabled || undefined}
     className={`ed-dropdown-option${index === active ? ' active' : ''}`} style={option.style}
     onPointerMove={() => { if (enabled(index) && index !== active) setActive(index); }} onPointerDown={event => event.preventDefault()} onClick={() => choose(index)}>{index === selected && <span className="ed-dropdown-check" aria-hidden="true">✓</span>}{option.label}</div>; };
-  const root = (button.current?.closest('.editor') as HTMLElement | null) ?? document.body;
+  const root = (button.current?.closest('dialog[open], .editor, .room') as HTMLElement | null) ?? document.body;
 
   return <>
-    <button ref={button} id={buttonId} type="button" role="combobox" className={`ed-dropdown${className ? ` ${className}` : ''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`}
+    <button ref={button} id={buttonId} type="button" role="combobox" value={value} aria-label={label} title={title} disabled={disabled} className={`ed-dropdown${className ? ` ${className}` : ''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? `${id}-list` : undefined}
       aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined} onKeyDown={onKey}
       onClick={event => { event.preventDefault(); if (open) setOpen(false); else show(); }} onBlur={() => setOpen(false)}>
-      <span className={selected < 0 ? 'ed-dropdown-placeholder' : undefined} style={selected >= 0 ? options[selected]!.style : undefined}>{selected >= 0 ? options[selected]!.label : placeholder}</span>
+      <span lang={options[selected]?.lang} className={selected < 0 ? 'ed-dropdown-placeholder' : undefined} style={selected >= 0 ? options[selected]!.style : undefined}>{selected >= 0 ? options[selected]!.label : placeholder}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
     </button>
     {open && createPortal(<div ref={list} id={`${id}-list`} role="listbox" className="ed-dropdown-list" style={place} tabIndex={-1} onPointerDown={event => event.preventDefault()}>

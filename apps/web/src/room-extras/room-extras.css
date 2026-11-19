@@ -11,8 +11,8 @@
 .room .dock-button .dock-dot { width: 10px; height: 10px; margin-left: 0; }
 /* Inside the menu: big tiles in a grid, easy to hit with a thumb. */
 .phone-dock { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
-.room .phone-dock button { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 84px; padding: 10px 6px; border-radius: 16px; background: var(--r-card); border: 1px solid var(--r-line); }
-.room .phone-dock button:active, .room .phone-dock button[aria-pressed=true] { background: var(--r-card-strong); }
+.room .phone-dock :is(button, a) { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 84px; padding: 10px 6px; border-radius: 16px; background: var(--r-card); border: 1px solid var(--r-line); }
+.room .phone-dock :is(button, a):active, .room .phone-dock :is(button, a)[aria-pressed=true] { background: var(--r-card-strong); }
 .phone-dock span { font-size: 1.6rem; line-height: 1; } .phone-dock small { font-size: .78rem; font-weight: 700; color: var(--r-text); text-align: center; }
 /* Challenged (or your move): a banner at the top of the phone that stays until Open or Later. */
 .challenge-alert { position: fixed; z-index: 40; top: calc(10px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; max-width: 520px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center;
@@ -110,7 +110,7 @@
 .room-display .room-connection .ghost, .room-display .conn-details, .room-display .conn.conn-ok { display: none; }
 .room-display .room-bar { padding-block: 10px; }
 @media (prefers-reduced-motion: reduce) { .break-icon, .wheel-disc, .finale-slide, .wheel-result.shown { animation: none; } .wheel-disc { transform: rotate(var(--turn)); } }
-.room .phone-dock button[aria-disabled=true] { opacity: .5; }
+.room .phone-dock :is(button, a)[aria-disabled=true] { opacity: .5; }
 
 /* Host: the chips & side games switch, always visible in the host panel. */
 .side-switch { display: grid; gap: 4px; padding: 12px; border-radius: 14px; background: rgb(0 0 0 / .18); border: 1px solid var(--r-line); }

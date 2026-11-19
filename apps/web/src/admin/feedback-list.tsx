@@ -1,3 +1,4 @@
+import { Dropdown } from '../ui/dropdown.js';
 import { useEffect, useMemo, useState } from 'react';
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES, FeedbackItemSchema, FeedbackListSchema, type FeedbackItem, type FeedbackUpdate } from '@party/contracts';
 import { roomApi } from '../room/api.js';
@@ -53,9 +54,8 @@ export function FeedbackList() {
           <button type="button" aria-pressed={kind === 'all'} onClick={() => setKind('all')}>Everything</button>
           {FEEDBACK_KINDS.map(key => <button key={key} type="button" aria-pressed={kind === key} onClick={() => setKind(key)}>{kindLabel(key)} <span>{counts(key)}</span></button>)}
         </div>
-        <label>Status<select value={status} onChange={event => setStatus(event.target.value as StatusFilter)}>
-          <option value="open">Open (new, planned, in progress)</option><option value="all">All</option>
-          {FEEDBACK_STATUSES.map(key => <option key={key} value={key}>{STATUS[key]}</option>)}</select></label>
+        <label>Status<Dropdown value={status} onChange={value => setStatus(value as StatusFilter)}
+          options={[{ value: 'open', label: 'Open (new, planned, in progress)' }, { value: 'all', label: 'All' }, ...FEEDBACK_STATUSES.map(value => ({ value, label: STATUS[value] }))]} /></label>
         <label>Search<input type="search" placeholder="Report ID or text" value={search} onChange={event => setSearch(event.target.value)} /></label>
         <button type="button" className="quiet" disabled={!shown.length} onClick={() => void copied1('all', shown.map(feedbackText).join('\n\n'))}>{copied === 'all' ? 'Copied' : `Copy ${shown.length} as text`}</button>
         <button type="button" className="quiet" disabled={!notDone.length} onClick={() => void markAllDone()}>{`Mark ${notDone.length} as done`}</button>
@@ -67,12 +67,13 @@ export function FeedbackList() {
         <div className="admin-item-head">
           <span className="admin-kind">{kindLabel(item.kind)}</span>
           <h2>{item.title}</h2>
-          <select aria-label={`Status of ${item.title}`} value={item.status} onChange={event => void update(item.id, { status: event.target.value as FeedbackItem['status'] })}>
-            {FEEDBACK_STATUSES.map(key => <option key={key} value={key}>{STATUS[key]}</option>)}</select>
+          <Dropdown label={`Status of ${item.title}`} value={item.status} onChange={value => void update(item.id, { status: value as FeedbackItem['status'] })}
+            options={FEEDBACK_STATUSES.map(value => ({ value, label: STATUS[value] }))} />
         </div>
         <p className="admin-meta admin-report-id">Report ID <code>{item.id}</code></p>
         <p className="admin-meta">{new Date(item.createdAt).toLocaleString()}{item.reporterName && <> · {item.reporterName}</>} · {item.context.screen} · <a href={item.context.page}>{item.context.page}</a> · {item.context.viewport.width}×{item.context.viewport.height}</p>
         {item.details && <p className="admin-details">{item.details}</p>}
+        {item.attachmentType && <FeedbackAttachment id={item.id} contentType={item.attachmentType} />}
         {item.context.elements.length > 0 && <ul className="admin-elements">{item.context.elements.map((element, index) => <li key={index}>
           <strong>{element.label || element.text || `<${element.tag}>`}</strong>
           {element.source ? <code>{sourcePath(element.source)}</code> : <small>No source location (outside the tagged app code)</small>}
@@ -81,12 +82,42 @@ export function FeedbackList() {
         <label className="admin-note">Your note<textarea defaultValue={item.ownerNote ?? ''} maxLength={2000} rows={2}
           onBlur={event => { if (event.target.value.trim() !== (item.ownerNote ?? '')) void update(item.id, { ownerNote: event.target.value }); }} /></label>
         <div className="admin-actions">
-          <select aria-label={`Kind of ${item.title}`} value={item.kind} onChange={event => void update(item.id, { kind: event.target.value as FeedbackItem['kind'] })}>
-            {FEEDBACK_KINDS.map(key => <option key={key} value={key}>{kindLabel(key)}</option>)}</select>
+          <Dropdown label={`Kind of ${item.title}`} value={item.kind} onChange={value => void update(item.id, { kind: value as FeedbackItem['kind'] })}
+            options={FEEDBACK_KINDS.map(value => ({ value, label: kindLabel(value) }))} />
           <button type="button" className="quiet" onClick={() => void copied1(item.id, feedbackText(item))}>{copied === item.id ? 'Copied' : 'Copy as text'}</button>
           <button type="button" className="danger" onClick={() => void remove(item)}>Delete</button>
         </div>
       </li>)}</ol>
     </>}
+  </>;
+}
+
+function FeedbackAttachment({ id, contentType }: { id: string; contentType: string }) {
+  const [open, setOpen] = useState(false);
+  return <div className="admin-feedback-attachment">
+    <button type="button" className="quiet" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide attachment' : 'View attachment'}</button>
+    {open && <AttachmentPreview id={id} video={contentType.startsWith('video/')} />}
+  </div>;
+}
+
+function AttachmentPreview({ id, video }: { id: string; video: boolean }) {
+  const [src, setSrc] = useState<string>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    let url: string | undefined;
+    void fetch(`/api/host/feedback/${id}/attachment`, { headers: { 'x-party-request': '1' }, signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error('Attachment unavailable'); return response.blob(); })
+      .then(blob => {
+        if (controller.signal.aborted) return;
+        url = URL.createObjectURL(blob); setSrc(url);
+      }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
+  }, [id]);
+  if (failed) return <p role="alert">Could not load the attachment.</p>;
+  if (!src) return <p role="status">Loading attachment…</p>;
+  return <>
+    {video ? <video src={src} controls playsInline aria-label="Feedback video" /> : <img src={src} alt="Feedback attachment" />}
+    <a href={src} download>Download attachment</a>
   </>;
 }

@@ -2,6 +2,8 @@
 
 Last checked against the checkout on 19 November 2026. This tracks feedback from the 14–15 November test evening and the follow-ups through 19 November. [Product plan](../../APP_PLAN.md) · [README](../../README.md)
 
+The separate build plan tracks the 41 feature requests from Admin → Feedback by report ID. The build plan records the work in Groups 1–4 and lists remaining checks and follow-ups by report. [Feature feedback build plan](feedback-build-plan.md)
+
 ## At a glance
 
 - The primary changes in **23 of 25 lettered groups (A–W)** are implemented. Most of **X and Y** is implemented too. The remaining work and checks are listed below, with the original group details kept further down.

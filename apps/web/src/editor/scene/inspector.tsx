@@ -1,24 +1,26 @@
+import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
 import { placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields } from './fields/explain-fields.js';
 import { ActionMenu, type MenuAction } from '../controls/action-menu.js';
+import { ReplaceSceneDialog, REPLACE_TEXTS } from './replace-scene.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { SavePrefab } from '../flow/save-prefab.js';
 import { Segmented } from '../controls/segmented.js';
-import { Dropdown } from '../controls/dropdown.js';
+import { Dropdown } from '../../ui/dropdown.js';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { WheelOfScene } from '../shell/show-settings.js';
 import { PlacesFields } from './fields/places-fields.js';
 import { MinigameFields } from './fields/minigame-fields.js';
 import { DrawingFields } from './fields/drawing-fields.js';
 import { DuelFields } from './fields/duel-fields.js';
-import { translate } from '../../i18n/texts.js';
+import { translate, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { MediaField } from './fields/media-field.js';
 import { musicSummary, SceneMusicFields } from './fields/music-fields.js';
-import { isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, QUIZ_KINDS, quizKind, setRouteOptions, uniqueKey, updateStage, withQuizKind, type Definition, type Node, type Option, type Stage } from '../model.js';
+import { isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, QUIZ_KINDS, quizKind, setRouteOptions, uniqueKey, updateStage, withQuizKind, WRITING_STARTERS, type Definition, type Node, type Option, type Stage } from '../model.js';
 
 type Change = (next: Definition, group?: string) => void;
 // In the current language; the editor redraws its panels when the language changes.
@@ -57,6 +59,7 @@ const scoreboardShows = () => [{ value: 'players', label: t('showPlayers') }, { 
  * duel is won) is chosen when adding it, so it is shown here, not asked again.
  */
 export function StageFields({ definition, node, index, onChange, mediaOpen, openMedia, closeMedia }: { definition: Definition; node: Node; index: number; onChange: Change; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void }) {
+  const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
   const input = stage['input'] as { kind?: string; options?: Option[]; items?: Option[]; layout?: string; maxLength?: number; accept?: string[] } | undefined;
@@ -68,11 +71,19 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
   const timed = !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
   const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || stage.kind === 'duel' || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
   const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
+  const voting = stage['voteMode'] === 'multi' || stage['voteMode'] === 'ranked' ? stage['voteMode'] : 'single';
+  const cards = stage['resultCards'];
+  const cardMode = typeof cards === 'number' ? 'timed' : cards === 'manual' ? 'manual' : 'together';
   return <div className="stage-fields">
     <Section title={t('content')} memory="Content" open>
       {stage.kind === 'info' && <label>{t('title')}<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
       <label>{t(stage.kind === 'info' ? 'lInfo' : stage.kind === 'scoreboard' ? 'lScoreboard' : stage.kind === 'route' ? 'lRoute' : stage.kind === 'minigame' ? 'lMinigame' : 'lQuestion')}
         <textarea rows={3} value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
+      {stage.kind === 'collect' && input?.kind === 'text' && <details className="writing-starters">
+        <summary>{t('writingStarters')}</summary>
+        <div>{WRITING_STARTERS.map(starter => <button key={starter.key} type="button" className="small-button" title={starter.prompt}
+          onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
+      </details>}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
       {timed && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : 'timer')}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600} placeholder={t('none')} value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />{t('sec')}</span></label>}
@@ -106,6 +117,22 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
       {stage.kind === 'vote' && <label>{t('voteOn')}<Dropdown value={`${(stage['source'] as { nodeKey: string }).nodeKey}/${(stage['source'] as { stageKey: string }).stageKey}`} placeholder={t('chooseSource')}
         onChange={value => { const [nodeKey, stageKey] = value.split('/'); edit(current => ({ ...current, source: { nodeKey, stageKey } })); }}
         options={definition.nodes.flatMap(other => other.stages.filter(isVotable).map(source => ({ value: `${other.key}/${source.key}`, label: `${sceneName(definition, other.key)}${other.stages.length > 1 ? t('partN', { number: other.stages.indexOf(source) + 1 }) : ''}` })))} /></label>}
+      {stage.kind === 'vote' && <>
+        <label>{rounds('voting')}<Dropdown value={voting} onChange={voteMode => edit(current => ({ ...current, voteMode }), 'vote-mode')}
+          options={(['single', 'multi', 'ranked'] as const).map(value => ({ value, label: rounds(value) }))} /></label>
+        {voting !== 'single' && <label>{rounds('limit')}<input type="number" min={2} max={8} value={Number(stage['voteLimit'] ?? 3)}
+          onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 2 && value <= 8) edit(current => ({ ...current, voteLimit: value }), 'vote-limit'); }} /></label>}
+      </>}
+      {(stage.kind === 'vote' || (stage.kind === 'collect' && (input?.kind === 'media' || input?.kind === 'drawing'))) && <>
+        <label>{rounds('cards')}<Dropdown value={cardMode} onChange={mode => {
+          edit(current => { const { resultCards: _old, ...rest } = current; return mode === 'together' ? rest : { ...rest, resultCards: mode === 'manual' ? 'manual' : 5 }; }, 'result-cards');
+        }} options={(['together', 'manual', 'timed'] as const).map(value => ({ value, label: rounds(value) }))} /></label>
+        {typeof cards === 'number' && <label>{rounds('interval')}<input type="number" min={1} max={60} value={cards}
+          onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 1 && value <= 60) edit(current => ({ ...current, resultCards: value }), 'result-cards'); }} /></label>}
+      </>}
+      {(stage.kind === 'minigame' || (stage.kind === 'collect' && input?.kind === 'drawing')) && <label>{rounds('countdown')}
+        <input type="number" min={0} max={15} value={Number(stage['countdownSeconds'] ?? (stage.kind === 'minigame' ? 3 : 0))}
+          onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= 15) edit(current => ({ ...current, countdownSeconds: value }), 'countdown'); }} /></label>}
       {stage.kind === 'scoreboard' && <Segmented label={t('show')} value={String(stage['show'] ?? 'players')} choices={scoreboardShows()} onChange={show => edit(current => ({ ...current, show }), 'show')} />}
       {stage.kind === 'minigame' && <MinigameFields part="settings" definition={definition} node={node} index={index} onChange={onChange} />}
       {stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
@@ -236,6 +263,7 @@ export function nextSummary(definition: Definition, node: Node): string {
  * ("Edit this scene"). The scene's actions are in the ☰ menu next to Close.
  */
 export function Inspector({ definition, node, problems, onChange, onDelete, onClose, onOpen, onDuplicate, prefab, readOnly = false }: { definition: Definition; node: Node; problems: DefinitionIssue[]; onChange: Change; onDelete: (next: Definition) => void; onClose: () => void; onOpen: () => void; onDuplicate?: () => void; readOnly?: boolean; prefab?: { content: () => PrefabContent; defaultName: string } }) {
+  const replacement = useTexts(REPLACE_TEXTS); const [replacing, setReplacing] = useState(false);
   const [confirming, setConfirming] = useState(false); const [saving, setSaving] = useState(false);
   useEffect(() => { setConfirming(false); setSaving(false); }, [node.key]);
   const text = cardText(definition, node); const start = definition.startNodeKey === node.key;
@@ -243,6 +271,7 @@ export function Inspector({ definition, node, problems, onChange, onDelete, onCl
     ...(start ? [] : [{ label: t('startHere'), onSelect: () => onChange({ ...definition, startNodeKey: node.key }) }]),
     ...(onDuplicate ? [{ label: t('duplicate'), onSelect: onDuplicate }] : []),
     ...(prefab ? [{ label: t('savePrefab'), onSelect: () => setSaving(true) }] : []),
+    { label: replacement('action'), onSelect: () => setReplacing(true) },
     { label: t('deleteScene'), danger: true, onSelect: () => setConfirming(true) }];
   return <aside className="inspector" aria-labelledby="inspector-heading">
     <div className="inspector-head">
@@ -250,6 +279,7 @@ export function Inspector({ definition, node, problems, onChange, onDelete, onCl
       <div className="ed-kind-text"><h2 id="inspector-heading">{text.label}</h2>{start && <small>{t('startsHere')}</small>}</div>
       {!readOnly && <ActionMenu label={t('sceneActions')} actions={actions} />}
       <button className="small-button" onClick={onClose}>{t('close')}</button></div>
+    {replacing && !readOnly && <ReplaceSceneDialog key={node.key} definition={definition} node={node} onChange={onChange} onClose={() => setReplacing(false)} />}
     {saving && prefab && <SavePrefab key={node.key} content={prefab.content} defaultName={prefab.defaultName} onClose={() => setSaving(false)} />}
     <div className="flow-summary">
       {text.banner && <p className="flow-summary-banner">{text.banner}</p>}

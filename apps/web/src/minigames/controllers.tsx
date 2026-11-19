@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { emptyDrawing, MINIGAME_COUNTDOWN_MS, type MinigameSettings } from '@party/contracts';
+import { emptyDrawing, type MinigameSettings } from '@party/contracts';
 import { DrawingPad } from '../drawing/drawing-pad.js';
 import { useTexts } from '../i18n/texts.js';
 import { CONTROL_TEXTS } from './controls.text.js';
@@ -10,9 +10,9 @@ export interface Result { value: number; early?: true; stroke?: number[]; teamId
 interface Props<S> { settings: S; startsAt: string; goAt: string | null; offset: number; disabled: boolean; onResult: (result: Result) => void }
 
 /** "3, 2, 1" until play starts, the same moment on every phone. Renders children once it has. */
-export function Countdown({ startsAt, offset, children }: { startsAt: string; offset: number; children: React.ReactNode }) {
-  const t = useText(); const c = useTexts(CONTROL_TEXTS); const now = useServerNow(offset, true); const left = Date.parse(startsAt) - now;
-  if (left > 0) return <div className="mg-countdown" role="timer" aria-label={c('starts')}><span>{t('minigame.getReady')}</span><strong key={Math.ceil(left / 1000)}>{Math.min(Math.ceil(left / 1000), MINIGAME_COUNTDOWN_MS / 1000)}</strong></div>;
+export function Countdown({ startsAt, offset, children }: { startsAt: string | undefined; offset: number; children: React.ReactNode }) {
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const now = useServerNow(offset, Boolean(startsAt)); const left = startsAt ? Date.parse(startsAt) - now : 0;
+  if (left > 0) return <div className="mg-countdown" role="timer" aria-label={c('starts')}><span>{t('minigame.getReady')}</span><strong key={Math.ceil(left / 1000)}>{Math.ceil(left / 1000)}</strong></div>;
   return <>{children}</>;
 }
 
@@ -21,7 +21,10 @@ export function Countdown({ startsAt, offset, children }: { startsAt: string; of
  * server announces it, and the phone times the tap from the first frame that shows it.
  */
 export function ReactionPad({ startsAt, goAt, offset, disabled, onResult }: Props<MinigameSettings<'reaction'>>) {
-  const t = useText(); const go = goAt !== null; const shownAt = useRef<number | null>(null); const done = useRef(false);
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const go = goAt !== null;
+  const phase = t(go ? 'minigame.go' : 'minigame.wait');
+  const cue = c(go ? 'reactionTap' : 'reactionWait');
+  const shownAt = useRef<number | null>(null); const done = useRef(false);
   // The moment GO is put on screen (before any tap can be handled), not a frame later.
   useLayoutEffect(() => { if (go && shownAt.current === null) shownAt.current = performance.now(); }, [go]);
   const tap = () => {
@@ -32,8 +35,13 @@ export function ReactionPad({ startsAt, goAt, offset, disabled, onResult }: Prop
     else onResult({ value: reacted });
   };
   return <Countdown startsAt={startsAt} offset={offset}>
-    <button type="button" className={`mg-pad ${go ? 'go' : 'wait'}`} onPointerDown={tap} onKeyDown={event => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) { event.preventDefault(); tap(); } }}>
-      {go ? t('minigame.go') : t('minigame.wait')}</button>
+    <button type="button" className={`mg-pad reaction-pad ${go ? 'go' : 'wait'}`} aria-label={`${phase} ${cue}`} disabled={disabled}
+      onPointerDown={event => { if (event.isPrimary && event.button === 0) tap(); }}
+      onClick={event => { if (event.detail === 0) tap(); }}
+      onKeyDown={event => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) { event.preventDefault(); tap(); } }}>
+      <span className="reaction-cue"><strong>{phase}</strong><small>{cue}</small></span>
+    </button>
+    <span className="visually-hidden" role="status">{phase} {cue}</span>
   </Countdown>;
 }
 
@@ -84,6 +92,6 @@ export function PerfectCircle({ settings, startsAt, offset, disabled, onResult }
   return <Countdown startsAt={startsAt} offset={offset}>
     <p className="mg-sub">{t('minigame.drawCircle')} · {t('timer.left', { time: `${Math.max(0, (end - now) / 1000).toFixed(1)} s` })}</p>
     <DrawingPad value={drawing} onChange={setDrawing} tools={false} oneStroke disabled={disabled || over} label={c('circle')} bringIntoView
-      onStrokeEnd={stroke => { if (sent.current) return; sent.current = true; const points = stroke.p.length >= 24 ? thin(stroke.p, 400) : [...stroke.p, ...Array.from({ length: 24 - stroke.p.length }, () => stroke.p[0]!)]; onResult({ value: 0, stroke: points }); }} />
+      onStrokeEnd={stroke => { if (sent.current) return; sent.current = true; onResult({ value: 0, stroke: thin(stroke.p, 400) }); }} />
   </Countdown>;
 }

@@ -4,6 +4,41 @@ import AxeBuilder from '@axe-core/playwright';
 
 if (process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E environment required');
 
+test('an Arcade lobby can require a password, and its leader can remove it', async ({ browser, page, baseURL }) => {
+  await page.goto('/?arcade');
+  const codeLink = page.getByRole('link', { name: 'Join a game with a code' });
+  await expect(codeLink).toHaveCSS('text-decoration-line', 'none');
+  await codeLink.click();
+  await expect(page.getByRole('button', { name: 'Join room', exact: true })).toBeVisible();
+  await page.goto('/?arcade');
+  await page.getByLabel('Your name').fill('Lobby leader');
+  const title = `Password lobby ${randomUUID().slice(0, 6)}`;
+  await page.getByLabel('Lobby name (optional)').fill(title);
+  await page.getByLabel('Lobby password (optional)').fill('game night');
+  await page.getByRole('button', { name: 'Open a lobby' }).click();
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  const invite = page.getByRole('region', { name: 'Invite players' });
+  const url = (await invite.getByRole('link').textContent())!;
+  expect(url).toMatch(/\?arcade=[a-f0-9-]{36}$/);
+  const context = await browser.newContext({ baseURL });
+  const friend = await context.newPage();
+  try {
+    await friend.goto(url);
+    await friend.getByLabel('Your name').fill('Friend');
+    const key = friend.getByLabel('Lobby password', { exact: true });
+    await key.fill('incorrect');
+    await friend.getByRole('button', { name: 'Join the lobby' }).click();
+    await expect(friend.getByRole('alert')).toContainText('Enter the correct lobby password');
+    await key.fill('game night');
+    await friend.getByRole('button', { name: 'Join the lobby' }).click();
+    await expect(friend.getByRole('heading', { name: 'Players (2)' })).toBeVisible();
+    await page.getByText('Lobby password · On', { exact: true }).click();
+    await page.getByRole('button', { name: 'Remove password' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Lobby password removed' })).toBeVisible();
+    await expect(invite.getByText('Share the password', { exact: false })).toHaveCount(0);
+  } finally { await context.close(); }
+});
+
 test('the arcade: a guest opens a lobby, friends join by link, the leader locks it and runs a round, and everyone is back with the totals', async ({ browser, baseURL }) => {
   test.setTimeout(120_000);
   const phone = async () => { const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }); return { context, page: await context.newPage() }; };

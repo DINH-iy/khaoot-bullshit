@@ -1,3 +1,4 @@
+import { replaceScene } from '../../src/editor/scene/replace-scene.js';
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routeSegments, routedPath, withBends, duplicateScenes, pasteScenes, addScene, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, COLUMN_STEP, cardHeight, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
@@ -7,6 +8,29 @@ const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', tit
 const choice = (key: string) => ({ key, stages: [{ key: 'main', kind: 'route', prompt: 'Which way?', durationMs: null, options: [{ key: 'left', label: 'Left' }, { key: 'right', label: 'Right' }], decide: { method: 'host' } }] });
 const game = (): Definition => ({ formatVersion: 2, title: 'T', startNodeKey: 'a', nodes: [scene('a'), choice('b'), scene('c'), scene('d')],
   edges: [{ key: 'ab', from: 'a', to: 'b' }, { key: 'bc', from: 'b', to: 'c', option: 'left' }] });
+
+describe('replacing a scene type', () => {
+  it('keeps the selected node, start, and edges and prevents accidental route loss', () => {
+    const definition = game();
+    const node = definition.nodes[1]!;
+    const result = replaceScene(definition, node, { type: 'writing' });
+    expect(result).toMatchObject({ startNodeKey: 'a', edges: [{ key: 'ab', from: 'a', to: 'b' }, { key: 'bc', from: 'b', to: 'c' }] });
+    if (typeof result !== 'string') expect(result.nodes[1]).toMatchObject({ key: 'b', stages: [{ key: 'main', input: { kind: 'text' } }] });
+    const split = { ...definition, edges: [...definition.edges, { key: 'bd', from: 'b', to: 'd', option: 'right' }] };
+    expect(replaceScene(split, node, { type: 'quiz' })).toBe('routes');
+  });
+
+  it('preserves a vote source when it is still compatible and blocks replacing it with a quiz', () => {
+    const writing = addScene(game(), 'writing');
+    const vote = addScene(writing.definition, 'vote');
+    const source = writing.definition.nodes.at(-1)!;
+    expect(replaceScene(vote.definition, source, { type: 'quiz' })).toBe('votes');
+    const result = replaceScene(vote.definition, source, { type: 'upload' });
+    expect(result).toMatchObject({ nodes: expect.arrayContaining([
+      expect.objectContaining({ key: vote.key, stages: [expect.objectContaining({ source: { nodeKey: source.key, stageKey: 'main' } })] }),
+    ]) });
+  });
+});
 
 describe('editor snapping', () => {
   it('lands cards on the grid', () => {

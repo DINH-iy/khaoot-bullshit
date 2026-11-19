@@ -56,6 +56,36 @@ describe('arcade lobbies', () => {
     expect((await view(lobbyId, leader)).members).toHaveLength(3);
   });
 
+  it('requires a password for new members and lets only the current leader change it', async () => {
+    const lobbyId = randomUUID();
+    const path = `/api/arcade/lobbies/${lobbyId}`;
+    const password = 'Friday arcade 42';
+    const created = await call('POST', '/api/arcade', { lobbyId, displayName: 'Password leader', title: 'Protected lobby', password });
+    expect(created.statusCode).toBe(200);
+    const leader = cookieOf(created);
+    const stored = await prisma.arcadeLobby.findUniqueOrThrow({ where: { id: lobbyId } });
+    expect(stored.passwordHash).toMatch(/^v1:[0-9a-f]{32}:[0-9a-f]{64}$/);
+    expect(stored.passwordHash).not.toContain(password);
+    expect(await view(lobbyId)).toMatchObject({ protected: true, members: [], me: null, lastRound: null });
+    const listing = (await call('GET', '/api/arcade')).json().data.lobbies.find((item: { id: string }) => item.id === lobbyId);
+    expect(listing).toMatchObject({ protected: true, leaderName: null, member: false });
+    expect(JSON.stringify(await view(lobbyId, leader))).not.toContain(stored.passwordHash!);
+
+    const enter = (displayName: string, password?: string, cookie?: string) => call('POST', `${path}/join`, { displayName, ...(password === undefined ? {} : { password }) }, cookie);
+    expect(code(await enter('Bo'))).toBe('LOBBY_PASSWORD_REQUIRED');
+    expect(code(await enter('Bo', 'wrong'))).toBe('LOBBY_PASSWORD_REQUIRED');
+    const admitted = await enter('Bo', password);
+    expect(admitted.statusCode).toBe(200);
+    const guest = cookieOf(admitted);
+    expect((await call('POST', `${path}/password`, { password: null }, guest)).statusCode).toBe(403);
+    expect((await call('POST', `${path}/password`, { password: 'new key' }, leader)).statusCode).toBe(200);
+    expect(code(await enter('Cy', password))).toBe('LOBBY_PASSWORD_REQUIRED');
+    expect((await call('POST', `${path}/leave`, {}, guest)).statusCode).toBe(200);
+    expect((await enter('Bo', undefined, guest)).statusCode).toBe(200);
+    expect((await call('POST', `${path}/password`, { password: null }, leader)).statusCode).toBe(200);
+    expect((await enter('Cy')).statusCode).toBe(200);
+  });
+
   it('hands the lead to the next member present when the leader leaves or goes quiet', async () => {
     const { lobbyId, leader } = await open();
     const bob = cookieOf(await join(lobbyId, 'Bob'));

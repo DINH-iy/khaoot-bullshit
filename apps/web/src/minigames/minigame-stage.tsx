@@ -45,7 +45,7 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
   if (isStepMinigame(minigame.game)) return state.role === 'player' ? <StepPhone state={state} stage={stage} offset={offset} canPlay={canPlay} disabled={disabled} onMove={onMove} />
     : <StepScreen state={state} stage={stage} offset={offset} />;
   if (state.role === 'player') {
-    if (own?.success) return <div className="mg-done" role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : minigameResult(minigame.game, own.data.value, settings)}</p><p>{t('minigame.played')}</p></div>;
+    if (own?.success) return <div className={`mg-done${own.data.early ? ' reaction-early' : ''}`} role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : minigameResult(minigame.game, own.data.value, settings)}</p><p>{t('minigame.played')}</p></div>;
     if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('minigame.paused')}</p>;
     if (!canPlay || !minigame.startsAt) return <p className="wait-note">{t(howToPlayKey(minigame.game))}</p>;
     const Controller = CONTROLLERS[minigame.game as keyof typeof CONTROLLERS] as (props: { settings: MinigameSettings; startsAt: string; goAt: string | null; offset: number; disabled: boolean; onResult: (result: Result) => void; onTaps: (count: number) => void }) => React.ReactElement;

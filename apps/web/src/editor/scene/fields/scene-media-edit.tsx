@@ -1,3 +1,4 @@
+import { Dropdown } from '../../../ui/dropdown.js';
 import { useState } from 'react';
 import { CROP_RATIOS, MediaTrimSchema, sceneMediaUrl, type SceneMedia } from '@party/contracts';
 import { useTexts } from '../../../i18n/texts.js';
@@ -32,9 +33,8 @@ export function SceneMediaEdit({ source, label, save, back }: { source: SceneMed
       <StageMedia key={picture ? source.id : JSON.stringify(next.trim)} media={{ ...next, url: sceneMediaUrl(source.id) }} role="display" displayConnected={false} label={label} preview />
     </div>
     {picture ? <>
-      <label>{t('ratio')}<select value={ratio} onChange={event => setRatio(event.target.value as typeof ratio)}>
-        {(['original', 'square', 'landscape', 'portrait'] as const).map(option => <option key={option} value={option}>{t(option)}</option>)}
-      </select></label>
+      <label>{t('ratio')}<Dropdown value={ratio} onChange={value => setRatio(value as typeof ratio)}
+        options={(['original', 'square', 'landscape', 'portrait'] as const).map(value => ({ value, label: t(value) }))} /></label>
       {ratio !== 'original' && <div className="youtube-times">
         <label>{t('horizontal')}<input type="range" min={0} max={100} value={x} onChange={event => setX(Number(event.target.value))} /></label>
         <label>{t('vertical')}<input type="range" min={0} max={100} value={y} onChange={event => setY(Number(event.target.value))} /></label>

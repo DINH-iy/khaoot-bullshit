@@ -1,3 +1,4 @@
+import { Dropdown } from '../../../ui/dropdown.js';
 import { useState } from 'react';
 import type { SceneTranslations } from '@party/contracts';
 import { LANGUAGES, isLanguage, type Language } from '../../../i18n/language.js';
@@ -8,13 +9,8 @@ import { TRANSLATION_TEXTS } from './translation.text.js';
 
 export function TranslationLanguage({ value, onChange }: { value: Language | ''; onChange: (value: Language | '') => void }) {
   const t = useTexts(TRANSLATION_TEXTS);
-  return <label>{t('language')}<select value={value} onChange={event => {
-    const next = event.target.value;
-    if (next === '' || isLanguage(next)) onChange(next);
-  }}>
-    <option value="">{t('original')}</option>
-    {Object.entries(LANGUAGES).map(([code, name]) => <option key={code} value={code} lang={code}>{name}</option>)}
-  </select></label>;
+  return <label>{t('language')}<Dropdown value={value} onChange={next => { if (next === '' || isLanguage(next)) onChange(next); }}
+    options={[{ value: '', label: t('original') }, ...Object.entries(LANGUAGES).map(([code, name]) => ({ value: code, label: name, lang: code }))]} /></label>;
 }
 
 export function SceneTranslationFields({ stage, onChange }: { stage: Stage; onChange: (next: Stage) => void }) {

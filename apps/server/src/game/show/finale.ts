@@ -1,3 +1,4 @@
+import { voteChoices } from '@party/contracts';
 import { FINALE_STATS, SubmissionValueSchema, type AwardRule, type FinaleStat } from '@party/contracts';
 import { minigameRules, type GameDefinition } from '../definition.js';
 import { locateStage } from '../graph.js';
@@ -41,7 +42,7 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
   const times = new Map<string, number[]>(); const firsts = new Map<string, number>();
   for (const submission of submissions) {
     const info = stageOf.get(submission.stageRunId); const value = SubmissionValueSchema.safeParse(submission.value); if (!info?.stage || !value.success) continue;
-    if (value.data.kind === 'vote') { const voted = author.get(value.data.submissionId); if (voted) bump(votes, voted); }
+    for (const choice of voteChoices(value.data)) { const voted = author.get(choice); if (voted) bump(votes, voted); }
     if (!submission.playerId || info.stage.kind !== 'collect') continue;
     const rule = info.stage.scoring;
     if (rule.kind !== 'none') {

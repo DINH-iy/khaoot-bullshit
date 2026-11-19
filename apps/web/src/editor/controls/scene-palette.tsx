@@ -24,8 +24,8 @@ let lastTab: Tab = SCENE_GROUPS[0]!.key;
 /**
  * The add-a-scene menu (toolbar, + buttons, right-click, dropped connections and
  * new parts). Scene types are grouped in tabs (Rounds, Games, Between rounds,
- * Prefabs when `onPrefab` is given). Types with kinds (writing prompts, every
- * minigame, how a duel is won) open a second menu in the same place.
+ * Prefabs when `onPrefab` is given). Types with kinds (each minigame and how
+ * a duel is won) open a second menu in the same place.
  */
 export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }: {
   label: string; onPick: (choice: SceneChoice) => void; onCancel: () => void;

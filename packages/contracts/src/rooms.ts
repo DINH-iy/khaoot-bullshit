@@ -4,6 +4,10 @@ import { PlayerLookSchema } from './players.js';
 import { ArcadeLinkSchema } from './arcade.js';
 import { TranslatedTextsSchema } from './presentation.js';
 
+export const AutoRevealSecondsSchema = z.number().int().min(0).max(120);
+export const MAX_IDLE_CLOSE_MINUTES = 1440;
+export const IdleCloseMinutesSchema = z.number().int().min(0).max(MAX_IDLE_CLOSE_MINUTES);
+
 export const ROOM_CODE_LENGTH = 6;
 export const RoomCodeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 /** What someone typed or pasted, as a code: capitals, only characters a code can have, never longer than a code. */
@@ -22,7 +26,7 @@ export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.
 export const NetworkErrorCodeSchema = z.enum([
   ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'CHIPS_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
   'AUDIO_TOOLS_UNAVAILABLE', 'AUDIO_IMPORT_FAILED', 'AUDIO_TRIM_FAILED',
-  'LOBBY_LOCKED', 'LOBBY_FULL', 'ARCADE_FULL', 'ROUND_ON', 'NOT_ENOUGH_PLAYERS', 'MEDIA_IN_USE',
+  'LOBBY_PASSWORD_REQUIRED', 'LOBBY_LOCKED', 'LOBBY_FULL', 'ARCADE_FULL', 'ROUND_ON', 'NOT_ENOUGH_PLAYERS', 'MEDIA_IN_USE',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
@@ -31,8 +35,10 @@ export const RoomSnapshotSchema = z.object({
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   // Whether a shared screen is connected: it plays the room's videos and songs; without one the host's screen does.
   displayConnected: z.boolean().optional(),
-  players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean() }).strict(),
+  birthdayVote: z.object({ voted: z.boolean(), ready: z.boolean() }).strict().optional(),
+  hostPhone: z.boolean().optional(), hostPhonePlayerId: GameIdSchema.nullable().optional(),
+  players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema, canBan: z.boolean().optional() }).strict()),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(), idleCloseMinutes: IdleCloseMinutesSchema.optional(), keepOpen: z.boolean().optional() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
@@ -76,6 +82,8 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   signup: z.boolean(),
   // `testBench`: phones on the test bench (several players in one browser) may join this room.
   testBench: z.boolean(),
+  autoRevealSeconds: AutoRevealSecondsSchema.nullable(),
+  keepOpen: z.boolean(),
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();

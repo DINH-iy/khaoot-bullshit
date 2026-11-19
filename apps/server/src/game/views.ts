@@ -1,3 +1,4 @@
+import { ballotTally } from './scoring/ballot.js';
 import { readExplain } from './explain.js';
 import { isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/steps/engine.js';
@@ -91,7 +92,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         const content = value.kind === 'text' ? { kind: 'text', text: value.text } : candidate.asset?.kind === 'DRAWING' ? { kind: 'drawing', assetId: candidate.asset.id } : candidate.asset ? { kind: 'media', assetId: candidate.asset.id, mediaKind: candidate.asset.kind.toLowerCase() } : null;
         return content ? { submissionId: candidate.id, own: ownEntry(candidate), content } : null;
       }).filter(entry => entry !== null).sort((a, b) => order(a.submissionId) < order(b.submissionId) ? -1 : 1) : null;
-      const votesFor = (submissionId: string) => submissions.filter(row => { const value = SubmissionValueSchema.safeParse(row.value); return value.success && value.data.kind === 'vote' && value.data.submissionId === submissionId; }).length;
+      const totalsByAnswer = stageEntry?.kind === 'vote' && revealed ? ballotTally(stageEntry, submissions) : null;
       // A minigame shows its settings and start times while it runs; places (and what was behind each door) only once revealed.
       const rules = stageEntry?.kind === 'minigame' ? minigameRules(stageEntry) : null;
       const run = rules && current ? readMinigameRun(current.presentation) : null;
@@ -103,7 +104,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         goAt: current?.status === 'ACTIVE' && session.status === 'RUNNING' && run?.goAt &&Date.parse(run.goAt) <= clock().getTime() ? run.goAt : null } : null;
       const minigameAnswer = rules && revealed ? { kind: 'minigame', game: rules.game, doorsMilli: run?.doorsMilli ?? null,
         entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id).entries } : null;
-      const voteAnswer = revealed && voteSource?.success ? { kind: 'vote', entries: candidates.map(candidate => ({ submissionId: candidate.id, playerId: candidate.playerId, teamId: candidate.teamId, votes: votesFor(candidate.id) })).sort((a, b) => b.votes - a.votes || (a.submissionId < b.submissionId ? -1 : 1)) } : null;
+      const voteAnswer = revealed && voteSource?.success ? { kind: 'vote', entries: candidates.map(candidate => ({ submissionId: candidate.id, playerId: candidate.playerId, teamId: candidate.teamId, votes: totalsByAnswer?.get(candidate.id) ?? 0 })).sort((a, b) => b.votes - a.votes || (a.submissionId < b.submissionId ? -1 : 1)) } : null;
       return SessionViewSchema.parse({ formatVersion: 1, sessionId: session.id, revision: session.revision, status: session.status, title: definition.title,
         stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt, translations: entry.stage.translations,
           input: entry.stage.kind === 'collect' ? publicInput(entry.stage.input, `${current.id}:${actorKey(actor.data)}`)
@@ -117,7 +118,10 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           mediaLayout: entry.stage.mediaLayout,
           media: entry.stage.media ? { ...entry.stage.media, url: sceneMediaUrl(entry.stage.media.id) } : null,
           info: entry.stage.kind === 'info' ? { title: entry.stage.title } : null, scoreboard: entry.stage.kind === 'scoreboard' ? { show: entry.stage.show } : null,
-          ballot, minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
+          ...(current.status === 'ACTIVE' && session.status === 'RUNNING' && typeof (current.presentation as { drawingStartsAt?: unknown }).drawingStartsAt === 'string'
+            ? { countdownUntil: (current.presentation as { drawingStartsAt: string }).drawingStartsAt } : {}),
+          ballot, ...(entry.stage.kind === 'vote' ? { voteMode: entry.stage.voteMode ?? 'single', voteLimit: entry.stage.voteMode && entry.stage.voteMode !== 'single' ? entry.stage.voteLimit ?? 3 : 1 } : {}),
+          ...('resultCards' in entry.stage && entry.stage.resultCards !== undefined && current.revealedAt ? { resultCards: { mode: entry.stage.resultCards, revealedAt: current.revealedAt.toISOString(), index: (current.presentation as { resultCardIndex?: number }).resultCardIndex ?? 0 } } : {}), minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
           revealed, reveal: revealed ? { answer: voteAnswer ?? minigameAnswer ?? answer, awards: awards.map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
             teamAwards: teamAwards.map(row => ({ teamId: row.recipientTeamId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })) } : null } : null,
         serverTime: clock().toISOString(),

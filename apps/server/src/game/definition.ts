@@ -1,3 +1,4 @@
+import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
@@ -62,12 +63,12 @@ export const WheelSchema = z.object({
 const look = { mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An explanation shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   explain: z.object({ text: z.string().trim().min(1).max(1000).optional() }).strict().optional() };
-const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
+const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), resultCards: ResultCardsSchema.optional(), countdownSeconds: z.number().int().min(0).max(15).optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
   z.object({ ...common, kind: z.literal('challenge'), maxAwardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
   // Players vote for one answer from an earlier text or upload round. Each vote gives its author points.
-  z.object({ ...common, kind: z.literal('vote'), source: z.object({ nodeKey: GameKeySchema, stageKey: GameKeySchema }).strict(), awardPerVoteMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
+  z.object({ ...common, kind: z.literal('vote'), voteMode: VotingModeSchema.optional(), voteLimit: z.number().int().min(2).max(MAX_BALLOT_SELECTIONS).optional(), source: z.object({ nodeKey: GameKeySchema, stageKey: GameKeySchema }).strict(), awardPerVoteMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
   // Show-only scenes: no answers, no points, no team play. The host continues
   // whenever they like; an optional countdown only informs the room.
   // An info scene (cutscene, rules, announcement): a title and text on every screen.
@@ -137,6 +138,9 @@ export const GameDefinitionSchema = z.object({
   // Challenges a player may have waiting for an answer at once (left out: 3). The host can change it in the room.
   openInvites: z.number().int().min(1).max(MAX_OPEN_INVITES).optional(),
   // The host's quick time button (+30 s by default): how many seconds it adds to a round.
+  birthdayVote: z.boolean().optional(),
+  autoRevealSeconds: AutoRevealSecondsSchema.optional(),
+  idleCloseMinutes: IdleCloseMinutesSchema.optional(),
   quickTimeSeconds: z.number().int().min(5).max(600).optional(),
   // The background playlist (songs from the media library), from the lobby on. Left out: no music.
   music: GameMusicSchema.optional(),
@@ -162,6 +166,8 @@ export const GameDefinitionSchema = z.object({
     const at = (message: string, stageIndex?: number) => ctx.addIssue({ code: 'custom', message, path: stageIndex === undefined ? ['nodes', nodeIndex] : ['nodes', nodeIndex, 'stages', stageIndex] });
     if (new Set(node.stages.map(stage => stage.key)).size !== node.stages.length) at('Duplicate stage key');
     for (const [stageIndex, stage] of node.stages.entries()) {
+      if ('countdownSeconds' in stage && stage.countdownSeconds !== undefined && stage.kind !== 'minigame' && !(stage.kind === 'collect' && stage.input.kind === 'drawing')) at('A countdown requires a drawing round or minigame', stageIndex);
+      if ('resultCards' in stage && stage.resultCards !== undefined && stage.kind !== 'vote' && !(stage.kind === 'collect' && (stage.input.kind === 'media' || stage.input.kind === 'drawing'))) at('Result cards require a vote, drawing or upload round', stageIndex);
       if (stage.youtube && stage.media) at('Choose either a YouTube clip or a library file for this scene', stageIndex);
       if (stage.media?.crop && stage.media.kind !== 'image') at('Only pictures can be cropped', stageIndex);
       if (stage.media?.trim && stage.media.kind === 'image') at('Only video or audio can be cut', stageIndex);

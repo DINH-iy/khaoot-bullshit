@@ -1,9 +1,107 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { closeRoundsByHand, expectPhoneScores, openHostFold, openHostTool } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
+
+test('an assigned host phone still answers and can close a round with immediate auto-reveal', async ({ browser, page, baseURL }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  const hostContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  try {
+    await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+    await host.getByRole('radio', { name: /Timed quiz/ }).check();
+    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await closeRoundsByHand(host);
+    await page.goto(`/?code=${roomCode}`);
+    await page.getByLabel('Your name').fill('Playing host');
+    await page.getByRole('button', { name: 'Join room', exact: true }).click();
+
+    await expect(host.getByText('Playing host · connected', { exact: false })).toBeVisible();
+    const phonePicker = host.getByRole('combobox', { name: 'Host phone', exact: true });
+    await phonePicker.selectOption({ label: 'Playing host' });
+    const menu = page.getByRole('button', { name: 'Host controls', exact: true });
+    const controls = page.getByRole('dialog', { name: 'Host controls' });
+    await menu.click();
+    await controls.getByLabel('Automatically reveal results').click();
+    await expect(controls.getByLabel('Reveal delay in seconds')).toHaveValue('0');
+    await controls.getByRole('button', { name: 'Start the game' }).click();
+
+    await page.getByRole('radio', { name: 'Saturn', exact: true }).check();
+    await page.getByRole('button', { name: 'Save answer', exact: true }).click();
+    await expect(page.getByText('Your answer is in!')).toBeVisible();
+    await menu.click();
+    await controls.getByRole('button', { name: 'Close answers' }).click();
+    await expect(page.getByRole('region', { name: 'Round results' })).toContainText('Correct answer: Saturn');
+    await expect(host.getByRole('region', { name: 'Round results' })).toContainText('Correct answer: Saturn');
+  } finally { await hostContext.close(); }
+});
+
+test('ranked ballots preserve the saved choices and advance result cards on the timer', async ({ browser, page: host, baseURL }) => {
+  await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const gameId = randomUUID();
+  const title = 'Ranked answers';
+  const draft = await host.request.post('/api/host/games', { headers, data: { gameId, title, startFrom: null } });
+  expect(draft.ok()).toBe(true);
+  const definition = {
+    formatVersion: 1, title, startNodeKey: 'write',
+    nodes: [
+      { key: 'write', stages: [{ kind: 'collect', key: 'write', prompt: 'Write a joke', durationMs: null, input: { kind: 'text', maxLength: 100 }, scoring: { kind: 'none' } }] },
+      { key: 'vote', stages: [{ kind: 'vote', key: 'vote', prompt: 'Rank the jokes', durationMs: null, source: { nodeKey: 'write', stageKey: 'write' }, awardPerVoteMilli: '1000', voteMode: 'ranked', voteLimit: 2, resultCards: 4 }] },
+    ],
+    edges: [{ key: 'write-to-vote', from: 'write', to: 'vote' }],
+  };
+  const saved = await host.request.put(`/api/host/games/${gameId}/draft`, { headers, data: { expectedRevision: (await draft.json()).data.revision, definition } });
+  expect(saved.ok(), await saved.text()).toBe(true);
+  expect((await host.request.post(`/api/host/games/${gameId}/publish`, { headers, data: { expectedRevision: (await saved.json()).data.revision } })).ok()).toBe(true);
+  const sessionId = randomUUID();
+  expect((await host.request.post('/api/host/rooms', { headers, data: { gameId, sessionId, commandId: randomUUID() } })).ok()).toBe(true);
+  await host.goto(`/?room=${sessionId}`);
+  const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+  await closeRoundsByHand(host);
+
+  const contexts = await Promise.all(Array.from({ length: 3 }, () => browser.newContext({ viewport: { width: 375, height: 667 } })));
+  try {
+    const phones = await Promise.all(contexts.map(context => context.newPage()));
+    const ada = phones[0]!; const bo = phones[1]!; const voter = phones[2]!;
+    await Promise.all(phones.map(async (phone, i) => {
+      await phone.goto(`${baseURL}/?code=${roomCode}`);
+      await phone.getByLabel('Your name').fill(['Ada', 'Bo', 'Voter'][i]!);
+      await phone.getByRole('button', { name: 'Join room', exact: true }).click();
+      await expect(phone.getByRole('heading', { name: `Room ${roomCode}` })).toBeVisible();
+    }));
+    await host.getByRole('button', { name: 'Start the game' }).click();
+    for (const [phone, joke] of [[ada, 'A joke about a seal'], [bo, 'A joke about a crab']] as const) {
+      await phone.getByRole('textbox').fill(joke);
+      await phone.getByRole('button', { name: 'Save answer' }).click();
+      await expect(phone.getByText('Your answer is in!')).toBeVisible();
+    }
+    await host.getByRole('button', { name: 'Close answers' }).click();
+    await host.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(ada.getByRole('checkbox', { name: /a seal/ })).toBeDisabled();
+    await voter.getByRole('checkbox', { name: /a crab/ }).check();
+    await expect(voter.getByRole('checkbox', { name: /^1\..*a crab/ })).toBeChecked();
+    await voter.getByRole('checkbox', { name: /a seal/ }).check();
+    await expect(voter.getByRole('checkbox', { name: /^2\..*a seal/ })).toBeChecked();
+    await voter.getByRole('button', { name: 'Save vote' }).click();
+    await expect(voter.locator('.saved-vote-badge')).toHaveCount(2);
+    await voter.reload();
+    await expect(voter.locator('.saved-vote-badge')).toHaveCount(2);
+    await host.getByRole('button', { name: 'Close answers' }).click();
+    await host.getByRole('button', { name: 'Reveal results' }).click();
+
+    const results = voter.getByRole('region', { name: 'Round results' });
+    await expect(results.locator('.ballot-entry')).toHaveCount(1);
+    await expect(results.locator('.ballot-entry')).toContainText('Bo · 2 pts');
+    await expect(results.locator('.ballot-entry')).toContainText('Ada · 1 pts');
+    await expect(results.locator('.result-card-controls')).toContainText('2 of 2');
+  } finally { await Promise.all(contexts.map(context => context.close())); }
+});
 
 test('owner opens a room from the host menu and stays in control of a timed stage', async ({ browser, page, baseURL }) => {
   // A browser without the owner key gets an explanation, not a menu.
@@ -102,13 +200,34 @@ test('owner opens a room from the host menu and stays in control of a timed stag
     await host.getByRole('button', { name: 'Next', exact: true }).click();
     const items = page.locator('.order-list .order-label');
     await expect(items).toHaveCount(4);
-    // Arrange with buttons only (no dragging): repeatedly lift each animal into place.
+    // The buttons also work without using a drag gesture.
     const wanted = ['Mouse', 'Wolf', 'Horse', 'Hippopotamus'];
     for (let target = 0; target < wanted.length; target++) {
       for (let guard = 0; guard < 4 && (await items.nth(target).textContent()) !== wanted[target]; guard++) await page.getByRole('button', { name: `Move ${wanted[target]} up` }).click();
     }
     await expect(items).toHaveText(wanted);
     await expect(page.getByRole('button', { name: 'Move Mouse up' })).toBeDisabled();
+    await items.nth(1).scrollIntoViewIfNeeded();
+    const from = (await items.nth(1).boundingBox())!;
+    const to = (await items.nth(0).boundingBox())!;
+    const points = [from, to].map(({ x, y, width, height }) => ({ x: Math.round(x + width / 2), y: Math.round(y + height / 2) }));
+    if (test.info().project.name === 'android-chrome') {
+      const session = await page.context().newCDPSession(page);
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]!] });
+      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [points[1]!] });
+      await expect(page.locator('.order-list [data-drop="before"]')).toContainText('Mouse');
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await session.detach();
+    } else {
+      await page.mouse.move(points[0]!.x, points[0]!.y);
+      await page.mouse.down();
+      await page.mouse.move(points[1]!.x, points[1]!.y, { steps: 4 });
+      await expect(page.locator('.order-list [data-drop="before"]')).toContainText('Mouse');
+      await page.mouse.up();
+    }
+    await expect(items).toHaveText(['Wolf', 'Mouse', 'Horse', 'Hippopotamus']);
+    await page.getByRole('button', { name: 'Move Mouse up' }).click();
+    await expect(items).toHaveText(wanted);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: 'Save answer', exact: true }).click();
@@ -146,5 +265,73 @@ test('the host goes back to the lobby: a fresh room with a new code, and the pho
     expect(secondCode).not.toBe(firstCode);
     await expect(page.getByRole('heading', { name: `Room ${secondCode}` })).toBeVisible();
     await expect(host.getByText('Stays along · connected', { exact: false })).toBeVisible();
+  } finally { await hostContext.close(); }
+});
+
+test('players can save the active look, leave the room, and see host moderation changes', async ({ browser, page, baseURL }) => {
+  const hostContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  try {
+    await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+    await host.getByRole('radio', { name: /Timed quiz/ }).check();
+    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+    await openHostFold(host, 'Room settings');
+    await host.getByRole('checkbox', { name: /Players confirm their look/ }).check();
+    await host.getByRole('dialog', { name: 'Room settings' }).getByRole('button', { name: 'Close', exact: true }).click();
+    await page.goto(`/?code=${code}`);
+    await page.getByLabel('Your name').fill('Draw and leave');
+    await page.getByRole('button', { name: 'Join room', exact: true }).click();
+    await expect(page.getByRole('heading', { name: `Room ${code}` })).toBeVisible();
+    const room = page.url();
+    const settings = () => page.getByRole('dialog', { name: 'Your look' });
+    await page.getByRole('button', { name: 'Change my look' }).click();
+    await settings().getByRole('tab', { name: 'Draw', exact: true }).click();
+    const pad = settings().getByRole('application');
+    await pad.focus();
+    await pad.press('Space');
+    await pad.press('ArrowRight');
+    await pad.press('ArrowDown');
+    await pad.press('Space');
+    await settings().getByRole('button', { name: 'Save my look' }).click();
+    await expect(settings()).toHaveCount(0);
+    await expect(host.locator('.lobby-seats .avatar-picture path')).not.toHaveCount(0);
+
+    const picture = { name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') };
+    await page.getByRole('button', { name: 'Change my look' }).click();
+    await settings().getByRole('tab', { name: 'Photo' }).click();
+    await settings().locator('input[type=file]').setInputFiles(picture);
+    await expect(settings().locator('.look-hero img')).toBeVisible();
+    await settings().getByRole('tab', { name: 'Character' }).click();
+    await settings().getByRole('button', { name: 'Save my look' }).click();
+    await expect(host.locator('.lobby-seats .avatar-picture path')).not.toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Change my look' }).click();
+    await settings().getByRole('tab', { name: 'Photo' }).click();
+    await settings().locator('input[type=file]').setInputFiles(picture);
+    await expect(settings().locator('.look-hero img')).toBeVisible();
+    await settings().getByRole('button', { name: 'Save my look' }).click();
+    await expect(host.locator('.lobby-seats .avatar-picture img')).toBeVisible();
+
+    await host.getByRole('button', { name: 'Manage Draw and leave' }).click();
+    await host.getByLabel('Display name', { exact: true }).fill('New display name');
+    await host.getByRole('button', { name: 'Save name' }).click();
+    await expect(host.getByRole('button', { name: 'Manage New display name' })).toBeVisible();
+    const oldPhoto = await host.locator('.lobby-seats .avatar-picture img').getAttribute('src');
+    await host.locator('.player-moderation input[type=file]').setInputFiles(picture);
+    await host.getByRole('button', { name: 'Replace photo', exact: true }).click();
+    await expect(host.locator('.lobby-seats .avatar-picture img')).not.toHaveAttribute('src', oldPhoto!);
+
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByRole('link', { name: 'Leave room', exact: true }).click();
+    await expect(page).toHaveURL(new URL('/', baseURL).href);
+    await page.goto(room);
+    await expect(page.getByRole('heading', { name: `Room ${code}` })).toBeVisible();
+    await openHostFold(host, 'Room settings');
+    host.once('dialog', dialog => dialog.accept());
+    await host.getByRole('button', { name: 'Close room', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Leave room', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Leave room', exact: true }).click();
+    await expect(page).toHaveURL(new URL('/', baseURL).href);
   } finally { await hostContext.close(); }
 });

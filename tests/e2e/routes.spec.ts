@@ -45,9 +45,12 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
       await phone.getByRole('radio', { name: label, exact: true }).check();
       await phone.getByRole('button', { name: 'Save vote', exact: true }).click();
       await expect(phone.getByText('Your vote is in!')).toBeVisible();
+      await expect(phone.locator('.route-saved-vote')).toContainText(`Saved vote ${label}`);
     }
     await cleo.reload();
     await expect(cleo.getByText('Your vote is in!')).toBeVisible();
+    await expect(cleo.locator('.route-saved-vote')).toContainText('Music');
+    await expect(host.locator('.saved-vote-badge')).toHaveCount(0);
     const hostRoute = host.getByRole('region', { name: 'Route choice' });
     await expect(hostRoute).toContainText('3 of 3 voted');
     await expect(hostRoute).toContainText('Physical · 2 votes');
@@ -65,6 +68,7 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
     await expect(hostRoute).toContainText('The party goes: Physical (by vote). Reveal to announce it.');
     await expect(ada.getByText('Voting has closed. The host announces the route.')).toBeVisible();
     await host.getByRole('button', { name: 'Announce the route' }).click();
+    await expect(cleo.locator('.route-saved-vote')).toContainText('Music');
     await expect(ada.getByRole('region', { name: 'Route choice' })).toContainText('The party goes: Physical (by vote).');
     await expect(ada.getByRole('region', { name: 'Route choice' })).toContainText('Physical · 2 votes');
     await host.getByRole('button', { name: 'Next', exact: true }).click();

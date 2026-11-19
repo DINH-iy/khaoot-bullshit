@@ -4,6 +4,7 @@ import { MINIGAMES, formatMinigameResult, type MinigameKey } from '@party/contra
 export function arcadeProblem(error: unknown): string {
   const code = error instanceof Error ? error.message : '';
   return ({
+    LOBBY_PASSWORD_REQUIRED: 'Enter the correct lobby password to join.',
     LOBBY_LOCKED: 'This lobby is locked. Ask its leader to unlock it.',
     LOBBY_FULL: 'This lobby is full.',
     ARCADE_FULL: 'There are too many open lobbies right now. Join one, or try again in a few minutes.',

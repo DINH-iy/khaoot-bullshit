@@ -7,9 +7,11 @@ import { buildApp } from '../../../src/app.js';
 import { readConfig } from '../../../src/config.js';
 import { createTokenVerifier } from '../../../src/auth/auth.js';
 import { provisionRehearsal } from '../../../src/rooms/rehearsal.js';
+import { reconcileEmptyRooms } from '../../../src/rooms/idle-close.js';
 import { createRoomGateway } from '../../../src/rooms/gateway.js';
 import { cookieName, tokenHash } from '../../../src/rooms/security.js';
 import { createGameService } from '../../../src/game/service.js';
+import { readRoomState } from '../../../src/rooms/reclaim.js';
 import { answer, db, fixture, prisma } from '../game-fixture.js';
 
 const config = readConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent', ROOM_TOKEN_SECRET: 'a'.repeat(64), PUBLIC_ORIGIN: 'http://127.0.0.1:4173', AUTH_ISSUER: 'https://identity.example/', AUTH_AUDIENCE: 'party-api', AUTH_JWKS_URL: 'https://identity.example/keys' });
@@ -54,6 +56,58 @@ async function hostCommand(socket: Socket, sessionId: string, type: string, extr
 }
 
 describe('verified HTTP admission and actual Socket.IO networking', () => {
+  it('keeps moderation and closing host-only and bans a linked account in this room only', async () => {
+    const f = await room(); const guest = await player(f); const host = await socketFor(f.sessionId, f.cookie);
+    const phone = await socketFor(f.sessionId, guest.cookie);
+    const state = await sync(phone, f.sessionId); const playerId = state.selfPlayerId!;
+    await expect(emit(phone, 'room.command', {
+      formatVersion: 1, sessionId: f.sessionId, commandId: randomUUID(), expectedRevision: state.view.revision, type: 'player.moderate', playerId, displayName: 'Changed',
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect((await api(`/api/rooms/${f.sessionId}/close`, {}, guest.cookie)).statusCode).toBe(403);
+    expect((await api(`/api/rooms/${f.sessionId}/revoke`, { playerId, ban: true }, f.cookie)).json().error.code).toBe('INVALID_COMMAND');
+    await hostCommand(host, f.sessionId, 'player.moderate', { playerId, displayName: 'New name' });
+    expect((await sync(phone, f.sessionId)).players.find(player => player.id === playerId)?.displayName).toBe('New name');
+
+    const name = `Room ban ${randomUUID().slice(0, 8)}`;
+    const account = await prisma.person.create({ data: { name, nameKey: name.toLowerCase(), linkHash: tokenHash(randomUUID()) } });
+    const gateway = createRoomGateway(prisma, config);
+    const joinAsPerson = (roomCode: string) => gateway.join({ roomCode, displayName: name, joinId: randomUUID() }, account);
+    await joinAsPerson(f.roomCode);
+    const accountSeat = (await sync(host, f.sessionId)).players.find(player => player.displayName === name)!;
+    expect(accountSeat.canBan).toBe(true);
+    expect((await sync(phone, f.sessionId)).players.find(player => player.id === accountSeat.id)?.canBan).toBeUndefined();
+    expect((await api(`/api/rooms/${f.sessionId}/revoke`, { playerId: accountSeat.id }, f.cookie)).statusCode).toBe(200);
+    await expect(joinAsPerson(f.roomCode)).resolves.toMatchObject({ sessionId: f.sessionId });
+    expect((await api(`/api/rooms/${f.sessionId}/revoke`, { playerId: accountSeat.id, ban: true }, f.cookie)).statusCode).toBe(200);
+    await expect(joinAsPerson(f.roomCode)).rejects.toMatchObject({ code: 'SEAT_DENIED' });
+    const other = await room();
+    await expect(joinAsPerson(other.roomCode)).resolves.toMatchObject({ sessionId: other.sessionId });
+    expect((await api(`/api/rooms/${f.sessionId}/close`, {}, f.cookie)).statusCode).toBe(200);
+    expect((await sync(phone, f.sessionId)).view.status).toBe('FINISHED');
+  });
+
+  it('persists empty room deadlines, resets them on reconnect and honors keep open', async () => {
+    const f = await room();
+    const start = new Date('2026-11-19T19:00:00Z');
+    const tick = (seconds: number, occupied = false) => reconcileEmptyRooms(prisma,
+      new Set(occupied ? [f.sessionId] : []), id => occupied && id === f.sessionId, new Date(start.getTime() + seconds * 1000));
+    const read = () => prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } });
+    await prisma.gameSession.update({ where: { id: f.sessionId }, data: { state: { idleCloseMinutes: 1, keepOpen: false } } });
+    await tick(0);
+    expect((await read()).idleCloseAt?.toISOString()).toBe('2026-11-19T19:01:00.000Z');
+    await tick(59, true);
+    expect((await read()).idleCloseAt).toBeNull();
+    await tick(60);
+    expect((await read()).idleCloseAt?.toISOString()).toBe('2026-11-19T19:02:00.000Z');
+    expect((await api(`/api/rooms/${f.sessionId}/settings`, { keepOpen: true }, f.cookie)).statusCode).toBe(200);
+    await tick(121);
+    expect(await read()).toMatchObject({ status: 'LOBBY', idleCloseAt: null });
+    expect((await api(`/api/rooms/${f.sessionId}/settings`, { keepOpen: false }, f.cookie)).statusCode).toBe(200);
+    await tick(122);
+    await tick(182);
+    expect(await read()).toMatchObject({ status: 'FINISHED', idleCloseAt: null });
+  });
+
   it('verifies signed host identities, ownership and idempotent room creation', async () => {
     const f = await fixture();
     const token = await new SignJWT({ scope: 'games:write' }).setProtectedHeader({ alg: 'RS256' }).setIssuer(config.AUTH_ISSUER!).setAudience('party-api').setSubject(f.creator.subject).setIssuedAt().setExpirationTime('5m').sign(keys.privateKey);
@@ -93,6 +147,46 @@ describe('verified HTTP admission and actual Socket.IO networking', () => {
     expect((await sync(display, f.sessionId)).role).toBe('display'); expect((await sync(host, f.sessionId)).role).toBe('host');
     await expect(emit(display, 'room.command', { formatVersion: 1, sessionId: f.sessionId, type: 'session.start', commandId: randomUUID(), expectedRevision: 1 })).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+  it('lets an assigned phone play and operate rounds, and keeps the birthday vote private', async () => {
+    const f = await room(); const path = `/api/rooms/${f.sessionId}`;
+    const host = await socketFor(f.sessionId, f.cookie);
+    const ada = await player(f, 'Ada'); const ben = await player(f, 'Ben'); const cleo = await player(f, 'Cleo');
+    const phone = await socketFor(f.sessionId, ada.cookie);
+    const benPhone = await socketFor(f.sessionId, ben.cookie);
+    const cleoPhone = await socketFor(f.sessionId, cleo.cookie);
+    const playerId = (await sync(phone, f.sessionId)).selfPlayerId!;
+    const roomRow = await prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } });
+    await prisma.gameSession.update({ where: { id: f.sessionId }, data: { state: { ...readRoomState(roomRow.state), birthdayVote: true } } });
+
+    expect((await api(`${path}/host-phone`, { playerId }, ben.cookie)).statusCode).toBe(403);
+    await expect(hostCommand(phone, f.sessionId, 'session.start')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect((await api(`${path}/host-phone`, { playerId }, f.cookie)).statusCode).toBe(200);
+    expect(await sync(phone, f.sessionId)).toMatchObject({ hostPhone: true, role: 'player' });
+    expect(await sync(benPhone, f.sessionId)).toMatchObject({ hostPhone: false });
+    expect((await api(`${path}/settings`, { autoRevealSeconds: 0 }, ben.cookie)).statusCode).toBe(403);
+    expect((await api(`${path}/settings`, { autoRevealSeconds: 0, showScores: false }, ada.cookie)).statusCode).toBe(403);
+    expect((await api(`${path}/settings`, { autoRevealSeconds: 0 }, ada.cookie)).statusCode).toBe(200);
+    const stageRunId = (await hostCommand(phone, f.sessionId, 'session.start')).stageRunId!;
+    await emit(phone, 'room.command', answer(f.sessionId, stageRunId));
+    expect((await sync(phone, f.sessionId)).view.ownSubmission).not.toBeNull();
+
+    expect((await api(`${path}/birthday-vote`, { vote: true }, ada.cookie)).statusCode).toBe(403);
+    expect((await api(`${path}/birthday-vote`, { vote: true }, f.cookie)).statusCode).toBe(403);
+    expect((await api(`${path}/birthday-vote`, { vote: true }, ben.cookie)).statusCode).toBe(200);
+    expect((await sync(cleoPhone, f.sessionId)).birthdayVote).toEqual({ voted: false, ready: false });
+    expect((await api(`${path}/birthday-vote`, { vote: true }, cleo.cookie)).statusCode).toBe(200);
+    expect((await sync(benPhone, f.sessionId)).birthdayVote).toEqual({ voted: true, ready: true });
+    expect((await sync(host, f.sessionId)).birthdayVote).toBeUndefined();
+    expect((await sync(phone, f.sessionId)).birthdayVote).toBeUndefined();
+
+    const closed = await hostCommand(phone, f.sessionId, 'stage.close', { stageRunId });
+    const saved = await emit<{ receipt: CommandReceipt }>(phone, 'room.receipt', { commandId: closed.commandId });
+    expect(saved.receipt).toEqual(closed);
+    await expect.poll(async () => (await sync(cleoPhone, f.sessionId)).view.stage?.revealed, { timeout: 5000 }).toBe(true);
+    expect((await api(`${path}/host-phone`, { playerId: null }, f.cookie)).statusCode).toBe(200);
+    await expect(hostCommand(phone, f.sessionId, 'stage.advance', { stageRunId })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  }, 12000);
+
   it('supports twenty real clients, private submissions, retries and reconnect state restoration', async () => {
     const f = await room(); const host = await socketFor(f.sessionId, f.cookie); const players = [];
     for (let i = 0; i < 20; i++) { const p = await player(f, `Player ${i}`); players.push(await socketFor(f.sessionId, p.cookie)); }
@@ -166,6 +260,8 @@ describe('taking over a seat from a new phone', () => {
     const receipt = await emit<CommandReceipt>(adaSocket, 'room.command', answer(f.sessionId, stageRunId));
     expect((await seatsOf(f.roomCode)).seats).toEqual([]);
     const adaId = await seatOf(f, 'Ada');
+    expect((await hostPost(f, 'host-phone', { playerId: adaId })).statusCode).toBe(200);
+    expect((await sync(adaSocket, f.sessionId)).hostPhone).toBe(true);
     expect((await reclaim(f.roomCode, adaId, randomUUID())).json()).toEqual({ ok: false, error: { code: 'SEAT_UNAVAILABLE' } });
 
     const gone = socketEvent(adaSocket, 'disconnect'); adaSocket.disconnect(); await gone;
@@ -180,6 +276,8 @@ describe('taking over a seat from a new phone', () => {
     const continued = await socketFor(f.sessionId, newPhone);
     const state = await sync(continued, f.sessionId);
     expect(state.selfPlayerId).toBe(adaId);
+    expect(state.hostPhone).toBe(false);
+    expect((await sync(host, f.sessionId)).hostPhonePlayerId).toBeNull();
     expect(state.view.ownSubmission?.id).toBe(receipt.submissionId);
     expect(await prisma.sessionPlayer.count({ where: { sessionId: f.sessionId } })).toBe(2);
     expect(await prisma.playerCredential.count({ where: { sessionId: f.sessionId, playerId: adaId, revokedAt: null } })).toBe(1);
