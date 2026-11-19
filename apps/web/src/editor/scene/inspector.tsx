@@ -13,6 +13,8 @@ import { PlacesFields } from './fields/places-fields.js';
 import { MinigameFields } from './fields/minigame-fields.js';
 import { DrawingFields } from './fields/drawing-fields.js';
 import { DuelFields } from './fields/duel-fields.js';
+import { MediaField } from './fields/media-field.js';
+import { musicSummary, SceneMusicFields } from './fields/music-fields.js';
 import { isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, QUIZ_KINDS, quizKind, setRouteOptions, uniqueKey, updateStage, withQuizKind, type Definition, type Node, type Option, type Stage } from '../model.js';
 
 type Change = (next: Definition, group?: string) => void;
@@ -65,6 +67,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
       {stage.kind === 'info' && <label>Title<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
       <label>{stage.kind === 'info' ? 'Text on every screen' : stage.kind === 'scoreboard' ? 'Heading' : stage.kind === 'route' ? 'Question to the party' : stage.kind === 'minigame' ? 'Title on the screens' : 'Question or instruction'}
         <textarea rows={3} value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
+      {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} onChange={next => edit(() => next, 'media')} />}
       {timed && <label className="ed-inline">{stage.kind === 'duel' ? 'Betting time' : 'Timer'}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600} placeholder="none" value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />sec</span></label>}
 
@@ -127,6 +130,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
     {hasPlay && <Section title="Explanation first" summary={stage['explain'] ? 'Shown before the round' : 'Off'}><ExplainFields definition={definition} stage={stage} onChange={(next, field) => edit(() => next, field)} /></Section>}
 
     {hasPlay && <Section title="Who plays" summary={playSummary(stage)}><PlayFields definition={definition} node={node} index={index} onChange={onChange} /></Section>}
+    <Section title="Music" memory="scene-music" summary={musicSummary(stage)}><SceneMusicFields stage={stage} onChange={next => edit(() => next, 'music')} /></Section>
   </div>;
 }
 

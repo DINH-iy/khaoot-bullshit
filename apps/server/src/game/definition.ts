@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, SceneMediaSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -57,7 +57,9 @@ export const WheelSchema = z.object({
 }).strict();
 // Every scene may carry its own look, a wheel to spin there (`spin`), or hide the last wheel result from here on (`wheelClear`).
 // All optional, so earlier definitions keep their hash.
-const look = { presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+// `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
+// `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
+const look = { media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An explanation shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   explain: z.object({ text: z.string().trim().min(1).max(1000).optional() }).strict().optional() };
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
@@ -136,6 +138,8 @@ export const GameDefinitionSchema = z.object({
   openInvites: z.number().int().min(1).max(MAX_OPEN_INVITES).optional(),
   // The host's quick time button (+30 s by default): how many seconds it adds to a round.
   quickTimeSeconds: z.number().int().min(5).max(600).optional(),
+  // The background playlist (songs from the media library), from the lobby on. Left out: no music.
+  music: GameMusicSchema.optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),
   // `option` names the route option an edge belongs to (format 2 choice nodes only).
   edges: z.array(z.object({ key: GameKeySchema, from: GameKeySchema, to: GameKeySchema, option: GameKeySchema.optional() }).strict()).max(300),

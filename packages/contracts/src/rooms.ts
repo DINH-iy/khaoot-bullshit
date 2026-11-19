@@ -20,15 +20,17 @@ export const ClaimRoomSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-
 export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.literal(true).optional(), seat: z.number().int().min(1).max(16).optional() }).strict();
 export const NetworkErrorCodeSchema = z.enum([
   ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'CHIPS_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
-  'LOBBY_LOCKED', 'LOBBY_FULL', 'ARCADE_FULL', 'ROUND_ON', 'NOT_ENOUGH_PLAYERS',
+  'LOBBY_LOCKED', 'LOBBY_FULL', 'ARCADE_FULL', 'ROUND_ON', 'NOT_ENOUGH_PLAYERS', 'MEDIA_IN_USE',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
 export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
+  // Whether a shared screen is connected: it plays the room's videos and songs; without one the host's screen does.
+  displayConnected: z.boolean().optional(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), signup: z.boolean(), testBench: z.boolean() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
@@ -66,6 +68,8 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   confirmLooks: z.boolean(),
   // `quickTimeSeconds`: what the host's quick time button adds to a round.
   quickTimeSeconds: z.number().int().min(5).max(600),
+  // `music`: the game's music plays (on the shared screen); `musicVolume`: how loud, 0 to 100.
+  music: z.boolean(), musicVolume: z.number().int().min(0).max(100),
   // `signup`: a guest may make their own account while joining (and sees their personal key once).
   signup: z.boolean(),
   // `testBench`: phones on the test bench (several players in one browser) may join this room.

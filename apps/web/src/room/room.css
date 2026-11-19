@@ -345,6 +345,10 @@
 .expected-state { font-size: .8rem; color: var(--r-muted); } .expected-state.in { color: #1f9d55; font-weight: 700; }
 .people-picker { display: grid; gap: 6px; max-height: 280px; overflow: auto; padding: 8px; border-radius: 12px; background: var(--r-card-strong); }
 .people-picker ul { margin: 0; }
+/* Groups first: ticking one adds all its members (half-ticked when only some are on the list). */
+.people-picker .group-picker { margin: 0 0 6px; padding: 0 0 8px; border: 0; border-bottom: 1px solid var(--r-line); }
+.people-picker .group-picker legend { padding: 0; margin-bottom: 4px; font-weight: 700; font-size: .85rem; opacity: .8; }
+.people-picker .group-picker .hint { margin-left: 4px; }
 .host-sheet.players .expected-list .icon-button { justify-self: end; }
 
 /* Icon buttons: one size everywhere in the room (copy, add people, kick, close). */
@@ -431,3 +435,18 @@
 /* Small secondary actions in the room: real buttons in the game's colours (never underlined text). */
 .room .link-button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font-size: .95rem; font-weight: 700; text-decoration: none; }
 .room .link-button:hover:not(:disabled) { border-color: var(--r-accent); }
+/* A scene's picture, video or song (stage-media.tsx): under the question, never wider than the card. */
+.stage-media { margin: 0; display: grid; justify-items: center; gap: 10px; }
+.stage-media.image img, .stage-media.video video { display: block; max-width: 100%; max-height: min(52vh, 560px); border-radius: var(--r-radius, 16px); object-fit: contain; background: rgb(0 0 0 / .2); }
+.stage-media.audio { padding: 16px; border-radius: var(--r-radius, 16px); background: var(--r-card-strong); }
+.stage-media.audio audio { width: min(420px, 100%); }
+.stage-media-art { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--r-accent); color: var(--r-accent-ink); font-size: 1.8rem; }
+.stage-media.note { margin: 0; display: flex; gap: 8px; align-items: center; justify-content: center; color: var(--r-muted); font-weight: 600; }
+.stage-media-play { min-height: 48px; }
+/* The music's start button, when the browser wants a tap before playing sound (music-player.tsx). */
+.music-start { position: fixed; right: 16px; bottom: 16px; z-index: 40; min-height: 48px; box-shadow: 0 6px 20px rgb(0 0 0 / .3); }
+/* "Now playing" for a few seconds when a song starts, with its credit (music-player.tsx). */
+.music-caption { position: fixed; left: 16px; bottom: 16px; z-index: 35; max-width: min(640px, calc(100vw - 32px)); margin: 0; padding: 8px 14px; border-radius: 12px; background: rgb(0 0 0 / .55); color: #fff; font-size: .85rem; line-height: 1.35; backdrop-filter: blur(6px); animation: music-caption-in .4s ease-out; }
+.music-credit { opacity: .85; }
+@keyframes music-caption-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .music-caption { animation: none; } }

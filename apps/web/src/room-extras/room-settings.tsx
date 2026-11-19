@@ -15,11 +15,11 @@ const LABELS: Record<Setting, string> = {
 /** Host: how the room behaves. Changes apply straight away for everyone. */
 export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
-  const [limit, setLimit] = useState(state.settings.reactionLimit);
+  const [limit, setLimit] = useState(state.settings.reactionLimit); const [volume, setVolume] = useState(state.settings.musicVolume);
   // A change shows at once and is confirmed by the server; if the server refuses, it goes back.
   const [pending, setPending] = useState<Partial<RoomSnapshot['settings']>>({});
   const shown = { ...state.settings, ...pending };
-  const change = (setting: Setting | 'reactionLimit' | 'reactionChoices' | 'autoCloseSeconds' | 'breakPercent' | 'quickTimeSeconds', value: boolean | number | number[]) => {
+  const change = (setting: Setting | 'reactionLimit' | 'reactionChoices' | 'autoCloseSeconds' | 'breakPercent' | 'quickTimeSeconds' | 'music' | 'musicVolume', value: boolean | number | number[]) => {
     setBusy(true); setPending(previous => ({ ...previous, [setting]: value }));
     void roomApi(`/api/rooms/${sessionId}/settings`, { [setting]: value }).catch(() => onError('The setting could not be changed. Try again.'))
       // The room update that follows carries the saved value; until then the chosen value stays visible.
@@ -32,6 +32,13 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
       <input type="number" inputMode="numeric" min={1} max={30} value={shown.autoCloseSeconds} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 1 && value <= 30) change('autoCloseSeconds', value); }} /></label>}
     <label className="inline-setting">Seconds the quick time button adds
       <input type="number" inputMode="numeric" min={5} max={600} step={5} value={shown.quickTimeSeconds} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 5 && value <= 600) change('quickTimeSeconds', value); }} /></label>
+    {/* Only for a game with music: it plays on the shared screen (or this screen without one). */}
+    {state.view.music && <div className="music-settings">
+      <label className="choice"><input type="checkbox" checked={shown.music} onChange={event => change('music', event.target.checked)} />Music plays (on the shared screen)</label>
+      {shown.music && <label>Music volume · {volume}%
+        <input type="range" min={0} max={100} step={5} value={volume} onChange={event => setVolume(Number(event.target.value))}
+          onPointerUp={() => { if (volume !== state.settings.musicVolume) change('musicVolume', volume); }} onKeyUp={() => { if (volume !== state.settings.musicVolume) change('musicVolume', volume); }} /></label>}
+    </div>}
     {shown.breakVotes && <label className="inline-setting">Players who must agree (%)
       <input type="number" inputMode="numeric" min={10} max={100} step={10} value={shown.breakPercent} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 10 && value <= 100) change('breakPercent', value); }} /></label>}
     {shown.reactions && <div className="reaction-settings">

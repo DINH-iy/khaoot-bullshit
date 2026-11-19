@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import type { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -13,7 +12,7 @@ import { VotePresentationSchema } from '../game/model.js';
 import { createRoomGateway, type Principal } from '../rooms/gateway.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
 import { cleanUpMedia } from './cleanup.js';
-import { assetPath, cleanPicture, defaultMediaDirectory, MAX_PICTURE_BYTES, MAX_UPLOAD_BYTES, removeStored, SESSION_MEDIA_BYTES, storeBytes, storeUpload, UPLOAD_CONTENT_TYPES, UploadTooLarge } from './media.js';
+import { assetPath, cleanPicture, sendStored, defaultMediaDirectory, MAX_PICTURE_BYTES, MAX_UPLOAD_BYTES, removeStored, SESSION_MEDIA_BYTES, storeBytes, storeUpload, UPLOAD_CONTENT_TYPES, UploadTooLarge } from './media.js';
 
 const MAX_ACTIVE_UPLOADS = 4;
 
@@ -164,18 +163,7 @@ export function registerAssetRoutes(app: FastifyInstance, client: PrismaClient, 
       roomAssert(open || own || principal.role === 'host' || asset.stage?.revealedAt || (ballot?.success && ballot.data.sourceStageRunId === asset.stageRunId && asset.submissionId), 'FORBIDDEN');
       const path = assetPath(directory, sessionId, assetId);
       const size = await stat(path).then(file => file.size, () => -1); roomAssert(size === asset.byteSize, 'NOT_FOUND');
-      let start = 0; let end = size - 1; let partial = false;
-      const range = /^bytes=(\d{0,15})-(\d{0,15})$/.exec(request.headers.range ?? '');
-      if (range && (range[1] || range[2])) {
-        partial = true;
-        if (range[1]) { start = Number(range[1]); if (range[2]) end = Math.min(Number(range[2]), size - 1); }
-        else start = Math.max(0, size - Number(range[2]));
-        if (start > end) return reply.code(416).header('content-range', `bytes */${size}`).send();
-      }
-      // Stored bytes are served as inert media: verified type, no sniffing, no script or navigation.
-      reply.code(partial ? 206 : 200).headers({ 'content-type': asset.contentType, 'content-length': end - start + 1, 'accept-ranges': 'bytes', 'content-disposition': 'inline',
-        'content-security-policy': "sandbox; default-src 'none'", 'x-content-type-options': 'nosniff', 'cache-control': open ? 'private, max-age=86400, immutable' : 'private, no-store', ...(partial ? { 'content-range': `bytes ${start}-${end}/${size}` } : {}) });
-      return reply.send(createReadStream(path, { start, end }));
+      return sendStored(request, reply, path, size, asset.contentType, open ? 'private, max-age=86400, immutable' : 'private, no-store');
     } catch (error) { return fail(reply, error); }
   });
 }

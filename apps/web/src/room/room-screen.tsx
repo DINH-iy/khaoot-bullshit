@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
-import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, SiteLookSchema, type TextKey } from '@party/contracts';
+import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { BigCode, CopyIcon, JoinLink, JoinQr, publicJoinUrl } from './join-qr.js';
@@ -32,6 +32,9 @@ import { KeySignIn } from '../people/key-sign-in.js';
 import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
+import { useSiteTheme } from '../presentation/site-look.js';
+import { StageMedia } from './stage-media.js';
+import { MusicPlayer } from './music-player.js';
 import { answerFit } from './answer-fit.js';
 import { Mark } from '../presentation/mark-icons.js';
 
@@ -187,9 +190,13 @@ export function RoomScreen() {
   }, [roomCode, sessionId]);
   // Before a room is known, the join screen wears the site's look (Admin → Join screen); a room code typed in
   // shows that room's game look, and in the room the game's look applies.
-  const [siteLook, setSiteLook] = useState<LookInput | undefined>();
-  useEffect(() => { let mounted = true; void roomApi('/api/site/look').then(data => { const parsed = SiteLookSchema.safeParse(data); if (mounted && parsed.success && parsed.data.theme) setSiteLook({ themes: [parsed.data.theme] }); }).catch(() => {}); return () => { mounted = false; }; }, []);
-  const look = useBuiltLook(state?.view.presentation ?? joinLook?.presentation ?? siteLook); const t = look.text;
+  // The arcade wears the site's look too: an arcade round's own look (its texts) goes on top of it.
+  const siteTheme = useSiteTheme(); const presentation = state?.view.presentation; const inArcade = Boolean(state?.arcade);
+  const lookInput = useMemo<LookInput | undefined>(() => {
+    if (presentation) return inArcade && siteTheme ? { ...presentation, themes: [siteTheme, ...(presentation.themes ?? [])] } : presentation;
+    return joinLook?.presentation ?? (siteTheme ? { themes: [siteTheme] } : undefined);
+  }, [presentation, inArcade, siteTheme, joinLook]);
+  const look = useBuiltLook(lookInput); const t = look.text;
   const lookStyle = themeStyle(look.theme); const lookClass = themeClass(look.theme);
   // Animation moments.
   const stageRef = useRef<HTMLElement>(null); const answersRef = useRef<HTMLDivElement>(null); const savedRef = useRef<HTMLParagraphElement>(null);
@@ -301,6 +308,7 @@ export function RoomScreen() {
           {/* While teams are picked, the round's question waits: one thing at a time. */}
           <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? 'Scoreboard' : stage.prompt)}</h2>
           {stage.info && <p className="info-text">{stage.prompt}</p>}
+          {stage.media && !forming && !explaining && <StageMedia media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} />}
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
           <TeamSummary state={state} stage={stage} />
@@ -405,6 +413,8 @@ export function RoomScreen() {
       confirm={state.settings.confirmLooks} onApply={next => { rememberLook(next); command('player.look', { look: next }); }} finishSignal={state.view.status === 'LOBBY' ? 0 : 1} /></div>}
     {state && <WheelOverlay wheel={state.view.wheel} offset={room.clockOffset} />}
     {state && role === 'display' && <WheelBadge wheel={state.view.wheel} />}
+    {/* The music plays where sound plays: the shared screen, or the host's screen without one. */}
+    {state?.view.music && state.settings.music && (role === 'display' || (role === 'host' && !state.displayConnected)) && <MusicPlayer music={state.view.music} volume={state.settings.musicVolume / 100} />}
     {state && <BreakOverlay state={state} host={host} disabled={disabled} onContinue={() => command('session.resume')} />}
     {state && role === 'player' && <PhoneDock state={state} challengeTick={room.challengeTick} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
       onBreak={vote => { void roomApi(`/api/rooms/${sessionId}/break`, { vote }).catch(() => setError('Your vote did not go through. Try again.')); }}

@@ -4,6 +4,7 @@ import { PresentationSchema, ThemeSchema, AnimationChoiceSchema } from './presen
 import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
+import { PublicMusicSchema, PublicSceneMediaSchema } from './media.js';
 
 export const GameKeySchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/);
 export const GameIdSchema = z.string().uuid().transform(value => value.toLowerCase());
@@ -230,6 +231,8 @@ export const PublicStageSchema = z.object({
   // “how to play” from the game's texts) and who has tapped “Got it”.
   explain: z.object({ text: z.string().max(1000).nullable(), readyIds: z.array(GameIdSchema) }).strict().nullable(),
   route: PublicRouteSchema.nullable(),
+  // The scene's picture, video or song from the media library (absent in older views).
+  media: PublicSceneMediaSchema.nullable().optional(),
   // Show-only scenes: an info scene's title, a scoreboard scene's standings selection.
   info: z.object({ title: z.string().min(1).max(120) }).strict().nullable(),
   scoreboard: z.object({ show: z.enum(['players', 'teams', 'both']) }).strict().nullable(),
@@ -268,6 +271,8 @@ export const SessionViewSchema = z.object({
   // The look and texts for this moment: the game's, with the current scene's changes on top.
   presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
   wheel: WheelViewSchema,
+  // The room's music (absent in older views; null: the game has none).
+  music: PublicMusicSchema.nullable().optional(),
   // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
   awards: z.array(FinaleSlideSchema).nullable(),
   // Totals of the game's current teams, following that lineup's carryover rule.

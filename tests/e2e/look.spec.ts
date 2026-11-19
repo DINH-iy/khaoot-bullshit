@@ -49,6 +49,8 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
 
   // A ready-made animation and one built from blocks.
   await page.getByRole('tab', { name: 'Animations' }).click();
+  // The long list scrolls inside its panel; the page itself never gets a scrollbar.
+  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
   await page.getByLabel('Animation for: A player’s answer is saved').click(); await page.getByRole('option', { name: 'Shake' }).click();
   const sceneMoment = page.getByRole('group', { name: 'A new scene or question appears' });
   await sceneMoment.getByRole('button', { name: 'Build your own' }).click();

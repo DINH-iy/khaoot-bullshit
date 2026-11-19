@@ -13,6 +13,8 @@ import { registerLocalHosting } from './hosting/local-owner.js';
 import { createOwnerAccess } from './hosting/owner-access.js';
 import { registerFeedbackRoutes } from './feedback/routes.js';
 import { registerPeopleRoutes } from './people/routes.js';
+import { registerGroupRoutes } from './people/groups.js';
+import { registerMediaLibrary } from './assets/library.js';
 import { registerSideGames } from './side-games/routes.js';
 import { registerPackAdminRoutes } from './side-games/pack-admin-routes.js';
 import { registerSiteLook } from './site/look.js';
@@ -133,9 +135,11 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerLocalHosting(app, options.database.client, config, owner, live);
     registerFeedbackRoutes(app, options.database.client, config, owner);
     registerPeopleRoutes(app, options.database.client, config, owner, live);
+    registerGroupRoutes(app, options.database.client, owner);
     registerPrefabRoutes(app, options.database.client, owner);
     registerPackAdminRoutes(app, options.database.client, config, owner);
     registerSiteLook(app, options.database.client, owner);
+    registerMediaLibrary(app, options.database.client, config, owner);
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway, rooms.io);
     if (rooms) { const lobbies = createLobbies(options.database.client); registerArcade(app, options.database.client, config, rooms.gateway, createRounds(options.database.client, config, rooms.service, lobbies), lobbies); }
   }

@@ -150,3 +150,34 @@ describe('wheel colours', () => {
     expect(inspectDefinition(definition).issues.length).toBeGreaterThan(0);
   });
 });
+
+describe('pictures, videos and songs in imported scenes', () => {
+  const media = { id: '0b5f3f6e-9d2a-4f3c-8a1e-2c4d6e8f0a1b', kind: 'image' };
+  it('keeps a library file an exported game carries, and leaves out anything else', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Media', scenes: [
+      { id: 'city', type: 'quiz', question: 'Which city is this?', answers: ['Paris', 'Rome'], correct: 'Paris', media },
+      { id: 'song', type: 'quiz', question: 'Name this song', answers: ['A', 'B'], correct: 'A', media: 'a famous song' },
+      { id: 'clip', type: 'cutscene', title: 'Watch', text: 'Watch this', media: { id: 'not-a-uuid', kind: 'video' } },
+    ] }));
+    expect(issues).toEqual([]);
+    const stages = (definition as { nodes: { key: string; stages: Record<string, unknown>[] }[] }).nodes.map(node => node.stages[0]!);
+    expect(stages[0]!['media']).toEqual(media);
+    expect(stages[1]!['media']).toBeUndefined(); expect(stages[2]!['media']).toBeUndefined();
+  });
+});
+
+describe('music in imported games', () => {
+  const song = { id: '1c6f3f6e-9d2a-4f3c-8a1e-2c4d6e8f0a1b', kind: 'audio' };
+  it('keeps a playlist and a scene song from an exported game, and "quiet" or "stop" written as text', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Music', music: { tracks: [song] }, scenes: [
+      { id: 'one', type: 'quiz', question: 'Q1', answers: ['A', 'B'], correct: 'A', music: 'quiet' },
+      { id: 'two', type: 'quiz', question: 'Q2', answers: ['A', 'B'], correct: 'A', music: { mode: 'play', track: song } },
+      { id: 'three', type: 'cutscene', title: 'Hush', text: 'Silence', music: 'stop' },
+      { id: 'four', type: 'cutscene', title: 'Bad', text: 'Not a song', music: { mode: 'play' } },
+    ] }));
+    expect(issues).toEqual([]);
+    const game = definition as { music?: unknown; nodes: { stages: Record<string, unknown>[] }[] };
+    expect(game.music).toEqual({ tracks: [song] });
+    expect(game.nodes.map(node => node.stages[0]!['music'])).toEqual([{ mode: 'quiet' }, { mode: 'play', track: song }, { mode: 'stop' }, undefined]);
+  });
+});

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PeopleListSchema, PersonKeyViewSchema, type PersonRow, type RoomSnapshot } from '@party/contracts';
+import { PeopleListSchema, PersonGroupListSchema, PersonKeyViewSchema, type PersonGroup, type PersonRow, type RoomSnapshot } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { FaIcon } from '../presentation/icons.js';
 import { CopyIcon } from './join-qr.js';
@@ -118,15 +118,24 @@ export function ExpectedPeople({ state, sessionId, onError }: { state: RoomSnaps
   </div>;
 }
 
-/** All people (from the People page), to tick who is expected. */
+/** All people (from the People page), to tick who is expected; a group (People → Groups) ticks all its members at once. */
 function PeoplePicker({ chosen, busy, onChange }: { chosen: string[]; busy: boolean; onChange: (personIds: string[]) => void }) {
   const [people, setPeople] = useState<PersonRow[]>(); const [search, setSearch] = useState(''); const [error, setError] = useState('');
+  const [groups, setGroups] = useState<PersonGroup[]>([]);
   useEffect(() => { void roomApi('/api/host/people').then(data => setPeople(PeopleListSchema.parse(data).people)).catch(() => setError('The people could not be loaded.')); }, []);
+  // Without groups (or when they cannot be loaded) the list of people works as before.
+  useEffect(() => { void roomApi('/api/host/groups').then(data => setGroups(PersonGroupListSchema.parse(data).groups.filter(group => group.personIds.length > 0))).catch(() => undefined); }, []);
+  const toggleGroup = (group: PersonGroup, add: boolean) => onChange(add ? [...new Set([...chosen, ...group.personIds])] : chosen.filter(id => !group.personIds.includes(id)));
   const shown = people?.filter(person => person.name.toLowerCase().includes(search.trim().toLowerCase()));
   return <div className="people-picker">
     {error && <p role="alert" className="error">{error}</p>}
     {!people && !error && <p role="status">Loading people…</p>}
     {people && !people.length && <p className="hint">No people yet. Make them in Admin → People, or let players make an account (Room settings).</p>}
+    {groups.length > 0 && <fieldset className="group-picker"><legend>Groups</legend><ul className="plain-list">{groups.map(group => {
+      const all = group.personIds.every(id => chosen.includes(id)); const some = !all && group.personIds.some(id => chosen.includes(id));
+      return <li key={group.id}><label className="choice"><input type="checkbox" disabled={busy} checked={all} ref={input => { if (input) input.indeterminate = some; }}
+        onChange={event => toggleGroup(group, event.target.checked)} />{group.name} <span className="hint">({group.personIds.length})</span></label></li>;
+    })}</ul></fieldset>}
     {people && people.length > 6 && <label><span className="visually-hidden">Search people</span><input type="search" placeholder="Search a person…" value={search} onChange={event => setSearch(event.target.value)} /></label>}
     {shown && <ul className="plain-list">{shown.map(person => <li key={person.id}><label className="choice"><input type="checkbox" disabled={busy} checked={chosen.includes(person.id)}
       onChange={event => onChange(event.target.checked ? [...chosen, person.id] : chosen.filter(id => id !== person.id))} />{person.name}</label></li>)}</ul>}

@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, open, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AssetKind } from '../generated/prisma/client.js';
 import { MAX_DRAWING_BYTES } from '@party/contracts';
 
@@ -47,22 +48,28 @@ export const assetPath = (directory: string, sessionId: string, assetId: string)
  * limit, then identifies it from the stored bytes. Returns null (and leaves no
  * file) when it is not supported media or exceeds its kind's limit.
  */
-export async function storeUpload(source: Readable, directory: string, sessionId: string, assetId: string): Promise<(MediaType & { byteSize: number; sha256: string }) | null> {
+/** What an upload may be: how it is recognised and how large each kind may get. Players' uploads by default. */
+export interface UploadRules<T extends { kind: string; contentType: string }> { sniff: (head: Uint8Array) => T | null; limit: (type: T) => number; max: number }
+const PLAYER_UPLOADS: UploadRules<MediaType> = { sniff: sniffMedia, limit: type => MEDIA_LIMITS[type.kind], max: MAX_UPLOAD_BYTES };
+export async function storeUpload(source: Readable, directory: string, sessionId: string, assetId: string): Promise<(MediaType & { byteSize: number; sha256: string }) | null>;
+export async function storeUpload<T extends { kind: string; contentType: string }>(source: Readable, directory: string, sessionId: string, assetId: string, rules: UploadRules<T>): Promise<(T & { byteSize: number; sha256: string }) | null>;
+// The rules are only used inside, where any kind type will do.
+export async function storeUpload(source: Readable, directory: string, sessionId: string, assetId: string, rules: UploadRules<{ kind: string; contentType: string }> = PLAYER_UPLOADS as unknown as UploadRules<{ kind: string; contentType: string }>) {
   const folder = join(directory, sessionId); const target = join(folder, assetId); const partial = `${target}.part`;
   await mkdir(folder, { recursive: true, mode: 0o700 });
   const hash = createHash('sha256'); let byteSize = 0;
   const meter = new Transform({ transform(chunk: Buffer, _encoding, done) {
     byteSize += chunk.length;
-    if (byteSize > MAX_UPLOAD_BYTES) { done(new UploadTooLarge()); return; }
+    if (byteSize > rules.max) { done(new UploadTooLarge()); return; }
     hash.update(chunk); done(null, chunk);
   } });
   try {
     await pipeline(source, meter, createWriteStream(partial, { mode: 0o600, flags: 'wx' }));
     const file = await open(partial, 'r'); const head = Buffer.alloc(16);
     try { await file.read(head, 0, 16, 0); } finally { await file.close(); }
-    const type = byteSize >= 12 ? sniffMedia(head) : null;
+    const type = byteSize >= 12 ? rules.sniff(head) : null;
     if (!type) { await rm(partial, { force: true }); return null; }
-    if (byteSize > MEDIA_LIMITS[type.kind]) throw new UploadTooLarge();
+    if (byteSize > rules.limit(type)) throw new UploadTooLarge();
     await rename(partial, target);
     return { ...type, byteSize, sha256: hash.digest('hex') };
   } catch (error) { await rm(partial, { force: true }); throw error; }
@@ -109,4 +116,22 @@ export function cleanPicture(bytes: Buffer): Buffer | null {
     if (type === 'IEND') { end = true; break; }
   }
   return header && data && end ? Buffer.concat(kept) : null;
+}
+
+/**
+ * Sends a stored file with byte-range support (videos and songs seek, and Safari needs ranges to play at all).
+ * Stored bytes are served as inert media: the verified type, no sniffing, no script or navigation.
+ */
+export function sendStored(request: FastifyRequest, reply: FastifyReply, path: string, size: number, contentType: string, cache: string) {
+  let start = 0; let end = size - 1; let partial = false;
+  const range = /^bytes=(\d{0,15})-(\d{0,15})$/.exec(request.headers.range ?? '');
+  if (range && (range[1] || range[2])) {
+    partial = true;
+    if (range[1]) { start = Number(range[1]); if (range[2]) end = Math.min(Number(range[2]), size - 1); }
+    else start = Math.max(0, size - Number(range[2]));
+    if (start > end) return reply.code(416).header('content-range', `bytes */${size}`).send();
+  }
+  reply.code(partial ? 206 : 200).headers({ 'content-type': contentType, 'content-length': end - start + 1, 'accept-ranges': 'bytes', 'content-disposition': 'inline',
+    'content-security-policy': "sandbox; default-src 'none'", 'x-content-type-options': 'nosniff', 'cache-control': cache, ...(partial ? { 'content-range': `bytes ${start}-${end}/${size}` } : {}) });
+  return reply.send(createReadStream(path, { start, end }));
 }

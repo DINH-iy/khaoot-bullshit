@@ -54,6 +54,7 @@ With cloudflared running on the same machine as the backend, every visitor reach
 - Reboot/process kill, persistence interruption, power-loss assumptions, and restore drills.
 - Auth/provider reachability and private versus public access configuration.
 - Performance budgets from APP_PLAN.md, measured on the actual home hardware.
+- How many rooms can play at once: run the [capacity load test](../testing/load-test.md) (`npm run load`) on the device.
 
 ## References
 

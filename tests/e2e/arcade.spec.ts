@@ -71,3 +71,18 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     await expect(cy.page.getByRole('region', { name: /Round 1: Left or right/ })).toContainText('Cy');
   } finally { await Promise.all([ann, bo, cy].map(entry => entry.context.close())); }
 });
+
+test('the arcade wears the join screen look the owner chose in admin', async ({ browser, page, baseURL }) => {
+  const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('region', { name: 'Your games' })).toBeVisible();
+  const save = (look: unknown) => page.evaluate(async body => (await fetch('/api/host/site-look', { method: 'POST', headers: { 'x-party-request': '1', 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(), look);
+  expect(await save({ theme: { colors: { background: '#123456', accent: '#ff5500' } } })).toMatchObject({ ok: true });
+  const guest = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    const arcade = await guest.newPage(); await arcade.goto(`${baseURL}/?arcade`);
+    const main = arcade.locator('main.arcade');
+    await expect(main).toHaveAttribute('style', /--r-bg1:\s*#123456/);
+    await expect(main).toHaveAttribute('style', /--r-accent:\s*#ff5500/);
+  } finally { await guest.close(); await save({}); }
+});

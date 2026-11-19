@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT } from '@party/contracts';
 import { sceneName } from '../scene/inspector.js';
+import { GameMusicFields } from '../scene/fields/music-fields.js';
 import { Section } from '../controls/section.js';
 import { FinaleSettings, WheelSettings } from './show-settings.js';
 import { estimateMinutes, type Definition } from '../model.js';
@@ -54,6 +55,9 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
       <p className="hint">Side games: slot machine, blackjack, packs and challenges between players, on by default. Chips (play money only) add bets, stakes and a leaderboard; off by default, so the games are just for fun. A player can invite up to {Number(definition['openInvites'] ?? OPEN_INVITES_DEFAULT)} others to a challenge before one answers. The host can still change all of this in the room, also before the game starts.</p>
     </Section>
     {/* Stored only when it differs from 30 seconds. */}
+    <Section title="Music" summary={(() => { const count = (definition['music'] as { tracks?: unknown[] } | undefined)?.tracks?.length ?? 0; return count ? `${count} ${count === 1 ? 'song' : 'songs'}` : 'No music'; })()}>
+      <GameMusicFields definition={definition} onChange={onChange} />
+    </Section>
     <Section title="Host tools" problems={problemsIn('host')} summary={`Quick time button: +${Number(definition['quickTimeSeconds'] ?? 30)} s`}>
       <label>Seconds the host's quick time button adds<input type="number" inputMode="numeric" min={5} max={600} step={5} value={Number(definition['quickTimeSeconds'] ?? 30)}
         onChange={event => { const value = Math.round(Number(event.target.value)); if (!(value >= 5 && value <= 600)) return; const next = { ...definition }; if (value === 30) delete next['quickTimeSeconds']; else next['quickTimeSeconds'] = value; onChange(next); }} /></label>

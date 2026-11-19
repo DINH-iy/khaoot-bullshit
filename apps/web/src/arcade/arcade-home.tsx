@@ -5,6 +5,7 @@ import { newId, roomApi } from '../room/api.js';
 import { savedLook } from '../players/look-builder.js';
 import { useMe } from '../people/use-me.js';
 import { FaIcon } from '../presentation/icons.js';
+import { useSiteLookFrame } from '../presentation/site-look.js';
 import { arcadeProblem, arcadeResult, points } from './arcade-text.js';
 
 const NAME_KEY = 'party_arcade_name';
@@ -14,6 +15,7 @@ export const openLobby = (lobbyId: string) => { navigate(`/?arcade=${lobbyId}`);
 
 /** The arcade's front page: open lobbies to join, opening your own, and the all-time leaderboards. */
 export function ArcadeHome() {
+  const frame = useSiteLookFrame();
   const account = useMe();
   const [list, setList] = useState<ArcadeList | null>(null); const [board, setBoard] = useState<ArcadeLeaderboard | null>(null);
   const [name, setName] = useState(rememberedName); const [title, setTitle] = useState('');
@@ -37,7 +39,7 @@ export function ArcadeHome() {
     } catch (cause) { setError(arcadeProblem(cause)); setBusy(false); }
   };
 
-  return <main className="room arcade">
+  return <main className={`room arcade ${frame.className}`} style={frame.style}>
     <header className="room-bar"><div className="room-id"><p className="brand">party<span>.</span></p><p className="room-game">Arcade</p></div><a href="/">Join a game with a code</a></header>
     <div className="arcade-page">
       <h1>Arcade</h1>

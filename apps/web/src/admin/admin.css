@@ -246,3 +246,16 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 /* The editor's own buttons inside the Join screen controls, in the editor's colours (not the admin page's). */
 .join-look-controls button.small-button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 600; }
 .join-look-controls > button.small-button { margin-top: 12px; }
+/* Groups of people (People → Groups). */
+.group-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.group-card { margin: 0; padding: 12px 14px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1d1a2b); }
+.group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.admin-page .group-toggle { display: inline-flex; align-items: center; gap: 10px; flex: 1; min-width: 12rem; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.admin-page .group-toggle:hover { background: light-dark(#f6f3fd, #26223a); }
+.group-name { font-weight: 800; }
+.group-count { color: light-dark(#5f5873, #b3acc8); font-size: .9rem; margin-right: auto; }
+.group-members { margin: 4px 8px 0; color: light-dark(#5f5873, #b3acc8); font-size: .9rem; overflow-wrap: anywhere; }
+.group-members-edit { margin-top: 10px; }
+.group-people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0 12px; }
+.group-people li { margin: 0; }
+.group-people .person-check { white-space: normal; }

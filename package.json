@@ -37,6 +37,8 @@
     "network:restart": "node scripts/network/restart.mjs",
     "network:smoke": "node scripts/network/smoke.mjs",
     "status": "node scripts/ops/status.mjs",
+    "load": "node scripts/ops/load.mjs",
+    "music:defaults": "node scripts/media/default-music.mjs",
     "stop": "node scripts/ops/stop.mjs",
     "host:link": "node scripts/ops/host-link.mjs"
   },

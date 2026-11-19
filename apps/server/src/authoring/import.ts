@@ -1,4 +1,4 @@
-import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES } from '@party/contracts';
+import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -79,7 +79,12 @@ function stageFrom(raw: Json, key: string): Json {
   const spun = typeof raw['spin'] === 'string' && raw['spin'].trim() ? { spin: { wheel: slug(raw['spin'], 'wheel') } } : isObject(raw['spin']) ? { spin: raw['spin'] } : {};
   // `explain`: true (a minigame's standard “how to play”) or the scene's own explanation, shown before it starts.
   const explain = raw['explain'] === true ? { explain: {} } : typeof raw['explain'] === 'string' && raw['explain'].trim() ? { explain: { text: raw['explain'].trim().slice(0, 1000) } } : {};
-  const extras = { ...spun, ...explain, ...(raw['wheelClear'] === true ? { wheelClear: true } : {}) };
+  // `media`: a picture, video or song already in the media library ({ id, kind }), as exported games carry it.
+  // An AI cannot upload one: the author adds it in the editor afterwards. Anything else is left out.
+  const media = SceneMediaSchema.safeParse(raw['media']);
+  // `music`: what the scene does with the game's music; "keep", "quiet" and "stop" can be written as text, a song of its own only from the library.
+  const music = SceneMusicSchema.safeParse(typeof raw['music'] === 'string' ? { mode: raw['music'] } : raw['music']);
+  const extras = { ...spun, ...explain, ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
   return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
 }
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
@@ -220,6 +225,8 @@ export function importDefinition(input: string): Json | null {
     ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
     // The host's quick time button in seconds (default 30).
     ...(Number.isFinite(Number(raw['quickTime'])) && raw['quickTime'] !== undefined ? { quickTimeSeconds: Math.max(5, Math.min(600, Math.round(Number(raw['quickTime'])))) } : {}),
+    // `music`: a background playlist of library songs, as exported games carry it (an AI cannot upload songs).
+    ...(GameMusicSchema.safeParse(raw['music']).success ? { music: raw['music'] } : {}),
     // Open challenge invites per player at once (default 3).
     ...(Number.isFinite(Number(raw['openInvites'])) && raw['openInvites'] !== undefined ? { openInvites: Math.max(1, Math.min(MAX_OPEN_INVITES, Math.round(Number(raw['openInvites'])))) } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,

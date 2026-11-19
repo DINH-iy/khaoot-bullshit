@@ -6,6 +6,7 @@ import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import { seenThisWeek } from './people-time.js';
 import { initials, LastSeen, PersonPage, type PersonActions } from './person-page.js';
 import { Leaderboard } from './leaderboard.js';
+import { GroupsPanel } from './groups-panel.js';
 
 const problems: Record<string, string> = {
   UNAUTHORIZED: SIGNED_OUT_TEXT,
@@ -44,15 +45,16 @@ export function PeoplePanel() {
   const [search, setSearch] = useState('');
   const found = useMemo(() => people?.filter(person => matches(person.name, search)), [people, search]);
   // One person's own page (?admin=people&person=…): the browser's back button returns to the list.
-  // The list or the leaderboard (?admin=people&tab=leaderboard), each in the browser's history too.
-  const read = () => { const query = new URLSearchParams(location.search); return { person: query.get('person'), leaderboard: query.get('tab') === 'leaderboard' }; };
+  // The list, the leaderboard (?admin=people&tab=leaderboard) or the groups (&tab=groups), each in the browser's history too.
+  type Tab = 'people' | 'leaderboard' | 'groups';
+  const read = () => { const query = new URLSearchParams(location.search); const tab = query.get('tab'); return { person: query.get('person'), tab: (tab === 'leaderboard' || tab === 'groups' ? tab : 'people') as Tab }; };
   const [place, setPlace] = useState(read); const personId = place.person;
   useEffect(() => { const moved = () => setPlace(read()); window.addEventListener('popstate', moved); return () => window.removeEventListener('popstate', moved); }, []);
-  const go = (next: { person: string | null; leaderboard: boolean }) => {
-    history.pushState(null, '', next.person ? `?admin=people&person=${next.person}` : next.leaderboard ? '?admin=people&tab=leaderboard' : '?admin=people');
+  const go = (next: { person: string | null; tab: Tab }) => {
+    history.pushState(null, '', next.person ? `?admin=people&person=${next.person}` : next.tab !== 'people' ? `?admin=people&tab=${next.tab}` : '?admin=people');
     setPlace(next); setShown(undefined); window.scrollTo(0, 0);
   };
-  const openPerson = (id: string | null) => go({ person: id, leaderboard: false });
+  const openPerson = (id: string | null) => go({ person: id, tab: 'people' });
   const [stats, setStats] = useState<PersonStats[]>();
   const load = () => Promise.all([
     roomApi<unknown>('/api/host/people').then(data => { setPeople(PeopleListSchema.parse(data).people); setError(''); }),
@@ -87,9 +89,11 @@ export function PeoplePanel() {
     </>;
   }
   const tabs = <div className="people-tabs" role="tablist" aria-label="People">
-    <button type="button" role="tab" aria-selected={!place.leaderboard} onClick={() => go({ person: null, leaderboard: false })}>People</button>
-    <button type="button" role="tab" aria-selected={place.leaderboard} onClick={() => go({ person: null, leaderboard: true })}>Leaderboard</button></div>;
-  if (place.leaderboard) return <>{tabs}
+    <button type="button" role="tab" aria-selected={place.tab === 'people'} onClick={() => go({ person: null, tab: 'people' })}>People</button>
+    <button type="button" role="tab" aria-selected={place.tab === 'groups'} onClick={() => go({ person: null, tab: 'groups' })}>Groups</button>
+    <button type="button" role="tab" aria-selected={place.tab === 'leaderboard'} onClick={() => go({ person: null, tab: 'leaderboard' })}>Leaderboard</button></div>;
+  if (place.tab === 'groups') return <>{tabs}<GroupsPanel people={people} /></>;
+  if (place.tab === 'leaderboard') return <>{tabs}
     {error && <p role="alert" className="error">{error}</p>}
     {people && stats ? <Leaderboard people={people} stats={stats} onOpen={openPerson} /> : !error && <p role="status">Loading the leaderboard…</p>}
   </>;

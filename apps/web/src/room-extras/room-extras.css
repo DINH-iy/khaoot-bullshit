@@ -129,3 +129,6 @@
 .room .finale-step { min-height: 44px; min-width: 44px; padding: 0; border-radius: 50%; font-size: 1.6rem; line-height: 1; background: var(--r-card-strong); border: 0; }
 .finale-count { font-variant-numeric: tabular-nums; color: var(--r-muted); font-weight: 700; }
 .room .finale-auto { min-height: 36px; padding: 4px 14px; font-size: .85rem; background: transparent; border: 1px solid var(--r-line); }
+/* Music in the room settings: on or off, and the volume. */
+.music-settings { display: grid; gap: 6px; }
+.music-settings input[type=range] { width: 100%; }

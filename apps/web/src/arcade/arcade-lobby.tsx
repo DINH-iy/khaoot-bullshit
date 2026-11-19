@@ -7,6 +7,7 @@ import { Avatar } from '../players/avatar.js';
 import { savedLook } from '../players/look-builder.js';
 import { useMe } from '../people/use-me.js';
 import { FaIcon } from '../presentation/icons.js';
+import { useSiteLookFrame } from '../presentation/site-look.js';
 import { rememberName } from './arcade-home.js';
 import { arcadeProblem, arcadeResult, points } from './arcade-text.js';
 
@@ -15,6 +16,7 @@ const POLL_MS = 2500;
 
 /** One lobby: join it, see who is here, and (the leader) pick the next minigame and lock or unlock it. */
 export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
+  const frame = useSiteLookFrame();
   const [lobby, setLobby] = useState<ArcadeLobbyView | null>(null); const [error, setError] = useState(''); const [gone, setGone] = useState(false);
   const [tick, setTick] = useState(0); const refresh = () => setTick(value => value + 1);
   const entering = useRef(false);
@@ -33,7 +35,7 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
   }, [lobby?.round?.seated, lobby?.round?.number]);
   const act = (path: string, body: unknown = {}) => { setError(''); void roomApi(`/api/arcade/lobbies/${lobbyId}/${path}`, body).then(refresh).catch(cause => setError(arcadeProblem(cause))); };
 
-  const shell = (content: React.ReactNode) => <main className="room arcade">
+  const shell = (content: React.ReactNode) => <main className={`room arcade ${frame.className}`} style={frame.style}>
     <header className="room-bar"><div className="room-id"><p className="brand">party<span>.</span></p><p className="room-game">Arcade{lobby ? ` · ${lobby.title}` : ''}</p></div><a href="/?arcade">All lobbies</a></header>
     <div className="arcade-page">{error && <p role="alert" className="join-error">{error}</p>}{content}</div></main>;
   if (gone || lobby?.closed) return shell(<section className="arcade-card"><h1>This lobby has closed</h1><p>A lobby closes after 15 minutes without anyone in it.</p><p><a href="/?arcade">Open or join another lobby</a></p></section>);

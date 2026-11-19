@@ -554,8 +554,67 @@ model Person {
   items   CollectedItem[]
   arcadeMembers ArcadeMember[]
   arcadeResults ArcadeResult[]
+  groups        PersonGroupMember[]
+  media         GameMedia[]
 
   @@map("people")
+}
+
+enum GameMediaKind {
+  IMAGE
+  VIDEO
+  AUDIO
+}
+
+// The media library: pictures, videos and songs the owner and editors upload for their games
+// (a scene shows one). The bytes live in the media folder under game-media/<id>, apart from the
+// rooms' uploads, so the room clean-up never touches them. Removing one keeps the row (removedAt).
+model GameMedia {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind        GameMediaKind
+  contentType String        @db.VarChar(64)
+  byteSize    Int
+  sha256      String        @db.Char(64)
+  // The uploaded file's name, to recognise it in the library.
+  name        String        @db.VarChar(120)
+  // Who made it and under which licence, shown when it plays ("Hotrock" Kevin MacLeod (incompetech.com), CC BY 4.0). Null: nothing to credit.
+  credit      String?       @db.VarChar(300)
+  // Who uploaded it: an editor, or null for the owner.
+  personId    String?       @db.Uuid
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  removedAt   DateTime?     @db.Timestamptz(3)
+
+  person Person? @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@index([removedAt, createdAt])
+  @@map("game_media")
+}
+
+// A named group of people (Admin → People → Groups), to add many people to a room at once.
+// Not history: deleting a group removes only the group and its member list, never the people.
+model PersonGroup {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(40)
+  // Lower-case name: two groups cannot share a name.
+  nameKey   String   @unique @db.VarChar(40)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  members PersonGroupMember[]
+
+  @@map("person_groups")
+}
+
+model PersonGroupMember {
+  groupId  String   @db.Uuid
+  personId String   @db.Uuid
+  addedAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  group  PersonGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  person Person      @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@id([groupId, personId])
+  @@index([personId])
+  @@map("person_group_members")
 }
 
 model PersonDevice {

@@ -253,6 +253,18 @@ Side games:
 - W3: with problems, **Play & publish** shows a warning triangle and one red line, *⚠ 4 problems to fix first* (its tooltip says where they are listed). Rehearsing works as the server does: it skips scenes it cannot reach from where it starts, so only problems of the whole game and of the scenes it would play stop it; those items then say *(fix 3 problems first)* and cannot be clicked. Publish needs every problem fixed.
 - W4: the corner stays quiet over the map: the folded buttons and the open lists are see-through with a blur behind them (solid when *Reduce transparency* is on). Not an opacity on the whole button: that made the text too faint for the contrast check.
 
+### Y. Owner's queue, 19 November 2026 (not committed yet)
+
+Details and status per item are in the plan's *Owner queue (19 November 2026)* ([APP_PLAN.md](../../APP_PLAN.md)).
+
+- Y1: **capacity load test** `npm run load` ([load test](../testing/load-test.md)): built; run it on the Pi. A Mac passed 10 rooms × 20 phones.
+- Y2: long page scrollbar in Look & feel → Animations: fixed (hidden labels escaped their panel); a browser test checks it.
+- Y3: the arcade wears the join screen's look (Admin → Join screen): built.
+- Y4: **groups of people** (People → Groups; tick a whole group in a room's *Add people…*; a person can be in several groups): built, with tests.
+- Y5: **picture, video or song in a question** (and in cutscenes), from a shared **media library**: built, with tests. Not checked on a real phone or TV yet.
+- Y6: **background music** (Game settings → Music) and per-scene music (keep, own song, quieter, silence), host on/off and volume, credits shown as a song starts; standard songs (Kevin MacLeod: Hotrock, At Launch, The Show Must Be Go; Gichco: Loop 3) via `npm run music:defaults`. The owner uploads Sascha Ende's “The Question Is” as a scene song. Spotify is not possible (its developer terms forbid games and trivia).
+- Y7 (backlog): **YouTube links in scenes**, played in YouTube's own visible player with a start and end time. Downloading YouTube audio into the app is ruled out.
+
 ### Open questions
 
 - Roulette: not built; a new side game if wanted.

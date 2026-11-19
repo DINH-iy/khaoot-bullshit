@@ -56,3 +56,15 @@ export const PersonStatsSchema = z.object({
 }).strict();
 export type PersonStats = z.infer<typeof PersonStatsSchema>;
 export const PeopleStatsSchema = z.object({ stats: z.array(PersonStatsSchema) }).strict();
+
+/**
+ * Groups of people (Admin → People → Groups): a name and its members, so the host can add
+ * a whole group to a room at once instead of ticking 20 people one by one. Owner only.
+ */
+export const PersonGroupSchema = z.object({ id: z.uuid(), name: z.string(), personIds: z.array(z.uuid()) }).strict();
+export type PersonGroup = z.infer<typeof PersonGroupSchema>;
+export const PersonGroupListSchema = z.object({ groups: z.array(PersonGroupSchema) }).strict();
+export const NewPersonGroupSchema = z.object({ name: PersonNameSchema }).strict();
+/** A new name, the whole member list, or both. Unknown or removed people are left out. */
+export const UpdatePersonGroupSchema = z.object({ name: PersonNameSchema.optional(), personIds: z.array(z.uuid()).max(500).optional() }).strict()
+  .refine(value => value.name !== undefined || value.personIds !== undefined, 'Nothing to change');

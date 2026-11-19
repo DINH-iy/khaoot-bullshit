@@ -1,5 +1,5 @@
 import { readExplain } from './explain.js';
-import { isStepMinigame, type MinigameSettings, type Presentation, GameIdSchema, SessionViewSchema, SubmissionValueSchema, type SessionView } from '@party/contracts';
+import { isStepMinigame, type MinigameSettings, type Presentation, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
@@ -113,6 +113,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           challenge: entry.stage.kind === 'challenge' ? { maxAwardMilli: entry.stage.maxAwardMilli, placesMilli: stagePlaces(entry.stage), judgedPlayerIds: judged.map(row => row.playerId), judgedTeamIds: [...new Set(judged.map(row => context?.teamOf.get(row.playerId)).filter(id => id !== undefined))] } : null,
           teams, route: choice?.view ?? null,
           explain: current.status === 'ACTIVE' && readExplain(current.presentation) ? { text: entry.stage.explain?.text ?? null, readyIds: readExplain(current.presentation)!.readyIds } : null,
+          media: entry.stage.media ? { ...entry.stage.media, url: sceneMediaUrl(entry.stage.media.id) } : null,
           info: entry.stage.kind === 'info' ? { title: entry.stage.title } : null, scoreboard: entry.stage.kind === 'scoreboard' ? { show: entry.stage.show } : null,
           ballot, minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
           revealed, reveal: revealed ? { answer: voteAnswer ?? minigameAnswer ?? answer, awards: awards.map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
@@ -123,8 +124,31 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         teamStandings: await teamStandings(tx, session.id, playerTotals),
         presentation: viewPresentation(definition.presentation, entry?.stage.presentation),
         wheel: await wheelView(tx, session.id, definition, current, actor.data.role === 'host'),
+        music: musicView(definition, current && entry ? entry.stage : null, await songInfo(tx, definition, current && entry ? entry.stage : null)),
         awards: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
       });
     }, { isolationLevel: 'RepeatableRead', maxWait: 2000, timeout: 5000 });
   } catch (error) { throw error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE'); }
+}
+
+type SongInfo = Map<string, { title: string; credit: string | null }>;
+/** Titles and credits of the songs the room may play now, from the library (removed songs are left out). */
+async function songInfo(tx: { gameMedia: { findMany: (args: { where: { id: { in: string[] }; removedAt: null }; select: { id: true; name: true; credit: true } }) => Promise<{ id: string; name: string; credit: string | null }[]> } },
+  definition: { music?: { tracks: { id: string }[] } | undefined }, stage: { music?: SceneMusic | undefined } | null): Promise<SongInfo> {
+  const ids = [...(definition.music?.tracks ?? []).map(track => track.id), ...(stage?.music?.mode === 'play' ? [stage.music.track.id] : [])];
+  if (!ids.length) return new Map();
+  const rows = await tx.gameMedia.findMany({ where: { id: { in: [...new Set(ids)] }, removedAt: null }, select: { id: true, name: true, credit: true } });
+  return new Map(rows.map(row => [row.id, { title: row.name.replace(/\.(mp3|m4a|ogg|wav|flac)$/i, ''), credit: row.credit }]));
+}
+/**
+ * The room's music: the game's playlist and what the scene on screen does with it (contracts/media.ts).
+ * Null when nothing would ever play: no playlist and no song of the scene's own.
+ */
+export function musicView(definition: { music?: { tracks: { id: string }[] } | undefined }, stage: { music?: SceneMusic | undefined; media?: SceneMedia | undefined } | null, songs: SongInfo): PublicMusic | null {
+  const song = (id: string) => { const info = songs.get(id); return info ? { id, url: sceneMediaUrl(id), title: info.title, credit: info.credit } : null; };
+  const playlist = (definition.music?.tracks ?? []).map(track => song(track.id)).filter(entry => entry !== null);
+  const music = stage?.music ?? { mode: 'keep' as const };
+  const own = music.mode === 'play' ? song(music.track.id) : null;
+  if (!playlist.length && !own) return null;
+  return { playlist, scene: { mode: music.mode === 'play' && !own ? 'keep' : music.mode, track: own }, duck: stage?.media?.kind === 'video' || stage?.media?.kind === 'audio' };
 }
