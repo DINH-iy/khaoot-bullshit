@@ -3,6 +3,7 @@ import { PeopleListSchema, PersonGroupListSchema, PersonKeyViewSchema, type Pers
 import { newId, roomApi } from './api.js';
 import { FaIcon } from '../presentation/icons.js';
 import { CopyIcon } from './join-qr.js';
+import { rich } from '../i18n/rich.js';
 import { useTexts } from '../i18n/texts.js';
 import { translate } from '../i18n/texts.js';
 import { EXTRAS_TEXTS } from './extras.text.js';
