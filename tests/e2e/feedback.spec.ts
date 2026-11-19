@@ -51,10 +51,14 @@ test('a tester points at a button and reports it; the owner finds it with its fi
     await expect(item).toContainText('join screen');
     await expect(item).toContainText(/JoinScreen in apps\/web\/src\/room\/room-screen\.tsx:\d+/);
     expect((await new AxeBuilder({ page: owner }).analyze()).violations).toEqual([]);
+    await ownerContext.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await item.getByRole('button', { name: 'Copy as text' }).click();
+    await expect(item.getByRole('button', { name: 'Copied' })).toBeVisible();
+    expect(await owner.evaluate(() => navigator.clipboard.readText())).toContain(`Report ID: ${reportId}`);
     await item.getByLabel(`Status of ${title}`).selectOption('done');
     await expect(item).toHaveCount(0);
     await owner.reload();
-    await owner.getByLabel('Status', { exact: true }).selectOption('done');
+    await owner.locator('.admin-filters').getByRole('combobox').selectOption('done');
     await owner.getByRole('searchbox', { name: 'Search' }).fill(reportId);
     await expect(item.getByLabel(`Status of ${title}`)).toHaveValue('done');
     await expect(item.locator('.admin-report-id code')).toHaveText(reportId);
