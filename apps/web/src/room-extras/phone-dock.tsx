@@ -8,6 +8,8 @@ import { setSound, soundOn, unlockSound } from './celebrate.js';
 import { chooseLanguage, LANGUAGES, useLanguage, type Language } from '../i18n/language.js';
 import { translate } from '../i18n/texts.js';
 import { PHONE_TEXTS } from '../room/phone.text.js';
+import { EXTRAS_TEXTS } from '../room/extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import './room-extras.css';
 
 type Sheet = 'menu' | 'scores' | 'players' | 'react' | 'games' | 'challenges' | 'language' | null;
@@ -52,23 +54,23 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
   // Something changed in the challenges while they were closed: a dot on the Menu button.
   const news = state.settings.sideGames && challengeTick !== seenTick;
   return <>
-    {pausedNote && <p className="side-paused-note" role="status">Round started: your side game is paused</p>}
+    {pausedNote && <p className="side-paused-note" role="status">{x('sidePaused')}</p>}
     {/* Being challenged (or your move) shows at the top of the screen, no menu needed. */}
     {sheet !== 'challenges' && <ChallengeAlert state={state} tick={challengeTick} needed={needed} onOpen={() => setSheet('challenges')} />}
     {/* One button instead of a row of icons; the menu holds everything. */}
     <button type="button" className="dock-button" aria-haspopup="dialog" aria-expanded={sheet === 'menu'} onClick={() => setSheet(sheet === 'menu' ? null : 'menu')}>
-      <span aria-hidden="true">☰</span>Menu{news && <span className="dock-dot" aria-label="news" />}</button>
-    {sheet === 'menu' && <BottomSheet title="Menu" onClose={close}><nav className="phone-dock" aria-label="More">
+      <span aria-hidden="true">☰</span>{x('menu')}{news && <span className="dock-dot" aria-label={x('news')} />}</button>
+    {sheet === 'menu' && <BottomSheet title={x('menu')} onClose={close}><nav className="phone-dock" aria-label={x('more')}>
       {canSeeScores && <button type="button" onClick={() => setSheet('scores')}><span aria-hidden="true">🏆</span><small>{t('scores.title')}</small></button>}
       <button type="button" onClick={() => setSheet('players')}><span aria-hidden="true">👥</span><small>{t('players.title', { count: state.players.length })}</small></button>
-      {state.settings.reactions && state.view.status !== 'FINISHED' && <button type="button" onClick={() => setSheet('react')}><span aria-hidden="true">😀</span><small>React</small></button>}
+      {state.settings.reactions && state.view.status !== 'FINISHED' && <button type="button" onClick={() => setSheet('react')}><span aria-hidden="true">😀</span><small>{x('react')}</small></button>}
       {state.settings.breakVotes && state.view.status === 'RUNNING' && <button type="button" aria-pressed={state.break.voted} onClick={() => { onBreak(!state.break.voted); close(); }}>
         <span aria-hidden="true">{t('break.icon')}</span><small>{t('break.vote')} {state.break.votes}/{state.break.needed}</small></button>}
       {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('games'); }}>
-        <span aria-hidden="true">🎰</span><small>{needed ? 'Games paused' : 'Games'}</small></button>}
+        <span aria-hidden="true">🎰</span><small>{x(needed ? 'gamesPaused' : 'games')}</small></button>}
       {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('challenges'); }}>
-        <span aria-hidden="true">⚔️</span><small>Challenge{challengeTick !== seenTick && <span className="dock-dot" aria-label="news" />}</small></button>}
-      <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>Sound</small></button>
+        <span aria-hidden="true">⚔️</span><small>{x('challenge')}{challengeTick !== seenTick && <span className="dock-dot" aria-label={x('news')} />}</small></button>}
+      <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>{x('sound')}</small></button>
       <button type="button" onClick={() => setSheet('language')}><span aria-hidden="true">🌐</span><small>{LANGUAGES[language]}</small></button>
     </nav></BottomSheet>}
     {/* The phone's language: the game's standard texts follow it; what the game's author wrote stays as written. */}
@@ -76,12 +78,12 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
       {(Object.keys(LANGUAGES) as Language[]).map(code => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => { chooseLanguage(code); close(); }}>{LANGUAGES[code]}</button>)}</div></BottomSheet>}
     {sheet === 'scores' && <BottomSheet title={t('scores.title')} onClose={close}>{scores}</BottomSheet>}
     {sheet === 'players' && <BottomSheet title={t('players.title', { count: state.players.length })} onClose={close}>
-      <ul className="sheet-players">{state.players.map(player => <li key={player.id}><Avatar look={player.look} size={40} /><span>{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}</span>
-        <span className={`dot ${player.connected ? 'on' : 'off'}`} aria-label={player.connected ? 'connected' : 'disconnected'} /></li>)}</ul>
+      <ul className="sheet-players">{state.players.map(player => <li key={player.id}><Avatar look={player.look} size={40} /><span>{player.displayName}{player.id === state.selfPlayerId ? x('you') : ''}</span>
+        <span className={`dot ${player.connected ? 'on' : 'off'}`} aria-label={x(player.connected ? 'connected' : 'disconnected')} /></li>)}</ul>
       <button type="button" className="primary" onClick={() => { close(); onChangeLook(); }}>{t('players.changeLook')}</button>
     </BottomSheet>}
-    {sheet === 'games' && <BottomSheet title="Side games" onClose={close}><Suspense fallback={<p role="status">Opening the games…</p>}><SideGames sessionId={state.view.sessionId} selfId={state.selfPlayerId} /></Suspense></BottomSheet>}
-    {sheet === 'challenges' && <BottomSheet title="Challenges" onClose={close}><Suspense fallback={<p role="status">Opening challenges…</p>}><Challenges sessionId={state.view.sessionId} selfId={state.selfPlayerId} players={state.players} tick={challengeTick} /></Suspense></BottomSheet>}
+    {sheet === 'games' && <BottomSheet title={x('sideGames')} onClose={close}><Suspense fallback={<p role="status">{x('openingGames')}</p>}><SideGames sessionId={state.view.sessionId} selfId={state.selfPlayerId} /></Suspense></BottomSheet>}
+    {sheet === 'challenges' && <BottomSheet title={x('challenges')} onClose={close}><Suspense fallback={<p role="status">{x('openingChallenges')}</p>}><Challenges sessionId={state.view.sessionId} selfId={state.selfPlayerId} players={state.players} tick={challengeTick} /></Suspense></BottomSheet>}
     {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} choices={state.settings.reactionChoices} limit={state.settings.reactionLimit} /></BottomSheet>}
   </>;
 }

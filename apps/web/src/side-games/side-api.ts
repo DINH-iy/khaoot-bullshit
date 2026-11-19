@@ -1,17 +1,15 @@
 import type { Challenge } from '@party/contracts';
+import { translate } from '../i18n/texts.js';
+import { SIDE_TEXTS } from './side.text.js';
 import { roomApi } from '../room/api.js';
 
 /** Side-game requests for this room; errors come back as plain sentences. */
 export const sideApi = <T>(sessionId: string, path: string, body?: unknown) => roomApi<T>(`/api/rooms/${sessionId}/side${path}`, body);
-const problems: Record<string, string> = {
-  NOT_ENOUGH_CHIPS: 'Not enough chips for that.',
-  SIDE_GAMES_PAUSED: 'Paused: the game needs you right now.',
-  SIDE_GAMES_OFF: 'The host has switched side games off.',
-  CHIPS_OFF: 'The host has switched chips off: games are just for fun now.',
-  RATE_LIMITED: 'Slow down a little and try again.',
-};
-export const sideProblem = (cause: unknown) => problems[cause instanceof Error ? cause.message : ''] ?? 'That did not go through. Check the connection and try again.';
-export const chips = (amount: number) => `${amount.toLocaleString()} ${Math.abs(amount) === 1 ? 'chip' : 'chips'}`;
+/** A side-games text in the phone's language (side.text.ts). */
+export const st = (key: keyof typeof SIDE_TEXTS.en, values?: Record<string, string | number>) => translate(SIDE_TEXTS, key, values);
+const problems: Record<string, keyof typeof SIDE_TEXTS.en> = { NOT_ENOUGH_CHIPS: 'notEnough', SIDE_GAMES_PAUSED: 'paused', SIDE_GAMES_OFF: 'sideOff', CHIPS_OFF: 'chipsOff', RATE_LIMITED: 'rateLimited' };
+export const sideProblem = (cause: unknown) => st(problems[cause instanceof Error ? cause.message : ''] ?? 'failed');
+export const chips = (amount: number) => st(Math.abs(amount) === 1 ? 'chip' : 'chipsN', { count: amount.toLocaleString() });
 /** Animations are skipped for people who ask for less motion. */
 export const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Whether this player has to move in a running challenge (in rock paper scissors: has not picked yet this round). */

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LIBRARY_ACCEPT, LIBRARY_LIMITS, LibraryItemSchema, MediaLibrarySchema, sceneMediaUrl, type LibraryItem, type MediaLibrary, type SceneMediaKind } from '@party/contracts';
 import { roomApi } from '../../../room/api.js';
 import { Icon } from '../../controls/icons.js';
@@ -92,8 +93,8 @@ export function MediaLibraryDialog({ current, only, title = t('library'), onPick
     setBusy(true); setError(''); void roomApi(`/api/host/media/${item.id}/remove`, {}).then(load).catch(cause => setError(explain(cause))).finally(() => setBusy(false));
   };
   const shown = library?.items.filter(item => filter === 'all' || item.kind === filter) ?? [];
-  return <div className="ed-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) close(); }}>
-    <div ref={box} className="ed-dialog media-library" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={event => {
+  return createPortal(<div className="ed-dialog-backdrop media-library-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) close(); }}>
+    <div ref={box} className={`ed-dialog media-library${edit ? ' editing-audio' : ''}`} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={event => {
       if (event.key === 'Escape') { event.stopPropagation(); if (edit && !busy) { setEdit(undefined); setError(''); } else close(); }
     }}>
       <h2 id={`${id}-title`}>{edit ? audioText(edit.kind === 'youtube' ? 'fromYouTube' : 'trimTitle') : title}</h2>
@@ -124,5 +125,5 @@ export function MediaLibraryDialog({ current, only, title = t('library'), onPick
       <div className="actions"><button type="button" onClick={onClose}>{t('close')}</button></div>
       </>}
     </div>
-  </div>;
+  </div>, document.querySelector('.editor') ?? document.body);
 }

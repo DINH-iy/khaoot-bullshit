@@ -32,7 +32,9 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
   const heading = useRef<HTMLHeadingElement>(null); const t = useTexts(SETTINGS_TEXTS);
   useEffect(() => { heading.current?.focus(); }, []);
   const teamGame = definition.nodes.some(node => node.stages.some(stage => stage.kind === 'teams'));
-  return <section className="game-settings-panel" aria-labelledby="game-settings-heading" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
+  return <div className="game-settings-layer">
+    <div className="game-settings-outside" aria-hidden="true" onClick={onClose} />
+    <section className="game-settings-panel" aria-labelledby="game-settings-heading" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
     <div className="inspector-head"><h2 id="game-settings-heading" ref={heading} tabIndex={-1}>{t('gameSettings')}</h2><button className="small-button" onClick={onClose}>{t('close')}</button></div>
     <p className="hint">{t('intro')}</p>
     <fieldset className="view-lock" disabled={readOnly}>
@@ -73,5 +75,6 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
       <p className="hint">{t('lookHint')}</p>
       <button className="small-button" onClick={() => { onClose(); onLook(); }}>{t('openLook')}</button>
     </Section>
-  </section>;
+    </section>
+  </div>;
 }

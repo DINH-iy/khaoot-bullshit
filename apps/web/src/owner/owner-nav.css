@@ -20,16 +20,30 @@
 .app-caret { font-size: .75em; opacity: .7; }
 /* The menus (the owner's, and the editor's logo menu). */
 .app-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; min-width: 15rem; margin: 0; padding: 6px; list-style: none; display: grid; gap: 2px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); color: light-dark(#1d1d22, #eceef3); box-shadow: 0 14px 40px rgb(0 0 0 / .25); }
-.app-menu.start { left: 0; right: auto; }
 .app-menu li { margin: 0; }
 .app-menu a { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 9px; color: inherit; text-decoration: none; font-weight: 600; }
 .app-menu a:hover { background: light-dark(#f1edfb, #2c2840); }
 .app-menu a[aria-current=page] { background: light-dark(#f1edfb, #2c2840); font-weight: 800; }
 .app-menu a svg { width: 16px; opacity: .75; }
-.app-menu-head { margin: 6px 0 2px; padding: 6px 12px 0; border-top: 1px solid light-dark(#eeeaf7, #2c2840); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .65; }
 /* The editor's logo is the button for its menu. */
 .app-logo-menu { position: relative; flex: none; }
-.app-logo-button { border: 0; padding: 0; cursor: pointer; }
+.editor .app-logo-button { width: auto; min-height: 40px; height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); cursor: pointer; }
+.editor .app-logo-button:is(:hover, [aria-expanded="true"]) { background: var(--e-accent-soft); border-color: var(--e-accent); }
+.app-logo-label { padding-inline-start: 8px; border-inline-start: 1px solid var(--e-border); font: 650 .8rem/1.35 system-ui, sans-serif; }
+.app-logo-button .fa-icon { width: 10px; height: 10px; flex: none; color: var(--e-muted); }
+.app-logo-button[aria-expanded="true"] .app-logo-caret { transform: rotate(180deg); }
+.app-logo-button .app-logo-bars { display: none; }
+@media (max-width: 530px) {
+  .app-logo-button .app-logo-label, .app-logo-button .app-logo-caret { display: none; }
+  .app-logo-button .app-logo-bars { display: block; width: 13px; height: 13px; }
+}
+.app-menu.app-navigation { left: 0; right: auto; width: min(17rem, calc(100vw - 32px)); min-width: 0; max-height: calc(100dvh - 72px); overflow: auto; align-content: start; gap: 3px; padding: 7px; border-color: var(--e-border); background: var(--e-panel); color: var(--e-text); }
+.app-navigation-heading { margin: 0; padding: 6px 10px 3px; color: var(--e-muted); font-size: .75rem; font-weight: 700; }
+.app-navigation-heading.owner-heading { border-top: 1px solid var(--e-border); margin-top: 3px; padding-top: 8px; }
+.app-navigation-links { display: grid; gap: 2px; list-style: none; margin: 0; padding: 0; }
+.app-navigation a { min-height: 40px; padding: 5px 10px; font-size: .94rem; }
+.app-navigation a[aria-current="page"] { color: var(--e-text); background: var(--e-accent-soft); }
+.app-navigation a .app-current-mark { margin-inline-start: auto; color: var(--e-accent); opacity: 1; }
 /* Phones: Feedback shows only its icon; the main places stay. */
 @media (max-width: 640px) {
   .app-header { padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
@@ -42,5 +56,5 @@
 /* The language of the host, editor and admin screens (i18n/language-picker.tsx). */
 .language-picker select { min-height: 40px; padding: 0 10px; border-radius: 999px; border: 1px solid light-dark(#d9d3ea, #3a3550); background: transparent; color: inherit; font: inherit; font-weight: 600; }
 .language-picker select:focus-visible { outline: 3px solid light-dark(#6d3fd6, #b9a2ff); outline-offset: 2px; }
-.app-menu-language { margin: 6px 0 0; padding: 8px 6px 2px; border-top: 1px solid light-dark(#eeeaf7, #2c2840); }
-.app-menu-language .language-picker, .app-menu-language select { width: 100%; }
+.app-menu-language { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: center; gap: 6px; margin-top: 4px; padding: 8px 6px 2px 10px; border-top: 1px solid var(--e-border); color: var(--e-muted); font-size: .8rem; }
+.app-menu-language select { width: 100%; min-height: 36px; border-radius: 8px; }

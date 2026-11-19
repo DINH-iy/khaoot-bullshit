@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { HostMenuSchema } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { rememberOwner } from './owner-session.js';
@@ -53,7 +53,11 @@ function useMenu() {
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (box.current?.contains(document.activeElement)) box.current.querySelector('button')?.focus();
+      setOpen(false);
+    };
     document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', escape);
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape); };
   }, [open]);
@@ -88,13 +92,22 @@ export function OwnerNav({ current, role }: { current: OwnerSection; role: HostR
 
 /** In the editor's own header: its "p." logo opens the same places (and, for the owner, the owner's pages). */
 export function AppMenu({ role, current = 'editor' }: { role: HostRole | null; current?: OwnerSection }) {
-  const menu = useMenu(); const t = useTexts(OWNER_TEXTS);
+  const menu = useMenu(); const t = useTexts(OWNER_TEXTS); const id = useId();
+  const links = (items: Link[]) => <ul className="app-navigation-links">{items.map(link =>
+    <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined} onClick={() => menu.setOpen(false)}>
+      <FaIcon name={link.icon} /><span>{t(link.label)}</span>{link.key === current && <FaIcon className="app-current-mark" name="check" />}
+    </a></li>)}</ul>;
   return <div className="app-logo-menu" ref={menu.box}>
-    <button type="button" className="editor-logo app-logo-button" aria-haspopup="menu" aria-expanded={menu.open} onClick={() => menu.setOpen(!menu.open)}><span aria-hidden="true">p.</span><span className="visually-hidden">{t('logoMenu')}</span></button>
-    {menu.open && <ul className="app-menu start" role="menu" aria-label={t('goTo')}>
-      {MAIN.filter(link => role === 'owner' || link.editor).map(link => menuLink(link, current, t))}
-      {role === 'owner' && <><li className="app-menu-head" role="presentation">{t('owner')}</li>{OWNER.map(link => menuLink(link, current, t))}</>}
-      <li className="app-menu-language" role="presentation"><LanguagePicker label={t('language')} /></li>
-    </ul>}
+    <button type="button" className="editor-logo app-logo-button" aria-label={t('logoMenu')} aria-expanded={menu.open} aria-controls={menu.open ? id : undefined}
+      onClick={() => menu.setOpen(!menu.open)}>
+      <span aria-hidden="true">p.</span><span className="app-logo-label">{t('menu')}</span>
+      <FaIcon className="app-logo-caret" name="chevron-down" /><FaIcon className="app-logo-bars" name="bars" />
+    </button>
+    {menu.open && <nav id={id} className="app-menu app-navigation" aria-labelledby={`${id}-heading`}>
+      <p className="app-navigation-heading" id={`${id}-heading`}>{t('goTo')}</p>
+      {links(MAIN.filter(link => role === 'owner' || link.editor))}
+      {role === 'owner' && <><p className="app-navigation-heading owner-heading">{t('owner')}</p>{links(OWNER)}</>}
+      <div className="app-menu-language"><span aria-hidden="true">{t('language')}</span><LanguagePicker label={t('language')} /></div>
+    </nav>}
   </div>;
 }

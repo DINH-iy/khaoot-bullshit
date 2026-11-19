@@ -150,7 +150,8 @@
 .person-badge { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--r-card-strong); }
 .person-linked { margin: 0; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--r-ok) 22%, transparent); }
 /* Signing in with a typed personal key, on the join screen. */
-.key-sign-in { display: grid; gap: 8px; margin: 0; }
+.key-sign-in { display: grid; gap: 10px; margin: 0; padding: 4px 12px 12px; }
+.key-sign-in label { font-size: .9em; font-weight: 600; }
 .key-sign-in input { font-family: ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 /* Challenge by place: one button per place for each player or team. */
 .place-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; } .place-buttons .small-button { margin: 0; }
@@ -183,10 +184,23 @@
   color: var(--r-text); background: color-mix(in srgb, var(--r-bad) 22%, transparent); border: 1px solid color-mix(in srgb, var(--r-bad) 60%, transparent); }
 .field-problem { margin-top: -6px; font-size: .95rem; }
 .field-problem::before, .join-error::before { content: '!'; flex: none; display: grid; place-items: center; width: 1.3em; height: 1.3em; border-radius: 50%; background: var(--r-bad); color: #fff; font-weight: 900; font-size: .85em; }
-.join-more { border-top: 1px solid var(--r-line); padding-top: 12px; }
-.join-more summary { cursor: pointer; color: var(--r-muted); font-weight: 600; }
-.join-more[open] { display: grid; gap: 12px; }
-.join-more[open] summary { margin-bottom: 4px; }
+.join-more { border-top: 1px solid var(--r-line); }
+.join-more > summary { list-style: none; display: flex; gap: 8px; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 2px; cursor: pointer; color: var(--r-muted); font-size: .9em; font-weight: 650; }
+.join-more > summary::-webkit-details-marker { display: none; }
+.join-more > summary .fa-icon { width: .8em; height: .8em; }
+.join-more[open] > summary .fa-icon, .join-option[aria-expanded="true"] .join-option-arrow { transform: rotate(180deg); }
+.join-options { border: 1px solid var(--r-line); border-radius: 14px; background: color-mix(in srgb, var(--r-text) 4%, var(--r-surface)); }
+.join-options > * + * { box-shadow: inset 0 1px var(--r-line); }
+.room .join-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 54px; margin: 0; padding: 9px 12px; background: transparent; color: var(--r-text); text-align: start; text-decoration: none; font-weight: 650; line-height: 1.3; border-radius: 0; }
+.room button.join-option { border: 0; }
+.join-options > :first-child, .join-options > :first-child > .join-option { border-start-start-radius: 13px; border-start-end-radius: 13px; }
+.join-options > :last-child { border-end-start-radius: 13px; border-end-end-radius: 13px; }
+.room .join-option:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--r-text) 7%, transparent); }
+.join-option-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: color-mix(in srgb, var(--r-text) 9%, transparent); color: var(--r-text); }
+.join-option .fa-icon { width: 1em; height: 1em; }
+.join-option .join-option-arrow { width: .75em; height: .75em; color: var(--r-muted); }
+.join-option-text { min-width: 0; overflow-wrap: anywhere; }
+.join-option-text small { display: block; margin-top: 2px; color: var(--r-muted); font-size: .82em; font-weight: 400; }
 
 /* Round strip under the top bar: what to do, the time, team round. Slim chips, never a wall of text. */
 .round-info { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 20px; border-bottom: 1px solid var(--r-line); background: rgb(0 0 0 / .12); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(6px); }

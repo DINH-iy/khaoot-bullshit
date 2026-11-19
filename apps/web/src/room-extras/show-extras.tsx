@@ -3,6 +3,9 @@ import type { RoomSnapshot, TextKey } from '@party/contracts';
 import { contrast } from '@party/contracts';
 import { useLook, useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from '../room/extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import './room-extras.css';
 
 type View = RoomSnapshot['view'];
@@ -92,11 +95,11 @@ export function FinaleShow({ state }: { state: RoomSnapshot }) {
       <p className="finale-value">{slide.value}</p>
     </div>
     {slides.length > 1 && <div className="finale-nav">
-      <button type="button" className="finale-step" aria-label="Previous award" onClick={() => go(-1)}>‹</button>
+      <button type="button" className="finale-step" aria-label={x('previousAward')} onClick={() => go(-1)}>‹</button>
       <span className="finale-count">{Math.min(at, slides.length - 1) + 1} / {slides.length}</span>
-      <button type="button" className="finale-step" aria-label="Next award" onClick={() => go(1)}>›</button>
+      <button type="button" className="finale-step" aria-label={x('nextAward')} onClick={() => go(1)}>›</button>
       <button type="button" className="finale-auto" aria-pressed={auto} onClick={() => setAuto(value => !value)}>{auto ? '⏸ Stop auto-play' : '▶ Auto-play'}</button>
     </div>}
-    {slides.length > 1 && <div className="finale-dots" role="group" aria-label="Awards">{slides.map((entry, index) => <button key={index} type="button" aria-pressed={index === at} aria-label={name(entry)} onClick={() => setAt(index)} />)}</div>}
+    {slides.length > 1 && <div className="finale-dots" role="group" aria-label={x('awards')}>{slides.map((entry, index) => <button key={index} type="button" aria-pressed={index === at} aria-label={name(entry)} onClick={() => setAt(index)} />)}</div>}
   </section>;
 }

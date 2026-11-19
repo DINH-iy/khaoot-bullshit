@@ -8,7 +8,7 @@ if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicate
 test('a player whose phone dies continues on a new phone, after the host approves', async ({ browser, baseURL }) => {
   const hostContext = await browser.newContext(); const host = await hostContext.newPage();
   const oldContext = await browser.newContext(); const oldPhone = await oldContext.newPage();
-  const newContext = await browser.newContext(); const newPhone = await newContext.newPage();
+  const newContext = await browser.newContext({ viewport: { width: 390, height: 844 } }); const newPhone = await newContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await host.getByRole('radio', { name: /First reliable game/ }).check();
@@ -34,6 +34,12 @@ test('a player whose phone dies continues on a new phone, after the host approve
     // While the old phone is connected, its seat is not offered.
     await newPhone.goto(`${baseURL}/?code=${roomCode}`);
     await newPhone.getByText('More options').click();
+    const signIn = newPhone.getByRole('button', { name: /^Sign in/ });
+    await signIn.click();
+    await expect(newPhone.getByLabel('Your personal key')).toBeFocused();
+    expect(await newPhone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await newPhone.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(signIn).toBeFocused();
     await newPhone.getByRole('button', { name: 'Take over my seat' }).click();
     await expect(newPhone.getByText('No seat is free right now.')).toBeVisible();
     // The battery dies.

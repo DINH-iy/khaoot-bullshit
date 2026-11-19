@@ -26,7 +26,7 @@ function KeyCard({ view, fresh, onDone }: { view: PersonKeyView; fresh: boolean;
   return <section className="person-link" aria-labelledby="person-link-heading">
     <h2 id="person-link-heading">Personal key for {view.name}</h2>
     <p className="person-key"><code>{view.key}</code></p>
-    <p>{fresh ? `Give ${view.name} this key. ` : ''}On the start page, {view.name} taps “Have a personal key? Sign in” and types it (capitals and dashes do not matter), or opens the link below (scan the code). That phone then always joins as {view.name}. Anyone with the key can become {view.name}, so give it only to them. You can look it up here again, or make a new one if it got out.</p>
+    <p>{fresh ? `Give ${view.name} this key. ` : ''}On the start page, {view.name} opens More options, taps “Sign in” and types it (capitals and dashes do not matter), or opens the link below (scan the code). That phone then always joins as {view.name}. Anyone with the key can become {view.name}, so give it only to them. You can look it up here again, or make a new one if it got out.</p>
     {image && <img src={image} alt={`QR code with the personal link for ${view.name}`} width={200} height={200} />}
     <p className="person-url"><code>{url}</code></p>
     <div className="admin-actions">

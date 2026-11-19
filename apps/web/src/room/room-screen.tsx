@@ -29,6 +29,7 @@ import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js
 import { useMe, type Person } from '../people/use-me.js';
 import { wasOwner } from '../owner/owner-session.js';
 import { KeySignIn } from '../people/key-sign-in.js';
+import { JoinOption } from './join-option.js';
 import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
@@ -97,13 +98,14 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
       <p className="join-links"><a href="/?arcade">{r('arcade')}</a></p>
       {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
       <details className="join-more">
-        <summary>{r('moreOptions')}</summary>
-        {person === null && <KeySignIn onSignIn={onSignIn} />}
-        <p className="join-links">{t('join.reclaim')} <button type="button" className="small-button" onClick={onReclaim}>{t('join.reclaimButton')}</button></p>
-        {/* Only for a browser that signed in as the owner before: players never see it, and nothing asks the server. */}
-        {ownerBrowser && <p className="join-links"><a href="/?host=1">{r('hostInstead')}</a></p>}
-        {/* A person with editor rights (the server says so in /api/people/me). */}
-        {!ownerBrowser && person?.canEdit && <p className="join-links"><a href="/?host=1#my-games">{r('editGames')}</a></p>}
+        <summary>{r('moreOptions')}<FaIcon name="chevron-down" /></summary>
+        <div className="join-options">
+          {person === null && <KeySignIn onSignIn={onSignIn} />}
+          <button type="button" className="join-option" onClick={onReclaim}><JoinOption icon="arrow-rotate-left" title={t('join.reclaimButton')} detail={t('join.reclaim')} /></button>
+          {/* The host link comes from this browser's owner hint. Editor access comes from /api/people/me. */}
+          {ownerBrowser && <a className="join-option" href="/?host=1"><JoinOption icon="tv" title={r('hostInstead')} /></a>}
+          {!ownerBrowser && person?.canEdit && <a className="join-option" href="/?host=1#my-games"><JoinOption icon="gear" title={r('editGames')} /></a>}
+        </div>
       </details>
     </section>
   </main>;

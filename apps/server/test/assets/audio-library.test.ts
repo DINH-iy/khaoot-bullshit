@@ -68,7 +68,7 @@ describe('audio library editing', () => {
         method: 'POST', url: `/api/host/media${path}`, payload,
         headers: signedIn ? { ...headers, cookie: `party_owner=${token}` } : headers,
       });
-      const importRequest = { url: `https://youtu.be/${id}`, name: 'Music', permission: true };
+      const importRequest = { url: `https://youtu.be/${id}`, name: 'Music' };
       const trimRequest = { name: 'Music clip', start: 3, end: 6 };
       expect((await post('/youtube', importRequest, false)).statusCode).toBe(401);
       expect((await post(`/${randomUUID()}/trim`, trimRequest, false)).statusCode).toBe(401);

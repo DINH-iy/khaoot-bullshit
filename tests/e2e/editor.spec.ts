@@ -480,6 +480,47 @@ test('coming back to a game opens the same place: editor, scene, panel and part 
   await expect(page.getByRole('heading', { name: 'Game settings' })).toHaveCount(0);
 });
 
+test('editor menus close outside and Game settings warnings can fold away', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await openCopy(page, baseURL!, `Warnings ${Date.now()}`);
+  const gameId = new URL(page.url()).searchParams.get('edit');
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const url = `${baseURL}/api/host/games/${gameId}`;
+  const draft = (await (await page.request.get(url, { headers })).json()).data;
+  const invalid = { ...draft.definition, finale: { stats: ['stats'] } };
+  const response = await page.request.put(`${url}/draft`, { headers, data: { definition: invalid, expectedRevision: draft.revision } });
+  expect(response.ok()).toBe(true);
+  await page.reload();
+
+  const siteMenu = page.getByRole('button', { name: 'Menu: go to another part of party' });
+  await expect(siteMenu).toContainText('Menu');
+  await siteMenu.click();
+  const navigation = page.getByRole('navigation', { name: 'Go to' });
+  await expect(navigation.getByRole('link', { name: 'Editor' })).toHaveAttribute('aria-current', 'page');
+  await page.mouse.click(700, 400);
+  await expect(navigation).toHaveCount(0);
+  const gameMenu = page.getByRole('button', { name: /^Game menu/ });
+  await gameMenu.click();
+  await expect(gameMenu).toHaveAttribute('aria-expanded', 'true');
+  await page.mouse.click(700, 400);
+  await expect(gameMenu).toHaveAttribute('aria-expanded', 'false');
+
+  await gameMenu.click();
+  await page.getByRole('menuitem', { name: /^Game settings/ }).click();
+  const settings = page.getByRole('region', { name: 'Game settings' });
+  const awards = settings.locator('details').filter({ has: page.getByText('End-of-game awards', { exact: true }) });
+  const summary = awards.locator('summary').first();
+  await expect(awards.getByRole('alert')).toBeVisible();
+  await summary.click();
+  await expect(awards.getByRole('alert')).toBeHidden();
+  await expect(summary).toContainText('1 problem');
+  await summary.press('Enter');
+  await expect(awards.getByRole('alert')).toBeVisible();
+  await page.mouse.click(700, 400);
+  await expect(settings).toHaveCount(0);
+  await expect(page.locator('.problems-toggle')).toContainText('1 problem');
+});
+
 test('the Scene editor lists scenes in play order, previews them, and edits parts and game settings on the same draft', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
   await openCopy(page, baseURL!, `Scenes ${Date.now()}`);

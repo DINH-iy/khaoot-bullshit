@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { HeadToHeadReplay } from '@party/contracts';
+import { h } from './h2h.text.js';
 import { PIECES, RPS_ICONS, squaresOf } from './pieces.js';
 
 // A finished game, played back move by move on a canvas, which can be saved as a
@@ -12,13 +13,13 @@ function draw(ctx: CanvasRenderingContext2D, replay: HeadToHeadReplay, index: nu
   ctx.fillStyle = '#1d1a2b'; ctx.fillRect(0, 0, SIZE, SIZE + 40);
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const last = index === frameCount(replay) - 1;
-  ctx.font = '600 15px system-ui, sans-serif'; ctx.fillText(last ? result : `${names[0]} vs ${names[1]}`, SIZE / 2, SIZE + 20);
+  ctx.font = '600 15px system-ui, sans-serif'; ctx.fillText(last ? result : h('versus', { first: names[0], second: names[1] }), SIZE / 2, SIZE + 20);
   if (replay.game === 'rps') {
     const rounds = replay.rounds.slice(0, index); const round = rounds.at(-1);
     const wins = [0, 1].map(seat => rounds.filter(entry => entry.winner === seat).length);
     ctx.font = '700 22px system-ui, sans-serif'; ctx.fillText(`${names[0]} ${wins[0]} – ${wins[1]} ${names[1]}`, SIZE / 2, 40);
     if (round) { ctx.font = '96px system-ui, sans-serif'; ctx.fillText(RPS_ICONS[round.picks[0]], SIZE / 4, SIZE / 2); ctx.fillText(RPS_ICONS[round.picks[1]], SIZE * 3 / 4, SIZE / 2);
-      ctx.font = '600 16px system-ui, sans-serif'; ctx.fillText(round.winner === null ? 'Tie' : `${names[round.winner]} wins the round`, SIZE / 2, SIZE - 40); }
+      ctx.font = '600 16px system-ui, sans-serif'; ctx.fillText(round.winner === null ? h('tie') : h('winsRound', { name: names[round.winner] }), SIZE / 2, SIZE - 40); }
     return;
   }
   if (replay.game === 'tictactoe') {
@@ -54,25 +55,25 @@ export function Replay({ replay, names, result }: { replay: HeadToHeadReplay; na
   // Records one playback of the canvas, then hands the video to the phone: the share sheet (to keep it in the photos) or a download.
   const save = () => {
     const element = canvas.current; if (!element || !type) return;
-    setSaving('Recording…'); const chunks: Blob[] = [];
+    setSaving(h('recording')); const chunks: Blob[] = [];
     const recorder = new MediaRecorder(element.captureStream(30), { mimeType: type });
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
       const file = new File(chunks, `party-${replay.game}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`, { type: type.split(';')[0] ?? type });
       const share = navigator.canShare?.({ files: [file] }) ? navigator.share({ files: [file], title: result }).catch(() => undefined) : null;
       if (!share) { const url = URL.createObjectURL(file); const link = document.createElement('a'); link.href = url; link.download = file.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
-      setSaving('Saved.');
+      setSaving(h('saved'));
     };
     setIndex(0); setPlaying(true); recorder.start();
     setTimeout(() => { recorder.stop(); }, total * FRAME_MS + 600);
   };
   return <div className="h2h-replay">
-    <canvas ref={canvas} width={SIZE} height={SIZE + 40} role="img" aria-label={`Replay, move ${index + 1} of ${total}: ${result}`} />
+    <canvas ref={canvas} width={SIZE} height={SIZE + 40} role="img" aria-label={h('replayLabel', { move: index + 1, total, result })} />
     <div className="actions">
-      <button type="button" className="small-button" disabled={playing} onClick={play}>▶ Replay</button>
-      {type && <button type="button" className="small-button" disabled={playing} onClick={save}>Save as video</button>}
+      <button type="button" className="small-button" disabled={playing} onClick={play}>▶ {h('replay')}</button>
+      {type && <button type="button" className="small-button" disabled={playing} onClick={save}>{h('saveVideo')}</button>}
     </div>
     {saving && <p className="hint" role="status">{saving}</p>}
-    <p className="hint">The replay disappears when the room ends.</p>
+    <p className="hint">{h('replayGone')}</p>
   </div>;
 }

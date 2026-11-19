@@ -2,6 +2,9 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { REACTIONS, type RoomSnapshot } from '@party/contracts';
 import { useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from '../room/extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import './room-extras.css';
 
 export interface Reaction { id: number; playerId: string; reaction: number; at: number }
@@ -44,8 +47,8 @@ export function ReactionTray({ onSend, choices, limit }: { onSend: (reaction: nu
   const send = (index: number) => { const at = Date.now(); const kept = recent.filter(time => at - time < 10_000); if (kept.length >= limit) return; setRecent([...kept, at]); setNow(at); onSend(index); setSent(index); };
   return <div className="reaction-tray">
     <p className="sheet-title">{t('react.title')}</p>    <div className="reaction-grid">{REACTIONS.map((value, index) => choices.includes(index) && <button key={value} type="button" className={/^[A-Z!]+$/.test(value) ? 'sticker' : undefined}
-      aria-label={`Send ${value}`} disabled={waiting} onClick={() => send(index)}>{value}</button>)}</div>
-    <p className="hint" role="status">{waiting ? `Slow down: ${limit} per 10 seconds. Ready in ${Math.ceil((10_000 - (now - live[0]!)) / 1000)} s.` : `${limit - live.length} of ${limit} left for now.`}</p>
+      aria-label={x('send', { reaction: value })} disabled={waiting} onClick={() => send(index)}>{value}</button>)}</div>
+    <p className="hint" role="status">{waiting ? x('slowDown', { limit, seconds: Math.ceil((10_000 - (now - live[0]!)) / 1000) }) : x('leftForNow', { count: limit - live.length, limit })}</p>
     {sent !== null && <p role="status" className="visually-hidden">Sent {REACTIONS[sent]}</p>}
   </div>;
 }

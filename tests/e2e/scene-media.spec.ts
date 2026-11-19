@@ -118,7 +118,7 @@ test('authors can import audio, trim it, and add the clip to the playlist from t
     return saved.json();
   }
   await page.route('**/api/host/media/youtube', async route => {
-    expect(route.request().postDataJSON()).toEqual({ url: 'https://youtu.be/a1_bc-DEF23', name: 'Sound source', permission: true });
+    expect(route.request().postDataJSON()).toEqual({ url: 'https://youtu.be/a1_bc-DEF23', name: 'Sound source' });
     await route.fulfill({ json: await storeFixture('Sound source', 3) });
   });
   let clipId: string | undefined;
@@ -137,11 +137,16 @@ test('authors can import audio, trim it, and add the clip to the playlist from t
   await settings.getByRole('button', { name: 'Add a song' }).click();
   const library = page.locator('.media-library');
   await library.getByRole('button', { name: 'Import from YouTube' }).click();
+  const desktop = page.viewportSize();
+  await page.setViewportSize({ width: 360, height: 440 });
+  const box = await library.boundingBox();
+  expect(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 440).toBe(true);
+  await expect(library.getByRole('button', { name: 'Import MP3' })).toBeInViewport({ ratio: 1 });
   await library.getByLabel('YouTube video link').fill('https://youtu.be/a1_bc-DEF23');
   await library.getByLabel('Track name').fill('Sound source');
-  await expect(library.getByRole('button', { name: 'Import MP3' })).toBeDisabled();
-  await library.getByLabel('I have permission to download and use this audio.').check();
+  await expect(library.getByRole('checkbox')).toHaveCount(0);
   await library.getByRole('button', { name: 'Import MP3' }).click();
+  if (desktop) await page.setViewportSize(desktop);
   await library.getByRole('listitem').filter({ hasText: 'Sound source' }).getByRole('button', { name: 'Trim', exact: true }).click();
   await expect(library.getByLabel('End (seconds)')).toHaveValue('3');
   await library.getByLabel('Start (seconds)').fill('0.5');

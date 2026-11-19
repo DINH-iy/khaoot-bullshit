@@ -55,8 +55,8 @@ export function PickYourName({ roomCode, people, onSignedIn }: { roomCode: strin
 export function NewKeyCard({ name, personalKey, busy, onContinue }: { name: string; personalKey: string; busy: boolean; onContinue: () => void }) {
   return <div className="new-key" role="group" aria-labelledby="new-key-heading">
     <p className="new-key-icon" aria-hidden="true"><FaIcon name="user-plus" /></p>
-    <h2 id="new-key-heading">Welcome, {name}!</h2>
-    <p>Your personal code. With it you are always {name}, on any phone, with your look, chips and stats.</p>
+    <h2 id="new-key-heading">{x('welcome', { name })}</h2>
+    <p>{x('codeIntro', { name })}</p>
     <div className="new-key-code"><code aria-label={x('personalCode', { code: personalKey })}>{personalKey}</code><CopyIcon text={personalKey} label={x('copyCode')} /></div>
     <p className="new-key-note">{x('codeNote')}</p>
     <button type="button" className="primary big" disabled={busy} onClick={onContinue}>{x('continueGame')}</button>

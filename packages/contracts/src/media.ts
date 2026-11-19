@@ -34,7 +34,7 @@ export const MAX_AUDIO_CLIP_SECONDS = 20 * 60;
 export const ImportYouTubeAudioSchema = z.object({
   url: z.string().trim().min(1).max(2048),
   name: z.string().trim().min(1).max(120),
-  permission: z.literal(true),
+  permission: z.literal(true).optional(), // Accepted for editors that still have the previous build open.
 }).strict();
 export const TrimAudioSchema = z.object({
   start: z.number().min(0).max(24 * 60 * 60),

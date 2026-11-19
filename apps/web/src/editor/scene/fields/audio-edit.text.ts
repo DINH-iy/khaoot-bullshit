@@ -2,7 +2,7 @@ import { defineTexts } from '../../../i18n/texts.js';
 
 export const AUDIO_EDIT_TEXTS = defineTexts('audio-edit', {
   fromYouTube: 'Import from YouTube', url: 'YouTube video link', name: 'Track name',
-  permission: 'I have permission to download and use this audio.', import: 'Import MP3',
+  import: 'Import MP3',
   importing: 'Importing audio…', trim: 'Trim', trimTitle: 'Trim audio', start: 'Start (seconds)', end: 'End (seconds)',
   play: 'Preview cut', stop: 'Pause preview', save: 'Save MP3 copy', saving: 'Saving clip…',
   back: 'Back to library', added: '“{name}” was added to the library.',
@@ -17,7 +17,7 @@ export const AUDIO_EDIT_TEXTS = defineTexts('audio-edit', {
 }, {
   nl: {
     fromYouTube: 'Importeren van YouTube', url: 'Link naar YouTube-video', name: 'Naam van het nummer',
-    permission: 'Ik heb toestemming om deze audio te downloaden en te gebruiken.', import: 'MP3 importeren',
+    import: 'MP3 importeren',
     importing: 'Audio importeren…', trim: 'Knippen', trimTitle: 'Audio knippen', start: 'Begin (seconden)', end: 'Einde (seconden)',
     play: 'Fragment beluisteren', stop: 'Voorbeeld pauzeren', save: 'Opslaan als MP3-kopie', saving: 'Fragment opslaan…',
     back: 'Terug naar de bibliotheek', added: '‘{name}’ is toegevoegd aan de bibliotheek.',
@@ -32,7 +32,7 @@ export const AUDIO_EDIT_TEXTS = defineTexts('audio-edit', {
   },
   de: {
     fromYouTube: 'Von YouTube importieren', url: 'Link zum YouTube-Video', name: 'Titel',
-    permission: 'Ich darf diese Audiodatei herunterladen und verwenden.', import: 'MP3 importieren',
+    import: 'MP3 importieren',
     importing: 'Audio wird importiert…', trim: 'Kürzen', trimTitle: 'Audio kürzen', start: 'Anfang (Sekunden)', end: 'Ende (Sekunden)',
     play: 'Ausschnitt anhören', stop: 'Vorschau pausieren', save: 'MP3-Kopie speichern', saving: 'Ausschnitt wird gespeichert…',
     back: 'Zurück zur Bibliothek', added: '„{name}“ wurde zur Bibliothek hinzugefügt.',
@@ -47,7 +47,7 @@ export const AUDIO_EDIT_TEXTS = defineTexts('audio-edit', {
   },
   ro: {
     fromYouTube: 'Importă de pe YouTube', url: 'Link către videoclipul YouTube', name: 'Numele piesei',
-    permission: 'Am permisiunea să descarc și să folosesc acest fișier audio.', import: 'Importă MP3',
+    import: 'Importă MP3',
     importing: 'Se importă fișierul audio…', trim: 'Decupează', trimTitle: 'Decupează fișierul audio', start: 'Început (secunde)', end: 'Sfârșit (secunde)',
     play: 'Ascultă fragmentul', stop: 'Pune previzualizarea pe pauză', save: 'Salvează o copie MP3', saving: 'Se salvează fragmentul…',
     back: 'Înapoi la bibliotecă', added: '„{name}” a fost adăugat în bibliotecă.',
