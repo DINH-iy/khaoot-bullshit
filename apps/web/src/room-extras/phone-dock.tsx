@@ -5,9 +5,12 @@ import { Avatar } from '../players/avatar.js';
 import { ReactionTray } from './reactions.js';
 import { ChallengeAlert } from './challenge-alert.js';
 import { setSound, soundOn, unlockSound } from './celebrate.js';
+import { chooseLanguage, LANGUAGES, useLanguage, type Language } from '../i18n/language.js';
+import { translate } from '../i18n/texts.js';
+import { PHONE_TEXTS } from '../room/phone.text.js';
 import './room-extras.css';
 
-type Sheet = 'menu' | 'scores' | 'players' | 'react' | 'games' | 'challenges' | null;
+type Sheet = 'menu' | 'scores' | 'players' | 'react' | 'games' | 'challenges' | 'language' | null;
 // Side games and challenges load only when opened.
 const SideGames = lazy(() => import('../side-games/side-games.js'));
 const Challenges = lazy(() => import('../side-games/challenges.js'));
@@ -31,7 +34,7 @@ function BottomSheet({ title, onClose, children }: { title: string; onClose: () 
 export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak, challengeTick }: {
   state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void; onBreak: (vote: boolean) => void; challengeTick: number;
 }) {
-  const t = useText(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
+  const t = useText(); const language = useLanguage(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
   // Sound needs a first tap on phones; any tap in the dock (or an answer) prepares it.
   useEffect(() => { const prepare = () => unlockSound(); window.addEventListener('pointerdown', prepare, { once: true }); return () => window.removeEventListener('pointerdown', prepare); }, []);
   const close = () => setSheet(null);
@@ -66,7 +69,11 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
       {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('challenges'); }}>
         <span aria-hidden="true">⚔️</span><small>Challenge{challengeTick !== seenTick && <span className="dock-dot" aria-label="news" />}</small></button>}
       <button type="button" aria-pressed={sound} onClick={() => { unlockSound(); setSound(!sound); setSoundState(!sound); }}><span aria-hidden="true">{sound ? '🔊' : '🔇'}</span><small>Sound</small></button>
+      <button type="button" onClick={() => setSheet('language')}><span aria-hidden="true">🌐</span><small>{LANGUAGES[language]}</small></button>
     </nav></BottomSheet>}
+    {/* The phone's language: the game's standard texts follow it; what the game's author wrote stays as written. */}
+    {sheet === 'language' && <BottomSheet title={translate(PHONE_TEXTS, 'languageTitle')} onClose={close}><div className="language-choices" role="group" aria-label={translate(PHONE_TEXTS, 'language')}>
+      {(Object.keys(LANGUAGES) as Language[]).map(code => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => { chooseLanguage(code); close(); }}>{LANGUAGES[code]}</button>)}</div></BottomSheet>}
     {sheet === 'scores' && <BottomSheet title={t('scores.title')} onClose={close}>{scores}</BottomSheet>}
     {sheet === 'players' && <BottomSheet title={t('players.title', { count: state.players.length })} onClose={close}>
       <ul className="sheet-players">{state.players.map(player => <li key={player.id}><Avatar look={player.look} size={40} /><span>{player.displayName}{player.id === state.selfPlayerId ? ' (you)' : ''}</span>

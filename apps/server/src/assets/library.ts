@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { GameIdSchema, LIBRARY_LIMITS, LibraryItemSchema, MediaLibrarySchema, UpdateLibraryItemSchema, type SceneMediaKind } from '@party/contracts';
+import { GameIdSchema, ImportYouTubeAudioSchema, LIBRARY_LIMITS, LibraryItemSchema, MediaLibrarySchema, TrimAudioSchema, UpdateLibraryItemSchema, type SceneMediaKind } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { GameMediaKind, PrismaClient } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
+import { withMp3, youtubeVideoUrl } from './audio-tools.js';
 import { defaultMediaDirectory, removeStored, sendStored, sniffMedia, storeUpload, UploadTooLarge, type UploadRules } from './media.js';
 
 // The media library (contracts/media.ts): the owner and editors upload pictures, videos and songs,
@@ -41,10 +43,42 @@ export const cleanName = (value: unknown) => (typeof value === 'string' ? value 
 
 export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess) {
   const directory = config.MEDIA_DIR ?? defaultMediaDirectory; const limiter = new RateLimiter(2048); let active = 0;
+  let audioJobActive = false;
   const idParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { id?: string }).id); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   const used = async () => (await client.gameMedia.aggregate({ where: { removedAt: null }, _sum: { byteSize: true } }))._sum.byteSize ?? 0;
   const item = (row: { id: string; kind: GameMediaKind; name: string; credit: string | null; contentType: string; byteSize: number; createdAt: Date }) =>
     LibraryItemSchema.parse({ id: row.id, kind: SCENE_KIND[row.kind], name: row.name, credit: row.credit, contentType: row.contentType, byteSize: row.byteSize, createdAt: row.createdAt.toISOString() });
+
+  async function addFile(source: Readable, name: string, personId: string | null, credit: string | null = null) {
+    const id = randomUUID();
+    const file = await storeUpload(source, directory, LIBRARY_FOLDER, id, RULES);
+    roomAssert(file, 'UNSUPPORTED_MEDIA');
+    let row;
+    try {
+      row = await client.$transaction(async tx => {
+        // Uploads and derived clips share the same quota, even when their final writes overlap.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(519243091)`;
+        const total = await tx.gameMedia.aggregate({ where: { removedAt: null }, _sum: { byteSize: true } });
+        roomAssert((total._sum.byteSize ?? 0) + file.byteSize <= LIBRARY_LIMITS.total, 'STORAGE_FULL');
+        return tx.gameMedia.create({ data: { id, kind: KIND[file.kind], contentType: file.contentType, byteSize: file.byteSize,
+          sha256: file.sha256, name, credit, personId } });
+      });
+    } catch (error) {
+      await removeStored(directory, LIBRARY_FOLDER, id).catch(() => undefined);
+      throw error;
+    }
+    app.log.info({ event: 'library_media_added', kind: file.kind, byteSize: file.byteSize }, 'Media added to the library');
+    return item(row);
+  }
+
+  async function processAudio<T>(personId: string | null, job: () => Promise<T>) {
+    roomAssert(!audioJobActive && limiter.allow(`audio:${personId ?? 'owner'}`, 6), 'RATE_LIMITED');
+    audioJobActive = true;
+    try {
+      roomAssert(await used() < LIBRARY_LIMITS.total, 'STORAGE_FULL');
+      return await job();
+    } finally { audioJobActive = false; }
+  }
 
   app.get('/api/host/media', async (request, reply) => {
     try {
@@ -58,7 +92,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
   void app.register(async scope => {
     scope.addContentTypeParser('*', (_request, payload, done) => { done(null, payload); });
     scope.post('/api/host/media', async (request, reply) => {
-      const id = randomUUID(); let counted = false; let stored = false;
+      let counted = false;
       try {
         const editor = await owner.requireEditor(request, 'edit');
         roomAssert(limiter.allow(`library:${editor.personId ?? 'owner'}`, 30), 'RATE_LIMITED');
@@ -66,20 +100,43 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
         if (Number.isFinite(declared) && declared > RULES.max) throw new UploadTooLarge();
         roomAssert(active < MAX_ACTIVE_UPLOADS, 'RATE_LIMITED'); active++; counted = true;
         roomAssert(await used() + (Number.isFinite(declared) ? declared : 0) <= LIBRARY_LIMITS.total, 'STORAGE_FULL');
-        const file = await storeUpload(request.body as Readable, directory, LIBRARY_FOLDER, id, RULES);
-        roomAssert(file, 'UNSUPPORTED_MEDIA'); stored = true;
-        const row = await client.gameMedia.create({ data: { id, kind: KIND[file.kind], contentType: file.contentType, byteSize: file.byteSize, sha256: file.sha256,
-          name: cleanName((request.query as { name?: unknown }).name), personId: editor.personId } });
-        stored = false;
-        app.log.info({ event: 'library_media_added', kind: file.kind, byteSize: file.byteSize }, 'Media added to the library');
-        return { ok: true, data: item(row) };
+        const data = await addFile(request.body as Readable, cleanName((request.query as { name?: unknown }).name), editor.personId);
+        return { ok: true, data };
       } catch (error) {
-        if (stored) await removeStored(directory, LIBRARY_FOLDER, id).catch(() => undefined);
         // A refused upload must not leave its unread bytes on a reused connection.
         reply.header('connection', 'close');
         return owner.fail(reply, error instanceof UploadTooLarge ? new RoomError('FILE_TOO_LARGE') : error);
       } finally { if (counted) active--; }
     });
+  });
+
+  app.post('/api/host/media/youtube', async (request, reply) => {
+    try {
+      const editor = await owner.requireEditor(request, 'edit');
+      const input = ImportYouTubeAudioSchema.safeParse(request.body);
+      roomAssert(input.success, 'INVALID_COMMAND');
+      const url = youtubeVideoUrl(input.data.url);
+      roomAssert(url, 'INVALID_COMMAND');
+      const data = await processAudio(editor.personId, () => withMp3({ url },
+        path => addFile(createReadStream(path), cleanName(input.data.name), editor.personId, url)));
+      return { ok: true, data };
+    } catch (error) { return owner.fail(reply, error instanceof UploadTooLarge ? new RoomError('FILE_TOO_LARGE') : error); }
+  });
+
+  app.post('/api/host/media/:id/trim', async (request, reply) => {
+    try {
+      const editor = await owner.requireEditor(request, 'edit');
+      const id = idParam(request);
+      const input = TrimAudioSchema.safeParse(request.body);
+      roomAssert(input.success, 'INVALID_COMMAND');
+      const source = await client.gameMedia.findFirst({ where: { id, removedAt: null } });
+      roomAssert(source, 'NOT_FOUND');
+      roomAssert(source.kind === 'AUDIO', 'UNSUPPORTED_MEDIA');
+      const { start, end, name } = input.data;
+      const data = await processAudio(editor.personId, () => withMp3({ path: join(directory, LIBRARY_FOLDER, id), start, end },
+        path => addFile(createReadStream(path), cleanName(name), editor.personId, source.credit)));
+      return { ok: true, data };
+    } catch (error) { return owner.fail(reply, error instanceof UploadTooLarge ? new RoomError('FILE_TOO_LARGE') : error); }
   });
 
   // A new name, or the credit shown when it plays (composer and licence; empty removes it).

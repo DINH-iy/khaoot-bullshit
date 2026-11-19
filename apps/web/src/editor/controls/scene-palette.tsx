@@ -2,6 +2,10 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { PrefabListSchema, PrefabSchema, type PrefabContent, type PrefabSummary } from '@party/contracts';
 import { roomApi } from '../../room/api.js';
 import { Icon } from './icons.js';
+import { translate } from '../../i18n/texts.js';
+import { marked } from '../../i18n/rich.js';
+import { CONTROLS_TEXTS } from './controls.text.js';
+const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { SCENE_GROUPS, SCENE_TYPES, SCENE_VARIANTS, type SceneType } from '../model.js';
 
 export interface SceneChoice { type: SceneType; variant?: string }
@@ -28,7 +32,7 @@ export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }
   onPrefab?: ((content: PrefabContent) => void) | undefined; only?: SceneType[]; inline?: boolean;
 }) {
   const groups = SCENE_GROUPS.map(group => ({ ...group, types: group.types.filter(type => !only || only.includes(type)) })).filter(group => group.types.length);
-  const tabs = [...groups.map(group => ({ key: group.key, name: group.name })), ...(onPrefab ? [{ key: 'prefabs', name: 'Prefabs' }] : [])];
+  const tabs = [...groups.map(group => ({ key: group.key, name: group.name })), ...(onPrefab ? [{ key: 'prefabs', name: t('prefabs') }] : [])];
   const [view, setView] = useState<View>(() => ({ kind: 'list', tab: tabs.some(tab => tab.key === lastTab) ? lastTab : tabs[0]!.key }));
   const menu = useRef<HTMLDivElement>(null); const tabList = useRef<HTMLDivElement>(null); const id = useId();
   // Keyboard users land on the first item when the menu opens or changes level (not when moving between tabs).
@@ -45,11 +49,11 @@ export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }
   };
   const current = view.kind === 'variants' ? SCENE_TYPES.find(type => type.type === view.type)! : null;
   const variants = view.kind === 'variants' ? SCENE_VARIANTS[view.type!] ?? [] : [];
-  const heading = current ? `${label} · ${current.name}` : view.tab === 'prefabs' ? `${label} · Prefabs` : label;
+  const heading = current ? `${label} · ${current.name}` : view.tab === 'prefabs' ? t('withPrefabs', { label }) : label;
   const shown = view.kind === 'list' ? groups.find(group => group.key === view.tab)?.types ?? [] : [];
   return <div className={`add-menu${inline ? ' inline' : ''}`} onPointerDown={event => event.stopPropagation()}>
     <p id={`${id}-heading`}>{heading}</p>
-    {view.kind === 'list' && tabs.length > 1 && <div ref={tabList} className="add-tabs" role="tablist" aria-label="Sorts of scenes" onKeyDown={onTabKey}>
+    {view.kind === 'list' && tabs.length > 1 && <div ref={tabList} className="add-tabs" role="tablist" aria-label={t('sceneSorts')} onKeyDown={onTabKey}>
       {tabs.map(tab => <button key={tab.key} type="button" role="tab" data-tab={tab.key} id={`${id}-tab-${tab.key}`} aria-selected={view.tab === tab.key} aria-controls={`${id}-list`} tabIndex={view.tab === tab.key ? 0 : -1} onClick={() => choose(tab.key)}>{tab.name}</button>)}
     </div>}
     <div ref={menu} id={`${id}-list`} className="add-list" role="menu" aria-label={heading}>
@@ -64,7 +68,7 @@ export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }
     </div>
     <div className="add-menu-foot">
       {view.kind === 'variants' ? <button type="button" onClick={() => setView({ kind: 'list', tab: view.tab })}>‹ Back</button> : <span />}
-      <button type="button" className="add-cancel" onClick={onCancel}>Cancel</button>
+      <button type="button" className="add-cancel" onClick={onCancel}>{t('cancel')}</button>
     </div>
   </div>;
 }
@@ -72,21 +76,21 @@ export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }
 /** The saved prefabs: insert one, or delete it. Loaded when opened. */
 function PrefabMenu({ onInsert }: { onInsert: (content: PrefabContent) => void }) {
   const [prefabs, setPrefabs] = useState<PrefabSummary[]>(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
-  const load = () => roomApi('/api/host/prefabs').then(data => setPrefabs(PrefabListSchema.parse(data).prefabs)).catch(() => setError('The prefabs could not be loaded. Try again.'));
+  const load = () => roomApi('/api/host/prefabs').then(data => setPrefabs(PrefabListSchema.parse(data).prefabs)).catch(() => setError(t('prefabsFailed')));
   useEffect(() => { void load(); }, []);
   const insert = (prefab: PrefabSummary) => {
     setBusy(true); setError('');
-    roomApi(`/api/host/prefabs/${prefab.id}`).then(data => onInsert(PrefabSchema.parse(data).content)).catch(() => { setError(`“${prefab.name}” could not be loaded. Try again.`); setBusy(false); });
+    roomApi(`/api/host/prefabs/${prefab.id}`).then(data => onInsert(PrefabSchema.parse(data).content)).catch(() => { setError(t('prefabFailed', { name: prefab.name })); setBusy(false); });
   };
   const remove = (prefab: PrefabSummary) => {
-    if (!confirm(`Delete the prefab “${prefab.name}”? Games it was inserted into keep their scenes.`)) return;
-    setBusy(true); void roomApi(`/api/host/prefabs/${prefab.id}/delete`, {}).then(load, () => setError('Deleting did not work. Try again.')).finally(() => setBusy(false));
+    if (!confirm(t('deletePrefabAsk', { name: prefab.name }))) return;
+    setBusy(true); void roomApi(`/api/host/prefabs/${prefab.id}/delete`, {}).then(load, () => setError(t('deleteFailed'))).finally(() => setBusy(false));
   };
   if (error) return <p role="alert" className="add-note error">{error}</p>;
-  if (!prefabs) return <p role="status" className="add-note">Loading prefabs…</p>;
-  if (!prefabs.length) return <p className="add-note">No prefabs yet. Select one or more scenes and press <strong>Save as prefab</strong>; they appear here for every game.</p>;
+  if (!prefabs) return <p role="status" className="add-note">{t('loadingPrefabs')}</p>;
+  if (!prefabs.length) return <p className="add-note">{marked(t('noPrefabs'))}</p>;
   return <>{prefabs.map(prefab => <div key={prefab.id} className="prefab-row">
-    <button role="menuitem" disabled={busy} onClick={() => insert(prefab)}><Icon name="prefab" /><span><strong>{prefab.name}</strong><small>{prefab.sceneCount === 1 ? '1 scene' : `${prefab.sceneCount} scenes`}</small></span></button>
-    <button type="button" className="prefab-delete" disabled={busy} aria-label={`Delete prefab ${prefab.name}`} onClick={() => remove(prefab)}>×</button>
+    <button role="menuitem" disabled={busy} onClick={() => insert(prefab)}><Icon name="prefab" /><span><strong>{prefab.name}</strong><small>{prefab.sceneCount === 1 ? t('sceneOne') : t('sceneMany', { count: prefab.sceneCount })}</small></span></button>
+    <button type="button" className="prefab-delete" disabled={busy} aria-label={t('deletePrefab', { name: prefab.name })} onClick={() => remove(prefab)}>×</button>
   </div>)}</>;
 }

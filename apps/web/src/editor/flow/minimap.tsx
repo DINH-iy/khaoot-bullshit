@@ -1,4 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from 'react';
+import { translate } from '../../i18n/texts.js';
+import { CONTROLS_TEXTS } from '../controls/controls.text.js';
+const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { CARD_WIDTH, cardHeight, type Definition, type Positions } from '../model.js';
 
 const WIDTH = 200; const HEIGHT = 130;
@@ -17,7 +20,7 @@ export function Minimap({ definition, positions, view, canvas, selected, onMove 
     const rect = event.currentTarget.getBoundingClientRect();
     onMove({ x: (event.clientX - rect.left) / scale + minX, y: (event.clientY - rect.top) / scale + minY });
   };
-  return <svg className="minimap" width={WIDTH} height={HEIGHT} role="img" aria-label="Overview of the whole game. Click to move the view there."
+  return <svg className="minimap" width={WIDTH} height={HEIGHT} role="img" aria-label={t('minimap')}
     onPointerDown={event => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); jump(event); }}
     onPointerMove={event => { if (event.buttons) jump(event); }}>
     {boxes.map(box => <rect key={box.key} x={(box.at!.x - minX) * scale} y={(box.at!.y - minY) * scale} width={CARD_WIDTH * scale} height={box.height * scale} rx={2} className={selected.includes(box.key) ? 'mini-card on' : 'mini-card'} />)}

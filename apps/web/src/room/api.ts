@@ -1,7 +1,7 @@
 import type { RoomReply } from '@party/contracts';
 import { seatHeaders } from './test-seat.js';
-export async function roomApi<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
-  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 8000);
+export async function roomApi<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', timeoutMs = 8000): Promise<T> {
+  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(path, { method: body === undefined ? 'GET' : method, credentials: 'same-origin', headers: { 'x-party-request': '1', ...seatHeaders(), ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal });
     const reply = await response.json() as RoomReply<T>;

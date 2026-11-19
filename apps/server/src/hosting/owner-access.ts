@@ -22,7 +22,7 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
     app.log.warn({ event: 'host_request_rejected', code }, 'Host request rejected');
-    return reply.code(status[code] ?? (code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
+    return reply.code(status[code] ?? (code === 'AUDIO_TOOLS_UNAVAILABLE' ? 503 : code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
   };
   // Each limit has its own counter: a strict key-guessing limit on signing in
   // must not be used up by the owner's ordinary menu and room requests.

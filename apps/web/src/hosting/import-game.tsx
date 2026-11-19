@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { DraftSchema } from '@party/contracts';
 import guide from '../../../../docs/guides/importing-games.md?raw';
 import { newId, roomApi } from '../room/api.js';
+import { useTexts } from '../i18n/texts.js';
+import { rich } from '../i18n/rich.js';
+import { HOSTING_TEXTS } from './hosting.text.js';
 
 // The instructions an AI needs: the marked section of the guide, so the app and the guide never disagree.
 export const aiInstructions = (() => {
@@ -11,31 +14,31 @@ export const aiInstructions = (() => {
 
 /** Create a game from pasted text, for example a game an AI wrote from the copied instructions. */
 export function ImportGame() {
+  const t = useTexts(HOSTING_TEXTS);
   const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [copied, setCopied] = useState(false);
-  const copy = () => { void navigator.clipboard.writeText(aiInstructions).then(() => setCopied(true), () => setMessage('Copying is blocked in this browser. Open “The full guide” below and copy the instructions from there.')); };
+  const copy = () => { void navigator.clipboard.writeText(aiInstructions).then(() => setCopied(true), () => setMessage(t('copyBlocked'))); };
   const submit = () => {
     setBusy(true); setMessage('');
     void roomApi('/api/host/games/import', { gameId: newId(), text }).then(data => location.assign(`/?edit=${DraftSchema.parse(data).gameId}`))
       .catch(cause => setMessage(cause instanceof Error && cause.message === 'INVALID_COMMAND'
-        ? 'This is not a game in JSON. Ask the AI to answer with only the JSON object, then paste it again.'
-        : 'Importing did not work. Check the server is running and try again.')).finally(() => setBusy(false));
+        ? t('notJson') : t('importFailed'))).finally(() => setBusy(false));
   };
-  return <section aria-labelledby="import-heading"><h2 id="import-heading">Import a game from text</h2>
-    <p>Make a whole game in one go, for example with an AI assistant such as Claude or ChatGPT:</p>
+  return <section aria-labelledby="import-heading"><h2 id="import-heading">{t('importHeading')}</h2>
+    <p>{t('importIntro')}</p>
     <ol className="steps">
-      <li>Press <strong>Copy instructions for an AI</strong> and paste them into the AI chat.</li>
-      <li>Underneath, describe your game in a sentence or two. The AI first asks a few short questions (who plays, how long, teams or not, which rounds, a style); answer them, or say “just make it”.</li>
-      <li>Copy the AI’s whole answer, paste it below and press <strong>Import</strong>. The editor opens with your game as a draft.</li>
-      <li>Check it there. Any problem is explained on the scene it concerns; fix it in the editor, or paste the problems back to the AI and import its corrected answer.</li>
-      <li><strong>Rehearse</strong> to try it, then <strong>Publish</strong> to play.</li>
+      <li>{rich(t('step1'), { copy: <strong>{t('copyInstructions')}</strong> })}</li>
+      <li>{t('step2')}</li>
+      <li>{rich(t('step3'), { import: <strong>{t('import')}</strong> })}</li>
+      <li>{t('step4')}</li>
+      <li>{rich(t('step5'), { rehearse: <strong>{t('rehearse')}</strong>, publish: <strong>{t('publish')}</strong> })}</li>
     </ol>
-    <p>What is needed: text in JSON with a title and a list of scenes. Everything else has a sensible default: scenes play in the order listed, quiz questions get 20 seconds and 10 points, writing rounds 60 seconds, party choices let everyone vote. A game with mistakes is still imported, with its problems listed; only text that is not JSON is refused. You can also write the text yourself, or paste a game made with <strong>Export as text</strong>.</p>
-    <div className="actions"><button onClick={copy}>{copied ? 'Instructions copied ✓' : 'Copy instructions for an AI'}</button></div>
+    <p>{rich(t('importNeeds'), { export: <strong>{t('exportAsText')}</strong> })}</p>
+    <div className="actions"><button onClick={copy}>{t(copied ? 'instructionsCopied' : 'copyInstructions')}</button></div>
     <form onSubmit={event => { event.preventDefault(); submit(); }}>
-      <label>Game text<textarea className="import-text" value={text} onChange={event => setText(event.target.value)} placeholder={'{ "title": "Quiz night", "scenes": [ … ] }'} spellCheck={false} /></label>
+      <label>{t('gameText')}<textarea className="import-text" value={text} onChange={event => setText(event.target.value)} placeholder={'{ "title": "Quiz night", "scenes": [ … ] }'} spellCheck={false} /></label>
       {message && <p role="alert" className="error">{message}</p>}
-      <button disabled={busy || text.trim().length < 2}>{busy ? 'Importing…' : 'Import'}</button>
+      <button disabled={busy || text.trim().length < 2}>{t(busy ? 'importing' : 'import')}</button>
     </form>
-    <details className="guide"><summary>The full guide: every scene type, team settings and an example</summary><pre>{guide.replace(/<!-- ai-instructions:(start|end) -->\n?/g, '')}</pre></details>
+    <details className="guide"><summary>{t('fullGuide')}</summary><pre>{guide.replace(/<!-- ai-instructions:(start|end) -->\n?/g, '')}</pre></details>
   </section>;
 }

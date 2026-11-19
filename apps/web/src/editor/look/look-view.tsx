@@ -11,10 +11,13 @@ import { LookPreview } from './look-preview.js';
 import '../../room/room.css';
 import './look.css';
 import { Dropdown } from '../controls/dropdown.js';
+import { translate } from '../../i18n/texts.js';
+import { LOOK_TEXTS } from './look.text.js';
+const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
 import { readMemory, rememberPlace } from '../shell/editor-memory.js';
 
 type Section = 'theme' | 'texts' | 'animations';
-const SECTIONS: Record<Section, string> = { theme: 'Colours & style', texts: 'Texts', animations: 'Animations' };
+const SECTIONS = { theme: 'tabTheme', texts: 'tabTexts', animations: 'tabAnimations' } as const satisfies Record<Section, keyof typeof LOOK_TEXTS.en>;
 const short = (text: string) => text.length > 48 ? `${text.slice(0, 46)}…` : text;
 const scopeValue = (scope: Scope) => scope.kind === 'game' ? 'game' : `${scope.nodeKey}|${scope.stageIndex}`;
 
@@ -34,20 +37,20 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
   const changedScenes = definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ node, index, stage }))).filter(entry => entry.stage['presentation']);
   return <div className="look-editor">
     <aside className="look-controls" aria-labelledby="look-heading">
-      <h2 id="look-heading">Look &amp; feel</h2>
-      <label>Change the look of<Dropdown value={scopeValue(live)} onChange={value => { if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}
-        options={[{ value: 'game', label: 'The whole game' }, ...definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ value: `${node.key}|${index}`, group: 'Only this scene',
-          label: `${short(cardText(definition, node).title || node.key)}${node.stages.length > 1 ? ` · part ${index + 1}` : ''}${stage['presentation'] ? ' ✎' : ''}` })))]} /></label>
-      <p className="hint">{live.kind === 'game' ? 'Changes here apply to every scene, unless a scene has its own.' : 'Changes here apply only to this scene; everything else follows the whole game.'}</p>
-      {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{changedScenes.length} {changedScenes.length === 1 ? 'scene has' : 'scenes have'} its own look (marked ✎).</p>}
-      <div className="tabs" role="tablist" aria-label="Part of the look">{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{SECTIONS[key]}</button>)}</div>
+      <h2 id="look-heading">{t('look')}</h2>
+      <label>{t('lookOf')}<Dropdown value={scopeValue(live)} onChange={value => { if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}
+        options={[{ value: 'game', label: t('wholeGame') }, ...definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ value: `${node.key}|${index}`, group: t('onlyScene'),
+          label: `${short(cardText(definition, node).title || node.key)}${node.stages.length > 1 ? t('partN', { number: index + 1 }) : ''}${stage['presentation'] ? ' ✎' : ''}` })))]} /></label>
+      <p className="hint">{t(live.kind === 'game' ? 'gameHint' : 'sceneHint')}</p>
+      {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{t(changedScenes.length === 1 ? 'ownLookOne' : 'ownLookMany', { count: changedScenes.length })}</p>}
+      <div className="tabs" role="tablist" aria-label={t('partOfLook')}>{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{t(SECTIONS[key])}</button>)}</div>
       <fieldset className="view-lock" disabled={d.readOnly}>
       {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} title={definition.title} onChange={theme => update({ theme }, 'theme')} />}
       {section === 'texts' && <TextsPanel texts={layer.texts} below={below.texts ?? {}} onChange={texts => update({ texts }, 'texts')} />}
       {section === 'animations' && <AnimationPanel animations={layer.animations} below={below.animations ?? {}} onChange={animations => update({ animations }, 'animations')} />}
       </fieldset>
     </aside>
-    <section className="look-preview-area" aria-label="Preview of the look">
+    <section className="look-preview-area" aria-label={t('previewLabel')}>
       <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={themeStyle(look.theme)} className={themeClass(look.theme)} /></LookContext.Provider>
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>

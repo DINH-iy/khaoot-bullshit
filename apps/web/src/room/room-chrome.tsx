@@ -4,6 +4,9 @@ import { FaIcon, type IconName } from '../presentation/icons.js';
 import './room-chrome.css';
 import { StageTimer } from './stage-timer.js';
 import { useText } from '../presentation/look.js';
+import { translate } from '../i18n/texts.js';
+import { CONNECTION_KEYS, ROOM_TEXTS } from './room.text.js';
+const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
 import { nameList, teamColor } from './teams.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
@@ -35,13 +38,15 @@ export function Badge({ icon, value, label, tone }: { icon: IconName; value: Rea
 
 /** The connection as a dot (green or red) with a menu: the status in words, reconnect, and the measurements. */
 export function ConnectionMenu({ status, ok, slow = false, busy, saving, onReconnect, details }: { status: string; ok: boolean; slow?: boolean; busy: boolean; saving: boolean; onReconnect: () => void; details: ReactNode }) {
-  return <div className="room-connection" role="region" aria-label="Connection">
+  // The state in this device's language (the code keeps comparing the English values).
+  const shown = CONNECTION_KEYS[status] ? r(CONNECTION_KEYS[status]!) : status;
+  return <div className="room-connection" role="region" aria-label={r('connection')}>
     {/* Sending an action shows as a small spinner here, so nothing on the page moves. */}
-    {saving && <span className="saving-spinner" role="status" aria-label="Saving"><span aria-hidden="true" /></span>}
+    {saving && <span className="saving-spinner" role="status" aria-label={r('saving')}><span aria-hidden="true" /></span>}
     {/* Green: connected; orange: connected but slow; red: not connected. */}
-    <Popover label={`Connection: ${busy ? 'verifying access' : status}${ok && slow ? ' (slow)' : ''}`} className="conn-menu" text={<span className={`conn-dot ${ok ? (slow ? 'slow' : 'ok') : 'bad'}`} aria-hidden="true" />}>
-      <p role="status" aria-label="Connection status" className={`conn ${ok ? 'conn-ok' : 'conn-bad'}`}>{busy ? 'Verifying access…' : status}</p>
-      {ok && slow && <p className="conn-slow">The connection is slow: actions may take a moment.</p>}
+    <Popover label={`${r('connectionLabel', { status: busy ? r('verifying') : shown })}${ok && slow ? r('slow') : ''}`} className="conn-menu" text={<span className={`conn-dot ${ok ? (slow ? 'slow' : 'ok') : 'bad'}`} aria-hidden="true" />}>
+      <p role="status" aria-label={r('connectionStatus')} className={`conn ${ok ? 'conn-ok' : 'conn-bad'}`}>{busy ? r('verifyingLong') : shown}</p>
+      {ok && slow && <p className="conn-slow">{r('slowNote')}</p>}
       <button type="button" className="ghost" onClick={onReconnect} disabled={busy}><FaIcon name="rotate" /> Reconnect and sync</button>
       {details}
     </Popover>
@@ -59,16 +64,16 @@ export function RoundBar({ state, stage, phase, remaining, timerRef, tools }: { 
   const forming = Boolean(stage.teams?.forming); const teams = stage.teams;
   const mine = state.role === 'player' && teams && !forming ? teams.teams.find(team => team.memberIds.includes(state.selfPlayerId ?? '')) : undefined;
   const t = useText(); const details = roundDetails(stage, t);
-  if (mine) { const mates = mine.memberIds.filter(id => id !== state.selfPlayerId); const captain = teams?.answers === 'captain' && mine.captainId ? ` Captain: ${mine.captainId === state.selfPlayerId ? 'you' : state.players.find(player => player.id === mine.captainId)?.displayName ?? 'someone'}.` : '';
-    details.unshift(['flag', `You are in ${mine.name}${mates.length ? ` with ${nameList(state, mates)}` : ''}.${captain}`]); }
+  if (mine) { const mates = mine.memberIds.filter(id => id !== state.selfPlayerId); const captain = teams?.answers === 'captain' && mine.captainId ? r('captainIs', { name: mine.captainId === state.selfPlayerId ? r('you') : state.players.find(player => player.id === mine.captainId)?.displayName ?? r('someone') }) : '';
+    details.unshift(['flag', `${mates.length ? r('youAreInWith', { team: mine.name, mates: nameList(state, mates) }) : r('youAreIn', { team: mine.name })}${captain}`]); }
   if (!phase && !mine && !details.length && !tools && (forming || stage.status !== 'ACTIVE')) return null;
-  return <div className="round-info" role="group" aria-label="This round">
+  return <div className="round-info" role="group" aria-label={r('thisRound')}>
     {phase && <p className={`chip phase-pill${forming ? ' teams' : ''}`} role="status">{KIND_ICON[stage.kind] && <FaIcon name={KIND_ICON[stage.kind]!} />}{phase}</p>}
-    {mine && <p className="chip team-flag" style={{ '--team': teamColor(mine.name, mine.index) } as React.CSSProperties} title={`Your team: ${mine.name}`}>
-      <FaIcon name="flag" /><span className="visually-hidden">Your team: </span>{mine.name}{mine.captainId === state.selfPlayerId && <span className="team-captain" title="You are the captain"><FaIcon name="star" label="captain" /></span>}</p>}
-    {stage.input?.kind === 'drawing' && stage.input.blind && <p className="chip chip-warn"><span aria-hidden="true">🙈</span> Blind</p>}
+    {mine && <p className="chip team-flag" style={{ '--team': teamColor(mine.name, mine.index) } as React.CSSProperties} title={r('yourTeam', { team: mine.name })}>
+      <FaIcon name="flag" /><span className="visually-hidden">{r('yourTeamHidden')}</span>{mine.name}{mine.captainId === state.selfPlayerId && <span className="team-captain" title={r('youCaptain')}><FaIcon name="star" label={r('captain')} /></span>}</p>}
+    {stage.input?.kind === 'drawing' && stage.input.blind && <p className="chip chip-warn"><span aria-hidden="true">🙈</span> {r('blind')}</p>}
     {!forming && !stage.explain && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
-    {details.length > 0 && <Popover label="About this round" icon="circle-info" className="round-about" align="end">
+    {details.length > 0 && <Popover label={r('aboutRound')} icon="circle-info" className="round-about" align="end">
       <ul className="round-details">{details.map(([icon, text]) => <li key={text}><FaIcon name={icon} />{text}</li>)}</ul></Popover>}
     {/* Extra tools at the right end, after the ⓘ (an arcade round's leader menu). */}
     {tools}
@@ -78,18 +83,18 @@ export function RoundBar({ state, stage, phase, remaining, timerRef, tools }: { 
 /** What the (i) explains about the round. */
 function roundDetails(stage: Stage, t: ReturnType<typeof useText>): [IconName, string][] {
   const rows: [IconName, string][] = [];
-  if (stage.teams && !stage.teams.forming) rows.push(['users', `Team round · ${stage.teams.answers === 'captain' ? 'the captains answer for their team' : 'everyone answers'}`]);
+  if (stage.teams && !stage.teams.forming) rows.push(['users', r('teamRound', { who: r(stage.teams.answers === 'captain' ? 'captainsAnswer' : 'everyoneAnswers') })]);
   const minigame = stage.minigame;
   if (minigame) {
     const game = minigame.game as MinigameKey; rows.push(['circle-info', t(howToPlayKey(game))]);
-    if (isStepMinigame(game) && stage.teams && minigame.steps) rows.push(['users', minigame.steps.decides === 'vote' ? 'Your team votes on every choice; who does not vote in time is not counted.' : minigame.steps.decides === 'captain' ? 'The captain makes every choice for the team.' : 'Anyone in the team taps the choice you agree on.']);
+    if (isStepMinigame(game) && stage.teams && minigame.steps) rows.push(['users', r(minigame.steps.decides === 'vote' ? 'stepsVote' : minigame.steps.decides === 'captain' ? 'stepsCaptain' : 'stepsAnyone')]);
     if (game === 'bus') {
       const settings = minigame.settings as MinigameSettings<'bus'>;
-      rows.push(['beer-mug-empty', `Sips when wrong: ${settings.sips.join(', ')} (rounds 1 to 4)`]);
-      if (settings.rainbow !== false) rows.push(['star', 'Rainbow (four different suits): the other teams drink the last round’s sips.']);
+      rows.push(['beer-mug-empty', r('sips', { sips: settings.sips.join(', ') })]);
+      if (settings.rainbow !== false) rows.push(['star', r('rainbow')]);
     }
   }
-  if (stage.input?.kind === 'drawing' && stage.input.blind) rows.push(['circle-info', 'Blind round: you see your drawing only once it is sent.']);
+  if (stage.input?.kind === 'drawing' && stage.input.blind) rows.push(['circle-info', r('blindRound')]);
   return rows;
 }
 
@@ -100,9 +105,9 @@ function roundDetails(stage: Stage, t: ReturnType<typeof useText>): [IconName, s
 export function FloatingScores({ children, leader, docked = false }: { children: ReactNode; leader: ReactNode; docked?: boolean }) {
   const [open, setOpen] = useState(() => { try { return localStorage.getItem('party_scores_open') !== 'false'; } catch { return true; } });
   const toggle = () => { setOpen(!open); try { localStorage.setItem('party_scores_open', String(!open)); } catch { /* remembered for this visit */ } };
-  return <section className={`floating-scores${docked ? ' docked' : ''}${open ? '' : ' folded'}`} aria-label="Scores">
+  return <section className={`floating-scores${docked ? ' docked' : ''}${open ? '' : ' folded'}`} aria-label={r('scores')}>
     <button type="button" className="floating-scores-head" aria-expanded={open} onClick={toggle}>
-      <FaIcon name="trophy" /><span className="floating-scores-title">{open ? 'Scores' : leader}</span><FaIcon name={open ? 'chevron-down' : 'chevron-up'} /></button>
+      <FaIcon name="trophy" /><span className="floating-scores-title">{open ? r('scores') : leader}</span><FaIcon name={open ? 'chevron-down' : 'chevron-up'} /></button>
     {open && <div className="floating-scores-body">{children}</div>}
   </section>;
 }
@@ -120,7 +125,7 @@ export function HostDialog({ title, icon, onClose, children, size = 'wide' }: { 
   return <div className="host-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div ref={box} tabIndex={-1} className={`host-dialog ${size}`} role="dialog" aria-modal="true" aria-labelledby={id}>
       <header className="host-dialog-head"><h2 id={id}><FaIcon name={icon} /> {title}</h2>
-        <button type="button" className="icon-button" aria-label="Close" title="Close" onClick={onClose}><FaIcon name="xmark" /></button></header>
+        <button type="button" className="icon-button" aria-label={r('close')} title={r('close')} onClick={onClose}><FaIcon name="xmark" /></button></header>
       <div className="host-dialog-body">{children}</div>
     </div>
   </div>;

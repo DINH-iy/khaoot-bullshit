@@ -17,7 +17,7 @@ export const PublicSceneMediaSchema = z.object({ id: z.uuid(), kind: SceneMediaK
 export type PublicSceneMedia = z.infer<typeof PublicSceneMediaSchema>;
 export const sceneMediaUrl = (id: string) => `/api/media/${id}`;
 
-/** Upload limits per kind, and for the whole library (the Pi's disk). Nothing is converted: the file is served as uploaded. */
+/** Upload limits per kind, and for the whole library (the Pi's disk). Regular uploads are served as uploaded. */
 export const LIBRARY_LIMITS = { image: 10 * 1024 * 1024, video: 80 * 1024 * 1024, audio: 25 * 1024 * 1024, total: 4 * 1024 * 1024 * 1024 } as const;
 export const LIBRARY_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/wav,audio/x-wav,audio/flac,.mp3,.m4a,.ogg,.wav,.flac';
 export const LibraryItemSchema = z.object({
@@ -29,6 +29,21 @@ export const UpdateLibraryItemSchema = z.object({ name: z.string().trim().min(1)
 export type LibraryItem = z.infer<typeof LibraryItemSchema>;
 export const MediaLibrarySchema = z.object({ items: z.array(LibraryItemSchema), usedBytes: z.number().int().min(0), limitBytes: z.number().int().min(0) }).strict();
 export type MediaLibrary = z.infer<typeof MediaLibrarySchema>;
+
+export const MAX_AUDIO_CLIP_SECONDS = 20 * 60;
+export const ImportYouTubeAudioSchema = z.object({
+  url: z.string().trim().min(1).max(2048),
+  name: z.string().trim().min(1).max(120),
+  permission: z.literal(true),
+}).strict();
+export const TrimAudioSchema = z.object({
+  start: z.number().min(0).max(24 * 60 * 60),
+  end: z.number().positive().max(24 * 60 * 60),
+  name: z.string().trim().min(1).max(120),
+}).strict().refine(({ start, end }) => {
+  const lengthMs = Math.round(end * 1000) - Math.round(start * 1000);
+  return lengthMs >= 100 && lengthMs <= MAX_AUDIO_CLIP_SECONDS * 1000;
+});
 
 /**
  * Music (songs from the media library). A game's background playlist plays from the lobby on, one song after the

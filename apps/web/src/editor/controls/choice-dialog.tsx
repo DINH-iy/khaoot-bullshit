@@ -1,4 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { translate } from '../../i18n/texts.js';
+import { CONTROLS_TEXTS } from './controls.text.js';
+const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { Icon } from './icons.js';
 
 export interface CardChoice { value: string; label: string; description: string; icon?: string }
@@ -16,8 +19,8 @@ export function ChoiceDialog({ title, intro, choices, value, groups, onPick, onC
 }) {
   const box = useRef<HTMLDivElement>(null); const id = useId();
   const grouped = new Set(groups?.flatMap(group => group.values));
-  const tabs = groups ? [{ key: 'all', name: 'All', values: choices.map(choice => choice.value) }, ...groups.filter(group => group.values.some(entry => choices.some(choice => choice.value === entry))),
-    ...(choices.some(choice => !grouped.has(choice.value)) ? [{ key: 'other', name: 'Other', values: choices.filter(choice => !grouped.has(choice.value)).map(choice => choice.value) }] : [])] : [];
+  const tabs = groups ? [{ key: 'all', name: t('all'), values: choices.map(choice => choice.value) }, ...groups.filter(group => group.values.some(entry => choices.some(choice => choice.value === entry))),
+    ...(choices.some(choice => !grouped.has(choice.value)) ? [{ key: 'other', name: t('other'), values: choices.filter(choice => !grouped.has(choice.value)).map(choice => choice.value) }] : [])] : [];
   const [tab, setTab] = useState('all');
   const shown = tabs.length ? choices.filter(choice => tabs.find(entry => entry.key === tab)?.values.includes(choice.value)) : choices;
   useEffect(() => {
@@ -37,15 +40,15 @@ export function ChoiceDialog({ title, intro, choices, value, groups, onPick, onC
     <div ref={box} className="ed-dialog choice-dialog" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={onKey}>
       <h2 id={`${id}-title`}>{title}</h2>
       {intro && <p>{intro}</p>}
-      {tabs.length > 2 && <div className="choice-tabs" role="tablist" aria-label="Sorts">{tabs.map(entry =>
+      {tabs.length > 2 && <div className="choice-tabs" role="tablist" aria-label={t('sorts')}>{tabs.map(entry =>
         <button key={entry.key} type="button" role="tab" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)}>{entry.name}<small>{entry.values.length}</small></button>)}</div>}
       <div className="choice-cards">
         {shown.map(choice => <button key={choice.value} type="button" className="choice-card" aria-pressed={value !== undefined ? choice.value === value : undefined} onClick={() => onPick(choice.value)}>
           {choice.icon && <Icon name={choice.icon} />}<span><strong>{choice.label}</strong><small>{choice.description}</small></span>
-          {choice.value === value && <span className="choice-current">Chosen</span>}
+          {choice.value === value && <span className="choice-current">{t('chosen')}</span>}
         </button>)}
       </div>
-      <div className="actions"><button type="button" onClick={onClose}>Cancel</button></div>
+      <div className="actions"><button type="button" onClick={onClose}>{t('cancel')}</button></div>
     </div>
   </div>;
 }

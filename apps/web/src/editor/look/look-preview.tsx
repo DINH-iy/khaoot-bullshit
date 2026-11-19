@@ -4,10 +4,13 @@ import { play, useLook } from '../../presentation/look.js';
 import type { Definition, Stage } from '../model.js';
 import type { Scope } from './layer.js';
 import { answerFit } from '../../room/answer-fit.js';
+import { translate } from '../../i18n/texts.js';
+import { LOOK_TEXTS } from './look.text.js';
+const tx = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
 import { Mark } from '../../presentation/mark-icons.js';
 
 type Moment_ = 'join' | 'lobby' | 'question' | 'saved' | 'results' | 'scores';
-const MOMENTS_SHOWN: Record<Moment_, string> = { join: 'Joining', lobby: 'Lobby', question: 'Question', saved: 'Answer saved', results: 'Results', scores: 'Scoreboard' };
+const MOMENTS_SHOWN = { join: 'vJoin', lobby: 'vLobby', question: 'vQuestion', saved: 'vSaved', results: 'vResults', scores: 'vScores' } as const satisfies Record<Moment_, keyof typeof LOOK_TEXTS.en>;
 const PLAYS: Record<Moment_, { moment: Moment; list: boolean }> = { join: { moment: 'sceneEnter', list: false }, lobby: { moment: 'lobbyJoin', list: false }, question: { moment: 'answersEnter', list: true }, saved: { moment: 'answerSaved', list: false }, results: { moment: 'reveal', list: true }, scores: { moment: 'scoreboard', list: true } };
 
 /** A question to show: the scene being styled, or else the first question in the game, or else an example. */
@@ -18,9 +21,9 @@ function sampleStage(definition: Definition, scope: Scope): { prompt: string; op
     const input = stage['input'] as { options?: { label: string }[]; items?: { label: string }[] } | undefined;
     const options = (input?.options ?? input?.items ?? []).map(option => option.label).filter(Boolean);
     if (stage.prompt && options.length >= 2) return { prompt: stage.prompt, options: options.slice(0, 6) };
-    if (stage === stages[0] && stage.prompt) return { prompt: stage.prompt, options: ['Answer one', 'Answer two', 'Answer three', 'Answer four'] };
+    if (stage === stages[0] && stage.prompt) return { prompt: stage.prompt, options: [tx('a1'), tx('a2'), tx('a3'), tx('a4')] };
   }
-  return { prompt: 'Which planet is the biggest?', options: ['Jupiter', 'Mars', 'Venus', 'Saturn'] };
+  return { prompt: tx('sample'), options: [tx('s1'), tx('s2'), tx('s3'), tx('s4')] };
 }
 
 /** The shared screen and a phone, drawn with the real room styles and the chosen look. */
@@ -34,10 +37,10 @@ export function LookPreview({ definition, scope, style, className }: { definitio
   };
   const players = ['Sam', 'Noor', 'Alex', 'Kim'];
   return <div className="look-preview">
-    <div className="segmented" role="group" aria-label="Show this moment">{(Object.keys(MOMENTS_SHOWN) as Moment_[]).map(key => <button key={key} aria-pressed={shown === key} onClick={() => replay(key)}>{MOMENTS_SHOWN[key]}</button>)}
-      <button className="small-button" onClick={() => replay(shown)}>▶ Play again</button></div>
+    <div className="segmented" role="group" aria-label={tx('showMoment')}>{(Object.keys(MOMENTS_SHOWN) as Moment_[]).map(key => <button key={key} aria-pressed={shown === key} onClick={() => replay(key)}>{tx(MOMENTS_SHOWN[key])}</button>)}
+      <button className="small-button" onClick={() => replay(shown)}>{tx('playAgain')}</button></div>
     <div className="look-devices">
-      <figure className="look-tv"><figcaption>Shared screen</figcaption>
+      <figure className="look-tv"><figcaption>{tx('sharedScreen')}</figcaption>
         <div className={`room room-display room-preview ${className}`} style={style}><div ref={tvRef} className="preview-body">
           {shown === 'join' || shown === 'lobby' ? <section className="lobby"><h2>{t('lobby.screenTitle')}</h2><p>{t('lobby.screenGo', { host: 'party.example' })}</p><p className="big-code">ABC-123</p>
             {shown === 'lobby' && <ul className="players preview-players">{players.map(name => <li key={name}>{name}</li>)}</ul>}</section>
@@ -49,7 +52,7 @@ export function LookPreview({ definition, scope, style, className }: { definitio
                 : <><h3>{t('results.title')}</h3><p>{t('results.correct', { answer: sample.options[0]! })}</p><h4>{t('results.points')}</h4><ul className="plain-list">{players.slice(0, 2).map(name => <li key={name}>{name} · 10</li>)}</ul></>}
             </section>}
         </div></div></figure>
-      <figure className="look-phone"><figcaption>Phone</figcaption>
+      <figure className="look-phone"><figcaption>{tx('phone')}</figcaption>
         <div className={`room room-player room-preview ${className}`} style={style}><div ref={phoneRef} className="preview-body">
           {shown === 'join' ? <section className="join-card"><p className="brand">party<span>.</span></p><h2>{t('join.title')}</h2><p className="room-game">{definition.title}</p>
             <label>{t('join.code')}<input className="code-input" readOnly value="ABC-123" /></label><label>{t('join.name')}<input readOnly value="Sam" /></label><button className="primary" type="button">{t('join.button')}</button></section>
@@ -64,6 +67,6 @@ export function LookPreview({ definition, scope, style, className }: { definitio
             </section>}
         </div></div></figure>
     </div>
-    <p className="hint">This is how the room will look. Animations play when you pick a moment. Pictures, sounds and the show host come later.</p>
+    <p className="hint">{tx('previewHint')}</p>
   </div>;
 }

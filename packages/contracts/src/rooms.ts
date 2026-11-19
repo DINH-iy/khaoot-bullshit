@@ -20,6 +20,7 @@ export const ClaimRoomSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-
 export const ConnectRoomSchema = z.object({ sessionId: GameIdSchema, display: z.literal(true).optional(), seat: z.number().int().min(1).max(16).optional() }).strict();
 export const NetworkErrorCodeSchema = z.enum([
   ...GameErrorCodeSchema.options, 'UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'AUTH_UNAVAILABLE', 'ROOM_NOT_AVAILABLE', 'RATE_LIMITED', 'ORIGIN_REJECTED', 'FILE_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_FULL', 'SEAT_UNAVAILABLE', 'SEAT_DENIED', 'SIDE_GAMES_OFF', 'CHIPS_OFF', 'SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS', 'NAME_TAKEN', 'PREFAB_LIMIT',
+  'AUDIO_TOOLS_UNAVAILABLE', 'AUDIO_IMPORT_FAILED', 'AUDIO_TRIM_FAILED',
   'LOBBY_LOCKED', 'LOBBY_FULL', 'ARCADE_FULL', 'ROUND_ON', 'NOT_ENOUGH_PLAYERS', 'MEDIA_IN_USE',
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;

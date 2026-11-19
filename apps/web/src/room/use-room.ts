@@ -3,6 +3,9 @@ import { testSeat } from './test-seat.js';
 import { io, type Socket } from 'socket.io-client';
 import { createLiveStrokes } from '../drawing/live-strokes.js';
 import { createReactionStore } from '../room-extras/reactions.js';
+import { translate } from '../i18n/texts.js';
+import { ROOM_TEXTS } from './room.text.js';
+const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
 import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, type GameCommand, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
 export function useRoom(sessionId: string | undefined, display = false) {
@@ -22,7 +25,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
   const remember = useCallback((command?: GameCommand) => {
     pendingRef.current = command; setPending(command);
     try { if (command) localStorage.setItem(storageKey, JSON.stringify(command)); else localStorage.removeItem(storageKey); }
-    catch { setMessage('This browser cannot retain pending actions across refreshes. Keep this page open until Saved.'); }
+    catch { setMessage(r('noRetain')); }
   }, [storageKey]);
   useEffect(() => {
     // Another room (back to the lobby): nothing of the previous room may show or act in the meantime.
@@ -33,14 +36,14 @@ export function useRoom(sessionId: string | undefined, display = false) {
     let admissionRetries = 0; let admissionTimer: ReturnType<typeof setTimeout> | undefined;
     const socket = io({ autoConnect: false, auth: { sessionId, ...(display ? { display: true } : {}), ...(testSeat ? { seat: testSeat } : {}) }, reconnectionAttempts: 20, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 }); socketRef.current = socket;
     const emit = <T,>(event: string, input: unknown): Promise<T> => new Promise((resolve, reject) => {
-      if (!socket.connected) { reject(new Error('Not connected')); return; }
+      if (!socket.connected) { reject(new Error(r('notConnected'))); return; }
       socket.timeout(5000).emit(event, input, (error: Error | null, reply: RoomReply<T>) => {
-        if (error) reject(new Error('Not confirmed — reconnect or check again.'));
-        else if (!reply?.ok) reject(new Error(reply && !reply.ok ? reply.error.code : 'Invalid server reply')); else resolve(reply.data);
+        if (error) reject(new Error(r('notConfirmedReconnect')));
+        else if (!reply?.ok) reject(new Error(reply && !reply.ok ? reply.error.code : r('invalidReply'))); else resolve(reply.data);
       });
     });
     const transmit = (command: GameCommand, attempt = 0) => {
-      if (!socket.connected) { setSaving(false); setMessage('Not confirmed — reconnecting. Your action is retained.'); return; }
+      if (!socket.connected) { setSaving(false); setMessage(r('retained')); return; }
       setSaving(true); const start = performance.now();
       void emit('room.command', command).then(data => {
         const receipt = CommandReceiptSchema.parse(data);
@@ -57,12 +60,12 @@ export function useRoom(sessionId: string | undefined, display = false) {
           void emit('room.sync', { sessionId }).then(data => {
             const state = RoomSnapshotSchema.parse(data); if (!mounted) return;
             latestRef.current = state; setSnapshot(state);
-            if (basisOf(state) !== basisRef.current) { remember(); setMessage('The room changed just before your action arrived. Check the screen and try again.'); return; }
+            if (basisOf(state) !== basisRef.current) { remember(); setMessage(r('changedBefore')); return; }
             const next = { ...command, commandId: crypto.randomUUID(), expectedRevision: state.view.revision } as GameCommand;
             remember(next); transmit(next, attempt + 1);
-          }).catch(() => { if (mounted) { remember(); setMessage('Not confirmed. Check the screen and try again.'); requestSync(); } });
+          }).catch(() => { if (mounted) { remember(); setMessage(r('notConfirmedCheck')); requestSync(); } });
           return;
-        } setMessage(error instanceof Error ? (error.message === 'TOO_LATE' ? 'Time was up before your answer reached the server.' : error.message) : 'Not confirmed');
+        } setMessage(error instanceof Error ? (error.message === 'TOO_LATE' ? r('tooLate') : error.message) : r('notConfirmed'));
         if (error instanceof Error && ['REVISION_CONFLICT', 'INVALID_STATE', 'ALREADY_SUBMITTED', 'ALREADY_JUDGED', 'INELIGIBLE', 'FORBIDDEN', 'INVALID_SUBMISSION', 'COMMAND_KEY_REUSED', 'TOO_LATE', 'ALREADY_DECIDED', 'DECISION_PENDING'].includes(error.message)) { remember(); requestSync(); }
       }).finally(() => { if (mounted) setSaving(false); });
     };
@@ -70,9 +73,9 @@ export function useRoom(sessionId: string | undefined, display = false) {
     const reconcile = async (state: RoomSnapshot) => {
       const command = pendingRef.current; if (!command) return;
       const data = await emit<{ receipt: unknown }>('room.receipt', { commandId: command.commandId }); if (!mounted) return;
-      if (data.receipt) { const receipt = CommandReceiptSchema.parse(data.receipt); if (receipt.commandId === command.commandId) { remember(); setMessage('Saved — restored after reconnect.'); } }
+      if (data.receipt) { const receipt = CommandReceiptSchema.parse(data.receipt); if (receipt.commandId === command.commandId) { remember(); setMessage(r('restored')); } }
       else if (command.type === 'submission.submit' && state.view.stage?.id === command.stageRunId && state.view.stage.status === 'ACTIVE' && state.view.status === 'RUNNING') transmit(command);
-      else setMessage('Previous action is not confirmed. Review the current stage before retrying or discarding it.');
+      else setMessage(r('previous'));
     };
     const sync = async () => {
       if (!mounted || !socket.connected) return; if (syncing) { syncAgain = true; return; } syncing = true;
@@ -81,22 +84,22 @@ export function useRoom(sessionId: string | undefined, display = false) {
         setSnapshot(previous => { const next = !previous || state.view.revision >= previous.view.revision ? state : previous; latestRef.current = next; return next; });
         setClockOffset(Date.parse(state.view.serverTime) - Date.now());
         if (!reconciled) { reconciled = true; await reconcile(state); }
-      } catch (error) { if (mounted) setMessage(error instanceof Error ? error.message : 'Could not synchronize.'); }
+      } catch (error) { if (mounted) setMessage(error instanceof Error ? error.message : r('syncFailed')); }
       finally { syncing = false; if (syncAgain) { syncAgain = false; requestSync(); } }
     };
     function requestSync() { if (debounce) clearTimeout(debounce); debounce = setTimeout(() => { void sync(); }, 150); }
     const heartbeat = async () => {
       if (!socket.connected || document.hidden) return; const nonce = String(Date.now()); const start = performance.now();
       try { const reply = HeartbeatReplySchema.parse(await emit('room.heartbeat', { nonce })); if (mounted && reply.nonce === nonce) setSamples(previous => [...previous.slice(-59), performance.now() - start]); }
-      catch { if (mounted) setMessage('Connection check failed. Saved data remains on the server.'); }
+      catch { if (mounted) setMessage(r('checkFailed')); }
     };
     socket.on('connect', () => { if (!mounted) return; admissionRetries = 0; if (admissionTimer) clearTimeout(admissionTimer); connections++; setReconnects(value => value + (connections > 1 ? 1 : 0)); setConnection('Connected'); reconciled = false; void sync(); void heartbeat(); });
     socket.on('disconnect', () => { if (mounted) { setConnection('Disconnected — reconnecting'); setSaving(false); } });
     socket.on('connect_error', (error: Error & { data?: { code?: string } }) => {
       if (!mounted) return; setConnection('Connection unavailable');
       const denied = ['UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'FORBIDDEN', 'ORIGIN_REJECTED'].includes(error.data?.code ?? '');
-      if (denied) { setSnapshot(undefined); setMessage('Room access denied. Your access may have expired, been revoked, or your seat was taken over on another phone.'); return; }
-      setMessage('Cannot reach the server. Retrying with backoff.');
+      if (denied) { setSnapshot(undefined); setMessage(r('denied')); return; }
+      setMessage(r('unreachable'));
       // Socket.IO retries transport failures itself, but namespace middleware
       // rejection needs an explicit bounded retry for temporary DB/rate failures.
       if (error.data && ++admissionRetries <= 20) {
@@ -128,6 +131,6 @@ export function useRoom(sessionId: string | undefined, display = false) {
     /** A stroke of a Pass the pencil turn while it is drawn (others see it grow); `stroke: null` with a smaller `count` is an undo. */
     sendStroke(message: { stageRunId: string; turn: number; strokeId: number; stroke: unknown; count: number }) { socketRef.current?.volatile.emit('drawing.stroke', message); },
     send(command: GameCommand) { if (pendingRef.current) return; basisRef.current = basisOf(latestRef.current); remember(command); sendRef.current(command); }, retry() { if (pendingRef.current) sendRef.current(pendingRef.current); },
-    discard() { remember(); setMessage('Pending action discarded locally. Already saved actions remain on the server.'); }, reconnect() { socketRef.current?.disconnect().connect(); },
+    discard() { remember(); setMessage(r('discarded')); }, reconnect() { socketRef.current?.disconnect().connect(); },
   };
 }

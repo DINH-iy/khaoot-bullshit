@@ -3,19 +3,25 @@ import { ANIMATION_PRESETS, DEFAULT_ANIMATIONS, EASINGS, MOMENTS, resolveAnimati
 import { play } from '../../presentation/look.js';
 import { Dropdown } from '../controls/dropdown.js';
 import { Icon } from '../controls/icons.js';
+import { translate } from '../../i18n/texts.js';
+import { LOOK_TEXTS } from './look.text.js';
+const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
 import { describeAnimation, Timeline } from './timeline.js';
 
 type Frame = CustomAnimation['keyframes'][number];
-const EASING_LABELS: Record<keyof typeof EASINGS, string> = { smooth: 'Smooth', linear: 'Steady', 'ease-in': 'Speeds up', 'ease-out': 'Slows down', springy: 'Springy (overshoots)', snappy: 'Snappy' };
+const EASING_LABELS = { smooth: 'eSmooth', linear: 'eLinear', 'ease-in': 'eIn', 'ease-out': 'eOut', springy: 'eSpringy', snappy: 'eSnappy' } as const satisfies Record<keyof typeof EASINGS, keyof typeof LOOK_TEXTS.en>;
+/** A moment's and a ready-made animation's name in the editor's language. */
+export const momentName = (moment: Moment) => t(`m.${moment}` as keyof typeof LOOK_TEXTS.en);
+export const presetName = (key: string) => `a.${key}` in LOOK_TEXTS.en ? t(`a.${key}` as keyof typeof LOOK_TEXTS.en) : ANIMATION_PRESETS[key]?.name ?? key;
 const LISTS: Moment[] = ['answersEnter', 'reveal', 'scoreboard'];
 /** One slider per thing a block can change. The empty state means "keep it as in the block before". */
 const PROPERTIES: { key: Exclude<keyof Frame, 'at'>; label: string; min: number; max: number; step: number; rest: number; unit: string }[] = [
-  { key: 'opacity', label: 'Visible', min: 0, max: 1, step: .05, rest: 1, unit: '' },
-  { key: 'x', label: 'Move sideways', min: -300, max: 300, step: 5, rest: 0, unit: 'px' },
-  { key: 'y', label: 'Move up/down', min: -300, max: 300, step: 5, rest: 0, unit: 'px' },
-  { key: 'scale', label: 'Size', min: 0, max: 3, step: .05, rest: 1, unit: '×' },
-  { key: 'rotate', label: 'Turn', min: -720, max: 720, step: 5, rest: 0, unit: '°' },
-  { key: 'blur', label: 'Blur', min: 0, max: 30, step: 1, rest: 0, unit: 'px' },
+  { key: 'opacity', get label() { return t('pOpacity'); }, min: 0, max: 1, step: .05, rest: 1, unit: '' },
+  { key: 'x', get label() { return t('pX'); }, min: -300, max: 300, step: 5, rest: 0, unit: 'px' },
+  { key: 'y', get label() { return t('pY'); }, min: -300, max: 300, step: 5, rest: 0, unit: 'px' },
+  { key: 'scale', get label() { return t('pScale'); }, min: 0, max: 3, step: .05, rest: 1, unit: '×' },
+  { key: 'rotate', get label() { return t('pRotate'); }, min: -720, max: 720, step: 5, rest: 0, unit: '°' },
+  { key: 'blur', get label() { return t('pBlur'); }, min: 0, max: 30, step: 1, rest: 0, unit: 'px' },
 ];
 
 /**
@@ -30,7 +36,7 @@ function Sample({ animation, list }: { animation: CustomAnimation | null; list: 
       {animation && <Timeline animation={animation} rows={list ? 4 : 1} run={run} />}
     </div>
     <div className="anim-sample-foot">
-      <button className="small-button with-icon" disabled={!animation} onClick={() => { play(ref.current, animation, { staggerChildren: list }); setRun(run + 1); }}><Icon name="play" size={14} />Play</button>
+      <button className="small-button with-icon" disabled={!animation} onClick={() => { play(ref.current, animation, { staggerChildren: list }); setRun(run + 1); }}><Icon name="play" size={14} />{t('play')}</button>
       {animation && <span className="anim-what">{describeAnimation(animation, list)}</span>}
     </div>
   </div>;
@@ -44,20 +50,20 @@ export function AnimationPanel({ animations, below, onChange }: { animations: Re
   const own = [...Object.values(below), ...Object.values(current)].filter((choice): choice is Extract<AnimationChoice, { custom: CustomAnimation }> => 'custom' in choice)
     .filter((choice, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(choice)) === index);
   return <div className="look-panel">
-    <p className="hint">Players who ask their phone for less motion see no animations, whatever you choose here.</p>
+    <p className="hint">{t('lessMotion')}</p>
     {(Object.keys(MOMENTS) as Moment[]).map(moment => {
       const choice = current[moment] ?? below[moment]; const resolved = resolveAnimation(choice, moment);
       const presetKey = choice && 'preset' in choice ? choice.preset : choice ? null : DEFAULT_ANIMATIONS[moment];
       const list = LISTS.includes(moment);
       // A card per moment: its name, the animation chosen, and below it the sample to play and the builder's button.
-      return <fieldset key={moment} className="moment"><legend>{MOMENTS[moment]}</legend>
-        <label className="visually-hidden" htmlFor={`anim-${moment}`}>Animation for: {MOMENTS[moment]}</label>
+      return <fieldset key={moment} className="moment"><legend>{momentName(moment)}</legend>
+        <label className="visually-hidden" htmlFor={`anim-${moment}`}>{t('animationFor', { moment: momentName(moment) })}</label>
         <Dropdown id={`anim-${moment}`} className="moment-pick" value={presetKey ? `preset:${presetKey}` : `own:${own.findIndex(entry => JSON.stringify(entry) === JSON.stringify(choice))}`}
           onChange={picked => { const [kind, value] = picked.split(':') as [string, string]; set(moment, kind === 'preset' ? (value === DEFAULT_ANIMATIONS[moment] && !below[moment] ? null : { preset: value }) : own[Number(value)]!); }}
-          options={[...Object.entries(ANIMATION_PRESETS).map(([key, preset]) => ({ value: `preset:${key}`, group: 'Ready-made', label: `${preset.name}${key === DEFAULT_ANIMATIONS[moment] ? ' (standard)' : ''}` })),
-            ...own.map((entry, index) => ({ value: `own:${index}`, group: 'Built in this game', label: entry.name || `My animation ${index + 1}` }))]} />
+          options={[...Object.keys(ANIMATION_PRESETS).map(key => ({ value: `preset:${key}`, group: t('readyMade'), label: `${presetName(key)}${key === DEFAULT_ANIMATIONS[moment] ? t('standard') : ''}` })),
+            ...own.map((entry, index) => ({ value: `own:${index}`, group: t('builtHere'), label: entry.name || t('myAnimationN', { number: index + 1 }) }))]} />
         <Sample animation={resolved} list={list} />
-        <button className="link-button moment-build" aria-expanded={open === moment} onClick={() => setOpen(open === moment ? null : moment)}>{open === moment ? 'Close the builder' : 'Build your own'}</button>
+        <button className="small-button moment-build" aria-expanded={open === moment} onClick={() => setOpen(open === moment ? null : moment)}>{t(open === moment ? 'closeBuilder' : 'buildOwn')}</button>
         {open === moment && <Builder start={resolved ?? ANIMATION_PRESETS['fade']!.animation!} name={choice && 'custom' in choice ? choice.name ?? '' : ''} list={list}
           onSave={(custom, name) => set(moment, { custom, ...(name ? { name } : {}) })} />}
       </fieldset>;
@@ -77,29 +83,29 @@ function Builder({ start, name: startName, list, onSave }: { start: CustomAnimat
   const valid = frames.length >= 2 && frames[0]!.at === 0 && frames.at(-1)!.at === 1 && frames.every((frame, index) => index === 0 || frame.at >= frames[index - 1]!.at);
   return <div className="anim-builder">
     <ol className="frame-list">{frames.map((frame, index) => <li key={index} className="frame-block">
-      <div className="frame-head"><strong>{index === 0 ? 'Start' : index === frames.length - 1 ? 'End' : `Step ${index}`}</strong>
-        {index > 0 && index < frames.length - 1 && <label>At {Math.round(frame.at * 100)}%<input type="range" min={1} max={99} value={Math.round(frame.at * 100)} onChange={event => setFrame(index, { ...frame, at: Number(event.target.value) / 100 })} /></label>}
-        {index > 0 && index < frames.length - 1 && <button className="small-button" onClick={() => setDraft({ ...draft, keyframes: frames.filter((_, at) => at !== index) })}>Remove</button>}</div>
+      <div className="frame-head"><strong>{index === 0 ? t('start') : index === frames.length - 1 ? t('end') : t('stepN', { number: index })}</strong>
+        {index > 0 && index < frames.length - 1 && <label>{t('atPercent', { percent: Math.round(frame.at * 100) })}<input type="range" min={1} max={99} value={Math.round(frame.at * 100)} onChange={event => setFrame(index, { ...frame, at: Number(event.target.value) / 100 })} /></label>}
+        {index > 0 && index < frames.length - 1 && <button className="small-button" onClick={() => setDraft({ ...draft, keyframes: frames.filter((_, at) => at !== index) })}>{t('remove')}</button>}</div>
       <div className="frame-props">{PROPERTIES.map(property => {
         const value = frame[property.key]; const used = value !== undefined;
         return <div key={property.key} className={`frame-prop${used ? '' : ' unused'}`}>
           <label className="choice"><input type="checkbox" checked={used} onChange={event => { const next = { ...frame }; if (event.target.checked) next[property.key] = property.rest; else delete next[property.key]; setFrame(index, next); }} />{property.label}</label>
-          {used && <label className="visually-hidden-label"><span className="visually-hidden">{property.label} value</span>
+          {used && <label className="visually-hidden-label"><span className="visually-hidden">{t('propValue', { property: property.label })}</span>
             <input type="range" min={property.min} max={property.max} step={property.step} value={value} onChange={event => setFrame(index, { ...frame, [property.key]: Number(event.target.value) })} />
             <output>{property.key === 'opacity' ? `${Math.round(value * 100)}%` : `${value}${property.unit}`}</output></label>}
         </div>;
       })}</div>
     </li>)}</ol>
-    <button className="small-button" disabled={frames.length >= 8} onClick={addFrame}>Add a step in between</button>
+    <button className="small-button" disabled={frames.length >= 8} onClick={addFrame}>{t('addStep')}</button>
     <div className="anim-timing">
-      <label>Length · {(draft.durationMs / 1000).toFixed(2)} s<input type="range" min={50} max={3000} step={50} value={draft.durationMs} onChange={event => setDraft({ ...draft, durationMs: Number(event.target.value) })} /></label>
-      <label>Wait first · {((draft.delayMs ?? 0) / 1000).toFixed(2)} s<input type="range" min={0} max={2000} step={50} value={draft.delayMs ?? 0} onChange={event => setDraft({ ...draft, delayMs: Number(event.target.value) })} /></label>
-      <label>Movement<Dropdown value={draft.easing} onChange={easing => setDraft({ ...draft, easing: easing as keyof typeof EASINGS })} options={(Object.keys(EASINGS) as (keyof typeof EASINGS)[]).map(key => ({ value: key, label: EASING_LABELS[key] }))} /></label>
-      <label>Play it · {draft.repeat ?? 1}×<input type="range" min={1} max={10} value={draft.repeat ?? 1} onChange={event => setDraft({ ...draft, repeat: Number(event.target.value) })} /></label>
-      {list && <label>Between items · {((draft.staggerMs ?? 0) / 1000).toFixed(2)} s<input type="range" min={0} max={500} step={10} value={draft.staggerMs ?? 0} onChange={event => setDraft({ ...draft, staggerMs: Number(event.target.value) })} /></label>}
-      <label>Name<input value={name} maxLength={60} placeholder="My animation" onChange={event => setName(event.target.value)} /></label>
+      <label>{t('length', { seconds: (draft.durationMs / 1000).toFixed(2) })}<input type="range" min={50} max={3000} step={50} value={draft.durationMs} onChange={event => setDraft({ ...draft, durationMs: Number(event.target.value) })} /></label>
+      <label>{t('waitFirst', { seconds: ((draft.delayMs ?? 0) / 1000).toFixed(2) })}<input type="range" min={0} max={2000} step={50} value={draft.delayMs ?? 0} onChange={event => setDraft({ ...draft, delayMs: Number(event.target.value) })} /></label>
+      <label>{t('movement')}<Dropdown value={draft.easing} onChange={easing => setDraft({ ...draft, easing: easing as keyof typeof EASINGS })} options={(Object.keys(EASINGS) as (keyof typeof EASINGS)[]).map(key => ({ value: key, label: t(EASING_LABELS[key]) }))} /></label>
+      <label>{t('playIt', { count: draft.repeat ?? 1 })}<input type="range" min={1} max={10} value={draft.repeat ?? 1} onChange={event => setDraft({ ...draft, repeat: Number(event.target.value) })} /></label>
+      {list && <label>{t('between', { seconds: ((draft.staggerMs ?? 0) / 1000).toFixed(2) })}<input type="range" min={0} max={500} step={10} value={draft.staggerMs ?? 0} onChange={event => setDraft({ ...draft, staggerMs: Number(event.target.value) })} /></label>}
+      <label>{t('name')}<input value={name} maxLength={60} placeholder={t('myAnimation')} onChange={event => setName(event.target.value)} /></label>
     </div>
     <div className="actions"><Sample animation={valid ? draft : null} list={list} />
-      <button className="accent" disabled={!valid} onClick={() => onSave(draft, name.trim())}>Use this animation</button></div>
+      <button className="accent" disabled={!valid} onClick={() => onSave(draft, name.trim())}>{t('useAnimation')}</button></div>
   </div>;
 }

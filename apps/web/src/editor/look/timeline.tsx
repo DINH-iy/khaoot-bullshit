@@ -3,7 +3,7 @@ import type { CustomAnimation } from '@party/contracts';
 type Frame = CustomAnimation['keyframes'][number];
 type Values = { opacity: number; x: number; y: number; scale: number; rotate: number; blur: number };
 const REST: Values = { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, blur: 0 };
-const EASING_WORDS: Record<CustomAnimation['easing'], string> = { smooth: 'smooth', linear: 'steady', 'ease-in': 'speeds up', 'ease-out': 'slows down', springy: 'springy', snappy: 'snappy' };
+const EASING_WORDS = { smooth: 'smooth', linear: 'steady', 'ease-in': 'speedsUp', 'ease-out': 'slowsDown', springy: 'springy', snappy: 'snappy' } as const satisfies Record<CustomAnimation['easing'], keyof typeof LOOK_TEXTS.en>;
 
 /** Each block's full values: what a block leaves out stays as in the block before (as the animation plays it). */
 function filled(frames: Frame[]): Values[] {
@@ -15,21 +15,21 @@ function filled(frames: Frame[]): Values[] {
 export function describeAnimation(animation: CustomAnimation, list: boolean): string {
   const values = filled(animation.keyframes); const first = values[0]!; const last = values.at(-1)!;
   const parts: string[] = [];
-  if (first.opacity < last.opacity) parts.push('fades in'); else if (first.opacity > last.opacity) parts.push('fades out');
-  if (first.y > last.y) parts.push('rises'); else if (first.y < last.y) parts.push('drops');
-  if (first.x !== last.x) parts.push('slides in');
-  if (first.scale < last.scale) parts.push('grows'); else if (first.scale > last.scale) parts.push('shrinks');
-  if (first.rotate !== last.rotate) parts.push('turns');
-  if (first.blur > last.blur) parts.push('sharpens'); else if (first.blur < last.blur) parts.push('blurs');
+  if (first.opacity < last.opacity) parts.push(t('wFadesIn')); else if (first.opacity > last.opacity) parts.push(t('wFadesOut'));
+  if (first.y > last.y) parts.push(t('wRises')); else if (first.y < last.y) parts.push(t('wDrops'));
+  if (first.x !== last.x) parts.push(t('wSlides'));
+  if (first.scale < last.scale) parts.push(t('wGrows')); else if (first.scale > last.scale) parts.push(t('wShrinks'));
+  if (first.rotate !== last.rotate) parts.push(t('wTurns'));
+  if (first.blur > last.blur) parts.push(t('wSharpens')); else if (first.blur < last.blur) parts.push(t('wBlurs'));
   // Moves away and comes back (a shake, a pop, a bounce).
   const middle = values.slice(1, -1);
-  if (!parts.length && middle.some(entry => entry.x !== last.x || entry.y !== last.y || entry.rotate !== last.rotate)) parts.push('wiggles');
-  if (!parts.length && middle.some(entry => entry.scale !== last.scale)) parts.push('pops');
-  if (!parts.length) parts.push('stays still');
-  const what = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]!;
+  if (!parts.length && middle.some(entry => entry.x !== last.x || entry.y !== last.y || entry.rotate !== last.rotate)) parts.push(t('wWiggles'));
+  if (!parts.length && middle.some(entry => entry.scale !== last.scale)) parts.push(t('wPops'));
+  if (!parts.length) parts.push(t('wStill'));
+  const what = parts.length > 1 ? t('and', { list: parts.slice(0, -1).join(', '), last: parts.at(-1)! }) : parts[0]!;
   const seconds = `${(animation.durationMs / 1000).toFixed(2)} s`; const repeat = (animation.repeat ?? 1) > 1 ? `, ${animation.repeat}×` : '';
-  const order = list && animation.staggerMs ? 'One after another, each ' : '';
-  const text = `${order}${what} · ${seconds}${repeat}, ${EASING_WORDS[animation.easing]}`;
+  const order = list && animation.staggerMs ? t('oneAfter') : '';
+  const text = `${order}${what} · ${seconds}${repeat}, ${t(EASING_WORDS[animation.easing])}`;
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -56,3 +56,6 @@ export function Timeline({ animation, rows, run }: { animation: CustomAnimation;
     <div className="timeline-axis"><span>0 s</span>{delay > 0 && <span className="timeline-axis-wait" style={{ left: percent(delay) }}>wait {(delay / 1000).toFixed(2)} s</span>}<span>{(total / 1000).toFixed(2)} s</span></div>
   </div>;
 }
+import { translate } from '../../i18n/texts.js';
+import { LOOK_TEXTS } from './look.text.js';
+const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);

@@ -39,3 +39,8 @@
 }
 .app-header .fa-icon, .app-menu .fa-icon { width: 1em; height: 1em; flex: none; }
 .app-avatar .fa-icon { width: 15px; height: 15px; }
+/* The language of the host, editor and admin screens (i18n/language-picker.tsx). */
+.language-picker select { min-height: 40px; padding: 0 10px; border-radius: 999px; border: 1px solid light-dark(#d9d3ea, #3a3550); background: transparent; color: inherit; font: inherit; font-weight: 600; }
+.language-picker select:focus-visible { outline: 3px solid light-dark(#6d3fd6, #b9a2ff); outline-offset: 2px; }
+.app-menu-language { margin: 6px 0 0; padding: 8px 6px 2px; border-top: 1px solid light-dark(#eeeaf7, #2c2840); }
+.app-menu-language .language-picker, .app-menu-language select { width: 100%; }

@@ -1,9 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { currentLanguage, useLanguage, type Language } from '../i18n/language.js';
+import { translate } from '../i18n/texts.js';
+import { GAME_TEXTS } from './game-texts.text.js';
+import { gameHowToPlay } from './catalog.text.js';
 import { contrast, EASINGS, FONTS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type Theme } from '@party/contracts';
 
 export interface LookInput { texts?: Record<string, string>; animations?: Record<string, unknown>; themes?: unknown[] }
 export interface Look { text: (key: TextKey, values?: Record<string, string | number>) => string; animation: (moment: Moment) => CustomAnimation | null; theme: ReturnType<typeof resolveTheme> }
-const defaultLook: Look = { text: (key, values) => fillText(TEXT_DEFAULTS[key], values), animation: moment => resolveAnimation(undefined, moment), theme: resolveTheme() };
+const defaultLook: Look = { text: (key, values) => fillText(standardText(key, currentLanguage()), values), animation: moment => resolveAnimation(undefined, moment), theme: resolveTheme() };
 const LookContext = createContext<Look>(defaultLook);
 export const useLook = () => useContext(LookContext);
 /** The game's text for this key (or the default), with `{placeholders}` filled in. */
@@ -25,13 +29,23 @@ export function themeStyle(theme: ReturnType<typeof resolveTheme>): CSSPropertie
 }
 export const themeClass = (theme: ReturnType<typeof resolveTheme>) => `bg-${theme.background} tiles-${theme.tiles}${theme.uppercaseHeadings ? ' caps' : ''}${theme.gradients ? ' gradients' : ''} marks-${theme.markerShape} marks-${theme.markerPlace}`;
 
-export function buildLook(look: LookInput | undefined): Look {
+/**
+ * A standard text (one the author did not change) in a language: the game's texts in every language, and the
+ * minigames' “how to play” from the catalog. English is the source, and the fallback for anything missing.
+ */
+export function standardText(key: TextKey, language: Language): string {
+  if (language === 'en') return TEXT_DEFAULTS[key];
+  if (key.startsWith('minigame.how.')) { const game = key.slice('minigame.how.'.length); return gameHowToPlay(game, language) || TEXT_DEFAULTS[key]; }
+  return translate(GAME_TEXTS, key as keyof typeof GAME_TEXTS.en, undefined, language);
+}
+/** The look in a language: texts the author changed stay as written; every other text is the standard one in that language. */
+export function buildLook(look: LookInput | undefined, language: Language = currentLanguage()): Look {
   const texts = look?.texts ?? {}; const animations = (look?.animations ?? {}) as Record<string, AnimationChoice>;
   const themes = (look?.themes ?? []).map(theme => ThemeSchema.safeParse(theme)).filter(result => result.success).map(result => result.data as Theme);
-  return { text: (key, values) => fillText(texts[key] ?? TEXT_DEFAULTS[key], values), animation: moment => resolveAnimation(animations[moment], moment), theme: resolveTheme(...themes) };
+  return { text: (key, values) => fillText(texts[key] ?? standardText(key, language), values), animation: moment => resolveAnimation(animations[moment], moment), theme: resolveTheme(...themes) };
 }
 /** Builds the look once per change of its input; use with `LookContext.Provider`. */
-export const useBuiltLook = (look: LookInput | undefined) => useMemo(() => buildLook(look), [look]);
+export const useBuiltLook = (look: LookInput | undefined) => { const language = useLanguage(); return useMemo(() => buildLook(look, language), [look, language]); };
 export { LookContext };
 export function LookProvider({ look, children, render }: { look: LookInput | undefined; children?: ReactNode; render?: (style: CSSProperties, className: string) => ReactNode }) {
   const value = useBuiltLook(look);

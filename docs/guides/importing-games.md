@@ -104,7 +104,7 @@ Leave teams out for everyone-for-themselves; most games are. For a team game, ad
 
 ### Pictures, videos and songs
 
-A quiz, writing, upload, drawing or challenge round and a cutscene can show one picture, video or song with its text. These files live in the media library (uploaded in the editor: a scene's *Picture, video or song*), so text cannot contain them. An exported game keeps them as `"media": { "id": "…", "kind": "image" | "video" | "audio" }` and imports them again on the same server. Pictures show on the shared screen and the phones; videos and songs play on the shared screen (on the host's screen when none is connected), and the phones say to watch or listen.
+A quiz, writing, upload, drawing or challenge round and a cutscene can show one picture, video or song with its text. Add files in the editor through the scene’s *Picture, video or song* library. The library can import an MP3 from a YouTube video when you have permission to download and use the audio, or save a trimmed MP3 copy of a library song. The game text stores library references. An exported game keeps them as `"media": { "id": "…", "kind": "image" | "video" | "audio" }` and imports them again on the same server. Pictures show on the shared screen and the phones; videos and songs play on the shared screen (on the host's screen when none is connected), and the phones say to watch or listen.
 
 ### Music
 
@@ -170,8 +170,8 @@ If the user says "just make it" or has already answered, do not ask; choose sens
 - Optional end-of-game awards, at top level, in order: `"awards"`: names from `"winner"`, `"mostCorrect"`, `"mostWrong"`, `"fastest"`, `"slowest"`, `"mostVotes"`, `"minigameChamp"`, `"luckiest"`, `"mostReactions"`, `"fewest"` (the wooden spoon), or objects with their own title; `"scene"` (most points in one scene) needs the scene's id: `{ "award": "scene", "scene": "karaoke", "title": "Karaoke champion" }`. Leave out for the standard awards; `[]` for none.
 - Side games on the phones while players wait are on; `"sideGames": false` switches them off, `"chips": true` plays them with chips. A player can have 3 challenge invites waiting at once; `"openInvites": 5` allows 5 (1 to 10).
 - Any round people play (not a cutscene, scoreboard, party choice, duel or Pick teams) can explain itself first: `"explain": "Each team gets one guess per card…"` shows that text before the round starts, players tap Got it and the host starts the round; on a minigame `"explain": true` uses its standard "how to play". Use it for minigames and unusual rounds.
-- Pictures, videos and songs (`"media"`) cannot be written as text: they are uploaded in the editor (a scene's *Picture, video or song*). Leave `"media"` out; when a question needs one ("Which city is this?", "Name this song"), say in its `"question"` what it shows and tell the user afterwards which scenes need a picture, video or song added.
-- Music (`"music"`): the background playlist is made of uploaded songs, added in the editor (Game settings → Music), so leave it out. A scene can still say what the music does there: `"music": "quiet"` (softer, for example under a speech or a tense question) or `"music": "stop"` (silence, for example for a minute of concentration); without it the music plays on.
+- Pictures, videos and songs (`"media"`) are added separately in the editor. Authors can upload a file, import permitted YouTube audio as an MP3, or trim a library song and save an MP3 clip (a scene's *Picture, video or song*). Leave `"media"` out; when a question needs one ("Which city is this?", "Name this song"), say in its `"question"` what it shows and tell the user afterwards which scenes need a picture, video or song added.
+- Music (`"music"`): the background playlist is made of library songs, added in the editor (Game settings → Music), so leave it out. A scene can still say what the music does there: `"music": "quiet"` (softer, for example under a speech or a tense question) or `"music": "stop"` (silence, for example for a minute of concentration); without it the music plays on.
 - The host's quick time button adds 30 seconds to a running round; `"quickTime": 60` makes it a minute (5 to 600 seconds).
 - Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Only add a look if the user asks for a style or colours.
   - Theme presets: `"party"`, `"neon"`, `"pub"`, `"clean"`, `"retro"`, `"kids"`, `"elegant"`, `"ocean"`, `"christmas"`, `"birthday"`, `"mbou"` (MBO Utrecht's colours). Anything in `"theme"` changes the preset:
@@ -193,13 +193,14 @@ Example:
     { "id": "excuse", "type": "writing", "question": "Write the worst excuse for being late tonight.", "seconds": 60 },
     { "id": "excuse-vote", "type": "vote", "question": "Vote for the best excuse!", "votesOn": "excuse", "pointsPerVote": 5, "seconds": 40 },
     { "id": "choose", "type": "party-choice", "question": "Choose your challenge!", "options": [{ "label": "Music", "to": "music" }, { "label": "Physical", "to": "sculpture" }], "seconds": 20 },
-    { "id": "music", "type": "quiz", "question": "Which instrument has 88 keys?", "answers": ["Piano", "Organ", "Harp"], "correct": "Piano", "seconds": 20, "next": "finale" },
+    { "id": "music", "type": "quiz", "question": "Which instrument is playing in this clip?", "answers": ["Piano", "Organ", "Harp"], "correct": "Piano", "music": "stop", "seconds": 20, "next": "finale" },
     { "id": "sculpture", "type": "challenge", "question": "Build the Eiffel Tower out of people!", "maxPoints": 10, "seconds": 120, "next": "finale" },
     { "id": "finale", "type": "order", "question": "Put these in order, oldest first.", "items": ["Walkman", "Discman", "iPod", "Smartphone"], "points": 15, "seconds": 30 },
     { "id": "results", "type": "scoreboard", "title": "Final scores", "show": "players" }
   ]
 }
 ```
+After importing this example, add a piano clip to the music question in the Scene editor under **Picture, video or song**. Choose a library track or import audio from a YouTube video you have permission to download and use, then select **Trim** to save a short MP3 for the question.
 <!-- ai-instructions:end -->
 
 ## Tips

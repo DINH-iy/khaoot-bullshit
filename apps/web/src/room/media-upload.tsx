@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react';
 import { seatHeaders } from './test-seat.js';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from './extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import { UploadedAssetSchema, type MediaKind, type RoomReply } from '@party/contracts';
 
 export interface UploadedMedia { assetId: string; mediaKind: MediaKind }
@@ -7,11 +10,7 @@ export const assetUrl = (sessionId: string, assetId: string) => `/api/rooms/${se
 const pickers: Record<MediaKind, string> = { image: 'image/png,image/jpeg,image/webp', gif: 'image/gif', video: 'video/mp4,video/webm,video/quicktime' };
 const names: Record<MediaKind, string> = { image: 'a picture', gif: 'a GIF', video: 'a short video' };
 const problems: Record<string, string> = {
-  FILE_TOO_LARGE: 'That file is too large. Pictures can be up to 8 MB, GIFs 12 MB and videos 40 MB.',
-  UNSUPPORTED_MEDIA: 'That file type is not accepted in this round.',
-  RATE_LIMITED: 'The server is busy with other uploads. Try again in a moment.',
-  STORAGE_FULL: 'This room has no upload space left. Tell the host.',
-  INVALID_STATE: 'This round is no longer accepting uploads.', ALREADY_SUBMITTED: 'Your answer is already saved.',
+  FILE_TOO_LARGE: 'uTooLarge', UNSUPPORTED_MEDIA: 'uType', RATE_LIMITED: 'uBusy', STORAGE_FULL: 'uFull', INVALID_STATE: 'uClosed', ALREADY_SUBMITTED: 'uSaved',
 };
 
 /**
@@ -60,15 +59,15 @@ export function MediaUpload({ sessionId, accept, value, onChange }: { sessionId:
   const choose = async (file: File | undefined) => {
     if (!file) return; setError(''); setProgress(0);
     try { onChange(await send(sessionId, await prepare(file), setProgress)); }
-    catch (cause) { onChange(undefined); setError(problems[cause instanceof Error ? cause.message : ''] ?? 'The upload did not finish. Check your connection and choose the file again.'); }
+    catch (cause) { onChange(undefined); setError(x((problems[cause instanceof Error ? cause.message : ''] ?? 'uFailed') as keyof typeof EXTRAS_TEXTS.en)); }
     finally { setProgress(undefined); if (picker.current) picker.current.value = ''; }
   };
   const wanted = accept.map(kind => names[kind]).join(accept.length > 2 ? ', ' : ' or ').replace(/, ([^,]*)$/, ' or $1');
   return <div className="media-upload">
     <label>Choose {wanted}<input ref={picker} type="file" accept={accept.map(kind => pickers[kind]).join(',')} disabled={progress !== undefined} onChange={event => { void choose(event.target.files?.[0]); }} /></label>
-    {progress !== undefined && <label>Uploading<progress max={1} value={progress} /></label>}
-    <p role="status">{progress !== undefined ? `Uploading… ${Math.round(progress * 100)}%` : value ? 'Uploaded. Check it below, then save your answer. Choose another file to replace it.' : ''}</p>
+    {progress !== undefined && <label>{x('uploading')}<progress max={1} value={progress} /></label>}
+    <p role="status">{progress !== undefined ? x('uploadingN', { percent: Math.round(progress * 100) }) : value ? x('uploaded') : ''}</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {value && progress === undefined && <MediaView sessionId={sessionId} media={value} label="Your upload" />}
+    {value && progress === undefined && <MediaView sessionId={sessionId} media={value} label={x('yourUpload')} />}
   </div>;
 }

@@ -37,6 +37,12 @@ npm run host
 
 Signed in as the owner, the host menu, the editor and the admin pages show a top bar: Play, Host, Editor (Your games on the host menu), Admin and People. Editors (people with editor rights) see only Play and Editor. Whether to show it comes from the owner endpoint (`GET /api/host`), never from reading cookies. The player screen never calls that endpoint; its "Host a game instead" link only shows in a browser that signed in as the owner before (a hint in that browser's storage, never the key). A browser that is not signed in is told to open the private owner link once.
 
+## Importing and trimming music
+
+In a game's editor, open **Game settings → Music → Add a song → Import from YouTube**. Paste a public video link, name the track and confirm you have permission to download and use its audio. The editor saves the MP3 in the shared media library. Select **Trim** on any library song, choose the start and end in seconds, preview the cut and select **Save MP3 copy**. Then choose **Use this** to add the track to the playlist. The same library is available from a scene's **Music** and **Picture, video or song** controls.
+
+Audio processing runs on the server. Install [FFmpeg](https://ffmpeg.org/download.html) with the MP3 encoder (libmp3lame), and install a current [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) with its JavaScript challenge solver (for example, `pipx install 'yt-dlp[default]'`). The server looks in the project's ignored `.local/tools/audio/` directory first and then on its PATH. YouTube import also needs internet access on the server and accepts individual public videos up to 20 minutes. Library tracks and clips use the existing 25 MB audio limit. Clips keep the source's credit, which you can edit in the library.
+
 ## Package boundaries
 
 - `apps/web`: React/Vite browser UI; presentation only.
@@ -111,6 +117,8 @@ Players play on their own phone while waiting: in the lobby, between rounds, aft
 - **Pausing**: as soon as a round needs the player (a question to answer, a vote, a minigame, picking teams), the side game closes with "Round started: your side game is paused" and the button says *Games paused*. An unfinished blackjack hand waits until the next time. The server refuses side-game moves while the player is needed, so this cannot be skipped.
 - Side games are **on** in a new room and chips are **off**, so everyone can play the slot machine, blackjack, packs and challenges just for fun (no bets, free packs, no leaderboard). Chips are an extra: with them on, players bet chips, stake them in challenges and get the leaderboard. A game can change both (editor → Game settings → *Side games & chips*, or `"sideGames": false` / `"chips": true` in an imported game), and the host can switch both at any time with the *Side games* and *Chips* switches in the host panel, in the lobby and during the game. Rooms opened before this change keep both on.
 - What pays and the chances are shown in each game. The slot machine pays back about 94 of every 100 chips bet, blackjack pays 3 to 2 for a blackjack (dealer stands on 17, doubling on the first two cards, no splitting), packs never pay chips back. The server draws every card, reel and pack.
+
+**Language of the app's own screens:** the *Language* choice in the header (and in the editor's logo menu) switches the host menu, the host's room controls and the whole editor (Flow map, Scene editor, scene settings, Look & feel, Game settings, help) between English, Nederlands, Deutsch and Română, remembered in that browser (it starts from the browser's language). The admin pages and the problem descriptions stay English. Each part keeps its translations next to its code in a `*.text.ts` file; a test fails when a language misses a text or a placeholder. **On the phones**, each player chooses a language too (on the join screen, and later under Menu → 🌐), starting from the phone's own language. The game's standard texts follow it (all 147, with the minigames' explanations); a text the game's author changed stays exactly as written. The phone screens' own words (side games, arcade, minigame controls…) and authors' translations of their own texts are the next steps. The shared screen follows its own browser's language.
 
 ### 5. Arcade: minigames with friends, without a host or a game
 

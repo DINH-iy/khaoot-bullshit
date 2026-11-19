@@ -15,6 +15,9 @@ import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import type { PrefabContent } from '@party/contracts';
 import type { DraftState } from '../shell/use-draft.js';
 import type { LiveState } from '../live/use-live.js';
+import { translate } from '../../i18n/texts.js';
+import { marked } from '../../i18n/rich.js';
+import { FLOW_TEXTS } from './flow.text.js';
 import { PeerCursors, peerOutline, peersOn, PeerTags } from '../live/presence.js';
 
 interface Connecting { from: string; option: string | undefined; pointer: Point; target: string | null; blocked: string | null; rewire: string | null }
@@ -27,7 +30,9 @@ function writeClip(clip: Clip) { try { localStorage.setItem(CLIP, JSON.stringify
 function readClip(): Clip | null { try { const value = JSON.parse(localStorage.getItem(CLIP) ?? 'null') as Clip | null; return value && Array.isArray(value.keys) && value.from && Array.isArray(value.from.nodes) ? value : null; } catch { return null; } }
 // ⌘ on a Mac, Ctrl elsewhere: how shortcuts are written in the menus.
 const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
-const blockedText: Record<string, string> = { self: 'A scene cannot lead to itself.', circle: 'That would make the game go round in a circle.', 'same-scene': 'Another option of this choice already leads there.' };
+const t = (key: keyof typeof FLOW_TEXTS.en, values?: Record<string, string | number>) => translate(FLOW_TEXTS, key, values);
+const BLOCKED = { self: 'bSelf', circle: 'bCircle', 'same-scene': 'bSame' } as const;
+const blockedText = (reason: string) => reason in BLOCKED ? t(BLOCKED[reason as keyof typeof BLOCKED]) : '';
 
 export function FlowView({ d, selected, setSelected, focus = null, live, onOpenScene, onHelp }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; focus?: { key: string; at: number } | null; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
   const readOnly = d.readOnly;
@@ -54,7 +59,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     if (!keys.length) return;
     const copied = duplicateScenes(definition, positions, keys, offset);
     change(copied.definition, copied.positions); select(copied.keys);
-    setNotice(`${keys.length === 1 ? 'Scene' : `${keys.length} scenes`} duplicated. Connect ${keys.length === 1 ? 'it' : 'them'} where you want ${keys.length === 1 ? 'it' : 'them'} to play.`);
+    setNotice(t(keys.length === 1 ? 'duplicatedOne' : 'duplicatedMany', { count: keys.length }));
   };
 
   const toCanvas = useCallback((clientX: number, clientY: number): Point => {
@@ -110,7 +115,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const finishPending = (to: string) => {
     if (!pending) return;
     const problem = connectProblem(definition, pending.from, pending.option, to);
-    if (problem) setNotice(blockedText[problem] ?? ''); else { change(connect(definition, pending.from, pending.option, to)); setNotice(''); }
+    if (problem) setNotice(blockedText(problem)); else { change(connect(definition, pending.from, pending.option, to)); setNotice(''); }
     setPending(null);
   };
   const nearestInput = useCallback((point: Point, from: string, option: string | undefined, without: string | null) => {
@@ -141,10 +146,10 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const up = () => {
       finish();
       const base = rewire ? disconnect(definition, rewire) : definition;
-      if (!dragged) { if (!rewire) { setPending({ from, option }); setNotice('Now tap the scene to connect to. Press Escape to cancel.'); } return; }
+      if (!dragged) { if (!rewire) { setPending({ from, option }); setNotice(t('tapTarget')); } return; }
       if (state.target && !state.blocked) { change(connect(base, from, option, state.target)); return; }
-      if (state.target && state.blocked) { setNotice(blockedText[state.blocked] ?? ''); return; }
-      if (rewire) { change(base); setNotice('Connection removed. Undo brings it back.'); return; }
+      if (state.target && state.blocked) { setNotice(blockedText(state.blocked)); return; }
+      if (rewire) { change(base); setNotice(t('removed')); return; }
       setAdding({ from, option, at: state.pointer });
     };
     element.addEventListener('pointermove', move); element.addEventListener('pointerup', up); element.addEventListener('pointercancel', finish);
@@ -205,8 +210,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const fit = useCallback(() => fitTo(), [fitTo]);
   // Tidying the map (the Tidy up menu and its shortcuts). Each is one change, so Undo takes it back.
   const tidy = {
-    rows: () => { change(definition, autoLayout(definition)); setNotice('Tidied up into rows.'); },
-    line: () => { change(definition, autoLayout(definition, { oneRow: true })); setNotice('Tidied up in one line.'); },
+    rows: () => { change(definition, autoLayout(definition)); setNotice(t('tidiedRows')); },
+    line: () => { change(definition, autoLayout(definition, { oneRow: true })); setNotice(t('tidiedLine')); },
     lineUp: (direction: 'row' | 'column') => { if (selected.length > 1) change(definition, lineUp(definition, positions, selected, direction)); },
     straighten: () => change(definition, straightenAll(positions)),
   };
@@ -235,7 +240,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const result = insertPrefab(definition, positions, content, { x: snap(target.x), y: snap(target.y) }, adding.from ? { key: adding.from, option: adding.option } : undefined);
     change(result.definition, result.positions); setAdding(null); select(result.keys);
     const first = result.positions[result.keys[0]!]; if (first) requestAnimationFrame(() => reveal(first));
-    setNotice(`Inserted ${result.keys.length === 1 ? 'a scene' : `${result.keys.length} scenes`} from the prefab.`);
+    setNotice(t(result.keys.length === 1 ? 'insertedOne' : 'insertedMany', { count: result.keys.length }));
   };
   const addFromMenu = ({ type, variant }: SceneChoice) => {
     if (!adding) return;
@@ -314,7 +319,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       // Tidying: Ctrl/⌘ + Shift + L tidies into rows; Alt + Shift + H / V lines up the selected scenes (by key position, so any layout and a Mac's Option work).
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.code === 'KeyL') { event.preventDefault(); tidy.rows(); return; }
       if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && (event.code === 'KeyH' || event.code === 'KeyV')) {
-        event.preventDefault(); if (selected.length > 1) tidy.lineUp(event.code === 'KeyH' ? 'row' : 'column'); else setNotice('Select two or more scenes to line them up (Shift-click or Shift-drag).'); return;
+        event.preventDefault(); if (selected.length > 1) tidy.lineUp(event.code === 'KeyH' ? 'row' : 'column'); else setNotice(t('selectTwo')); return;
       }
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
       else if ((event.key === 'Delete' || event.key === 'Backspace') && selected.length) { event.preventDefault(); setAskDelete(true); }
@@ -323,8 +328,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c' && selected.length) {
         const keys = new Set(selected);
         const from = { ...definition, nodes: definition.nodes.filter(node => keys.has(node.key)), edges: definition.edges.filter(edge => keys.has(edge.from) && keys.has(edge.to)) };
-        if (!writeClip({ keys: [...selected], from, positions: Object.fromEntries(selected.map(key => [key, positions[key]!])), game: d.draft?.gameId ?? null })) { setNotice('This browser does not allow copying here. Use Duplicate instead.'); return; }
-        setNotice(`Copied ${selected.length === 1 ? 'a scene' : `${selected.length} scenes`}. Paste with ${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+V.`); }
+        if (!writeClip({ keys: [...selected], from, positions: Object.fromEntries(selected.map(key => [key, positions[key]!])), game: d.draft?.gameId ?? null })) { setNotice(t('noCopy')); return; }
+        setNotice(t(selected.length === 1 ? 'copiedOne' : 'copiedMany', { count: selected.length, key: navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl' })); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') { const clip = readClip(); if (clip) { event.preventDefault(); paste(clip); } }
       if (event.key === 'Escape') { setConnecting(null); setSelectedEdge(null); setPending(null); setAdding(null); setNotice(''); }
     };
@@ -337,48 +342,44 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const offset = clip.game === d.draft?.gameId ? { x: GRID * 3, y: GRID * 3 } : { x: (-view.x + 160) / view.zoom - first.x, y: (-view.y + 160) / view.zoom - first.y };
     const pasted = pasteScenes(definition, positions, clip.from, clip.positions, clip.keys, offset);
     change(pasted.definition, pasted.positions); select(pasted.keys);
-    setNotice(`Pasted ${pasted.keys.length === 1 ? 'a scene' : `${pasted.keys.length} scenes`}. Connect ${pasted.keys.length === 1 ? 'it' : 'them'} where you want ${pasted.keys.length === 1 ? 'it' : 'them'} to play.`);
+    setNotice(t(pasted.keys.length === 1 ? 'pastedOne' : 'pastedMany', { count: pasted.keys.length }));
   };
   const problemsBy = useMemo(() => { const map = new Map<string, DefinitionIssue[]>(); for (const issue of d.issues) if (issue.nodeKey) map.set(issue.nodeKey, [...(map.get(issue.nodeKey) ?? []), issue]); return map; }, [d.issues]);
   const nodes = definition.nodes; const single = selected.length === 1 ? nodes.find(node => node.key === selected[0]) : undefined;
   const sceneTitle = (key: string) => { const node = definition.nodes.find(entry => entry.key === key); if (!node) return key; const text = cardText(definition, node); return text.banner || text.title; };
   const deleteSelected = () => { let next = definition; for (const key of selected) next = deleteScene(next, key); const kept = { ...positions }; for (const key of selected) delete kept[key]; change(next, kept); select([]); };
   return <div className={`editor-body${selected.length ? ' with-inspector' : ''}${readOnly ? ' viewing' : ''}`}>
-    <div className="flow-tools" role="toolbar" aria-label="Flow tools">
-      <button className="with-icon" aria-label="Add a scene" disabled={readOnly} onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" /><span className="tool-label">Add a scene</span></button>
+    <div className="flow-tools" role="toolbar" aria-label={t('flowTools')}>
+      <button className="with-icon" aria-label={t('addScene')} disabled={readOnly} onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" /><span className="tool-label">{t('addScene')}</span></button>
       {/* Everything that tidies the map, in one menu; each item says its shortcut (also in Help & shortcuts). */}
-      <ActionMenu label="Tidy up" text="Tidy up" icon="tidy" align="start" actions={[
-        { label: 'Tidy up into rows', icon: 'rows', shortcut: `${MOD} + Shift + L`, disabled: readOnly, onSelect: () => tidy.rows() },
-        { label: 'Tidy up in one line', icon: 'line', disabled: readOnly, onSelect: () => tidy.line() },
+      <ActionMenu label={t('tidyUp')} text={t('tidyUp')} icon="tidy" align="start" actions={[
+        { label: t('tidyRows'), icon: 'rows', shortcut: `${MOD} + Shift + L`, disabled: readOnly, onSelect: () => tidy.rows() },
+        { label: t('tidyLine'), icon: 'line', disabled: readOnly, onSelect: () => tidy.line() },
         // Shown greyed out until two or more scenes are selected (the intro says how).
-        { label: 'Line up selected in a row', icon: 'align-row', shortcut: 'Alt + Shift + H', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('row') },
-        { label: 'Line up selected in a column', icon: 'align-column', shortcut: 'Alt + Shift + V', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('column') },
-        { label: 'Straighten all arrows', icon: 'straighten', disabled: readOnly || !Object.keys(positions).some(isBendKey), onSelect: () => tidy.straighten() },
-      ]} intro={selected.length > 1 ? undefined : 'Select scenes (Shift-click or Shift-drag) to line them up.'} />
+        { label: t('lineRow'), icon: 'align-row', shortcut: 'Alt + Shift + H', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('row') },
+        { label: t('lineColumn'), icon: 'align-column', shortcut: 'Alt + Shift + V', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('column') },
+        { label: t('straightenAll'), icon: 'straighten', disabled: readOnly || !Object.keys(positions).some(isBendKey), onSelect: () => tidy.straighten() },
+      ]} intro={selected.length > 1 ? undefined : t('lineUpIntro')} />
       {/* Zooming, as in design tools: the zoom level opens the menu. */}
-      <ActionMenu label="Zoom" text={`${Math.round(view.zoom * 100)}%`} icon="zoom" align="start" actions={[
-        { label: 'Zoom in', icon: 'zoom-in', onSelect: () => zoomBy(1.2) },
-        { label: 'Zoom out', icon: 'zoom-out', onSelect: () => zoomBy(1 / 1.2) },
-        { label: 'Zoom to 100%', icon: 'actual-size', onSelect: () => zoomBy(1 / view.zoom) },
-        { label: 'Show the whole game', icon: 'fit', shortcut: 'Shift + 1', onSelect: fit },
-        { label: 'Zoom to selected', icon: 'zoom', shortcut: 'Shift + 2', disabled: !selected.length, onSelect: () => fitTo(selected) },
+      <ActionMenu label={t('zoom')} text={`${Math.round(view.zoom * 100)}%`} icon="zoom" align="start" actions={[
+        { label: t('zoomIn'), icon: 'zoom-in', onSelect: () => zoomBy(1.2) },
+        { label: t('zoomOut'), icon: 'zoom-out', onSelect: () => zoomBy(1 / 1.2) },
+        { label: t('zoom100'), icon: 'actual-size', onSelect: () => zoomBy(1 / view.zoom) },
+        { label: t('showAll'), icon: 'fit', shortcut: 'Shift + 1', onSelect: fit },
+        { label: t('zoomSelected'), icon: 'zoom', shortcut: 'Shift + 2', disabled: !selected.length, onSelect: () => fitTo(selected) },
       ]} />
       {/* The ways to work the map, behind one ⓘ instead of a line of text (A selected arrow's actions are on the arrow itself). */}
-      <InfoTip label="Tips for the map" icon="tips" text="Tips" align="start">
+      <InfoTip label={t('tipsLabel')} icon="tips" text={t('tips')} align="start">
         <span className="tip-list">
-          {readOnly && <strong>Viewing: nothing can be changed. Switch to Editing at the top to make changes.</strong>}
-          <span><b>Scroll</b> to zoom; <b>Shift + scroll</b> or drag the background to move around.</span>
-          <span><b>Right-click</b> the background to add a scene there.</span>
-          <span><b>Drag from ○</b> to connect scenes; drop on empty space to add a connected scene.</span>
-          <span><b>Click an arrow</b> to bend it or add a scene on it.</span>
-          <span><b>Shift-drag</b> or <b>Shift-click</b> to select several scenes.</span>
-          <button type="button" className="link-button" onClick={onHelp}>All shortcuts (?)</button>
+          {readOnly && <strong>{t('viewingLong')}</strong>}
+          {(['tip1', 'tip2', 'tip3', 'tip4', 'tip5'] as const).map(key => <span key={key}>{marked(t(key))}</span>)}
+          <button type="button" className="small-button" onClick={onHelp}>{t('allShortcuts')}</button>
         </span>
       </InfoTip>
-      {readOnly && <span className="flow-hint">Viewing: nothing can be changed.</span>}
+      {readOnly && <span className="flow-hint">{t('viewingShort')}</span>}
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
-    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label="Game flow" role="application" aria-roledescription="flow canvas">
+    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
         <svg className="flow-lines" width="1" height="1" overflow="visible" aria-hidden="true">
           <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="arrow-head" /></marker>
@@ -396,12 +397,12 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
             return <g key={edge.key} data-edge={edge.key} className={`edge${on ? ' selected' : ''}${connecting?.rewire === edge.key ? ' moving' : ''}`} onPointerDown={event => { event.stopPropagation(); setSelectedEdge(edge.key); setSelected([]); }}>
               <path d={path} className="edge-hit" /><path d={path} className="edge-line" markerEnd={on ? 'url(#arrow-on)' : 'url(#arrow)'} />
               {label && <text x={end.x - 12} y={end.y - 12} textAnchor="end" className="edge-label">{label}</text>}
-              <circle cx={grip.x} cy={grip.y} r={10} className="edge-end" onPointerDown={event => { setSelectedEdge(edge.key); startConnect(event, edge.from, edge.option, edge.key); }}><title>Drag to move this arrow to another scene</title></circle>
+              <circle cx={grip.x} cy={grip.y} r={10} className="edge-end" onPointerDown={event => { setSelectedEdge(edge.key); startConnect(event, edge.from, edge.option, edge.key); }}><title>{t('moveArrow')}</title></circle>
               {/* A selected arrow's bend points (drag; double-click removes) and + handles between them (drag to add one). */}
               {on && !readOnly && <>
                 {[start, ...bends, end].slice(1).map((point, index) => { const previous = [start, ...bends][index]!; const mid = bends.length ? { x: (previous.x + point.x) / 2, y: (previous.y + point.y) / 2 } : pointOnRoute(start, end, bends, 0.5);
-                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={8} className="edge-bend-add" onPointerDown={event => dragBend(event, edge.key, index, true)}><title>Drag to bend the arrow here</title></circle>; })}
-                {bends.map((point, index) => <circle key={`bend-${index}`} cx={point.x} cy={point.y} r={8} className="edge-bend" onPointerDown={event => dragBend(event, edge.key, index, false)} onDoubleClick={event => { event.stopPropagation(); removeBend(edge.key, index); }}><title>Drag to move this bend point; double-click to remove it</title></circle>)}
+                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={8} className="edge-bend-add" onPointerDown={event => dragBend(event, edge.key, index, true)}><title>{t('bendHere')}</title></circle>; })}
+                {bends.map((point, index) => <circle key={`bend-${index}`} cx={point.x} cy={point.y} r={8} className="edge-bend" onPointerDown={event => dragBend(event, edge.key, index, false)} onDoubleClick={event => { event.stopPropagation(); removeBend(edge.key, index); }}><title>{t('moveBend')}</title></circle>)}
               </>}
             </g>;
           })}
@@ -417,31 +418,31 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           const incoming = definition.edges.some(edge => edge.to === node.key); const others = peersOn(live.peers, node.key);
           return <div key={node.key} className={`scene-card kind-${text.kind}${problems.length ? ' has-problems' : ''}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
             style={{ ...peerOutline(others), left: position.x, top: position.y, width: CARD_WIDTH, height: cardHeight(node) }} tabIndex={0} role="group" aria-roledescription="scene card"
-            aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? ' Start scene.' : ''}${on ? ' Selected.' : ''}${others.length ? ` ${others.map(peer => peer.name).join(', ')} working here.` : ''}${problems.length ? ` ${problems.length} problems.` : ''}`}
+            aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? t('startScene') : ''}${on ? t('selected') : ''}${others.length ? t('workingHere', { names: others.map(peer => peer.name).join(', ') }) : ''}${problems.length ? t('problemsN', { count: problems.length }) : ''}`}
             onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)} onDoubleClick={() => onOpenScene(node.key)}>
             <PeerTags peers={others} />
-            <p className="card-label">{definition.startNodeKey === node.key && <span className="start-flag">Start · </span>}{text.label}</p>
+            <p className="card-label">{definition.startNodeKey === node.key && <span className="start-flag">{t('start')}</span>}{text.label}</p>
             <div className={`card-thumb thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true">{text.banner ?? <Icon name={sceneIcon(text.kind, text.input)} size={26} />}</div>
             <p className="card-title">{text.title}</p><p className="card-line">{text.line}</p>
             {problems.length > 0 && <p className="card-problems" title={problems.map(issue => issue.message).join('\n')}>{problems.length} {problems.length === 1 ? 'problem' : 'problems'}</p>}
             <span className={`port port-in${incoming ? ' grabbable' : ''}${isTarget && !connecting?.blocked ? ' port-hot' : ''}`} style={{ top: inputPort(position).y - position.y }} aria-hidden="true"
-              onPointerDown={incoming ? event => grabInput(event, node.key) : undefined} title={incoming ? 'Drag to move the arrow into this scene' : undefined} />
+              onPointerDown={incoming ? event => grabInput(event, node.key) : undefined} title={incoming ? t('arrowInto') : undefined} />
             {isRoute(node) ? optionsOf(node).map(option => <span key={option.key} className="port-row" style={{ top: outputPort(node, position, option.key).y - position.y }}>
               <span className="port-label">{option.label} →</span>
-              <span className="port port-out" aria-hidden="true" onPointerDown={event => startConnect(event, node.key, option.key)} title={`Drag to connect “${option.label}”`} />
+              <span className="port port-out" aria-hidden="true" onPointerDown={event => startConnect(event, node.key, option.key)} title={t('connectOption', { option: option.label })} />
               {!definition.edges.some(edge => edge.from === node.key && edge.option === option.key) && <button className="port-plus" onPointerDown={event => event.stopPropagation()} onClick={() => setAdding({ from: node.key, option: option.key, at: { x: position.x + CARD_WIDTH + GRID * 4, y: outputPort(node, position, option.key).y } })}>+<span className="visually-hidden"> Add a scene after “{option.label}”</span></button>}</span>)
-              : <><span className="port port-out" style={{ top: outputPort(node, position).y - position.y }} aria-hidden="true" onPointerDown={event => startConnect(event, node.key, undefined)} title="Drag to connect the next scene" />
+              : <><span className="port port-out" style={{ top: outputPort(node, position).y - position.y }} aria-hidden="true" onPointerDown={event => startConnect(event, node.key, undefined)} title={t('connectNext')} />
                 {!definition.edges.some(edge => edge.from === node.key) && <button className="port-plus" style={{ top: outputPort(node, position).y - position.y }} onPointerDown={event => event.stopPropagation()} onClick={() => setAdding({ from: node.key, option: undefined, at: { x: position.x + CARD_WIDTH + GRID * 4, y: outputPort(node, position).y } })}>+<span className="visually-hidden"> Add a scene after {text.title}</span></button>}</>}
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {adding && <div className="add-menu-anchor" ref={menuRef} style={menuSpot(adding.at)}><ScenePalette label={adding.onEdge ? 'Add a scene on this arrow' : adding.from ? 'Add a connected scene' : 'Add a scene'} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
+        {adding && <div className="add-menu-anchor" ref={menuRef} style={menuSpot(adding.at)}><ScenePalette label={t(adding.onEdge ? 'addOnArrow' : adding.from ? 'addConnected' : 'addScene')} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       </div>
       {/* A selected arrow's actions float at the top of the map (never on the line, which keeps its bend handles free; never in the toolbar, which would jump). */}
-      {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" role="toolbar" aria-label="Selected arrow" onPointerDown={event => event.stopPropagation()}>
+      {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" role="toolbar" aria-label={t('selectedArrow')} onPointerDown={event => event.stopPropagation()}>
         <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>
-        {selectedBends.length > 0 && <button type="button" onClick={() => change(definition, withBends(positions, selectedEdge, []))}>Straighten</button>}
-        <button type="button" className="danger-outline" aria-label="Remove this connection" onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>Remove</button>
+        {selectedBends.length > 0 && <button type="button" onClick={() => change(definition, withBends(positions, selectedEdge, []))}>{t('straighten')}</button>}
+        <button type="button" className="danger-outline" aria-label={t('removeConnection')} onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>{t('remove')}</button>
       </div>}
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
@@ -449,9 +450,9 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)} onOpen={() => onOpenScene(single.key)}
       onDelete={next => { const kept = { ...positions }; delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
       readOnly={readOnly} prefab={{ content: () => prefabFrom(definition, positions, [single.key]), defaultName: cardText(definition, single).banner || cardText(definition, single).title }} />}
-    {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? `Delete “${sceneTitle(selected[0]!)}”?` : `Delete ${selected.length} scenes?`}
-      text={`${selected.length === 1 ? 'The scene and its connections go' : 'The scenes and their connections go'}. Undo (Ctrl/Cmd+Z) brings ${selected.length === 1 ? 'it' : 'them'} back.`}
-      confirm={selected.length === 1 ? 'Delete scene' : `Delete ${selected.length} scenes`} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}
+    {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? t('deleteOne', { title: sceneTitle(selected[0]!) }) : t('deleteMany', { count: selected.length })}
+      text={t(selected.length === 1 ? 'deleteTextOne' : 'deleteTextMany')}
+      confirm={selected.length === 1 ? t('deleteScene') : t('deleteScenes', { count: selected.length })} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}
     {selected.length > 1 && <MultiPanel count={selected.length} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)}
       savePrefab={<SavePrefab key={selected.join()} content={() => prefabFrom(definition, positions, selected)} defaultName={`${selected.length} scenes`} />} />}
   </div>;
@@ -460,12 +461,12 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
 function MultiPanel({ count, onDelete, onClear, onDuplicate, savePrefab }: { count: number; onDelete: () => void; onClear: () => void; onDuplicate: () => void; savePrefab: React.ReactNode }) {
   const [confirming, setConfirming] = useState(false);
   return <aside className="inspector" aria-labelledby="multi-heading">
-    <div className="inspector-head"><h2 id="multi-heading">{count} scenes selected</h2><button className="small-button" onClick={onClear}>Clear selection</button></div>
-    <p className="hint">Drag any of them to move them together, or use the arrow keys. Shift-click a scene to add or remove it.</p>
-    <button onClick={onDuplicate}>Duplicate {count} scenes</button>
+    <div className="inspector-head"><h2 id="multi-heading">{t('selectedN', { count })}</h2><button className="small-button" onClick={onClear}>{t('clear')}</button></div>
+    <p className="hint">{t('multiHint')}</p>
+    <button onClick={onDuplicate}>{t('duplicateN', { count })}</button>
     {savePrefab}
-    <p className="hint">Copy and paste also work: Ctrl/Cmd+C, then Ctrl/Cmd+V, even in another game.</p>
-    {confirming ? <div className="actions"><button className="danger" onClick={onDelete}>Yes, delete {count} scenes</button><button onClick={() => setConfirming(false)}>Keep them</button></div>
-      : <button className="danger-outline" onClick={() => setConfirming(true)}>Delete {count} scenes</button>}
+    <p className="hint">{t('copyHint')}</p>
+    {confirming ? <div className="actions"><button className="danger" onClick={onDelete}>{t('yesDelete', { count })}</button><button onClick={() => setConfirming(false)}>{t('keepThem')}</button></div>
+      : <button className="danger-outline" onClick={() => setConfirming(true)}>{t('deleteScenes', { count })}</button>}
   </aside>;
 }

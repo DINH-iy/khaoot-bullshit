@@ -1,4 +1,7 @@
 import { useRef } from 'react';
+import { translate } from '../../i18n/texts.js';
+import { CONTROLS_TEXTS } from './controls.text.js';
+const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { Icon } from './icons.js';
 
 /**
@@ -7,7 +10,7 @@ import { Icon } from './icons.js';
  * and a bin on the chip itself (always shown on touch screens). At least `min` and at most
  * `max` colours. Used for the answer colours (Look & feel) and a wheel's own colours.
  */
-export function Swatches({ colors, name, removeName, onChange, min = 2, max = 8, addName = 'Add a colour' }: {
+export function Swatches({ colors, name, removeName, onChange, min = 2, max = 8, addName = t('addColour') }: {
   colors: string[]; name: (index: number) => string; removeName: (index: number) => string; onChange: (colors: string[]) => void;
   min?: number; max?: number; addName?: string;
 }) {

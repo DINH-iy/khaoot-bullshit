@@ -79,7 +79,7 @@ function stageFrom(raw: Json, key: string): Json {
   const spun = typeof raw['spin'] === 'string' && raw['spin'].trim() ? { spin: { wheel: slug(raw['spin'], 'wheel') } } : isObject(raw['spin']) ? { spin: raw['spin'] } : {};
   // `explain`: true (a minigame's standard “how to play”) or the scene's own explanation, shown before it starts.
   const explain = raw['explain'] === true ? { explain: {} } : typeof raw['explain'] === 'string' && raw['explain'].trim() ? { explain: { text: raw['explain'].trim().slice(0, 1000) } } : {};
-  // `media`: a picture, video or song already in the media library ({ id, kind }), as exported games carry it.
+  // `media`: a library item ({ id, kind }), including imported tracks and trimmed clips, as exported games carry it.
   // An AI cannot upload one: the author adds it in the editor afterwards. Anything else is left out.
   const media = SceneMediaSchema.safeParse(raw['media']);
   // `music`: what the scene does with the game's music; "keep", "quiet" and "stop" can be written as text, a song of its own only from the library.

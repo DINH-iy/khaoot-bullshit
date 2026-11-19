@@ -62,8 +62,8 @@ test('an author puts a picture in a quiz question, and the room shows it with th
 });
 
 /** A tenth of a second of silence as a real WAV file. */
-function silentWav(): Buffer {
-  const samples = 4410; const data = Buffer.alloc(samples * 2); const header = Buffer.alloc(44);
+function silentWav(seconds = 0.1): Buffer {
+  const samples = Math.round(44100 * seconds); const data = Buffer.alloc(samples * 2); const header = Buffer.alloc(44);
   header.write('RIFF', 0); header.writeUInt32LE(36 + data.length, 4); header.write('WAVE', 8); header.write('fmt ', 12);
   header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(1, 22); header.writeUInt32LE(44100, 24); header.writeUInt32LE(88200, 28); header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34);
   header.write('data', 36); header.writeUInt32LE(data.length, 40);
@@ -98,6 +98,60 @@ test('a song plays in one place only: the host screen when no shared screen is c
     await expect(phone.locator('.stage-media.note')).toHaveText(/Listen: the song plays on the shared screen/);
     await expect(phone.locator('audio')).toHaveCount(0);
   } finally { await phoneContext.close(); }
+});
+
+test('authors can import audio, trim it, and add the clip to the playlist from the editor', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const gameId = randomUUID();
+  const creation = await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: `Audio clip ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' } });
+  expect(creation.ok()).toBe(true);
+
+  // Replace external audio processing with playable fixtures. Library reads and game saves use the real API.
+  async function storeFixture(name: string, seconds: number) {
+    const saved = await page.request.post(`${baseURL}/api/host/media?name=${encodeURIComponent(name)}`, {
+      headers: { ...headers, 'content-type': 'application/octet-stream' }, data: silentWav(seconds),
+    });
+    expect(saved.ok()).toBe(true);
+    return saved.json();
+  }
+  await page.route('**/api/host/media/youtube', async route => {
+    expect(route.request().postDataJSON()).toEqual({ url: 'https://youtu.be/a1_bc-DEF23', name: 'Sound source', permission: true });
+    await route.fulfill({ json: await storeFixture('Sound source', 3) });
+  });
+  let clipId: string | undefined;
+  await page.route('**/api/host/media/*/trim', async route => {
+    expect(route.request().postDataJSON()).toEqual({ name: 'Sound source clip', start: 0.5, end: 2 });
+    const clip = await storeFixture('Sound source clip', 1.5);
+    clipId = clip.data.id;
+    await route.fulfill({ json: clip });
+  });
+
+  await page.goto(`${baseURL}/?edit=${gameId}`);
+  await page.getByRole('button', { name: 'Game menu' }).click();
+  await page.getByRole('menuitem', { name: 'Game settings' }).click();
+  const settings = page.locator('.game-settings-panel');
+  await settings.locator('summary', { hasText: 'Music' }).click();
+  await settings.getByRole('button', { name: 'Add a song' }).click();
+  const library = page.locator('.media-library');
+  await library.getByRole('button', { name: 'Import from YouTube' }).click();
+  await library.getByLabel('YouTube video link').fill('https://youtu.be/a1_bc-DEF23');
+  await library.getByLabel('Track name').fill('Sound source');
+  await expect(library.getByRole('button', { name: 'Import MP3' })).toBeDisabled();
+  await library.getByLabel('I have permission to download and use this audio.').check();
+  await library.getByRole('button', { name: 'Import MP3' }).click();
+  await library.getByRole('listitem').filter({ hasText: 'Sound source' }).getByRole('button', { name: 'Trim', exact: true }).click();
+  await expect(library.getByLabel('End (seconds)')).toHaveValue('3');
+  await library.getByLabel('Start (seconds)').fill('0.5');
+  await library.getByLabel('End (seconds)').fill('2');
+  await library.getByRole('button', { name: 'Save MP3 copy' }).click();
+  await library.getByRole('listitem').filter({ hasText: 'Sound source clip' }).getByRole('button', { name: 'Use this' }).click();
+  await expect(settings.locator('.music-list')).toContainText('Sound source clip');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  const draft = (await (await page.request.get(`${baseURL}/api/host/games/${gameId}`, { headers })).json()).data;
+  expect(draft.definition.music.tracks).toEqual([{ kind: 'audio', id: clipId }]);
 });
 
 test('background music plays from the lobby on, follows the scene and the host’s volume, and stops when switched off', async ({ page, baseURL }) => {

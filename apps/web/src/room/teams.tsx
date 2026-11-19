@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { defaultLook, type RoomSnapshot } from '@party/contracts';
 import { Avatar } from '../players/avatar.js';
+import { translate } from '../i18n/texts.js';
+import { PLAY_TEXTS } from './play.text.js';
+const p = (key: keyof typeof PLAY_TEXTS.en, values?: Record<string, string | number>) => translate(PLAY_TEXTS, key, values);
 import { formatPoints } from './results.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Teams = NonNullable<Stage['teams']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
-const nameOf = (state: RoomSnapshot, playerId: string) => state.players.find(player => player.id === playerId)?.displayName ?? 'Former player';
-const list = (state: RoomSnapshot, ids: string[]) => ids.length ? ids.map(id => nameOf(state, id)).join(', ') : 'nobody yet';
-const how: Record<Teams['formation'], string> = { random: 'Teams were drawn at random. The host can still change them.', host: 'The host is making the teams.', players: 'Pick your team.' };
-const pointsText: Record<Teams['points'], string> = { team: 'Points go to the team.', members: 'Points go to each player.', both: 'Points go to the team and to each player.' };
+const nameOf = (state: RoomSnapshot, playerId: string) => state.players.find(player => player.id === playerId)?.displayName ?? p('formerPlayer');
+const list = (state: RoomSnapshot, ids: string[]) => ids.length ? ids.map(id => nameOf(state, id)).join(', ') : p('nobodyYet');
+const how = { random: 'tRandom', host: 'tHost', players: 'tPlayers' } as const satisfies Record<Teams['formation'], keyof typeof PLAY_TEXTS.en>;
+const pointsText = { team: 'pTeam', members: 'pMembers', both: 'pBoth' } as const satisfies Record<Teams['points'], keyof typeof PLAY_TEXTS.en>;
 
 export const captainAnswers = (teams: Teams | null) => Boolean(teams && !teams.forming && teams.answers === 'captain');
 export const ownTeam = (teams: Teams | null) => teams?.teams.find(team => team.index === teams.ownTeamIndex);
@@ -44,37 +47,37 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
     onDragOver: (event: React.DragEvent) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; },
     onDrop: (event: React.DragEvent) => { event.preventDefault(); const id = event.dataTransfer.getData('text/plain'); if (id) assign(id, teamIndex); },
   } : {};
-  return <div role="region" aria-label="Team forming" className="team-forming">
+  return <div role="region" aria-label={p('teamForming')} className="team-forming">
     <div className="team-forming-head">
-      <h3>{teams.scope === 'game' ? 'Teams for the game' : 'Teams for this round'}</h3>
-      <p>{host ? (picked ? `Now tap the team for ${nameOf(state, picked)}${captains && pickedTeam ? ', or make them captain' : ''}.` : 'Tap a player, then their team (or drag them). Then start the round.') : state.arcade && teams.formation === 'random' ? 'Teams were drawn at random. The leader can shuffle them.' : how[teams.formation]}
-        {' '}{captains ? 'Each team’s captain answers for the team.' : 'Everyone answers.'} {pointsText[teams.points]}</p>
+      <h3>{p(teams.scope === 'game' ? 'forGame' : 'forRound')}</h3>
+      <p>{host ? (picked ? p(captains && pickedTeam ? 'tapTeamOrCaptain' : 'tapTeamFor', { name: nameOf(state, picked) }) : p('tapPlayer')) : state.arcade && teams.formation === 'random' ? p('leaderShuffle') : p(how[teams.formation])}
+        {' '}{p(captains ? 'captainsAnswer' : 'everyoneAnswers')} {p(pointsText[teams.points])}</p>
     </div>
     <ul className="team-columns">{teams.teams.map(team => {
       const color = teamColor(team.name, team.index); const mine = teams.ownTeamIndex === team.index;
       const full = team.targetSize !== null && team.memberIds.length >= team.targetSize;
       return <li key={team.index} className={`team-column${mine ? ' mine' : ''}${picked && !team.memberIds.includes(picked) ? ' target' : ''}`} style={{ '--team': color } as React.CSSProperties} {...dropTo(team.index)}>
-        <div className="team-column-head"><strong>{team.name}</strong><span className="team-count">{team.targetSize !== null ? ` · ${team.memberIds.length} of ${team.targetSize}` : ` · ${team.memberIds.length}`}</span>
-          {host && teams.teams.length > 1 && <button type="button" className="team-remove" disabled={disabled} aria-label={`Remove ${team.name}`} onClick={() => send('teams.remove', { stageRunId: stage.id, teamIndex: team.index })}>×</button>}</div>
-        {captains && team.captainId && <p className="visually-hidden">captain: {nameOf(state, team.captainId)}</p>}
+        <div className="team-column-head"><strong>{team.name}</strong><span className="team-count">{team.targetSize !== null ? p('ofTarget', { count: team.memberIds.length, target: team.targetSize }) : ` · ${team.memberIds.length}`}</span>
+          {host && teams.teams.length > 1 && <button type="button" className="team-remove" disabled={disabled} aria-label={p('removeTeam', { team: team.name })} onClick={() => send('teams.remove', { stageRunId: stage.id, teamIndex: team.index })}>×</button>}</div>
+        {captains && team.captainId && <p className="visually-hidden">{p('captainOf', { name: nameOf(state, team.captainId) })}</p>}
         {chooser && <button type="button" className="team-join" disabled={disabled || mine || full} onClick={() => send('teams.choose', { stageRunId: stage.id, teamIndex: team.index })}>
-          {mine ? `You are in ${team.name}` : full ? `${team.name} is full` : `Join ${team.name}`}</button>}
-        {team.memberIds.length ? <ul className="team-members">{team.memberIds.map(id => chip(id, team))}</ul> : <p className="team-empty">{host ? 'Nobody yet: tap a player, then here' : 'Nobody yet'}</p>}
+          {p(mine ? 'youAreIn' : full ? 'isFull' : 'join', { team: team.name })}</button>}
+        {team.memberIds.length ? <ul className="team-members">{team.memberIds.map(id => chip(id, team))}</ul> : <p className="team-empty">{p(host ? 'nobodyTap' : 'nobody')}</p>}
         {host && picked && !team.memberIds.includes(picked) && <button type="button" className="team-put" disabled={disabled || full} onClick={() => assign(picked, team.index)}>Put {nameOf(state, picked)} in {team.name}</button>}
       </li>;
     })}
       {host && teams.teams.length < 12 && <li className="team-column add"><button type="button" className="team-add" disabled={disabled} onClick={() => send('teams.add', { stageRunId: stage.id })}>+ Add team</button></li>}
     </ul>
     {(teams.unassignedIds.length > 0 || (host && pickedTeam)) && <div className="team-bench" {...dropTo(null)}>
-      <p>Not in a team (sits out unless placed)</p>
+      <p>{p('notInTeam')}</p>
       {teams.unassignedIds.length > 0 && <ul className="team-members">{teams.unassignedIds.map(id => chip(id))}</ul>}
       {host && picked && pickedTeam && <button type="button" className="team-put" disabled={disabled} onClick={() => assign(picked, null)}>Take {nameOf(state, picked)} out of the teams</button>}
     </div>}
     {host && <div className="actions team-actions">
       {picked && pickedTeam && captains && pickedTeam.captainId !== picked && <button type="button" disabled={disabled} onClick={() => { send('teams.captain', { stageRunId: stage.id, playerId: picked }); setPicked(null); }}>Make {nameOf(state, picked)} captain</button>}
-      <button type="button" className="ghost" disabled={disabled} onClick={() => { send('teams.shuffle', { stageRunId: stage.id }); setPicked(null); }}>Shuffle randomly</button>
+      <button type="button" className="ghost" disabled={disabled} onClick={() => { send('teams.shuffle', { stageRunId: stage.id }); setPicked(null); }}>{p('shuffle')}</button>
     </div>}
-    {host && teams.teams.every(team => team.memberIds.length === 0) && <p className="wait-note">Put at least one player in a team to start the round.</p>}
+    {host && teams.teams.every(team => team.memberIds.length === 0) && <p className="wait-note">{p('putOne')}</p>}
   </div>;
 }
 
@@ -86,16 +89,16 @@ export function TeamSummary({ state, stage }: { state: RoomSnapshot; stage: Stag
   const teams = stage.teams; if (!teams || teams.forming) return null;
   const mine = ownTeam(teams);
   // A player sees their team as a coloured flag in the round bar (with the team mates under its (i)).
-  if (state.role === 'player') return mine ? null : <p className="team-summary">You sit this team round out.</p>;
+  if (state.role === 'player') return mine ? null : <p className="team-summary">{p('sitOut')}</p>;
   // Host and shared screen: the same coloured columns as while picking, smaller.
-  return <ul className="team-columns compact" aria-label="Teams">{teams.teams.map(team => <li key={team.index} className="team-column" style={{ '--team': teamColor(team.name, team.index) } as React.CSSProperties}>
+  return <ul className="team-columns compact" aria-label={p('teams')}>{teams.teams.map(team => <li key={team.index} className="team-column" style={{ '--team': teamColor(team.name, team.index) } as React.CSSProperties}>
     <div className="team-column-head"><strong>{team.name}</strong><span className="team-count"> · {team.memberIds.length}</span></div>
-    <p className="team-names">{list(state, team.memberIds)}{team.captainId && teams.answers === 'captain' ? ` · captain: ${nameOf(state, team.captainId)}` : ''}</p></li>)}</ul>;
+    <p className="team-names">{list(state, team.memberIds)}{team.captainId && teams.answers === 'captain' ? p('captainSummary', { name: nameOf(state, team.captainId) }) : ''}</p></li>)}</ul>;
 }
 
 export const teamName = (state: RoomSnapshot, teamId: string) => state.view.stage?.teams?.teams.find(team => team.teamId === teamId)?.name ?? state.view.teamStandings.find(team => team.teamId === teamId)?.name ?? 'A team';
 
 export function TeamStandings({ state }: { state: RoomSnapshot }) {
   const rows = state.view.teamStandings; if (!rows.length) return null;
-  return <><h3>Teams</h3><ol className="scoreboard">{rows.map(row => <li key={row.teamId}><span className="score-name">{row.name} · {list(state, row.memberIds)}</span><span className="score-points">{formatPoints(row.amountMilli)}</span></li>)}</ol></>;
+  return <><h3>{p('teams')}</h3><ol className="scoreboard">{rows.map(row => <li key={row.teamId}><span className="score-name">{row.name} · {list(state, row.memberIds)}</span><span className="score-points">{formatPoints(row.amountMilli)}</span></li>)}</ol></>;
 }

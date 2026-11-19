@@ -1,4 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { translate } from '../../i18n/texts.js';
+import { CONTROLS_TEXTS } from './controls.text.js';
+const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { createPortal } from 'react-dom';
 
 export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; style?: CSSProperties }
@@ -12,7 +15,7 @@ export interface DropdownOption { value: string; label: string; group?: string; 
  * The list is drawn over the page (not clipped by a scrolling panel) and opens
  * upwards when there is no room below.
  */
-export function Dropdown({ id: buttonId, value, options, onChange, placeholder = 'Choose…', className }: {
+export function Dropdown({ id: buttonId, value, options, onChange, placeholder = t('choose'), className }: {
   id?: string; value: string; options: DropdownOption[]; onChange: (value: string) => void; placeholder?: string; className?: string;
 }) {
   const id = useId(); const button = useRef<HTMLButtonElement>(null); const list = useRef<HTMLDivElement>(null);

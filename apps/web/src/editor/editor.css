@@ -707,14 +707,19 @@
 .media-field .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .media-preview { display: block; width: 100%; max-height: 180px; object-fit: contain; border-radius: 10px; background: var(--e-bg); border: 1px solid var(--e-border); }
 .media-preview.audio { max-height: none; height: 40px; border: 0; background: none; }
-.ed-dialog.media-library { width: min(760px, 100%); max-height: calc(100dvh - 32px); grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto; }
+.ed-dialog.media-library { width: min(760px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
 .media-library .media-upload { justify-content: flex-start; align-items: center; flex-wrap: wrap; }
+.media-audio-form, .media-audio-form label { display: grid; gap: 8px; }
+.media-audio-form { overflow-y: auto; padding: 2px; }
+.media-audio-form .media-permission { display: flex; align-items: center; }
+.media-trim-times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.media-audio-form input { min-width: 0; }
 .media-items { list-style: none; margin: 0; padding: 2px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; overflow-y: auto; min-height: 0; }
 .media-items li { margin: 0; display: grid; gap: 6px; align-content: start; padding: 10px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-bg); min-width: 0; }
 .media-items li.current { border-color: var(--e-accent); box-shadow: 0 0 0 1px var(--e-accent); }
 .media-items .media-preview { max-height: 120px; }
 .media-item-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.media-items .actions { display: flex; gap: 6px; justify-content: space-between; align-items: center; }
+.media-items .actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; align-items: center; }
 /* Music: the game's playlist (Game settings) and a scene's own song (music-fields.tsx). */
 .music-fields { display: grid; gap: 8px; }
 .music-list { margin: 0; padding: 0 0 0 1.4em; display: grid; gap: 6px; }

@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { buildLook, LookContext, themeStyle } from '../../presentation/look.js';
 import { WheelDisc } from '../../room-extras/show-extras.js';
 import { layerOf } from '../look/layer.js';
+import { useTexts } from '../../i18n/texts.js';
+import { SETTINGS_TEXTS } from './settings.text.js';
 import type { Definition } from '../model.js';
 
 /** The disc's angle right now (0–360), also halfway through a turn. */
@@ -17,6 +19,7 @@ export function WheelTest({ definition, wheel, onClose }: {
 }) {
   const look = buildLook({ themes: [layerOf(definition, { kind: 'game' }).theme] });
   const entries = wheel.entries.map(entry => entry.label);
+  const t = useTexts(SETTINGS_TEXTS);
   const [result, setResult] = useState<number | null>(null); const [spinning, setSpinning] = useState(false); const [boosts, setBoosts] = useState(0);
   const box = useRef<HTMLDivElement>(null); const stage = useRef<HTMLDivElement>(null); const turning = useRef<Animation | null>(null); const id = useId();
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; box.current?.querySelector<HTMLElement>('.actions button.accent')?.focus(); return () => { turning.current?.cancel(); previous?.focus?.(); }; }, []);
@@ -39,15 +42,15 @@ export function WheelTest({ definition, wheel, onClose }: {
   return <div className="ed-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div ref={box} className="ed-dialog wheel-test" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
       <h2 id={`${id}-title`}>Test spin: {wheel.title}</h2>
-      <p>The wheel as the shared screen shows it, in this game's look. Click the wheel to turn it; click again while it turns for a boost. Not saved.</p>
+      <p>{t('testIntro')}</p>
       <LookContext.Provider value={look}>
         <div ref={stage} className="wheel-test-stage" style={themeStyle(look.theme)}>
-          {/* Clicking the wheel itself does what the Spin / Boost button does (that button is the keyboard's way). */}          <div className={`wheel-hit${spinning ? ' turning' : ''}`} title={spinning ? 'Click for a boost' : 'Click to turn the wheel'} onClick={spin}>
+          {/* Clicking the wheel itself does what the Spin / Boost button does (that button is the keyboard's way). */}          <div className={`wheel-hit${spinning ? ' turning' : ''}`} title={t(spinning ? 'clickBoost' : 'clickTurn')} onClick={spin}>
             <WheelDisc entries={entries} index={0} seconds={wheel.spinSeconds} spinKey="test" colors={wheel.colors} still /></div>
-          <p className={`wheel-result${result !== null ? ' shown' : ''}`} role="status">{result !== null ? entries[result] : spinning ? (boosts ? `Boost${boosts > 1 ? ` ×${boosts}` : ''}!` : '…') : ' '}</p>
+          <p className={`wheel-result${result !== null ? ' shown' : ''}`} role="status">{result !== null ? entries[result] : spinning ? (boosts ? `${boosts > 1 ? t('boostTimes', { count: boosts }) : t('boost')}!` : '…') : ' '}</p>
         </div>
       </LookContext.Provider>
-      <div className="actions"><button type="button" onClick={onClose}>Close</button><button type="button" className="accent" onClick={spin}>{spinning ? 'Boost' : result !== null ? 'Spin again' : 'Spin'}</button></div>
+      <div className="actions"><button type="button" onClick={onClose}>{t('close')}</button><button type="button" className="accent" onClick={spin}>{t(spinning ? 'boost' : result !== null ? 'spinAgain' : 'spin')}</button></div>
     </div>
   </div>;
 }

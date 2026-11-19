@@ -1,6 +1,9 @@
 import { howToPlayKey, type MinigameKey, type RoomSnapshot } from '@party/contracts';
 import { useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from './extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import { FaIcon } from '../presentation/icons.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
@@ -22,8 +25,8 @@ export function ExplainPanel({ state, stage, disabled, send }: { state: RoomSnap
     {state.role === 'player' && (mine ? <p className="wait-note" role="status"><FaIcon name="clock" /> {t('explain.waiting')}</p>
       : <button type="button" className="primary big explain-ok" disabled={disabled} onClick={() => send('stage.understood', { stageRunId: stage.id })}>{t('explain.ok')}</button>)}
     <p className="explain-count" role="status">{t('explain.ready', { count, total: state.players.length })}</p>
-    {state.role !== 'player' && <ul className="explain-faces" aria-label="Who is ready">{state.players.map(player =>
+    {state.role !== 'player' && <ul className="explain-faces" aria-label={x('whoReady')}>{state.players.map(player =>
       <li key={player.id} className={ready.has(player.id) ? 'ready' : undefined}><Avatar look={player.look} size={36} /><span>{player.displayName}</span>
-        {ready.has(player.id) && <span className="explain-check" aria-label="ready"><FaIcon name="check" /></span>}</li>)}</ul>}
+        {ready.has(player.id) && <span className="explain-check" aria-label={x('ready')}><FaIcon name="check" /></span>}</li>)}</ul>}
   </section>;
 }

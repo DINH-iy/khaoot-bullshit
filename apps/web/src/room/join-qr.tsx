@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { formatRoomCode, RoomCodeSchema } from '@party/contracts';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from './extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import { FaIcon } from '../presentation/icons.js';
 
 export function publicJoinUrl(origin: string, code: string): string {
@@ -14,7 +17,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState<'yes' | 'no' | null>(null);
   useEffect(() => { if (!copied) return; const timer = setTimeout(() => setCopied(null), 1800); return () => clearTimeout(timer); }, [copied]);
   const copy = () => { navigator.clipboard.writeText(text).then(() => setCopied('yes'), () => setCopied('no')); };
-  return <button type="button" className="small-button copy-button" onClick={copy}>{copied === 'yes' ? 'Copied!' : copied === 'no' ? 'Could not copy' : label}</button>;
+  return <button type="button" className="small-button copy-button" onClick={copy}>{copied === 'yes' ? x('copied') : copied === 'no' ? x('couldNotCopy') : label}</button>;
 }
 
 /** A QR code for any link, made locally. */
@@ -32,7 +35,7 @@ export function useQr(url: string) {
 export function CopyIcon({ text, label, icon = 'copy' }: { text: string; label: string; icon?: 'copy' | 'link' }) {
   const [copied, setCopied] = useState<'yes' | 'no' | null>(null);
   useEffect(() => { if (!copied) return; const timer = setTimeout(() => setCopied(null), 1600); return () => clearTimeout(timer); }, [copied]);
-  return <button type="button" className={`icon-button copy-icon${copied === 'yes' ? ' copied' : ''}`} title={label} aria-label={copied === 'yes' ? 'Copied' : copied === 'no' ? 'Could not copy' : label}
+  return <button type="button" className={`icon-button copy-icon${copied === 'yes' ? ' copied' : ''}`} title={label} aria-label={copied === 'yes' ? x('copiedShort') : copied === 'no' ? x('couldNotCopy') : label}
     onClick={() => { navigator.clipboard.writeText(text).then(() => setCopied('yes'), () => setCopied('no')); }}><FaIcon name={copied === 'yes' ? 'check' : copied === 'no' ? 'xmark' : icon} /></button>;
 }
 
@@ -41,15 +44,15 @@ export function JoinQr({ origin, roomCode, copy = true, link = true }: { origin:
   const url = publicJoinUrl(origin, roomCode);
   const image = useQr(url);
   return <div className="join-qr">
-    {image ? <img src={image.src} width={image.pixels} height={image.pixels} alt={`Scan to join room ${roomCode}`} /> : <p>QR unavailable. Use the room code or link.</p>}
+    {image ? <img src={image.src} width={image.pixels} height={image.pixels} alt={x('scanToJoin', { code: roomCode })} /> : <p>{x('qrUnavailable')}</p>}
     {link && <JoinLink url={url} copy={copy} />}
   </div>;
 }
 /** The join address, short, with a copy button (handy for a chat; the shared screen has nobody to copy for). */
 export function JoinLink({ url, copy }: { url: string; copy: boolean }) {
-  return <p className="join-link"><a href={url}>{url.replace(/^https?:\/\//, '')}</a>{copy && <CopyIcon text={url} label="Copy link" />}</p>;
+  return <p className="join-link"><a href={url}>{url.replace(/^https?:\/\//, '')}</a>{copy && <CopyIcon text={url} label={x('copyLink')} />}</p>;
 }
 /** The room code in big letters, with a copy button for the host. */
 export function BigCode({ roomCode, copy }: { roomCode: string; copy: boolean }) {
-  return <p className="big-code-row"><span className="big-code" aria-label={`Room code ${roomCode}`}>{formatRoomCode(roomCode)}</span>{copy && <CopyIcon text={roomCode} label="Copy room code" />}</p>;
+  return <p className="big-code-row"><span className="big-code" aria-label={x('roomCode', { code: roomCode })}>{formatRoomCode(roomCode)}</span>{copy && <CopyIcon text={roomCode} label={x('copyRoomCode')} />}</p>;
 }

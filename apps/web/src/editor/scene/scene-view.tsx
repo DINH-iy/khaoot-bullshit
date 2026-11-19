@@ -10,6 +10,9 @@ import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
 import { Section } from '../controls/section.js';
 import { isWheelScene, addScene, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from '../model.js';
+import { translate } from '../../i18n/texts.js';
+import { FIELDS_TEXTS } from './fields.text.js';
+const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
 import type { DraftState } from '../shell/use-draft.js';
 
 // What a part is, without the scene's own route or rejoin label.
@@ -60,8 +63,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   // stop every practice room; a vote needs the round it votes on, which is not in a room of one scene.
   const gameWide = d.issues.filter(issue => !issue.nodeKey || !definition.nodes.some(node => node.key === issue.nodeKey));
   const stopping = [...gameWide, ...problems]; const [why, setWhy] = useState(false);
-  const cannotTry = stopping.length ? `Fix ${stopping.length === 1 ? 'the problem' : `the ${stopping.length} problems`} first (${gameWide.length ? 'in Game settings' : 'in this scene'}): ${stopping[0]!.message}`
-    : current.stages.some(stage => stage.kind === 'vote') ? 'A vote needs the round it votes on, so it cannot be tried alone. Use Rehearse from here on that earlier round.' : null;
+  const cannotTry = stopping.length ? t(stopping.length === 1 ? 'fixOne' : 'fixMany', { count: stopping.length, where: t(gameWide.length ? 'inSettings' : 'inScene'), problem: stopping[0]!.message })
+    : current.stages.some(stage => stage.kind === 'vote') ? t('voteAlone') : null;
   const problemsFor = (key: string) => d.issues.filter(issue => issue.nodeKey === key).length;
   const onChange = (next: Definition, group?: string) => change(next, undefined, group);
 
@@ -103,14 +106,14 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       <svg className="ed-chevron" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
       <span className="route-group-name">Route: {entry.via}</span>
       <small>{count === 1 ? '1 scene' : `${count} scenes`}</small>
-      {!open && problemsIn > 0 && <span className="row-problems" aria-label={`${problemsIn} problems`}>{problemsIn}</span>}
+      {!open && problemsIn > 0 && <span className="row-problems" aria-label={t('problemsN', { count: problemsIn })}>{problemsIn}</span>}
     </button></li>;
   };
   const row =(node: Node, depth: number, _via: string | null) => {
     const text = cardText(definition, node); const count = problemsFor(node.key);
     return <li key={node.key}><button className={`scene-row${node.key === current.key ? ' current' : ''}${count ? ' has-problems' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={node.key === current.key ? 'true' : undefined} onClick={() => setSelected([node.key])}>
       <span className={`row-icon thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`}><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
-      <span className="row-text"><small>{definition.startNodeKey === node.key ? 'Start · ' : ''}{text.label}</small><span>{text.banner || text.title}</span></span>
+      <span className="row-text"><small>{definition.startNodeKey === node.key ? t('start') : ''}{text.label}</small><span>{text.banner || text.title}</span></span>
       <PeerTags peers={peersOn(peers, node.key)} className="row-peers" />
       {count > 0 && <span className="row-problems" aria-label={`${count} problems`}>{count}</span>}
     </button></li>;
@@ -124,18 +127,18 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   const routeIds = [...new Set(rows.flatMap(entry => entry.branch))];
   const allFolded = routeIds.length > 0 && routeIds.every(id => folded.has(id));
   return <div className="scene-editor">
-    <nav className="scene-list" aria-label="Scenes in play order">
-      <div className="scene-list-head"><h2>Scenes</h2>
-        {routeIds.length > 0 && <button type="button" className="small-button icon-only" aria-label={allFolded ? 'Unfold all routes' : 'Fold all routes'} title={allFolded ? 'Unfold all routes' : 'Fold all routes'}
+    <nav className="scene-list" aria-label={t('playOrder')}>
+      <div className="scene-list-head"><h2>{t('scenes')}</h2>
+        {routeIds.length > 0 && <button type="button" className="small-button icon-only" aria-label={t(allFolded ? 'unfoldAll' : 'foldAll')} title={t(allFolded ? 'unfoldAll' : 'foldAll')}
           onClick={() => setFolded(allFolded ? new Set() : new Set(routeIds))}><Icon name={allFolded ? 'unfold-all' : 'fold-all'} size={16} /></button>}
-        <button ref={addButton} className="with-icon small-button" disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} />Add after this</button></div>
+        <button ref={addButton} className="with-icon small-button" disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} />{t('addAfter')}</button></div>
       <ol>{listed}</ol>
-      {loose.length > 0 && <><h3>Not connected</h3><ol>{loose.map(node => row(node, 0, null))}</ol></>}
+      {loose.length > 0 && <><h3>{t('notConnected')}</h3><ol>{loose.map(node => row(node, 0, null))}</ol></>}
     </nav>
     {/* Floating over the preview, next to the list (on top of everything, so nothing covers it). */}
-    {adding === 'scene' && <FloatingMenu anchor={addButton.current} onClose={() => setAdding(null)}><ScenePalette label="Add a scene after this one" onPick={insertAfter} onCancel={() => setAdding(null)} /></FloatingMenu>}
-    <section className="scene-stage" aria-label="Preview">
-      {current.stages.length > 1 && <div className="part-tabs" role="tablist" aria-label="Parts of this scene">{current.stages.map((stage, position) =>
+    {adding === 'scene' && <FloatingMenu anchor={addButton.current} onClose={() => setAdding(null)}><ScenePalette label={t('addAfterLabel')} onPick={insertAfter} onCancel={() => setAdding(null)} /></FloatingMenu>}
+    <section className="scene-stage" aria-label={t('preview')}>
+      {current.stages.length > 1 && <div className="part-tabs" role="tablist" aria-label={t('partsOf')}>{current.stages.map((stage, position) =>
         <button key={stage.key} role="tab" aria-selected={position === index} onClick={() => setPart(position)}>Part {position + 1} · {partLabel(definition, stage)}</button>)}</div>}
       <Preview node={current} index={index} />
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
@@ -145,31 +148,31 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         {/* Try just this scene in a practice room (a minigame, a round), without playing the whole game. */}
         {/* Greyed out when it cannot work, with a red "!" on it that shows why (click, or hover). */}
         <span className={`try-wrap${cannotTry ? ' blocked' : ''}`} onMouseEnter={() => setWhy(true)} onMouseLeave={() => setWhy(false)}>
-          <button type="button" className="small-button with-icon try-scene" disabled={d.busy || d.save !== 'saved' || Boolean(cannotTry)} title={cannotTry ? undefined : 'Plays only this scene in a practice room (opens in a new tab)'} onClick={() => d.rehearse(current.key, true)}><Icon name="try" size={16} />Try this scene</button>
-          {cannotTry && <button type="button" className="try-alert" aria-label="Why this scene cannot be tried" aria-expanded={why} aria-describedby={why ? 'try-why' : undefined} onClick={() => setWhy(!why)} onBlur={() => setWhy(false)}>!</button>}
+          <button type="button" className="small-button with-icon try-scene" disabled={d.busy || d.save !== 'saved' || Boolean(cannotTry)} title={cannotTry ? undefined : t('tryTitle')} onClick={() => d.rehearse(current.key, true)}><Icon name="try" size={16} />{t('tryScene')}</button>
+          {cannotTry && <button type="button" className="try-alert" aria-label={t('whyNot')} aria-expanded={why} aria-describedby={why ? 'try-why' : undefined} onClick={() => setWhy(!why)} onBlur={() => setWhy(false)}>!</button>}
           {cannotTry && why && <span id="try-why" role="tooltip" className="try-pop">{cannotTry}</span>}
         </span>
-        <ActionMenu label="Scene actions" actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: 'Start the game here', icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
-          { label: 'Rehearse from here', icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
-          { label: 'Change where it leads (Flow editor)', icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: 'Delete scene…', icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
-      {definition.startNodeKey === current.key && <p className="start-note">The game starts here.</p>}
+        <ActionMenu label={t('sceneActions')} actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
+          { label: t('rehearseHere'), icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
+          { label: t('changeLeads'), icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
+      {definition.startNodeKey === current.key && <p className="start-note">{t('startsHere')}</p>}
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
       {/* A small named group (K4), like the scene's settings: open as left last time. */}
-      {!isRoute(current) && <Section title="Parts" memory="scene:parts" summary={current.stages.length === 1 ? '1 part' : `${current.stages.length} parts`}>
+      {!isRoute(current) && <Section title={t('parts')} memory="scene:parts" summary={current.stages.length === 1 ? t('partOne') : t('partsMany', { count: current.stages.length })}>
         <ol className="part-list">{current.stages.map((stage, position) => <li key={stage.key} className={position === index ? 'current' : undefined}>
-          <button className="link-button" onClick={() => setPart(position)}>Part {position + 1}: {partLabel(definition, stage)}</button>
-          <button className="icon-button" aria-label={`Move part ${position + 1} up`} disabled={readOnly || position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
-          <button className="icon-button" aria-label={`Remove part ${position + 1}`} disabled={readOnly || current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
-        <button className="small-button with-icon" disabled={readOnly} onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />Add a part</button>
-        {adding === 'part' && <div className="part-palette"><ScenePalette label="Add a part" only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
-        <p className="hint">Parts play one after another inside this scene, for example a question and then its scoreboard.</p>
+          <button className="link-button" onClick={() => setPart(position)}>{t('partN', { number: position + 1, label: partLabel(definition, stage) })}</button>
+          <button className="icon-button" aria-label={t('movePartUp', { number: position + 1 })} disabled={readOnly || position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
+          <button className="icon-button" aria-label={t('removePart', { number: position + 1 })} disabled={readOnly || current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
+        <button className="small-button with-icon" disabled={readOnly} onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />{t('addPart')}</button>
+        {adding === 'part' && <div className="part-palette"><ScenePalette label={t('addPart')} only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
+        <p className="hint">{t('partsHint')}</p>
       </Section>}
       {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
       <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} /></fieldset>
       {/* Where it leads: a button to go there (changing it is the Flow editor's business, in the ☰ menu). */}
       <NextScenes definition={definition} node={current} onGo={key => setSelected([key])} />
-      <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title="Wheel of fortune" summary={(current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'Spun here' : 'Not on this scene'}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
-      {confirming && <ConfirmDialog title={`Delete “${cardText(definition, current).title}”?`} text="The scene and its connections go. Undo (Ctrl/Cmd+Z) brings it back." confirm="Delete scene"
+      <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
+      {confirming && <ConfirmDialog title={t('deleteAsk', { title: cardText(definition, current).title })} text={t('deleteText')} confirm={t('deleteConfirm')}
         onConfirm={() => { const kept = { ...positions }; delete kept[current.key]; setConfirming(false); change(deleteScene(definition, current.key), kept); setSelected([]); }} onCancel={() => setConfirming(false)} />}
     </aside>
   </div>;
@@ -180,8 +183,8 @@ function NextScenes({ definition, node, onGo }: { definition: Definition; node: 
   const out = definition.edges.filter(edge => edge.from === node.key);
   const name = (key: string) => { const target = definition.nodes.find(entry => entry.key === key); if (!target) return key; const text = cardText(definition, target); return text.banner || text.title; };
   const via = (option: string | undefined) => option ? optionsOf(node).find(entry => entry.key === option)?.label : undefined;
-  return <div className="scene-next" role="group" aria-label="Next">
-    <span className="scene-next-title">Next</span>
+  return <div className="scene-next" role="group" aria-label={t('next')}>
+    <span className="scene-next-title">{t('next')}</span>
     {out.length === 0 ? <span className="scene-next-end">{nextSummary(definition, node)}</span>
       : out.map(edge => <button key={edge.key} type="button" className="scene-next-go" onClick={() => onGo(edge.to)}>
         <span>{via(edge.option) && <small>{via(edge.option)}</small>}{name(edge.to)}</span><Icon name="next" size={16} /></button>)}
@@ -203,7 +206,7 @@ function FloatingMenu({ anchor, onClose, children }: { anchor: HTMLElement | nul
 }
 
 function Problems({ problems, parts }: { problems: DefinitionIssue[]; parts: number }) {
-  return <div role="alert" className="inspector-problems"><h3>Problems in this scene</h3><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && parts > 1 ? `Part ${issue.stageIndex + 1}: ` : ''}{issue.message}</li>)}</ul></div>;
+  return <div role="alert" className="inspector-problems"><h3>{t('problemsHere')}</h3><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && parts > 1 ? t('part', { number: issue.stageIndex + 1 }) : ''}{issue.message}</li>)}</ul></div>;
 }
 
 /** A rough picture of what the shared screen and a phone show for this part. Not the final game look. */
@@ -211,19 +214,19 @@ function Preview({ node, index }: { node: Node; index: number }) {
   const stage = node.stages[index]!; const input = stage['input'] as { kind?: string; options?: { key: string; label: string }[]; items?: { key: string; label: string }[]; layout?: string } | undefined;
   const timer = typeof stage.durationMs === 'number' ? `${Math.round(stage.durationMs / 1000)} s` : null;
   const options = stage.kind === 'route' ? optionsOf(node) : input?.options ?? input?.items ?? [];
-  const phone = stage.kind === 'info' || stage.kind === 'scoreboard' ? 'Watching the shared screen'
-    : stage.kind === 'challenge' ? 'Follow the host' : stage.kind === 'minigame' ? 'Minigame controls: big buttons to play'
-    : stage.kind === 'vote' ? 'Vote for an answer' : input?.kind === 'text' ? 'Type an answer' : input?.kind === 'media' ? 'Upload a picture or video' : input?.kind === 'drawing' ? 'Draw on the phone' : input?.kind === 'order' ? 'Put the items in order' : 'Choose an answer';
+  const phone = t(stage.kind === 'info' || stage.kind === 'scoreboard' ? 'pWatch'
+    : stage.kind === 'challenge' ? 'pHost' : stage.kind === 'minigame' ? 'pMinigame'
+    : stage.kind === 'vote' ? 'pVote' : input?.kind === 'text' ? 'pType' : input?.kind === 'media' ? 'pUpload' : input?.kind === 'drawing' ? 'pDraw' : input?.kind === 'order' ? 'pOrder' : 'pChoose');
   return <div className="preview">
-    <figure className="tv"><figcaption>Shared screen</figcaption>
+    <figure className="tv"><figcaption>{t('sharedScreen')}</figcaption>
       <div className={`tv-screen tv-${stage.kind}`}>
         {stage.kind === 'info' && <p className="tv-banner">{String(stage.title ?? '')}</p>}
         <p className="tv-prompt">{String(stage.prompt ?? '')}</p>
         {options.length > 0 && <ul className={`tv-options${input?.kind === 'order' ? ' order' : ''}`}>{options.map((option, position) => <li key={option.key}><span>{input?.kind === 'order' ? position + 1 : String.fromCharCode(65 + position)}</span>{option.label}</li>)}</ul>}
-        {stage.kind === 'scoreboard' && <ol className="tv-scores"><li>Player one <b>30</b></li><li>Player two <b>20</b></li><li>Player three <b>10</b></li></ol>}
+        {stage.kind === 'scoreboard' && <ol className="tv-scores"><li>{t('playerOne')} <b>30</b></li><li>{t('playerTwo')} <b>20</b></li><li>{t('playerThree')} <b>10</b></li></ol>}
         {timer && <p className="tv-timer">{timer}</p>}
       </div></figure>
-    <figure className="phone"><figcaption>Phone</figcaption>
+    <figure className="phone"><figcaption>{t('phone')}</figcaption>
       <div className="phone-screen"><p className="phone-prompt">{stage.kind === 'info' ? String(stage.title ?? '') : String(stage.prompt ?? '')}</p>
         {['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && input?.kind !== 'order'
           ? <div className={(input?.layout === 'tiles' || stage.kind === 'route') && !longOptions(options) ? 'phone-tiles' : 'phone-list'}>{options.map(option => <span key={option.key}>{option.label}</span>)}</div>

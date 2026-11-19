@@ -13,7 +13,10 @@ export function ConfirmDialog({ title, text, confirm, onConfirm, onCancel }: { t
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onCancel(); } if (event.key === 'Tab') { event.preventDefault(); (document.activeElement === button.current ? event.currentTarget.querySelector<HTMLButtonElement>('.ed-dialog-keep') : button.current)?.focus(); } }}>
       <h2 id="ed-dialog-title">{title}</h2>
       <p id="ed-dialog-text">{text}</p>
-      <div className="actions"><button type="button" className="ed-dialog-keep" onClick={onCancel}>Keep</button><button type="button" ref={button} className="danger" onClick={onConfirm}>{confirm}</button></div>
+      <div className="actions"><button type="button" className="ed-dialog-keep" onClick={onCancel}>{t('keep')}</button><button type="button" ref={button} className="danger" onClick={onConfirm}>{confirm}</button></div>
     </div>
   </div>;
 }
+import { translate } from '../../i18n/texts.js';
+import { CONTROLS_TEXTS } from './controls.text.js';
+const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);

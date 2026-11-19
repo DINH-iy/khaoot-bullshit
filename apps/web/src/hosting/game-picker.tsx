@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import type { HostMenu } from '@party/contracts';
 import { Icon } from '../editor/controls/icons.js';
+import { useTexts, type Translate } from '../i18n/texts.js';
+import { HOSTING_TEXTS } from './hosting.text.js';
+
+type T = Translate<keyof typeof HOSTING_TEXTS.en>;
 
 type Game = HostMenu['games'][number];
 type Feature = Game['features'][number];
-const FEATURES: Record<Feature, { label: string; icon: string }> = {
-  quiz: { label: 'Quiz questions', icon: 'quiz' }, order: { label: 'Put in order', icon: 'order' }, writing: { label: 'Writing & jokes', icon: 'writing' },
-  drawing: { label: 'Drawing', icon: 'drawing' }, uploads: { label: 'Photos & videos', icon: 'upload' }, votes: { label: 'Voting', icon: 'vote' },
-  minigames: { label: 'Minigames', icon: 'minigame' }, challenges: { label: 'Challenges in the room', icon: 'challenge' }, teams: { label: 'Teams', icon: 'scoreboard' }, routes: { label: 'The party picks a route', icon: 'route' }, duels: { label: 'Duels with bets', icon: 'duel' },
-};
+const FEATURES = {
+  quiz: { label: 'fQuiz', icon: 'quiz' }, order: { label: 'fOrder', icon: 'order' }, writing: { label: 'fWriting', icon: 'writing' },
+  drawing: { label: 'fDrawing', icon: 'drawing' }, uploads: { label: 'fUploads', icon: 'upload' }, votes: { label: 'fVotes', icon: 'vote' },
+  minigames: { label: 'fMinigames', icon: 'minigame' }, challenges: { label: 'fChallenges', icon: 'challenge' }, teams: { label: 'fTeams', icon: 'scoreboard' }, routes: { label: 'fRoutes', icon: 'route' }, duels: { label: 'fDuels', icon: 'duel' },
+} as const satisfies Record<Feature, { label: keyof typeof HOSTING_TEXTS.en; icon: string }>;
 /** The short line under a game in the list when the owner has their own version of it. */
-const customLabel = (custom: NonNullable<Game['custom']>) => custom.inUse ? (custom.unpublished ? 'Your version · changes not published' : 'Your version') : 'Being edited · not published';
+const customLabel = (custom: NonNullable<Game['custom']>, t: T) => t(custom.inUse ? (custom.unpublished ? 'yourVersionUnpublished' : 'yourVersion') : 'beingEdited');
 
 /** A different angle and pattern per game, so covers are told apart even when games share colours. */
 const seed = (key: string) => [...key].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7);
@@ -34,14 +38,14 @@ export function GameCover({ game, size }: { game: Game; size: 'small' | 'large' 
  */
 export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRestore }: { games: Game[]; chosen: string; onChoose: (key: string) => void; busy: boolean; onOpen: () => void; onEdit?: (key: string) => void; onRestore?: (key: string) => void }) {
   const game = games.find(entry => entry.key === chosen) ?? games[0];
-  const [restoring, setRestoring] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null); const t = useTexts(HOSTING_TEXTS);
   return <form className="game-picker" onSubmit={event => { event.preventDefault(); onOpen(); }}>
-    <fieldset className="game-list"><legend>Available games</legend>
+    <fieldset className="game-list"><legend>{t('availableGames')}</legend>
       {games.map(entry => <label key={entry.key} className={`game-card${entry.key === chosen ? ' chosen' : ''}`}>
         <input type="radio" name="game" value={entry.key} checked={entry.key === chosen} onChange={() => onChoose(entry.key)} />
         <GameCover game={entry} size="small" />
-        <span className="game-card-text"><strong>{entry.title}</strong><small>{entry.branches ? 'up to ' : ''}{entry.stageCount} rounds · about {entry.minutes} min</small>
-          {entry.custom && <small className="custom-badge">{customLabel(entry.custom)}</small>}</span>
+        <span className="game-card-text"><strong>{entry.title}</strong><small>{t(entry.branches ? 'cardRoundsUpTo' : 'cardRounds', { count: entry.stageCount, minutes: entry.minutes })}</small>
+          {entry.custom && <small className="custom-badge">{customLabel(entry.custom, t)}</small>}</span>
       </label>)}
     </fieldset>
     {game && <article className="game-detail" aria-labelledby="game-detail-title">
@@ -50,19 +54,19 @@ export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRe
         <h3 id="game-detail-title">{game.title}</h3>
         <p className="game-detail-text">{game.description}</p>
         <ul className="game-facts">
-          <li><strong>{game.branches ? `Up to ${game.stageCount}` : game.stageCount}</strong> rounds</li>
-          <li>About <strong>{game.minutes}</strong> minutes</li>
-          <li>{game.timed ? 'Timed rounds' : 'No time limits'}</li>
+          <li><strong>{game.branches ? t('upTo', { count: game.stageCount }) : game.stageCount}</strong> {t('rounds')}</li>
+          <li>{t('aboutMinutes', { minutes: game.minutes })}</li>
+          <li>{t(game.timed ? 'timedRounds' : 'noLimits')}</li>
         </ul>
-        <ul className="feature-chips" aria-label="In this game">{game.features.map(feature => <li key={feature}><Icon name={FEATURES[feature].icon} size={16} />{FEATURES[feature].label}</li>)}</ul>
-        {game.custom && <p className="custom-note"><Icon name="edit" size={16} /> {game.custom.inUse ? `Your own version${game.custom.unpublished ? ' (with changes not published yet)' : ''}: rooms play it.` : 'Your own version is not published yet: rooms still play the original.'}</p>}
-        <button type="submit" className="primary big" disabled={busy}>{busy ? 'Opening…' : 'Open room'}</button>
+        <ul className="feature-chips" aria-label={t('inThisGame')}>{game.features.map(feature => <li key={feature}><Icon name={FEATURES[feature].icon} size={16} />{t(FEATURES[feature].label)}</li>)}</ul>
+        {game.custom && <p className="custom-note"><Icon name="edit" size={16} /> {t(game.custom.inUse ? (game.custom.unpublished ? 'ownInUseChanged' : 'ownInUse') : 'ownNotPublished')}</p>}
+        <button type="submit" className="primary big" disabled={busy}>{t(busy ? 'opening' : 'openRoom')}</button>
         {/* The owner may change a built-in game: their own version, edited and published like any game. */}
         {onEdit && <div className="game-detail-actions">
-          <button type="button" className="ghost" disabled={busy} onClick={() => onEdit(game.key)}><Icon name="edit" size={18} /> {game.custom ? 'Edit your version' : 'Edit this game'}</button>
+          <button type="button" className="ghost" disabled={busy} onClick={() => onEdit(game.key)}><Icon name="edit" size={18} /> {t(game.custom ? 'editYourVersion' : 'editThisGame')}</button>
           {game.custom && onRestore && (restoring === game.key
-            ? <span className="restore-confirm">Back to the original? Your changes are put away.<button type="button" className="danger" onClick={() => { setRestoring(null); onRestore(game.key); }}>Yes, restore</button><button type="button" className="ghost" onClick={() => setRestoring(null)}>Keep mine</button></span>
-            : <button type="button" className="ghost" disabled={busy} onClick={() => setRestoring(game.key)}>Restore original…</button>)}
+            ? <span className="restore-confirm">{t('restoreAsk')}<button type="button" className="danger" onClick={() => { setRestoring(null); onRestore(game.key); }}>{t('yesRestore')}</button><button type="button" className="ghost" onClick={() => setRestoring(null)}>{t('keepMine')}</button></span>
+            : <button type="button" className="ghost" disabled={busy} onClick={() => setRestoring(game.key)}>{t('restoreOriginal')}</button>)}
         </div>}
       </div>
     </article>}

@@ -1,5 +1,8 @@
 import { useText } from '../presentation/look.js';
 import { useEffect, useState } from 'react';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from './extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import type { RoomSnapshot } from '@party/contracts';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
@@ -33,7 +36,7 @@ export function StageTimer({ stage, remaining }: { stage: Stage; remaining: numb
   const text = remaining === null ? t('timer.none') : paused ? t('timer.paused', { time: formatRemaining(remaining) }) : remaining > 0 ? t('timer.left', { time: formatRemaining(remaining) }) : t('timer.up');
   // role=timer is not announced on every tick; the ending is announced separately.
   return <p className={`timer${remaining !== null && remaining <= 5000 && !paused ? ' timer-ending' : ''}`}>
-    <span role="timer" aria-label="Time left">{text}</span>
-    <span className="visually-hidden" role="status">{remaining === 0 && !paused ? 'Time is up.' : ''}</span>
+    <span role="timer" aria-label={x('timeLeft')}>{text}</span>
+    <span className="visually-hidden" role="status">{remaining === 0 && !paused ? x('timeUp') : ''}</span>
   </p>;
 }

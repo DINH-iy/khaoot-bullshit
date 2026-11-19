@@ -1,4 +1,8 @@
 import { howToPlayKey, isMinigameKey, TEXT_DEFAULTS } from '@party/contracts';
+import { translate } from '../../../i18n/texts.js';
+import { marked } from '../../../i18n/rich.js';
+import { FIELDS_TEXTS } from '../fields.text.js';
+const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
 import type { Definition, Stage } from '../../model.js';
 
 /**
@@ -14,14 +18,13 @@ export function ExplainFields({ definition, stage, onChange }: { definition: Def
   const without = () => { const { explain: _explain, ...rest } = stage; return rest as Stage; };
   return <>
     <label className="choice"><input type="checkbox" checked={Boolean(explain)} onChange={event => onChange(event.target.checked ? { ...stage, explain: {} } : without(), 'explain')} />
-      Explain the round first</label>
+      {t('explainFirst')}</label>
     {explain && <>
-      <label>Explanation
-        <textarea rows={4} maxLength={1000} value={explain.text ?? ''} placeholder={standard ?? 'How this round works, in a few sentences.'}
+      <label>{t('explanation')}
+        <textarea rows={4} maxLength={1000} value={explain.text ?? ''} placeholder={standard ?? t('explainPlaceholder')}
           onChange={event => onChange({ ...stage, explain: event.target.value ? { text: event.target.value } : {} }, 'explain-text')} /></label>
-      <p className="hint">Everyone sees this before the round starts; players tap <em>Got it!</em> and you start the round when everyone is ready.
-        {game ? ' Left empty: the standard explanation of this minigame, shown in grey (change it for the whole game in Look & feel → Texts → Minigames).' : ''}</p>
-      {!game && !explain.text?.trim() && <p className="hint warn">Write the explanation, or switch it off.</p>}
+      <p className="hint">{marked(t('explainHint'))}{game ? t('explainGame') : ''}</p>
+      {!game && !explain.text?.trim() && <p className="hint warn">{t('writeIt')}</p>}
     </>}
   </>;
 }

@@ -28,7 +28,7 @@
 .brand { margin: 0; font: 800 1.5rem/1 Georgia, serif; letter-spacing: -.02em; } .brand span { color: var(--r-accent); }
 
 /* Join */
-.room-join { display: grid; place-items: center; padding: 24px 16px; }
+.room-join { position: relative; display: grid; place-items: center; padding: 24px 16px; }
 .join-card { width: min(440px, 100%); display: grid; gap: 18px; padding: 28px !important; border-radius: var(--r-radius) !important; background: var(--r-card) !important; border: 1px solid var(--r-line) !important; }
 .join-card h1 { margin: 0; font-size: 2rem; }
 .code-input { font-size: 2rem !important; letter-spacing: .3em; text-transform: uppercase; text-align: center; font-weight: 800; }
@@ -450,3 +450,9 @@
 .music-credit { opacity: .85; }
 @keyframes music-caption-in { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .music-caption { animation: none; } }
+/* The phone's language (join screen top right, and the menu's Language sheet). */
+.join-language { position: absolute; top: 12px; right: 12px; z-index: 2; }
+.join-language select { min-height: 40px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--r-line, rgb(255 255 255 / .25)); background: var(--r-surface); color: var(--r-text); font: inherit; font-weight: 600; }
+.language-choices { display: grid; gap: 8px; }
+.language-choices button { min-height: 52px; font-size: 1.05rem; font-weight: 700; }
+.language-choices button[aria-pressed=true] { outline: 3px solid var(--r-accent); }

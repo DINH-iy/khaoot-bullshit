@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PublicMusic } from '@party/contracts';
+import { translate } from '../i18n/texts.js';
+import { EXTRAS_TEXTS } from './extras.text.js';
+const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
 import { FaIcon } from '../presentation/icons.js';
 
 // How much quieter the music plays: when the scene asks for it, and under a question's own video or song.
@@ -48,6 +51,6 @@ export function MusicPlayer({ music, volume }: { music: PublicMusic; volume: num
     {/* A song that cannot be loaded (removed, network) is skipped; a scene's own song then waits silently. */}
     <audio ref={audio} preload="auto" aria-hidden="true" onEnded={() => { if (!own) setIndex(value => value + 1); }} onError={() => { if (!own && playlist.length > 1) setIndex(value => value + 1); }} />
     {caption && <p className="music-caption" role="status"><span aria-hidden="true">♪</span> <strong>{caption.title}</strong>{caption.credit ? <span className="music-credit"> · {caption.credit}</span> : null}</p>}
-    {blocked && target && <button type="button" className="primary music-start" onClick={start}><FaIcon name="play" /> Start the music</button>}
+    {blocked && target && <button type="button" className="primary music-start" onClick={start}><FaIcon name="play" /> {x('startMusic')}</button>}
   </>;
 }
