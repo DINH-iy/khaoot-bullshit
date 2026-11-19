@@ -81,6 +81,7 @@ export const ThemeSchema = z.object({
   font: z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]).optional(), headingFont: z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]).optional(),
   radius: z.number().int().min(0).max(40).optional(), textScale: z.number().min(.8).max(1.6).optional(),
   background: z.enum(['gradient', 'solid', 'dots', 'stripes', 'glow', 'grid']).optional(), tiles: z.enum(['filled', 'outline', 'glass', 'flat']).optional(),
+  backgroundMotion: z.enum(['none', 'starlight', 'light-lines']).optional(),
   // A shine and glow on answer tiles and main buttons; off unless chosen.
   gradients: z.boolean().optional(),
   // The marks before each answer: letters (A B C), numbers, shapes or none; their shape and place; and whether
@@ -94,7 +95,7 @@ export const ThemeSchema = z.object({
 export type Theme = z.infer<typeof ThemeSchema>;
 export type FullTheme = { [K in Exclude<keyof Theme, 'preset' | 'colors'>]-?: NonNullable<Theme[K]> } & { colors: z.infer<typeof FullColorsSchema> };
 // Every style starts with the classic marks: A B C in a circle before the answer, arrows on party choices.
-const MARKS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const };
+const MARKS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const, backgroundMotion: 'none' as const };
 /** Starting points. Every value can be changed afterwards. */
 export const THEME_PRESETS: Record<string, { name: string; theme: FullTheme }> = {
   party: { name: 'Party', theme: { ...MARKS, font: 'system', headingFont: 'system', radius: 24, textScale: 1, background: 'glow', tiles: 'filled', uppercaseHeadings: false, gradients: false,
@@ -112,6 +113,10 @@ export const THEME_PRESETS: Record<string, { name: string; theme: FullTheme }> =
   retro: { name: 'Retro arcade', theme: { ...MARKS, font: 'mono', headingFont: 'mono', radius: 0, textScale: 1, background: 'dots', tiles: 'filled', uppercaseHeadings: true, gradients: false,
     colors: { background: '#1b1b3a', background2: '#0b0b1f', surface: '#26264f', text: '#fffbe6', muted: '#c8c3a3', accent: '#ff5c8a', accentText: '#1b1b3a', success: '#7cff6b', danger: '#ff6b6b',
       answers: ['#c62f3d', '#2459c4', '#8a6a00', '#1a7a42', '#8e44ad', '#a84300'], answerText: '#ffffff' } } },
+  terminal: { name: 'ASCII Terminal', theme: { ...MARKS, font: 'mono', headingFont: 'mono', radius: 2, textScale: 1, background: 'grid', tiles: 'outline', uppercaseHeadings: false, gradients: false,
+    markers: 'custom', customMarks: ['[A]', '[B]', '[C]', '[D]', '[E]', '[F]', '[G]', '[H]'], markerShape: 'plain',
+    colors: { background: '#0b1510', background2: '#050b07', surface: '#13221a', text: '#dbffe6', muted: '#a3c9b0', accent: '#8cffa8', accentText: '#08170e', success: '#8cffa8', danger: '#ff9d95',
+      answers: ['#8cffa8', '#9cddfb', '#f4d484', '#e6b9ff', '#ffb5c6', '#90e8d9'], answerText: '#08170e' } } },
   kids: { name: 'Bright & playful', theme: { ...MARKS, font: 'playful', headingFont: 'rounded', radius: 32, textScale: 1.1, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#fff7e0', background2: '#ffe2ef', surface: '#ffffff', text: '#2a2140', muted: '#6a5f80', accent: '#ff6f3c', accentText: '#2a1300', success: '#1d8a4a', danger: '#c62828',
       answers: ['#d81b60', '#1e63d6', '#8a6a00', '#2e7d32', '#7b3fd6', '#c2410c'], answerText: '#ffffff' } } },
@@ -222,9 +227,23 @@ export function resolveAnimation(choice: AnimationChoice | undefined, moment: Mo
 
 // ---------- everything together ----------
 const TextsSchema = z.record(z.string(), z.string().max(400)).refine(texts => Object.keys(texts).every(key => key in TEXT_DEFAULTS), 'Unknown text');
+export const GAME_LANGUAGES = ['en', 'nl', 'de', 'ro'] as const;
+export const TranslatedTextsSchema = z.partialRecord(z.enum(GAME_LANGUAGES), TextsSchema);
+export type TranslatedTexts = z.infer<typeof TranslatedTextsSchema>;
 const AnimationsSchema = z.record(z.string(), AnimationChoiceSchema).refine(animations => Object.keys(animations).every(key => key in MOMENTS), 'Unknown moment');
-export const PresentationSchema = z.object({ texts: TextsSchema.optional(), theme: ThemeSchema.optional(), animations: AnimationsSchema.optional() }).strict();
+export const PresentationSchema = z.object({ texts: TextsSchema.optional(), translations: TranslatedTextsSchema.optional(), theme: ThemeSchema.optional(), animations: AnimationsSchema.optional() }).strict();
 export type Presentation = z.infer<typeof PresentationSchema>;
+
+export function mergePresentationTexts(game?: Presentation, scene?: Presentation) {
+  const texts = { ...game?.texts, ...scene?.texts };
+  const translations: TranslatedTexts = {};
+  for (const language of GAME_LANGUAGES) {
+    const layer = Object.fromEntries(Object.entries(game?.translations?.[language] ?? {}).filter(([key]) => !Object.hasOwn(scene?.texts ?? {}, key)));
+    Object.assign(layer, scene?.translations?.[language]);
+    if (Object.keys(layer).length) translations[language] = layer;
+  }
+  return { texts, ...(Object.keys(translations).length ? { translations } : {}) };
+}
 
 /**
  * The site's own look (Admin → Join screen): the screen where players type a room code and their name, before

@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
-import { formatMinigameResult, howToPlayKey, MINIGAMES, type MinigameKey, type MinigameSettings, type RoomSnapshot, type StepSideView, type TeamDecides } from '@party/contracts';
+import { howToPlayKey, type MinigameKey, type MinigameSettings, type RoomSnapshot, type StepSideView, type TeamDecides } from '@party/contracts';
+import { translate, useTexts } from '../../i18n/texts.js';
+import { CATALOG_TEXTS } from '../../presentation/catalog.text.js';
+import { minigameResult } from '../result-label.js';
+import { CONTROL_TEXTS } from '../controls.text.js';
 import { useText } from '../../presentation/look.js';
 import { useServerNow } from '../clock.js';
 import { STEP_RENDERERS } from './renderers.js';
@@ -21,7 +25,7 @@ export interface StepRenderer {
   stake?(step: number, settings: MinigameSettings): string | null;
 }
 
-const nameOf = (state: RoomSnapshot, playerId: string | null) => state.players.find(player => player.id === playerId)?.displayName ?? 'someone';
+const nameOf = (state: RoomSnapshot, playerId: string | null) => state.players.find(player => player.id === playerId)?.displayName ?? translate(CONTROL_TEXTS, 'someone');
 
 /** Who may tap the move for this side now: anyone, the captain, or (in a vote) everyone who has not voted yet. */
 function canMove(state: RoomSnapshot, stage: Stage, side: StepSideView, decides: TeamDecides): 'move' | 'vote' | 'voted' | 'captain' {
@@ -34,7 +38,7 @@ function canMove(state: RoomSnapshot, stage: Stage, side: StepSideView, decides:
 
 /** A step game on a phone: the side's board, the question and its options, and in a team vote the split and the time left. */
 export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: { state: RoomSnapshot; stage: Stage; offset: number; canPlay: boolean; disabled: boolean; onMove: SendMove }) {
-  const t = useText(); const minigame = stage.minigame!; const steps = minigame.steps; const game = minigame.game as MinigameKey;
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const minigame = stage.minigame!; const steps = minigame.steps; const game = minigame.game as MinigameKey;
   const renderer = STEP_RENDERERS[game]!; const settings = minigame.settings as MinigameSettings; const me = state.selfPlayerId;
   const side = steps?.sides.find(entry => entry.playerId === me || (entry.teamId !== null && stage.teams?.teams.find(team => team.teamId === entry.teamId)?.memberIds.includes(me ?? '')));
   const starts = minigame.startsAt ? Date.parse(minigame.startsAt) : null;
@@ -44,10 +48,10 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
   const board = renderer.board?.(side, settings, true);
   const head = <>{side.teamId && <p className="step-team-title">{side.name}</p>}{board}</>;
   if (!side.options) return <div className="step-phone">{head}
-    <p className="mg-big" role="status">{side.result !== null ? formatMinigameResult(game, side.result, settings) : 'Your choice is in.'}</p><p>{t('minigame.played')}</p></div>;
+    <p className="mg-big" role="status">{side.result !== null ? minigameResult(game, side.result, settings) : c('saved')}</p><p>{t('minigame.played')}</p></div>;
   if (!canPlay || !minigame.startsAt) return <div className="step-phone">{head}<p className="wait-note">{t(howToPlayKey(game))}</p></div>;
   // The countdown everyone starts together after (as in every minigame).
-  if (starts !== null && now < starts) return <div className="step-phone">{head}<p className="mg-big" role="timer" aria-label="Starts in">{Math.ceil((starts - now) / 1000)}</p></div>;
+  if (starts !== null && now < starts) return <div className="step-phone">{head}<p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil((starts - now) / 1000)}</p></div>;
   const who = canMove(state, stage, side, steps.decides);
   const left = side.voteEndsAt ? Math.max(0, Math.ceil((Date.parse(side.voteEndsAt) - now) / 1000)) : null;
   const team = stage.teams?.teams.find(entry => entry.teamId === side.teamId);
@@ -56,16 +60,16 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
     <div className="step-question">
       <p className="step-ask">{renderer.question(side.view, side.step, settings)}</p>
       {renderer.stake?.(side.step, settings) && <p className="step-stake">{renderer.stake(side.step, settings)}</p>}
-      {who === 'captain' ? <p className="wait-note">Your captain, {nameOf(state, steps.decides === 'captain' ? side.captainId : team?.captainId ?? null)}, decides. Talk it over together.</p>
+      {who === 'captain' ? <p className="wait-note">{c('captain', { name: nameOf(state, steps.decides === 'captain' ? side.captainId : team?.captainId ?? null) })}</p>
         : <>
-          {who === 'vote' && <p className="step-vote-note">Vote for your team’s choice{left !== null ? ` · ${left} s left` : ''}. Who does not vote is not counted.</p>}
+          {who === 'vote' && <p className="step-vote-note">{c('teamVote')}{left !== null && ` · ${c('leftSeconds', { seconds: left })}`}</p>}
           {who !== 'voted' && <div className={`step-options options-${side.options.length}`}>{side.options.map(option =>
             <button key={option} type="button" className={`big step-option option-${option}`} disabled={disabled} onClick={() => onMove(side.step, option)}>{renderer.label(option, side.view, settings)}</button>)}</div>}
           {who === 'voted' && <div className="step-votes" role="status">
-            <p>Your vote is in · {counted} of {total} voted{left !== null ? ` · ${left} s left` : ''}</p>
+            <p>{c('voted', { count: counted, total })}{left !== null && ` · ${c('leftSeconds', { seconds: left })}`}</p>
             <ul className="step-split">{side.options.map(option => { const count = side.votes.find(vote => vote.option === option)?.count ?? 0;
               return <li key={option}><span>{renderer.label(option, side.view, settings)}</span><span className="step-bar" aria-hidden="true"><span style={{ width: `${counted ? Math.round(count / counted * 100) : 0}%` }} /></span><strong>{count}</strong></li>; })}</ul>
-            <button type="button" className="step-decide" disabled={disabled} onClick={() => onMove(side.step, side.options![0]!, true)}>Decide now with these votes</button>
+            <button type="button" className="step-decide" disabled={disabled} onClick={() => onMove(side.step, side.options![0]!, true)}>{c('decide')}</button>
           </div>}
         </>}
     </div>
@@ -74,20 +78,20 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
 
 /** Every side on the shared screen and for the host: its board, and whether it is choosing, voting or done. */
 export function StepScreen({ state, stage, offset }: { state: RoomSnapshot; stage: Stage; offset: number }) {
-  const t = useText(); const minigame = stage.minigame!; const game = minigame.game as MinigameKey; const info = MINIGAMES[game];
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const minigame = stage.minigame!; const game = minigame.game as MinigameKey; const name = useTexts(CATALOG_TEXTS);
   const renderer = STEP_RENDERERS[game]!; const settings = minigame.settings as MinigameSettings; const steps = minigame.steps;
   const now = useServerNow(offset, Boolean(steps?.sides.some(side => side.voteEndsAt)));
   const status = (side: StepSideView) => {
-    if (!side.options) return side.result !== null ? formatMinigameResult(game, side.result, settings) : 'Done';
-    if (side.voteEndsAt) return `Voting · ${side.voters.length} voted · ${Math.max(0, Math.ceil((Date.parse(side.voteEndsAt) - now) / 1000))} s`;
-    if (side.captainId) return `Captain ${nameOf(state, side.captainId)} decides`;
-    return side.step > 0 ? `Step ${side.step + 1}` : 'Choosing';
+    if (!side.options) return side.result !== null ? minigameResult(game, side.result, settings) : c('done');
+    if (side.voteEndsAt) return c('voting', { count: side.voters.length, seconds: Math.max(0, Math.ceil((Date.parse(side.voteEndsAt) - now) / 1000)) });
+    if (side.captainId) return c('captainChooses', { name: nameOf(state, side.captainId) });
+    return side.step > 0 ? c('step', { number: side.step + 1 }) : c('choosing');
   };
   return <div className={`mg-screen mg-${game}`}>
-    <p className="mg-name">{info.name}</p>
+    <p className="mg-name">{name(game)}</p>
     <p className="mg-how">{t(howToPlayKey(game))}</p>
     {state.view.status === 'PAUSED' ? <p className="mg-big wait" role="status">{t('minigame.paused')}</p>
-      : steps && <ol className="step-sides" aria-label="Everyone’s progress">{steps.sides.map(side =>
+      : steps && <ol className="step-sides" aria-label={c('progress')}>{steps.sides.map(side =>
         <li key={side.teamId ?? side.playerId} className={side.options ? undefined : 'done'}><span className="step-side-name">{side.name}</span>{renderer.board?.(side, settings, false)}<span className="step-status">{status(side)}</span></li>)}</ol>}
   </div>;
 }

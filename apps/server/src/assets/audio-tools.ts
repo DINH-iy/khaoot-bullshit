@@ -6,27 +6,18 @@ import { delimiter, join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { LIBRARY_LIMITS, MAX_AUDIO_CLIP_SECONDS } from '@party/contracts';
+import { LIBRARY_LIMITS, MAX_AUDIO_CLIP_SECONDS, youtubeVideoId, youtubeWatchUrl } from '@party/contracts';
 import { RoomError } from '../rooms/security.js';
 import { UploadTooLarge } from './media.js';
 
-const VIDEO_ID = /^[a-zA-Z0-9_-]{11}$/;
-const VIDEO_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com']);
 const DOWNLOAD_LIMIT = 64 * 1024 * 1024;
 const AUDIO_FORMATS = 'mov,matroska,webm,mp3,ogg,wav,flac';
 const localTools = fileURLToPath(new URL('../../../../.local/tools/audio/', import.meta.url));
 
 /** Only a video ID crosses the boundary into the downloader's URL. */
 export function youtubeVideoUrl(value: string): string | null {
-  let url: URL;
-  try { url = new URL(value); } catch { return null; }
-  if (url.protocol !== 'https:' || url.port || url.username || url.password) return null;
-  let id: string | null = null;
-  if (url.hostname === 'youtu.be') id = /^\/([^/]+)\/?$/.exec(url.pathname)?.[1] ?? null;
-  if (VIDEO_HOSTS.has(url.hostname)) {
-    id = url.pathname === '/watch' ? url.searchParams.get('v') : /^\/(?:shorts|embed|live)\/([^/]+)\/?$/.exec(url.pathname)?.[1] ?? null;
-  }
-  return id && VIDEO_ID.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
+  const id = youtubeVideoId(value);
+  return id ? youtubeWatchUrl(id) : null;
 }
 
 // No shell, inherited app credentials, user config or downloader plugins.

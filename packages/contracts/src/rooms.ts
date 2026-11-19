@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { GameIdSchema, GameErrorCodeSchema, SessionViewSchema } from './game.js';
 import { PlayerLookSchema } from './players.js';
 import { ArcadeLinkSchema } from './arcade.js';
+import { TranslatedTextsSchema } from './presentation.js';
 
 export const ROOM_CODE_LENGTH = 6;
 export const RoomCodeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -109,7 +110,7 @@ export const HostRoomSchema = z.object({ gameKey: HostGameSchema.shape.key.optio
 export const RestartRoomSchema = z.object({ sessionId: GameIdSchema, commandId: GameIdSchema }).strict();
 
 // The public look of a room, for its join screen: title, texts and theme only.
-export const RoomLookSchema = z.object({ title: z.string().min(1).max(160), presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), z.unknown()), themes: z.array(z.unknown()).max(2) }).strict(),
+export const RoomLookSchema = z.object({ title: z.string().min(1).max(160), presentation: z.object({ texts: z.record(z.string(), z.string()), translations: TranslatedTextsSchema.optional(), animations: z.record(z.string(), z.unknown()), themes: z.array(z.unknown()).max(2) }).strict(),
   // For the join screen: whether a guest may make an account here, and the people the host added who have no seat yet ("Are you one of these?").
   signup: z.boolean().optional(), expected: z.array(z.object({ id: GameIdSchema, name: z.string() }).strict()).max(100).optional() }).strict();
 /** A guest makes their own account while joining (only when the room allows it). The key is shown once on the phone. */

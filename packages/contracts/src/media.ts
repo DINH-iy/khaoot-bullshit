@@ -10,10 +10,58 @@ export const SCENE_MEDIA_KINDS = ['image', 'video', 'audio'] as const;
 export const SceneMediaKindSchema = z.enum(SCENE_MEDIA_KINDS);
 export type SceneMediaKind = z.infer<typeof SceneMediaKindSchema>;
 /** A scene's media in a game definition: which library item, and what it is. */
-export const SceneMediaSchema = z.object({ id: z.uuid(), kind: SceneMediaKindSchema }).strict();
+export const CROP_RATIOS = { square: 1, landscape: 16 / 9, portrait: 3 / 4 } as const;
+export const MediaCropSchema = z.object({
+  ratio: z.enum(['square', 'landscape', 'portrait']),
+  x: z.number().int().min(0).max(100), y: z.number().int().min(0).max(100),
+}).strict();
+export const MediaTrimSchema = z.object({
+  startSeconds: z.number().min(0).max(86_400),
+  endSeconds: z.number().positive().max(86_400).optional(),
+}).strict().refine(trim => trim.endSeconds === undefined || trim.endSeconds > trim.startSeconds);
+export const SceneMediaSchema = z.object({
+  id: z.uuid(), kind: SceneMediaKindSchema, crop: MediaCropSchema.optional(), trim: MediaTrimSchema.optional(), waveform: z.boolean().optional(),
+}).strict();
 export type SceneMedia = z.infer<typeof SceneMediaSchema>;
+
+export const MEDIA_POSITIONS = ['below', 'above', 'left', 'right'] as const;
+export const MEDIA_SIZES = ['compact', 'standard', 'wide'] as const;
+export const MediaLayoutSchema = z.object({
+  position: z.enum(MEDIA_POSITIONS),
+  size: z.enum(MEDIA_SIZES),
+}).strict();
+export type MediaLayout = z.infer<typeof MediaLayoutSchema>;
+export const DEFAULT_MEDIA_LAYOUT: MediaLayout = { position: 'below', size: 'standard' };
+
+const VIDEO_ID = /^[a-zA-Z0-9_-]{11}$/;
+const VIDEO_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com']);
+const clipTime = z.number().int().min(0).max(86_400);
+export const YouTubeClipSchema = z.object({
+  videoId: z.string().regex(VIDEO_ID), startSeconds: clipTime.optional(), endSeconds: clipTime.optional(),
+}).strict().refine(clip => clip.endSeconds === undefined || clip.endSeconds > (clip.startSeconds ?? 0), {
+  path: ['endSeconds'], message: 'The end time must be after the start time.',
+});
+export type YouTubeClip = z.infer<typeof YouTubeClipSchema>;
+
+export function youtubeVideoId(value: string): string | null {
+  let url: URL;
+  try { url = new URL(value); } catch { return null; }
+  if (url.protocol !== 'https:' || url.port || url.username || url.password) return null;
+  let id: string | null = null;
+  if (url.hostname === 'youtu.be') id = /^\/([^/]+)\/?$/.exec(url.pathname)?.[1] ?? null;
+  if (VIDEO_HOSTS.has(url.hostname)) {
+    id = url.pathname === '/watch' ? url.searchParams.get('v') : /^\/(?:shorts|embed|live)\/([^/]+)\/?$/.exec(url.pathname)?.[1] ?? null;
+  }
+  return id && VIDEO_ID.test(id) ? id : null;
+}
+
+export function youtubeWatchUrl(videoId: string, startSeconds?: number): string {
+  const params = new URLSearchParams({ v: videoId });
+  if (startSeconds) params.set('t', String(startSeconds));
+  return `https://www.youtube.com/watch?${params}`;
+}
 /** The same in a room: where the screens fetch it. */
-export const PublicSceneMediaSchema = z.object({ id: z.uuid(), kind: SceneMediaKindSchema, url: z.string().regex(/^\/api\/media\/[0-9a-f-]{36}$/) }).strict();
+export const PublicSceneMediaSchema = SceneMediaSchema.extend({ url: z.string().regex(/^\/api\/media\/[0-9a-f-]{36}$/) });
 export type PublicSceneMedia = z.infer<typeof PublicSceneMediaSchema>;
 export const sceneMediaUrl = (id: string) => `/api/media/${id}`;
 

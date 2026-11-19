@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { DRAWING_COLORS, DRAWING_SIZE, DRAWING_WIDTHS, MAX_DRAWING_POINTS, type Drawing, type Stroke } from '@party/contracts';
+import { useTexts } from '../i18n/texts.js';
+import { DRAWING_TEXTS } from './drawing.text.js';
 import { useText } from '../presentation/look.js';
 import { Strokes } from './drawing-view.js';
 
-const COLOR_NAMES = ['Black', 'White', 'Grey', 'Red', 'Orange', 'Yellow', 'Green', 'Teal', 'Blue', 'Indigo', 'Purple', 'Pink', 'Brown', 'Skin', 'Dark green', 'Wine'];
-const WIDTH_NAMES = ['Fine', 'Medium', 'Thick', 'Huge'];
+const COLOR_NAMES = ["black","white","grey","red","orange","yellow","green","teal","blue","indigo","purple","pink","brown","skin","darkGreen","wine"] as const;
+const WIDTH_NAMES = ["fine","medium","thick","huge"] as const;
 /** Points closer than this (on the 1000 grid) are skipped: smaller drawings, same look. */
 const MIN_STEP = 4;
 export const countPoints = (drawing: Drawing) => drawing.strokes.reduce((sum, stroke) => sum + stroke.p.length / 2, 0);
@@ -24,7 +26,7 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
   /** Scrolls the pad onto the screen when it appears: for timed drawing, where every second counts. */
   bringIntoView?: boolean;
 }) {
-  const t = useText(); const surface = useRef<SVGSVGElement>(null); const hintId = useId();
+  const t = useText(); const d = useTexts(DRAWING_TEXTS); const surface = useRef<SVGSVGElement>(null); const hintId = useId();
   const [color, setColor] = useState(0); const [width, setWidth] = useState(1); const [current, setCurrent] = useState<Stroke | null>(null);
   const pointer = useRef<number | null>(null);
   // Keyboard drawing: a pen moved with the arrow keys; Space puts it down or lifts it.
@@ -77,7 +79,7 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
   return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}`}>
     {/* Impossible to miss: in a blind round your own lines stay hidden until you send the drawing. */}
     {blind && <p className="blind-banner"><span aria-hidden="true">🙈</span><strong>{t('drawing.blindTitle')}</strong><small>{t('drawing.blindHint')}</small></p>}
-    <svg ref={surface} className="drawing-surface" viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription="drawing area" aria-label={label}
+    <svg ref={surface} className="drawing-surface" viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription={d('area')} aria-label={label}
       aria-describedby={hintId} tabIndex={disabled ? -1 : 0} onKeyDown={key} onBlur={() => setPen(previous => ({ ...previous, active: false }))}
       onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
       <rect width={DRAWING_SIZE} height={DRAWING_SIZE} fill="#ffffff" />
@@ -86,12 +88,12 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
       {!blind && current && <Strokes strokes={[current]} />}
       {pen.active && <g className="drawing-pen" aria-hidden="true"><circle cx={pen.x} cy={pen.y} r={current ? 14 : 18} fill={current ? DRAWING_COLORS[color] : 'none'} stroke="#6d3fd6" strokeWidth={4} /></g>}
     </svg>
-    <p id={hintId} className="drawing-keys">Keyboard: arrow keys move the pen (Shift: faster), Space puts the pen down or lifts it, Enter finishes the line.</p>
+    <p id={hintId} className="drawing-keys">{d('keyboard')}</p>
     {blind && <p className="drawing-note">{t('drawing.blind')} · {value.strokes.length + (current ? 1 : 0)}</p>}
     {tools && <div className="drawing-tools">
-      <div className="drawing-colors" role="radiogroup" aria-label={t('drawing.colour')}>{DRAWING_COLORS.map((swatch, index) => <button key={swatch} type="button" role="radio" aria-checked={color === index} aria-label={COLOR_NAMES[index]}
+      <div className="drawing-colors" role="radiogroup" aria-label={t('drawing.colour')}>{DRAWING_COLORS.map((swatch, index) => <button key={swatch} type="button" role="radio" aria-checked={color === index} aria-label={d(COLOR_NAMES[index]!)}
         style={{ background: swatch }} onClick={() => setColor(index)} />)}</div>
-      <div className="drawing-widths" role="radiogroup" aria-label={t('drawing.size')}>{DRAWING_WIDTHS.map((size, index) => <button key={size} type="button" role="radio" aria-checked={width === index} aria-label={WIDTH_NAMES[index]} onClick={() => setWidth(index)}>
+      <div className="drawing-widths" role="radiogroup" aria-label={t('drawing.size')}>{DRAWING_WIDTHS.map((size, index) => <button key={size} type="button" role="radio" aria-checked={width === index} aria-label={d(WIDTH_NAMES[index]!)} onClick={() => setWidth(index)}>
         <span style={{ width: Math.max(4, size / 2), height: Math.max(4, size / 2), background: DRAWING_COLORS[color] }} /></button>)}</div>
       <div className="drawing-actions"><button type="button" className="ghost small-button" disabled={disabled || !value.strokes.length} onClick={() => onChange({ ...value, strokes: value.strokes.slice(0, -1) })}>{t('drawing.undo')}</button>
         <button type="button" className="ghost small-button" disabled={disabled || !value.strokes.length} onClick={() => onChange({ ...value, strokes: [] })}>{t('drawing.clear')}</button></div>

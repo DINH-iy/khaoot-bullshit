@@ -11,7 +11,10 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
   try {
     // From the start page into the arcade, and a lobby of one's own.
     await ann.page.goto(`${baseURL}/`);
-    await ann.page.getByRole('link', { name: 'Arcade: play minigames with friends' }).click();
+    const arcade = ann.page.getByRole('link', { name: 'Arcade Play minigames with friends' });
+    await expect(arcade).toBeHidden();
+    await ann.page.locator('.join-more summary').click();
+    await arcade.click();
     await ann.page.getByLabel('Your name').fill('Ann');
     expect((await new AxeBuilder({ page: ann.page }).analyze()).violations).toEqual([]);
     // A name of its own per run: lobbies of other runs (the other browser project) may still be listed.

@@ -98,10 +98,9 @@ export function AppMenu({ role, current = 'editor' }: { role: HostRole | null; c
       <FaIcon name={link.icon} /><span>{t(link.label)}</span>{link.key === current && <FaIcon className="app-current-mark" name="check" />}
     </a></li>)}</ul>;
   return <div className="app-logo-menu" ref={menu.box}>
-    <button type="button" className="editor-logo app-logo-button" aria-label={t('logoMenu')} aria-expanded={menu.open} aria-controls={menu.open ? id : undefined}
+    <button type="button" className="editor-logo app-logo-button" aria-label={`p. ${t('logoMenu')}`} aria-expanded={menu.open} aria-controls={menu.open ? id : undefined}
       onClick={() => menu.setOpen(!menu.open)}>
-      <span aria-hidden="true">p.</span><span className="app-logo-label">{t('menu')}</span>
-      <FaIcon className="app-logo-caret" name="chevron-down" /><FaIcon className="app-logo-bars" name="bars" />
+      <span className="app-logo-mark" aria-hidden="true">p.</span><FaIcon className="app-logo-caret" name="chevron-down" />
     </button>
     {menu.open && <nav id={id} className="app-menu app-navigation" aria-labelledby={`${id}-heading`}>
       <p className="app-navigation-heading" id={`${id}-heading`}>{t('goTo')}</p>

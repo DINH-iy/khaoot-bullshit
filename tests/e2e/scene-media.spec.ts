@@ -1,11 +1,120 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { closeHostFold, openHostFold } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
 // A real 1 × 1 PNG.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+
+test('scene translations, background motion and a YouTube clip work from editor to room', async ({ browser, page, context, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'This test sets up the game in the desktop editor.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await context.route('https://www.youtube-nocookie.com/embed/**', route => route.fulfill({ body: `<html lang="en"><title>Clip test</title><script>
+    window.addEventListener('message', event => {
+      const message = JSON.parse(event.data);
+      if (message.event === 'listening') {
+        event.source.postMessage(JSON.stringify({event: 'initialDelivery', info: {playerState: 1}}), event.origin);
+      }
+      if (message.event === 'command') document.documentElement.dataset.playback = message.func;
+    });
+  </script></html>`, contentType: 'text/html' }));
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  const gameId = randomUUID();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  expect((await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: 'Translated clip', startFrom: 'timed-quiz' } })).ok()).toBe(true);
+  await page.goto(`${baseURL}/?edit=${gameId}`);
+  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  const chrome = page.locator('.editor-header');
+  const sidebar = page.locator('.scene-props');
+  const headerColor = await chrome.evaluate(el => getComputedStyle(el).backgroundColor);
+  const sidebarColor = await sidebar.evaluate(el => getComputedStyle(el).backgroundColor);
+  await page.locator('summary').getByText('Translations', { exact: true }).click();
+  await page.getByLabel('Text language').selectOption('nl');
+  await page.getByLabel('Question or scene text').fill('Welke planeet heeft de meeste bekende manen?');
+  await page.getByLabel('Saturn', { exact: true }).fill('Saturnus');
+  const field = page.getByRole('group', { name: 'Picture, video or song' });
+  await field.getByRole('button', { name: 'Add media' }).click();
+  await page.getByRole('dialog', { name: 'Media library' }).getByRole('button', { name: 'Add YouTube video' }).click();
+  const clip = page.getByRole('dialog', { name: 'Add YouTube video' });
+  await clip.getByLabel('YouTube video link').fill('https://youtu.be/M7lc1UVf-VE');
+  await clip.getByLabel('Start time (seconds)').fill('5');
+  await clip.getByLabel('End time (seconds)').fill('3');
+  await clip.getByRole('button', { name: 'Use this clip' }).click();
+  await expect(clip.getByRole('alert')).toContainText('The end must be after the start.');
+  await clip.getByLabel('End time (seconds)').fill('15');
+  await clip.getByRole('button', { name: 'Use this clip' }).click();
+  await expect(field.getByRole('link', { name: 'Open on YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=M7lc1UVf-VE&t=5');
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  await page.getByLabel('Change the look of').click();
+  await page.getByRole('option', { name: 'The whole game' }).click();
+  await page.getByRole('button', { name: 'ASCII Terminal' }).click();
+  await page.locator('summary').getByText('Shapes and background', { exact: true }).click();
+  await page.getByRole('button', { name: 'Starlight' }).click();
+  await expect(page.locator('.room-preview.motion-starlight')).toHaveCount(2);
+  await page.getByRole('tab', { name: 'Texts', exact: true }).click();
+  await page.getByLabel('Text language').selectOption('nl');
+  await page.getByRole('searchbox', { name: 'Find a text' }).fill('Join room');
+  await page.getByLabel('Join room', { exact: true }).fill('Speel deze quiz');
+  await page.getByRole('button', { name: 'Joining', exact: true }).click();
+  await expect(page.locator('.room-preview').getByRole('button', { name: 'Speel deze quiz' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  await expect(chrome).toHaveCSS('background-color', headerColor);
+  await expect(sidebar).toHaveCSS('background-color', sidebarColor);
+  await expect(page.locator('.scene-canvas .tv-screen')).toHaveCSS('color', 'rgb(219, 255, 230)');
+  await page.getByRole('button', { name: 'Phone preview' }).click();
+  const themedPreview = page.getByRole('dialog', { name: 'Preview' });
+  await expect(themedPreview).toHaveCSS('background-color', sidebarColor);
+  await expect(themedPreview.locator('.phone-screen')).toHaveCSS('color', 'rgb(219, 255, 230)');
+  await expect(themedPreview.locator('.timer')).toHaveText('0:20 left');
+  await themedPreview.getByRole('button', { name: 'Close' }).click();
+  const game = (await (await page.request.get(`${baseURL}/api/host/games/${gameId}`, { headers })).json()).data;
+  expect((await page.request.post(`${baseURL}/api/host/games/${gameId}/publish`, { headers, data: { expectedRevision: game.revision } })).ok()).toBe(true);
+  const sessionId = randomUUID();
+  expect((await page.request.post(`${baseURL}/api/host/rooms`, { headers, data: { gameId, sessionId, commandId: randomUUID() } })).ok()).toBe(true);
+  const response = await page.goto(`${baseURL}/?room=${sessionId}`);
+  expect(response?.headers()['content-security-policy']).toContain('https://www.youtube-nocookie.com');
+  const code = (await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', locale: 'nl-NL' });
+  const phone = await phoneContext.newPage();
+  try {
+    await phone.goto(`${baseURL}/?code=${code}`);
+    const background = phone.locator('.room-join.motion-starlight');
+    await expect(background).toBeVisible();
+    expect(await background.evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('none');
+    await phone.getByLabel('Je naam').fill('Clip fan');
+    await phone.getByRole('button', { name: 'Speel deze quiz', exact: true }).click();
+    await expect(page.getByText('Clip fan · connected', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: 'Start the game' }).click();
+    const player = (screen: typeof page) => screen.locator('.stage-media.youtube iframe');
+    await expect(player(page)).toHaveAttribute('src', /\/M7lc1UVf-VE\?autoplay=1&playsinline=1&start=5&end=15&enablejsapi=1&origin=/);
+    expect(await player(page).contentFrame().locator('html').evaluate(el => el.ownerDocument.title)).toBe('Clip test');
+    expect((await player(page).boundingBox())!.height).toBeGreaterThanOrEqual(200);
+    await expect(player(phone)).toHaveCount(0);
+    await expect(phone.getByText('Welke planeet heeft de meeste bekende manen?', { exact: true })).toBeVisible();
+    await expect(phone.getByRole('radio', { name: 'Jupiter', exact: true })).toBeVisible();
+    await phone.getByRole('radio', { name: 'Saturnus', exact: true }).check();
+    await phone.getByRole('button', { name: 'Antwoord opslaan', exact: true }).click();
+    await expect(page.getByText(/1 of 1 answered/)).toBeVisible();
+    await openHostFold(page, 'Shared screen & invite');
+    await page.getByRole('button', { name: 'Create display link' }).click();
+    const href = await page.getByRole('link', { name: 'Open shared display' }).getAttribute('href');
+    await closeHostFold(page);
+    const display = await context.newPage();
+    await display.goto(href!);
+    await expect(player(display)).toBeVisible();
+    await expect(player(page)).toHaveCount(0);
+    const embedded = player(display).contentFrame().locator('html');
+    await expect(embedded).toBeAttached();
+    await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await expect(embedded).toHaveAttribute('data-playback', 'pauseVideo');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await expect(embedded).toHaveAttribute('data-playback', 'playVideo');
+  } finally { await phoneContext.close(); }
+});
 
 test('an author puts a picture in a quiz question, and the room shows it with the question', async ({ browser, page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first; the phone view is checked below.');
@@ -22,16 +131,69 @@ test('an author puts a picture in a quiz question, and the room shows it with th
   // The Scene editor, first scene: upload a picture in the media library and use it.
   await page.getByRole('tab', { name: 'Scene editor' }).click();
   const field = page.getByRole('group', { name: 'Picture, video or song' });
-  await field.getByRole('button', { name: 'Add a picture, video or song' }).click();
+  const canvas = page.locator('.scene-canvas');
+  await canvas.getByRole('button', { name: 'Add media' }).click();
   const library = page.getByRole('dialog', { name: 'Media library' });
+  await expect(library.getByRole('tab', { name: 'All', exact: true })).toBeVisible();
+  const uploadAction = await library.getByRole('button', { name: 'Upload a file' }).boundingBox();
+  const youtubeAction = await library.getByRole('button', { name: 'Add YouTube video' }).boundingBox();
+  expect(Math.abs(uploadAction!.y - youtubeAction!.y)).toBeLessThan(3);
   await library.locator('input[type=file]').setInputFiles({ name: 'Eiffel tower.png', mimeType: 'image/png', buffer: PNG });
   await expect(library).toHaveCount(0);
   await expect(field.getByRole('img', { name: 'Eiffel tower.png' })).toBeVisible();
+  await expect(canvas.locator('.stage-media.image img')).toBeVisible();
+  await field.getByRole('button', { name: 'Remove from this scene' }).click();
+  const confirmation = page.getByRole('alertdialog', { name: 'Remove this media from the scene?' });
+  await confirmation.getByRole('button', { name: 'Keep', exact: true }).click();
+  await expect(canvas.locator('.stage-media.image img')).toBeVisible();
+  await field.getByRole('button', { name: 'Remove from this scene' }).click();
+  await confirmation.getByRole('button', { name: 'Remove from this scene' }).click();
+  await expect(canvas.locator('.stage-media.image img')).toHaveCount(0);
+  await canvas.getByRole('button', { name: 'Add media' }).click();
+  await library.getByRole('listitem').filter({ hasText: 'Eiffel tower.png' }).getByRole('button', { name: 'Use this' }).click();
+  await expect(canvas.locator('.stage-media.image img')).toBeVisible();
+  await page.setViewportSize({ width: 1180, height: 900 });
+  const position = () => canvas.locator('.scene-composition-body').evaluate(node => {
+    const copy = node.querySelector('.composition-copy')!.getBoundingClientRect();
+    const media = node.querySelector('.composition-media')!.getBoundingClientRect();
+    return { copyLeft: copy.left, copyRight: copy.right, mediaLeft: media.left, mediaRight: media.right };
+  });
+  await field.getByRole('button', { name: 'Right of the text' }).click();
+  await expect.poll(async () => { const result = await position(); return result.mediaLeft - result.copyRight; }).toBeGreaterThan(0);
+  await field.getByRole('button', { name: 'Left of the text' }).click();
+  await expect.poll(async () => { const result = await position(); return result.copyLeft - result.mediaRight; }).toBeGreaterThan(0);
+  const sizes = [];
+  for (const size of ['compact', 'standard', 'wide']) {
+    await field.getByLabel('Media size').selectOption(size);
+    sizes.push((await canvas.locator(`.media-${size} .composition-media`).boundingBox())!.width);
+  }
+  expect(sizes[0]).toBeLessThan(sizes[1]!);
+  expect(sizes[1]).toBeLessThan(sizes[2]!);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await field.getByRole('button', { name: 'Above the text' }).click();
+  await field.getByLabel('Media size').selectOption('wide');
+  await expect(canvas.locator('.media-above.media-wide .composition-media')).toBeVisible();
+  expect((await canvas.locator('.stage-media.image img').boundingBox())!.width).toBeGreaterThan(100);
+  await page.getByRole('button', { name: 'Phone preview' }).click();
+  const phonePreview = page.getByRole('dialog', { name: 'Preview' });
+  await expect(phonePreview.locator('.phone-screen .media-above.media-wide .stage-media img')).toBeVisible();
+  await phonePreview.getByRole('button', { name: 'Close' }).click();
   await expect(field).toContainText('Shows on the shared screen and the phones.');
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
   // The library lists it; a file a game uses cannot be removed.
-  await field.getByRole('button', { name: 'Change…' }).click();
-  await expect(library.getByRole('button', { name: 'In this scene' })).toBeVisible();
+  await canvas.getByRole('button', { name: 'Media settings' }).click();
+  const crop = page.getByRole('dialog', { name: 'Crop picture' });
+  await crop.getByLabel('Crop shape').selectOption('landscape');
+  await expect(crop.locator('.stage-media.cropped')).toBeVisible();
+  await crop.getByRole('button', { name: 'Use this', exact: true }).click();
+  await expect(canvas.locator('.stage-media.cropped')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await field.getByRole('button', { name: 'Media settings' }).click();
+  await crop.getByRole('button', { name: 'Back to library' }).click();
+  await expect(library.getByText('In this scene', { exact: true })).toBeVisible();
+  await expect(library.getByLabel('Credit', { exact: true })).toBeHidden();
+  await library.locator('summary').getByText('Details', { exact: true }).click();
+  await expect(library.getByLabel('Credit', { exact: true })).toBeVisible();
   expect((await new AxeBuilder({ page }).include('.media-library').analyze()).violations).toEqual([]);
   page.once('dialog', dialog => void dialog.accept());
   await library.getByRole('button', { name: 'Remove Eiffel tower.png from the library' }).click();
@@ -54,7 +216,7 @@ test('an author puts a picture in a quiz question, and the room shows it with th
     await expect(page.getByText('Picture fan · connected', { exact: false })).toBeVisible();
     await page.getByRole('button', { name: 'Start the game' }).click();
     for (const screen of [page, phone]) {
-      const picture = screen.locator('.stage-media.image img');
+      const picture = screen.locator('.media-above.media-wide .stage-media.image.cropped img');
       await expect(picture).toBeVisible();
       expect(await picture.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1);
     }
@@ -70,17 +232,91 @@ function silentWav(seconds = 0.1): Buffer {
   return Buffer.concat([header, data]);
 }
 
+test('the Game menu opens the shared media library from the Flow editor', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const gameId = randomUUID();
+  const games = `${baseURL}/api/host/games`;
+  expect((await page.request.post(games, {
+    headers, data: { gameId, title: `Standalone library ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' },
+  })).ok()).toBe(true);
+
+  // The video header is enough for listing and filtering. This test doesn't play it.
+  for (const [name, data] of [['Library song.wav', silentWav()], ['Library clip.mp4', Buffer.from('0000ftypisom')]] as const) {
+    expect((await page.request.post(`${baseURL}/api/host/media?name=${encodeURIComponent(name)}`, {
+      headers: { ...headers, 'content-type': 'application/octet-stream' }, data,
+    })).ok()).toBe(true);
+  }
+
+  await page.goto(`${baseURL}/?edit=${gameId}&view=flow`);
+  await page.getByRole('button', { name: /^Game menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Media library' }).click();
+  const library = page.getByRole('dialog', { name: 'Media library' });
+  await expect(library.getByRole('tab', { name: 'All', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(library.getByText('Library clip.mp4', { exact: true })).toBeVisible();
+  await expect(library.getByText('Library song.wav', { exact: true })).toBeVisible();
+  await library.locator('input[type=file]').setInputFiles({ name: 'Library photo.png', mimeType: 'image/png', buffer: PNG });
+  await expect(library.getByRole('img', { name: 'Library photo.png' })).toBeVisible();
+  await expect(library.getByRole('button', { name: 'Use this' })).toHaveCount(0);
+  await library.getByRole('tab', { name: 'Pictures' }).click();
+  await expect(library.getByText('Library song.wav', { exact: true })).toHaveCount(0);
+  await expect(library.getByText('Library clip.mp4', { exact: true })).toHaveCount(0);
+  await library.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Flow editor' })).toHaveAttribute('aria-selected', 'true');
+  const draft = (await (await page.request.get(`${games}/${gameId}`, { headers })).json()).data;
+  expect(draft.revision).toBe(0);
+  await page.getByRole('button', { name: 'Editing: switch to view only' }).click();
+  await page.getByRole('button', { name: /^Game menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Media library' }).click();
+  await expect(library.getByRole('img', { name: 'Library photo.png' })).toBeVisible();
+  await expect(library.getByRole('button', { name: 'Upload a file' })).toHaveCount(0);
+  await expect(library.getByRole('button', { name: /^Remove / })).toHaveCount(0);
+});
+
 test('a song plays in one place only: the host screen when no shared screen is connected, and the phones are told to listen', async ({ browser, page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Set up from the desktop; the phone view is checked below.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
-  const song = (await (await page.request.post(`${baseURL}/api/host/media?name=Thinking%20music.wav`, { headers: { ...headers, 'content-type': 'application/octet-stream' }, data: silentWav() })).json()).data;
+  const samples = silentWav(15);
+  for (let offset = 44; offset < samples.length; offset += 2) {
+    const index = (offset - 44) / 2;
+    const amplitude = index < 44100 * 3.5 ? 4000 : 16000;
+    samples.writeInt16LE(Math.round(amplitude * Math.sin(index / 12)), offset);
+  }
+  const song = (await (await page.request.post(`${baseURL}/api/host/media?name=Thinking%20music.wav`, { headers: { ...headers, 'content-type': 'application/octet-stream' }, data: samples })).json()).data;
   expect(song).toMatchObject({ kind: 'audio', contentType: 'audio/wav' });
   const gameId = randomUUID();
-  const draft = (await (await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: `Song quiz ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' } })).json()).data;
-  const definition = { ...draft.definition, nodes: draft.definition.nodes.map((node: { key: string; stages: object[] }) => node.key === draft.definition.startNodeKey ? { ...node, stages: [{ ...node.stages[0], media: { id: song.id, kind: 'audio' } }, ...node.stages.slice(1)] } : node) };
-  const saved = (await (await page.request.put(`${baseURL}/api/host/games/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).json()).data;
+  expect((await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: `Song quiz ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' } })).ok()).toBe(true);
+  await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  await page.locator('.scene-canvas').getByRole('button', { name: 'Add media' }).click();
+  const item = page.getByRole('dialog', { name: 'Media library' }).getByRole('listitem').filter({ hasText: 'Thinking music.wav' });
+  await item.getByRole('button', { name: 'Cut clip' }).click();
+  const cut = page.getByRole('dialog', { name: 'Cut clip' });
+  await cut.getByLabel('Start time (seconds)').fill('2');
+  await cut.getByLabel('End time (seconds)').fill('5');
+  const waveform = cut.locator('.audio-waveform');
+  await expect(waveform).toBeVisible();
+  await expect.poll(() => waveform.locator('i').evaluateAll(bars => new Set(bars.map(bar => bar.getBoundingClientRect().height)).size)).toBeGreaterThan(1);
+  await cut.getByLabel('Show waveform').uncheck();
+  await expect(waveform).toHaveCount(0);
+  await cut.getByLabel('Show waveform').check();
+  await cut.getByRole('button', { name: 'Use this', exact: true }).click();
+  const canvasAudio = page.locator('.scene-canvas .scene-audio-player');
+  const sidebar = page.getByRole('group', { name: 'Picture, video or song' });
+  await expect(canvasAudio).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Play the song' }).click();
+  await sidebar.getByRole('button', { name: 'Pause the song' }).click();
+  await expect(sidebar.getByRole('button', { name: 'Play the song' })).toBeVisible();
+  await sidebar.getByLabel('Show waveform').uncheck();
+  await expect(canvasAudio.locator('.audio-waveform')).toHaveCount(0);
+  await sidebar.getByLabel('Show waveform').check();
+  await expect(canvasAudio.locator('.audio-waveform')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  const saved = (await (await page.request.get(`${baseURL}/api/host/games/${gameId}`, { headers })).json()).data;
   expect((await page.request.post(`${baseURL}/api/host/games/${gameId}/publish`, { headers, data: { expectedRevision: saved.revision } })).ok()).toBe(true);
   const sessionId = randomUUID();
   expect((await page.request.post(`${baseURL}/api/host/rooms`, { headers, data: { gameId, sessionId, commandId: randomUUID() } })).ok()).toBe(true);
@@ -94,7 +330,17 @@ test('a song plays in one place only: the host screen when no shared screen is c
     // The host starts once the player shows up (as a host would); a start sent while the room changes is refused.
     await expect(page.getByText('Listener · connected', { exact: false })).toBeVisible();
     await page.getByRole('button', { name: 'Start the game' }).click();
-    await expect(page.locator('.stage-media.audio audio')).toHaveAttribute('src', `/api/media/${song.id}`);
+    const audio = page.locator('.stage-media.audio audio');
+    await expect(audio).toHaveAttribute('src', `/api/media/${song.id}`);
+    await expect(audio).toHaveJSProperty('paused', false);
+    await expect(page.locator('.stage-media.audio .audio-waveform')).toBeVisible();
+    await expect.poll(() => audio.evaluate(element => (element as HTMLAudioElement).currentTime)).toBeGreaterThanOrEqual(2);
+    await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await expect(audio).toHaveJSProperty('paused', true);
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await expect(audio).toHaveJSProperty('paused', false);
+    await expect(audio).toHaveJSProperty('paused', true, { timeout: 7_000 });
+    await expect.poll(() => audio.evaluate(element => (element as HTMLAudioElement).currentTime)).toBeCloseTo(5, 1);
     await expect(phone.locator('.stage-media.note')).toHaveText(/Listen: the song plays on the shared screen/);
     await expect(phone.locator('audio')).toHaveCount(0);
   } finally { await phoneContext.close(); }

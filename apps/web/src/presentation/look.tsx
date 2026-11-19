@@ -3,9 +3,9 @@ import { currentLanguage, useLanguage, type Language } from '../i18n/language.js
 import { translate } from '../i18n/texts.js';
 import { GAME_TEXTS } from './game-texts.text.js';
 import { gameHowToPlay } from './catalog.text.js';
-import { contrast, EASINGS, FONTS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type Theme } from '@party/contracts';
+import { contrast, EASINGS, FONTS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type TranslatedTexts, type Theme } from '@party/contracts';
 
-export interface LookInput { texts?: Record<string, string>; animations?: Record<string, unknown>; themes?: unknown[] }
+export interface LookInput { texts?: Record<string, string>; translations?: TranslatedTexts | undefined; animations?: Record<string, unknown>; themes?: unknown[] }
 export interface Look { text: (key: TextKey, values?: Record<string, string | number>) => string; animation: (moment: Moment) => CustomAnimation | null; theme: ReturnType<typeof resolveTheme> }
 const defaultLook: Look = { text: (key, values) => fillText(standardText(key, currentLanguage()), values), animation: moment => resolveAnimation(undefined, moment), theme: resolveTheme() };
 const LookContext = createContext<Look>(defaultLook);
@@ -27,7 +27,7 @@ export function themeStyle(theme: ReturnType<typeof resolveTheme>): CSSPropertie
   for (let index = colors.answers.length; index < 8; index++) vars[`--a${index + 1}`] = colors.answers[index % colors.answers.length]!;
   return vars as CSSProperties;
 }
-export const themeClass = (theme: ReturnType<typeof resolveTheme>) => `bg-${theme.background} tiles-${theme.tiles}${theme.uppercaseHeadings ? ' caps' : ''}${theme.gradients ? ' gradients' : ''} marks-${theme.markerShape} marks-${theme.markerPlace}`;
+export const themeClass = (theme: ReturnType<typeof resolveTheme>) => `bg-${theme.background} motion-${theme.backgroundMotion} tiles-${theme.tiles}${theme.uppercaseHeadings ? ' caps' : ''}${theme.gradients ? ' gradients' : ''} marks-${theme.markerShape} marks-${theme.markerPlace}`;
 
 /**
  * A standard text (one the author did not change) in a language: the game's texts in every language, and the
@@ -42,7 +42,7 @@ export function standardText(key: TextKey, language: Language): string {
 export function buildLook(look: LookInput | undefined, language: Language = currentLanguage()): Look {
   const texts = look?.texts ?? {}; const animations = (look?.animations ?? {}) as Record<string, AnimationChoice>;
   const themes = (look?.themes ?? []).map(theme => ThemeSchema.safeParse(theme)).filter(result => result.success).map(result => result.data as Theme);
-  return { text: (key, values) => fillText(texts[key] ?? standardText(key, language), values), animation: moment => resolveAnimation(animations[moment], moment), theme: resolveTheme(...themes) };
+  return { text: (key, values) => fillText(look?.translations?.[language]?.[key] ?? texts[key] ?? standardText(key, language), values), animation: moment => resolveAnimation(animations[moment], moment), theme: resolveTheme(...themes) };
 }
 /** Builds the look once per change of its input; use with `LookContext.Provider`. */
 export const useBuiltLook = (look: LookInput | undefined) => { const language = useLanguage(); return useMemo(() => buildLook(look, language), [look, language]); };

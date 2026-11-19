@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, SceneMediaSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -59,7 +59,7 @@ export const WheelSchema = z.object({
 // All optional, so earlier definitions keep their hash.
 // `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
 // `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
-const look = { media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+const look = { mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An explanation shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   explain: z.object({ text: z.string().trim().min(1).max(1000).optional() }).strict().optional() };
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), ...look };
@@ -162,6 +162,11 @@ export const GameDefinitionSchema = z.object({
     const at = (message: string, stageIndex?: number) => ctx.addIssue({ code: 'custom', message, path: stageIndex === undefined ? ['nodes', nodeIndex] : ['nodes', nodeIndex, 'stages', stageIndex] });
     if (new Set(node.stages.map(stage => stage.key)).size !== node.stages.length) at('Duplicate stage key');
     for (const [stageIndex, stage] of node.stages.entries()) {
+      if (stage.youtube && stage.media) at('Choose either a YouTube clip or a library file for this scene', stageIndex);
+      if (stage.media?.crop && stage.media.kind !== 'image') at('Only pictures can be cropped', stageIndex);
+      if (stage.media?.trim && stage.media.kind === 'image') at('Only video or audio can be cut', stageIndex);
+      if (stage.media?.waveform !== undefined && stage.media.kind !== 'audio') at('Only songs can show a waveform', stageIndex);
+      if (stage.youtube && !['collect', 'challenge', 'info'].includes(stage.kind)) at('This scene cannot play a YouTube clip', stageIndex);
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-choice') {
         const rule = stage.scoring;
         if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) at('Invalid correct choice', stageIndex);

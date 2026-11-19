@@ -2,12 +2,12 @@ import { useSyncExternalStore } from 'react';
 
 /**
  * The language of the app's own screens: the host menu, the host's room controls, the editor and the admin pages.
- * Chosen per browser (remembered here), starting from the browser's own language. The players' screens are not
- * affected: their words are the game's texts (Look & feel → Texts), chosen by the game's author.
+ * Chosen per browser, starting from the browser's own language. Rooms use this choice for built-in text
+ * and any translations the game's author supplies.
  */
 export const LANGUAGES = { en: 'English', nl: 'Nederlands', de: 'Deutsch', ro: 'Română' } as const;
 export type Language = keyof typeof LANGUAGES;
-export const isLanguage = (value: unknown): value is Language => typeof value === 'string' && value in LANGUAGES;
+export const isLanguage = (value: unknown): value is Language => typeof value === 'string' && Object.hasOwn(LANGUAGES, value);
 const KEY = 'party_ui_language';
 
 function fromBrowser(): Language {

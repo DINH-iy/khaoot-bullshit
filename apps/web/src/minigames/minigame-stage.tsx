@@ -1,7 +1,11 @@
 import { useCallback, useRef } from 'react';
 import type { Stroke } from '@party/contracts';
 import type { LiveStrokes } from '../drawing/live-strokes.js';
-import { defaultLook, formatMinigameResult, howToPlayKey, isStepMinigame, MINIGAMES, MinigameValueSchema, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { defaultLook, howToPlayKey, isStepMinigame, MINIGAMES, MinigameValueSchema, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { useTexts } from '../i18n/texts.js';
+import { CATALOG_TEXTS } from '../presentation/catalog.text.js';
+import { minigameResult } from './result-label.js';
+import { CONTROL_TEXTS } from './controls.text.js';
 import { useText } from '../presentation/look.js';
 import { Avatar } from '../players/avatar.js';
 import { formatPoints } from '../room/results.js';
@@ -41,7 +45,7 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
   if (isStepMinigame(minigame.game)) return state.role === 'player' ? <StepPhone state={state} stage={stage} offset={offset} canPlay={canPlay} disabled={disabled} onMove={onMove} />
     : <StepScreen state={state} stage={stage} offset={offset} />;
   if (state.role === 'player') {
-    if (own?.success) return <div className="mg-done" role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : formatMinigameResult(minigame.game, own.data.value, settings)}</p><p>{t('minigame.played')}</p></div>;
+    if (own?.success) return <div className="mg-done" role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : minigameResult(minigame.game, own.data.value, settings)}</p><p>{t('minigame.played')}</p></div>;
     if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('minigame.paused')}</p>;
     if (!canPlay || !minigame.startsAt) return <p className="wait-note">{t(howToPlayKey(minigame.game))}</p>;
     const Controller = CONTROLLERS[minigame.game as keyof typeof CONTROLLERS] as (props: { settings: MinigameSettings; startsAt: string; goAt: string | null; offset: number; disabled: boolean; onResult: (result: Result) => void; onTaps: (count: number) => void }) => React.ReactElement;
@@ -56,15 +60,15 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
 
 /** The TV: name, how to play, the countdown and (in a reaction duel) the GO everyone waits for. */
 function ScreenView({ state, minigame, offset, progress }: { state: RoomSnapshot; minigame: Minigame; offset: number; progress: { playerId: string; count: number }[] }) {
-  const t = useText(); const info = MINIGAMES[minigame.game]; const now = useServerNow(offset, Boolean(minigame.startsAt));
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const name = useTexts(CATALOG_TEXTS); const now = useServerNow(offset, Boolean(minigame.startsAt));
   const left = minigame.startsAt ? Date.parse(minigame.startsAt) - now : null;
   const go = minigame.goAt ? now >= Date.parse(minigame.goAt) : false;
   return <div className={`mg-screen mg-${minigame.game}`}>
-    <p className="mg-name">{info.name}</p>
+    <p className="mg-name">{name(minigame.game)}</p>
     <p className="mg-how">{t(howToPlayKey(minigame.game))}</p>
     {/* Paused: no countdown or GO; continuing starts a fresh countdown. */}
     {state.view.status === 'PAUSED' ? <p className="mg-big wait" role="status">{t('minigame.paused')}</p>
-      : left !== null && left > 0 ? <p className="mg-big" role="timer" aria-label="Starts in">{Math.ceil(left / 1000)}</p>
+      : left !== null && left > 0 ? <p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil(left / 1000)}</p>
       : minigame.game === 'reaction' && minigame.startsAt ? <p className={`mg-big ${go ? 'go' : 'wait'}`}>{go ? t('minigame.go') : t('minigame.wait')}</p>
       : minigame.game === 'tap-race' && minigame.startsAt ? <RaceBars state={state} progress={progress} />
       : minigame.game === 'lucky-doors' ? <p className="mg-sub">{t('minigame.pickDoor')} · {(minigame.settings as MinigameSettings<'lucky-doors'>).doorsMilli.map(formatPoints).join(' · ')}</p> : null}
@@ -73,10 +77,10 @@ function ScreenView({ state, minigame, offset, progress }: { state: RoomSnapshot
 
 /** Live race: one bar per player, growing with every tap the server sees. */
 function RaceBars({ state, progress }: { state: RoomSnapshot; progress: { playerId: string; count: number }[] }) {
-  const t = useText(); const most = Math.max(10, ...progress.map(entry => entry.count));
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const most = Math.max(10, ...progress.map(entry => entry.count));
   const rows = [...progress].sort((a, b) => b.count - a.count).slice(0, 12);
   if (!rows.length) return <p className="mg-big">{t('minigame.tap')}</p>;
-  return <ol className="mg-race" aria-label="Taps so far">{rows.map(entry => <li key={entry.playerId}>
+  return <ol className="mg-race" aria-label={c('taps')}>{rows.map(entry => <li key={entry.playerId}>
     <Avatar look={lookOf(state, entry.playerId)} size={32} /><span className="mg-race-name">{nameOf(state, entry.playerId)}</span>
     <span className="mg-race-track" aria-hidden="true"><span style={{ width: `${Math.round(entry.count / most * 100)}%` }} /></span><span className="mg-race-count">{entry.count}</span></li>)}</ol>;
 }
@@ -85,25 +89,25 @@ const lookOf = (state: RoomSnapshot, playerId: string | null) => state.players.f
 const nameOf = (state: RoomSnapshot, playerId: string | null) => state.players.find(player => player.id === playerId)?.displayName ?? 'Former player';
 
 function RelayPictures({ state, relay }: { state: RoomSnapshot; relay: NonNullable<Minigame['relay']> }) {
-  return <ul className="drawing-gallery">{relay.teams.map(team => <li key={team.teamId}><StoredDrawing sessionId={state.view.sessionId} assetIds={team.parts.map(part => part.assetId)} label={`Drawing of ${team.name}`} /><span>{team.name}</span></li>)}</ul>;
+  const t = useTexts(CONTROL_TEXTS);
+  return <ul className="drawing-gallery">{relay.teams.map(team => <li key={team.teamId}><StoredDrawing sessionId={state.view.sessionId} assetIds={team.parts.map(part => part.assetId)} label={t('drawingOf', { name: team.name })} /><span>{team.name}</span></li>)}</ul>;
 }
 
 /** After the reveal: the podium, everyone's result, and what was behind each door. */
 export function MinigameResults({ state, answer }: { state: RoomSnapshot; answer: Extract<NonNullable<NonNullable<Stage['reveal']>['answer']>, { kind: 'minigame' }> }) {
-  const t = useText(); const game = answer.game as MinigameKey;
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const game = answer.game as MinigameKey;
   const settings = (state.view.stage?.minigame?.settings ?? MINIGAMES[game].defaults) as MinigameSettings;
   const teams = answer.entries.filter(entry => entry.playerId === null); const players = answer.entries.filter(entry => entry.playerId !== null);
-  const teamResult = (value: number | null) => value === null ? 'No result' : game === 'relay-drawing' || isStepMinigame(game) ? formatMinigameResult(game, value, settings) : game === 'tap-race' ? `${value} taps` : game === 'stop-clock' ? `${(value / 1000).toFixed(2)} s off` : `${value} ms`;
   return <div className="mg-results">
     {game === 'relay-drawing' && state.view.stage?.minigame?.relay && <RelayPictures state={state} relay={state.view.stage.minigame.relay} />}
     {isStepMinigame(game) && state.view.stage?.minigame?.steps && game !== 'lucky-doors' && <StepScreenBoards stage={state.view.stage} />}
     {answer.doorsMilli && <><h4>{t('minigame.behindDoors')}</h4><ol className="mg-doors revealed">{answer.doorsMilli.map((milli, index) => <li key={index} className="mg-door">{t('minigame.door', { number: index + 1 })}<strong>{formatPoints(milli)}</strong></li>)}</ol></>}
     {teams.length > 0 && <><h4>{t('minigame.places')}</h4><ol className="mg-podium">{teams.map(entry => <li key={entry.teamId} className={entry.place === 1 ? 'first' : undefined}>
-      <span className="mg-place">{entry.place ?? '–'}</span><strong>{teamName(state, entry.teamId!)}</strong><span>{teamResult(entry.value)}</span></li>)}</ol></>}
-    {players.length > 0 && <><h4>{teams.length ? 'Everyone' : game === 'lucky-doors' ? 'Who chose which door' : t('minigame.places')}</h4><ol className="mg-podium">{players.map(entry => <li key={entry.playerId} className={entry.place === 1 ? 'first' : undefined}>
-      <span className="mg-place">{teams.length || game === 'lucky-doors' ? '' : entry.place ?? '–'}</span><Avatar look={lookOf(state, entry.playerId)} size={36} /><strong>{nameOf(state, entry.playerId)}{entry.playerId === state.selfPlayerId ? ' (you)' : ''}</strong>
-      {entry.stroke && <span className="mg-circle"><DrawingView drawings={[{ v: 1, strokes: [{ c: 0, w: 14, p: entry.stroke }] }]} label={`Circle by ${nameOf(state, entry.playerId)}`} /></span>}
-      <span>{formatMinigameResult(game, entry.value, settings)}</span></li>)}</ol></>}
+      <span className="mg-place">{entry.place ?? '–'}</span><strong>{teamName(state, entry.teamId!)}</strong><span>{minigameResult(game, entry.value, settings, true)}</span></li>)}</ol></>}
+    {players.length > 0 && <><h4>{teams.length ? c('everyone') : game === 'lucky-doors' ? c('whoChose') : t('minigame.places')}</h4><ol className="mg-podium">{players.map(entry => <li key={entry.playerId} className={entry.place === 1 ? 'first' : undefined}>
+      <span className="mg-place">{teams.length || game === 'lucky-doors' ? '' : entry.place ?? '–'}</span><Avatar look={lookOf(state, entry.playerId)} size={36} /><strong>{nameOf(state, entry.playerId)}{entry.playerId === state.selfPlayerId ? ` ${c('you')}` : ''}</strong>
+      {entry.stroke && <span className="mg-circle"><DrawingView drawings={[{ v: 1, strokes: [{ c: 0, w: 14, p: entry.stroke }] }]} label={c('circleBy', { name: nameOf(state, entry.playerId) })} /></span>}
+      <span>{minigameResult(game, entry.value, settings)}</span></li>)}</ol></>}
   </div>;
 }
 

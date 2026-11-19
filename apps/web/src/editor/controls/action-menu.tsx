@@ -37,8 +37,8 @@ export function ActionMenu({ label, actions, text, icon, intro, align = 'end' }:
   const problems = actions.reduce((sum, action) => sum + (action.problems ?? 0), 0);
   return <div ref={box} className={`action-menu${text ? ' has-text' : ''}${align === 'start' ? ' align-start' : ''}`} onKeyDown={onKey}>
     {/* With `text`, a labelled button ("Play & publish ▾"); without, the ☰ icon. */}
-    <button ref={button} type="button" className={text ? `action-menu-text${icon ? ' with-icon' : ''}` : 'small-button icon-only'} aria-label={text ? undefined : problems ? `${label} (${problems} ${problems === 1 ? 'problem' : 'problems'})` : label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
-      {text ? <>{icon && <Icon name={icon} size={18} />}{text}<span className="action-menu-caret" aria-hidden="true">▾</span></> : <Icon name="menu" size={18} />}{problems > 0 && <span className="action-menu-alert" aria-hidden="true">!</span>}</button>
+    <button ref={button} type="button" className={text ? `action-menu-text${icon ? ' with-icon' : ''}` : 'small-button icon-only'} aria-label={text || (problems ? `${label} (${problems} ${problems === 1 ? 'problem' : 'problems'})` : label)} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
+      {text ? <>{icon && <Icon name={icon} size={18} />}<span className="action-menu-button-label">{text}</span><span className="action-menu-caret" aria-hidden="true">▾</span></> : <Icon name="menu" size={18} />}{problems > 0 && <span className="action-menu-alert" aria-hidden="true">!</span>}</button>
     {open && <div id={id} className={`action-menu-list${withIcons ? ' with-icons' : ''}`} role="menu" aria-label={label}>
       {intro && <p className="action-menu-intro">{intro}</p>}
       {actions.map(action => <button key={action.label} type="button" role="menuitem" disabled={action.disabled} className={action.danger ? 'danger-item' : undefined}

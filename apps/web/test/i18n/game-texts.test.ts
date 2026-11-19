@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TEXT_DEFAULTS } from '@party/contracts';
+import { mergePresentationTexts, TEXT_DEFAULTS } from '@party/contracts';
 import { buildLook, standardText } from '../../src/presentation/look.js';
 
 describe('the game’s texts in the phone’s language', () => {
@@ -17,5 +17,21 @@ describe('the game’s texts in the phone’s language', () => {
     for (const key of Object.keys(TEXT_DEFAULTS) as (keyof typeof TEXT_DEFAULTS)[]) for (const language of ['nl', 'de', 'ro'] as const)
       expect(standardText(key, language), `${key} in ${language}`).toBeTruthy();
     expect(standardText('minigame.how.bus', 'nl')).toContain('rood of zwart');
+  });
+  it('resolves translations without using another language as a fallback', () => {
+    const game = {
+      texts: { 'answer.saved': 'Locked in!', 'answer.submit': 'Lock it in' },
+      translations: { nl: { 'answer.saved': 'Binnen!', 'answer.submit': 'Vastzetten' } },
+    };
+    const scene = {
+      texts: { 'answer.saved': 'Saved for this scene.' },
+      translations: { de: { 'answer.saved': 'Gespeichert.' } },
+    };
+    expect(buildLook(mergePresentationTexts(game), 'nl').text('answer.saved')).toBe('Binnen!');
+    const merged = mergePresentationTexts(game, scene);
+    expect(buildLook(merged, 'nl').text('answer.saved')).toBe('Saved for this scene.');
+    expect(buildLook(merged, 'nl').text('answer.submit')).toBe('Vastzetten');
+    expect(buildLook(merged, 'de').text('answer.saved')).toBe('Gespeichert.');
+    expect(buildLook(merged, 'ro').text('answer.submit')).toBe('Lock it in');
   });
 });

@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import jsQR from 'jsqr';
 import { createDatabase } from '../../apps/server/src/database/client.js';
 import { provisionRehearsal } from '../../apps/server/src/rooms/rehearsal.js';
+import { preparedGame } from '../../apps/server/src/game/prepared-game.js';
 import { closeHostFold, connectionStatus, openHostFold } from './helpers.js';
 
 const url = process.env['DATABASE_URL'];
@@ -92,4 +93,36 @@ test('the join form keeps the code readable and capped, and says what is missing
   await page.getByLabel('Your name').fill('Dash tester');
   await page.getByRole('button', { name: 'Join room', exact: true }).click();
   await expect(page.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
+});
+
+test('the room header keeps the full logo and puts the connection button at the right on narrow screens', async ({ page }) => {
+  const title = 'MBO Utrecht: De Ultieme Schoolbattle MetEenExtraLangWoordVoorDeLaatsteRonde';
+  const f = await provisionRehearsal(db.client, { ...preparedGame, title, presentation: { theme: { preset: 'mbou' } } });
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto(`/?code=${f.roomCode}`);
+  await page.getByLabel('Your name').fill('Phone player');
+  await page.getByRole('button', { name: 'Join room', exact: true }).click();
+  await expect(page.getByRole('heading', { name: `Room ${f.roomCode}` })).toBeVisible();
+
+  const bar = page.locator('.session-bar');
+  await expect(bar.locator('.room-game')).toContainText(title);
+  const positions = await bar.evaluate(element => {
+    const brand = element.querySelector('.brand')!;
+    const range = document.createRange();
+    range.selectNodeContents(brand);
+    const logo = brand.getBoundingClientRect();
+    const title = element.querySelector('.room-game')!.getBoundingClientRect();
+    const connection = element.querySelector('.room-connection button')!.getBoundingClientRect();
+    const rightEdge = element.getBoundingClientRect().right - parseFloat(getComputedStyle(element).paddingRight);
+    return {
+      logoLines: new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size,
+      fitsBetween: logo.right <= title.left && title.right <= connection.left,
+      sameRow: Math.abs(logo.y + logo.height / 2 - connection.y - connection.height / 2) < 1,
+      rightOffset: Math.abs(rightEdge - connection.right),
+    };
+  });
+  expect(positions).toEqual({ logoLines: 1, fitsBetween: true, sameRow: true, rightOffset: 0 });
+  await bar.getByRole('button').click();
+  await expect(bar.getByRole('dialog')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { DrawingSchema, emptyDrawing, type Drawing } from '@party/contracts';
+import { useTexts } from '../i18n/texts.js';
+import { DRAWING_TEXTS } from './drawing.text.js';
 import { useText } from '../presentation/look.js';
 import { DrawingPad } from './drawing-pad.js';
 import { uploadDrawing } from './drawing-view.js';
 
-const problems: Record<string, string> = { INVALID_STATE: 'This round is no longer taking drawings.', ALREADY_SUBMITTED: 'Your drawing is already saved.', RATE_LIMITED: 'Too many tries. Wait a moment and send again.', STORAGE_FULL: 'This room has no space left for drawings. Tell the host.' };
+const problems = { INVALID_STATE: 'drawingClosed', ALREADY_SUBMITTED: 'drawingSaved', RATE_LIMITED: 'limited', STORAGE_FULL: 'full' } as const;
 
 /** The unsent drawing survives a refresh or a lost connection (kept on this phone only). */
 function useKeptDrawing(stageRunId: string): [Drawing, (drawing: Drawing) => void] {
@@ -18,11 +20,11 @@ function useKeptDrawing(stageRunId: string): [Drawing, (drawing: Drawing) => voi
 export function DrawingAnswer({ sessionId, stageRunId, input, disabled, timeUp, onSubmit }: {
   sessionId: string; stageRunId: string; input: { maxStrokes: number; blind?: boolean | undefined; start?: Drawing | undefined }; disabled: boolean; timeUp: boolean; onSubmit: (assetId: string) => void;
 }) {
-  const t = useText(); const [drawing, setDrawing] = useKeptDrawing(stageRunId); const [sending, setSending] = useState(false); const [error, setError] = useState('');
+  const t = useText(); const d = useTexts(DRAWING_TEXTS); const [drawing, setDrawing] = useKeptDrawing(stageRunId); const [sending, setSending] = useState(false); const [error, setError] = useState('');
   const send = async () => {
     setSending(true); setError('');
     try { const { assetId } = await uploadDrawing(sessionId, 'answer', drawing); onSubmit(assetId); }
-    catch (cause) { setError(problems[cause instanceof Error ? cause.message : ''] ?? 'Sending failed. Check the connection and send again.'); }
+    catch (cause) { setError(d(problems[(cause instanceof Error ? cause.message : '') as keyof typeof problems] ?? 'failed')); }
     finally { setSending(false); }
   };
   // Time is up with a drawing that was not sent yet: send it as it is (drawing rounds take answers a few seconds after
@@ -31,7 +33,7 @@ export function DrawingAnswer({ sessionId, stageRunId, input, disabled, timeUp, 
   useEffect(() => { if (timeUp) setAutoSend(current => current === 'no' ? 'due' : current); }, [timeUp]);
   useEffect(() => { if (autoSend === 'due' && !sending) { setAutoSend('done'); if (drawing.strokes.length) void send(); } }, [autoSend, drawing]);
   return <div className="drawing-answer">
-    <DrawingPad value={drawing} onChange={setDrawing} under={input.start ? [input.start] : []} blind={input.blind ?? false} maxStrokes={input.maxStrokes} disabled={timeUp || sending} label="Your drawing" />
+    <DrawingPad value={drawing} onChange={setDrawing} under={input.start ? [input.start] : []} blind={input.blind ?? false} maxStrokes={input.maxStrokes} disabled={timeUp || sending} label={d('yours')} />
     {error && <p role="alert" className="error">{error}</p>}
     <button type="button" className="primary" disabled={disabled || sending || timeUp || !drawing.strokes.length} onClick={() => { void send(); }}>{timeUp ? t('timer.up') : t('drawing.submit')}</button>
   </div>;

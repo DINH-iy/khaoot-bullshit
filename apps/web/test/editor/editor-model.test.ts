@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routedPath, withBends, duplicateScenes, pasteScenes, addScene, pointOnCurve, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, COLUMN_STEP, cardHeight, curve, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routeSegments, routedPath, withBends, duplicateScenes, pasteScenes, addScene, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, COLUMN_STEP, cardHeight, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
 import { toDoc } from '../../src/editor/live/document.js';
 
 const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] });
@@ -78,11 +78,12 @@ describe('editor scene types and arrow handles', () => {
       expect(node.stages).toHaveLength(1); expect(typeof node.stages[0]!.kind).toBe('string');
     }
   });
-  it('places an arrow handle on its own curve, so two arrows into one scene get separate handles', () => {
-    const end = { x: 500, y: 100 };
-    const a = pointOnCurve({ x: 0, y: 0 }, end, 0.82); const b = pointOnCurve({ x: 0, y: 300 }, end, 0.82);
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(20);
-    expect(pointOnCurve({ x: 0, y: 0 }, end, 1)).toEqual(end);
+  it('places a handle on the same straight segments used to draw the arrow', () => {
+    const from = { x: 0, y: 0 }; const end = { x: 480, y: 96 };
+    const route = routeSegments(from, end);
+    expect(routedPath(route)).toBe('M 0 0 L 240 0 L 240 96 L 480 96');
+    expect(pointOnRoute(route, 0.5)).toEqual({ x: 240, y: 48 });
+    expect(pointOnRoute(route, 1)).toEqual(end);
   });
 });
 
@@ -193,8 +194,9 @@ describe('tidying a long game', () => {
     expect(straightenAll(positions)).toEqual({ a: { x: 0, y: 0 } });
   });
   it('runs an arrow into the next row along the gap between the rows', () => {
-    expect(curve({ x: 1500, y: 100 }, { x: 0, y: 600 })).toContain('L 0 350');
-    expect(pointOnCurve({ x: 1500, y: 100 }, { x: 0, y: 600 }, 0.5)).toEqual({ x: 750, y: 350 });
+    const route = routeSegments({ x: 1488, y: 96 }, { x: 0, y: 600 });
+    expect(routedPath(route)).toBe('M 1488 96 L 1536 96 L 1536 384 L -48 384 L -48 600 L 0 600');
+    expect(pointOnRoute(route, 0.5)).toEqual({ x: 780, y: 384 });
   });
 });
 
@@ -208,10 +210,11 @@ describe('bend points on an arrow', () => {
     expect(bendsOf(withBends(one, 'ab', []), 'ab')).toEqual([]);
   });
   it('make the arrow pass through them, still leaving and arriving horizontally', () => {
-    const path = routedPath({ x: 0, y: 0 }, { x: 400, y: 0 }, [{ x: 200, y: 300 }]);
-    expect(path).toMatch(/^M 0 0 C 60 0, .* 200 300 C .* 340 0, 400 0$/);
-    expect(pointOnRoute({ x: 0, y: 0 }, { x: 400, y: 0 }, [{ x: 200, y: 0 }], 0.75)).toEqual({ x: 300, y: 0 });
-    expect(routedPath({ x: 0, y: 0 }, { x: 400, y: 0 }, [])).toBe(curve({ x: 0, y: 0 }, { x: 400, y: 0 }));
+    const from = { x: 0, y: 0 }; const to = { x: 400, y: 0 };
+    const route = routeSegments(from, to, [{ x: 192, y: 288 }]);
+    expect(routedPath(route)).toBe('M 0 0 L 96 0 L 96 288 L 192 288 L 288 288 L 288 0 L 400 0');
+    expect(pointOnRoute([route[0]!], 0.5)).toEqual({ x: 96, y: 144 });
+    expect(pointOnRoute(routeSegments(from, to, [{ x: 192, y: 0 }]), 0.75)).toEqual({ x: 300, y: 0 });
   });
   it('are not cards: snapping ignores them', () => {
     const definition = game(); const positions = withBends({ a: { x: 0, y: 0 }, c: { x: 600, y: 600 } }, 'ab', [{ x: 487, y: 312 }]);

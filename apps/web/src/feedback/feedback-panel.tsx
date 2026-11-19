@@ -51,6 +51,7 @@ export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent
   return <section className="feedback-panel" role="dialog" aria-labelledby="feedback-heading" {...{ [FEEDBACK_UI]: '' }}>
     <header><h2 id="feedback-heading">Feedback</h2><button type="button" className="feedback-close" aria-label="Close feedback" onClick={onClose}>×</button></header>
     {sent ? <div className="feedback-sent" role="status"><p><strong>Thank you!</strong> Your report is in.</p>
+      <p className="feedback-report-id">Report ID <code>{id}</code></p>
       <div className="feedback-row"><button type="button" onClick={again}>Send another</button><button type="button" className="quiet" onClick={onClose}>Close</button></div></div>
     : <form onSubmit={event => void send(event)}>
       <fieldset className="feedback-kinds"><legend>What is it?</legend>

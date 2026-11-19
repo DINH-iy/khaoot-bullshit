@@ -9,8 +9,10 @@ import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
 import { Section } from '../controls/section.js';
-import { isWheelScene, addScene, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, type Definition, type Node, type SceneType } from '../model.js';
-import { translate } from '../../i18n/texts.js';
+import { isWheelScene, addScene, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
+import { translate, useTexts } from '../../i18n/texts.js';
+import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
+import { ScenePreview, ScenePreviewDialog } from './scene-preview.js';
 import { FIELDS_TEXTS } from './fields.text.js';
 const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
 import type { DraftState } from '../shell/use-draft.js';
@@ -52,6 +54,7 @@ export function sceneOrder(definition: Definition): { rows: Row[]; loose: Node[]
 
 export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; peers: EditorPeer[]; onOpenFlow: (key: string) => void }) {
   const definition = d.definition!; const { change, positions } = d; const readOnly = d.readOnly;
+  const labels = useTexts(SCENE_PRESENTATION_TEXTS);
   const { rows, loose } = useMemo(() => sceneOrder(definition), [definition]);
   const current = definition.nodes.find(node => node.key === selected[0]) ?? rows[0]?.node ?? definition.nodes[0]!;
   const [part, setPart] = useState(0); const [adding, setAdding] = useState<'scene' | 'part' | null>(null); const [confirming, setConfirming] = useState(false);
@@ -59,12 +62,12 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   useEffect(() => { setPart(0); setConfirming(false); }, [current.key]);
   const index = Math.min(part, current.stages.length - 1);
   const problems = d.issues.filter(issue => issue.nodeKey === current.key);
-  // Why "Try this scene" cannot work now, said before anything opens: problems of the whole game or of this scene
-  // stop every practice room; a vote needs the round it votes on, which is not in a room of one scene.
-  const gameWide = d.issues.filter(issue => !issue.nodeKey || !definition.nodes.some(node => node.key === issue.nodeKey));
-  const stopping = [...gameWide, ...problems]; const [why, setWhy] = useState(false);
-  const cannotTry = stopping.length ? t(stopping.length === 1 ? 'fixOne' : 'fixMany', { count: stopping.length, where: t(gameWide.length ? 'inSettings' : 'inScene'), problem: stopping[0]!.message })
-    : current.stages.some(stage => stage.kind === 'vote') ? t('voteAlone') : null;
+  const canRehearseOnly = !d.issues.some(issue => !issue.nodeKey || issue.nodeKey === current.key)
+    && !current.stages.some(stage => stage.kind === 'vote');
+  const [previewDevice, setPreviewDevice] = useState<'sharedScreen' | 'phone'>();
+  const [mediaKey, setMediaKey] = useState<string>();
+  const scenePart = `${current.key}:${index}`;
+  const editMedia = () => { if (!readOnly) setMediaKey(scenePart); };
   const problemsFor = (key: string) => d.issues.filter(issue => issue.nodeKey === key).length;
   const onChange = (next: Definition, group?: string) => change(next, undefined, group);
 
@@ -131,7 +134,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       <div className="scene-list-head"><h2>{t('scenes')}</h2>
         {routeIds.length > 0 && <button type="button" className="small-button icon-only" aria-label={t(allFolded ? 'unfoldAll' : 'foldAll')} title={t(allFolded ? 'unfoldAll' : 'foldAll')}
           onClick={() => setFolded(allFolded ? new Set() : new Set(routeIds))}><Icon name={allFolded ? 'unfold-all' : 'fold-all'} size={16} /></button>}
-        <button ref={addButton} className="with-icon small-button" disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} />{t('addAfter')}</button></div>
+        <button ref={addButton} className="scene-add-after with-icon small-button" disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} /><span>{t('addAfter')}</span></button></div>
       <ol>{listed}</ol>
       {loose.length > 0 && <><h3>{t('notConnected')}</h3><ol>{loose.map(node => row(node, 0, null))}</ol></>}
     </nav>
@@ -140,20 +143,21 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
     <section className="scene-stage" aria-label={t('preview')}>
       {current.stages.length > 1 && <div className="part-tabs" role="tablist" aria-label={t('partsOf')}>{current.stages.map((stage, position) =>
         <button key={stage.key} role="tab" aria-selected={position === index} onClick={() => setPart(position)}>Part {position + 1} · {partLabel(definition, stage)}</button>)}</div>}
-      <Preview node={current} index={index} />
+      <div className="scene-canvas-tools">
+        <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => setPreviewDevice('phone')}>{labels('phonePreview')}</button>
+      </div>
+      <ScenePreview definition={definition} node={current} index={index} device="sharedScreen" canvas={{
+        readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
+      }} />
+      {previewDevice && <ScenePreviewDialog definition={definition} node={current} index={index} initialDevice={previewDevice} onClose={() => setPreviewDevice(undefined)} />}
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>
     <aside className="scene-props" aria-labelledby="scene-props-heading">
       <div className="inspector-head"><h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
-        {/* Try just this scene in a practice room (a minigame, a round), without playing the whole game. */}
-        {/* Greyed out when it cannot work, with a red "!" on it that shows why (click, or hover). */}
-        <span className={`try-wrap${cannotTry ? ' blocked' : ''}`} onMouseEnter={() => setWhy(true)} onMouseLeave={() => setWhy(false)}>
-          <button type="button" className="small-button with-icon try-scene" disabled={d.busy || d.save !== 'saved' || Boolean(cannotTry)} title={cannotTry ? undefined : t('tryTitle')} onClick={() => d.rehearse(current.key, true)}><Icon name="try" size={16} />{t('tryScene')}</button>
-          {cannotTry && <button type="button" className="try-alert" aria-label={t('whyNot')} aria-expanded={why} aria-describedby={why ? 'try-why' : undefined} onClick={() => setWhy(!why)} onBlur={() => setWhy(false)}>!</button>}
-          {cannotTry && why && <span id="try-why" role="tooltip" className="try-pop">{cannotTry}</span>}
-        </span>
+        <button type="button" className="small-button with-icon try-scene" aria-haspopup="dialog" title={t('tryScene')} onClick={() => setPreviewDevice('sharedScreen')}><Icon name="try" size={16} /><span>{t('tryScene')}</span></button>
         <ActionMenu label={t('sceneActions')} actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
           { label: t('rehearseHere'), icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
+          { label: labels('rehearseOnly'), icon: 'try', disabled: d.busy || d.save !== 'saved' || !canRehearseOnly, onSelect: () => d.rehearse(current.key, true) },
           { label: t('changeLeads'), icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
       {definition.startNodeKey === current.key && <p className="start-note">{t('startsHere')}</p>}
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
@@ -168,7 +172,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         <p className="hint">{t('partsHint')}</p>
       </Section>}
       {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
-      <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} /></fieldset>
+      <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
       {/* Where it leads: a button to go there (changing it is the Flow editor's business, in the ☰ menu). */}
       <NextScenes definition={definition} node={current} onGo={key => setSelected([key])} />
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
@@ -208,32 +212,3 @@ function FloatingMenu({ anchor, onClose, children }: { anchor: HTMLElement | nul
 function Problems({ problems, parts }: { problems: DefinitionIssue[]; parts: number }) {
   return <div role="alert" className="inspector-problems"><h3>{t('problemsHere')}</h3><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && parts > 1 ? t('part', { number: issue.stageIndex + 1 }) : ''}{issue.message}</li>)}</ul></div>;
 }
-
-/** A rough picture of what the shared screen and a phone show for this part. Not the final game look. */
-function Preview({ node, index }: { node: Node; index: number }) {
-  const stage = node.stages[index]!; const input = stage['input'] as { kind?: string; options?: { key: string; label: string }[]; items?: { key: string; label: string }[]; layout?: string } | undefined;
-  const timer = typeof stage.durationMs === 'number' ? `${Math.round(stage.durationMs / 1000)} s` : null;
-  const options = stage.kind === 'route' ? optionsOf(node) : input?.options ?? input?.items ?? [];
-  const phone = t(stage.kind === 'info' || stage.kind === 'scoreboard' ? 'pWatch'
-    : stage.kind === 'challenge' ? 'pHost' : stage.kind === 'minigame' ? 'pMinigame'
-    : stage.kind === 'vote' ? 'pVote' : input?.kind === 'text' ? 'pType' : input?.kind === 'media' ? 'pUpload' : input?.kind === 'drawing' ? 'pDraw' : input?.kind === 'order' ? 'pOrder' : 'pChoose');
-  return <div className="preview">
-    <figure className="tv"><figcaption>{t('sharedScreen')}</figcaption>
-      <div className={`tv-screen tv-${stage.kind}`}>
-        {stage.kind === 'info' && <p className="tv-banner">{String(stage.title ?? '')}</p>}
-        <p className="tv-prompt">{String(stage.prompt ?? '')}</p>
-        {options.length > 0 && <ul className={`tv-options${input?.kind === 'order' ? ' order' : ''}`}>{options.map((option, position) => <li key={option.key}><span>{input?.kind === 'order' ? position + 1 : String.fromCharCode(65 + position)}</span>{option.label}</li>)}</ul>}
-        {stage.kind === 'scoreboard' && <ol className="tv-scores"><li>{t('playerOne')} <b>30</b></li><li>{t('playerTwo')} <b>20</b></li><li>{t('playerThree')} <b>10</b></li></ol>}
-        {timer && <p className="tv-timer">{timer}</p>}
-      </div></figure>
-    <figure className="phone"><figcaption>{t('phone')}</figcaption>
-      <div className="phone-screen"><p className="phone-prompt">{stage.kind === 'info' ? String(stage.title ?? '') : String(stage.prompt ?? '')}</p>
-        {['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && input?.kind !== 'order'
-          ? <div className={(input?.layout === 'tiles' || stage.kind === 'route') && !longOptions(options) ? 'phone-tiles' : 'phone-list'}>{options.map(option => <span key={option.key}>{option.label}</span>)}</div>
-          : <p className="phone-hint">{phone}</p>}
-      </div></figure>
-  </div>;
-}
-
-/** Options too long for two side by side on a phone: they go below one another (as the phone itself does). */
-const longOptions = (options: { label: string }[]) => options.some(option => option.label.length > 18 || option.label.split(/\s+/).some(word => word.length > 12));

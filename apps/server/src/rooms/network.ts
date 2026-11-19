@@ -103,7 +103,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const definition = parseDefinition(room.gameVersion.definition);
       const look = definition.presentation;
       const joining = await people.joinInfo(room.id, readRoomState(room.state));
-      return { ok: true, data: RoomLookSchema.parse({ title: definition.title, presentation: { texts: look?.texts ?? {}, animations: look?.animations ?? {}, themes: look?.theme ? [look.theme] : [] }, ...joining }) };
+      return { ok: true, data: RoomLookSchema.parse({ title: definition.title, presentation: { texts: look?.texts ?? {}, translations: look?.translations, animations: look?.animations ?? {}, themes: look?.theme ? [look.theme] : [] }, ...joining }) };
     } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 404).send(failure(error)); }
   });
   app.get('/api/rooms/seats/:roomCode', async (request, reply) => {

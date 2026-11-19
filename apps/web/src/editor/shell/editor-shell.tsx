@@ -18,6 +18,8 @@ import { pendingClaim } from '../../people/use-me.js';
 import { chooseTheme, currentTheme } from '../../theme.js';
 import { ProblemsPanel } from './problems-panel.js';
 import { HistoryPanel } from './history-panel.js';
+import { MediaLibraryDialog } from '../scene/fields/media-field.js';
+import { MEDIA_TEXTS } from '../scene/fields/media.text.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SHELL_TEXTS } from './shell.text.js';
 import '../editor.css';
@@ -26,6 +28,7 @@ const SAVE_TEXT = { saved: 'saved', pending: 'pending', saving: 'saving', error:
 type View = 'flow' | 'scene' | 'look';
 const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const VIEW_NAMES = { flow: 'viewFlow', scene: 'viewScene', look: 'viewLook' } as const satisfies Record<View, keyof typeof SHELL_TEXTS.en>;
+const COMPACT_HEADER = '(max-width: 1320px)';
 
 /**
  * The editor page: the owner or editor bar (when signed in) above the editors. An
@@ -46,6 +49,16 @@ function EditorPage({ gameId }: { gameId: string }) {
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
 function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
   const d = useDraft(gameId); const t = useTexts(SHELL_TEXTS);
+  const mediaText = useTexts(MEDIA_TEXTS);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [compactHeader, setCompactHeader] = useState(() => matchMedia(COMPACT_HEADER).matches);
+  useEffect(() => {
+    const query = matchMedia(COMPACT_HEADER);
+    const update = () => setCompactHeader(query.matches);
+    query.addEventListener('change', update);
+    update();
+    return () => query.removeEventListener('change', update);
+  }, []);
   // Coming back opens the same place (K2): the link's view wins, then what was open last time in this browser.
   const [memory] = useState(() => readMemory(gameId)); const [helping, setHelping] = useState(false); const [theme, setTheme] = useState(currentTheme);
   const [view, setViewState] = useState<View>(() => { const wanted = new URLSearchParams(location.search).get('view'); return wanted === 'flow' || wanted === 'scene' || wanted === 'look' ? wanted : memory.view ?? 'flow'; });
@@ -88,29 +101,32 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   const fromStart = blocking(definition.startNodeKey); const fromScene = blocking(selected[0]);
   const fix = (count: number) => t(count === 1 ? 'fixFirst' : 'fixFirstMany', { count });
   const openPanel = (panel: 'settings' | 'invite' | 'export') => { setSettings(panel === 'settings'); setInviting(panel === 'invite'); setExporting(panel === 'export'); };
+  const toggleMode = () => d.setReadOnly(!d.readOnly);
+  const modeLabel = t(d.readOnly ? 'viewingSwitch' : 'editingSwitch');
   const overview = `${t('minutes', { minutes: estimateMinutes(definition) })} · ${t(nodes.length === 1 ? 'sceneOne' : 'sceneMany', { count: nodes.length })}${routes ? `, ${t(routes === 1 ? 'choiceOne' : 'choiceMany', { count: routes })}` : ''} · ${d.issues.length ? problemCount : t('noProblems')}`;
   return <div className={`editor${d.readOnly ? ' viewing' : ''}`}>
     {/* One compact bar: the game and its state, the three editors, and the actions; the rest is in the ☰ menu. */}
-    <header className="editor-header">
+    <header className={`editor-header${compactHeader ? ' compact-header' : ''}`}>
       <h1 className="visually-hidden">{t(VIEW_NAMES[view])}: {definition.title}</h1>
       <div className="editor-title"><AppMenu role={role} />
         <div><label className="visually-hidden" htmlFor="game-title">{t('gameName')}</label>
           <input id="game-title" className="title-input" readOnly={d.readOnly} value={definition.title} maxLength={160} onChange={event => d.change({ ...definition, title: event.target.value }, undefined, 'title')} />
-          <p className="crumb" title={overview}>{draft.builtIn ? <><a href="/?host=1">{t('builtInGames')}</a> / <span className="crumb-builtin" title={t('yourVersionTitle', { title: draft.builtIn.title })}>{t('yourVersionOf', { title: draft.builtIn.title })}</span></> : <a href="/?host=1">{t('yourGames')}</a>} / {t('draft')}{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : t('changes')}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{t(SAVE_TEXT[d.save])}</span> · <span className="game-overview">{overview}</span></p></div></div>
+          <p className="crumb" title={overview}>{draft.builtIn ? <><a href="/?host=1">{t('builtInGames')}</a> / <span className="crumb-builtin" title={t('yourVersionTitle', { title: draft.builtIn.title })}>{t('yourVersionOf', { title: draft.builtIn.title })}</span></> : <a href="/?host=1">{t('yourGames')}</a>} / {t('draft')}{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : t('changes')}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{t(SAVE_TEXT[d.save])}</span>{compactHeader && d.readOnly && <> · {t('viewing')}</>}<span className="game-overview"> · {overview}</span></p></div></div>
       <div className="tabs editor-tabs" role="tablist" aria-label={t('editorView')}>
         {(Object.keys(VIEW_NAMES) as View[]).map(key => <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}>{t(VIEW_NAMES[key])}</button>)}</div>
       <div className="editor-actions">
-        {/* Undo and Redo up here, so they are in reach in every editor, however long the scene list. */}
+        {!compactHeader && <>
         <div className="history-buttons">
           <button type="button" className="icon-only" aria-label={t('undo')} title={t('undoTitle', { key: MOD })} disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" size={18} /></button>
           <button type="button" className="icon-only" aria-label={t('redo')} title={t('redoTitle', { key: MOD })} disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" size={18} /></button></div>
         {/* View mode: look through the game without changing anything by accident. One button switches. */}
-        <button type="button" className={`mode-toggle${d.readOnly ? ' viewing' : ''}`} aria-label={t(d.readOnly ? 'viewingSwitch' : 'editingSwitch')}
-          title={t(d.readOnly ? 'viewingTitle' : 'editingTitle')} onClick={() => d.setReadOnly(!d.readOnly)}>
+        <button type="button" className={`mode-toggle${d.readOnly ? ' viewing' : ''}`} aria-label={modeLabel}
+          title={t(d.readOnly ? 'viewingTitle' : 'editingTitle')} onClick={toggleMode}>
           <Icon name={d.readOnly ? 'eye' : 'edit'} size={18} /><span>{t(d.readOnly ? 'viewing' : 'editing')}</span></button>
+        </>}
         {/* Trying out, publishing and playing: one menu. Each item says why when it cannot be used yet. */}
         {/* A game with problems cannot be rehearsed or published: the menu says so, and the problems are in the box at the bottom left. */}
-        <ActionMenu label={t('playPublish')} text={t('playPublishText')} {...(d.issues.length ? { icon: 'warning' } : {})}
+        <ActionMenu label={t('playPublish')} text={t('playPublishText')} {...(d.issues.length || compactHeader ? { icon: compactHeader ? 'play' : 'warning' } : {})}
           intro={d.issues.length ? <span className="menu-warning" title={t('problemsTip')}><Icon name="warning" size={16} />{t('toFixFirst', { problems: problemCount })}</span> : t('rehearseIntro')} actions={[
           { label: fromStart ? t('rehearseStartFix', { fix: fix(fromStart) }) : t('rehearseStart'), disabled: d.busy || d.save !== 'saved' || fromStart > 0, onSelect: () => d.rehearse(null) },
           { label: selected.length !== 1 ? t('rehearseSelectOne') : fromScene ? t('rehearseSceneFix', { fix: fix(fromScene) }) : t('rehearseScene'), disabled: d.busy || d.save !== 'saved' || selected.length !== 1 || fromScene > 0, onSelect: () => d.rehearse(selected[0]!) },
@@ -119,13 +135,21 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
           ...(role === 'owner' ? [{ label: draft.published ? t('playPublished') : t('playFirst'), disabled: d.busy || !draft.published, onSelect: d.play }] : []),
         ]} />
-        <ActionMenu label={t('gameMenu')} actions={[{ label: t('gameSettings'), icon: 'gear', onSelect: () => openPanel('settings'), problems: gameProblems }, { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
+        <ActionMenu label={t('gameMenu')} actions={[{ label: t('gameSettings'), icon: 'gear', onSelect: () => openPanel('settings'), problems: gameProblems },
+          ...(role ? [{ label: mediaText('library'), icon: 'upload', onSelect: () => setLibraryOpen(true) }] : []),
+          ...(compactHeader ? [
+            { label: t('undo'), icon: 'undo', disabled: !d.canUndo, onSelect: d.undo },
+            { label: t('redo'), icon: 'redo', disabled: !d.canRedo, onSelect: d.redo },
+            { label: modeLabel, icon: d.readOnly ? 'eye' : 'edit', onSelect: toggleMode },
+          ] : []),
+          { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}
         <PeerBar live={live} />
       </div>
     </header>
     {helping && <HelpPanel onClose={() => setHelping(false)} />}
+    {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly} onClose={() => setLibraryOpen(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}

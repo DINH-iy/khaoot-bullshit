@@ -34,9 +34,12 @@ import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/ar
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 import { useSiteTheme } from '../presentation/site-look.js';
-import { StageMedia } from './stage-media.js';
+import { SceneComposition } from '../presentation/scene-composition.js';
+import { StageMedia, StageYouTube } from './stage-media.js';
 import { MusicPlayer } from './music-player.js';
 import { translate, useTexts } from '../i18n/texts.js';
+import { useLanguage } from '../i18n/language.js';
+import { localizeStage } from '../presentation/scene-translations.js';
 import { LanguagePicker } from '../i18n/language-picker.js';
 import { rich } from '../i18n/rich.js';
 import { PHONE_TEXTS } from './phone.text.js';
@@ -94,14 +97,13 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
         <button className="primary big" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
       {person === null && roomCode.length === ROOM_CODE_LENGTH && <PickYourName roomCode={roomCode} people={expected} onSignedIn={onPicked} />}
-      {/* The arcade: minigames with friends, no host or game needed. */}
-      <p className="join-links"><a href="/?arcade">{r('arcade')}</a></p>
       {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
       <details className="join-more">
         <summary>{r('moreOptions')}<FaIcon name="chevron-down" /></summary>
         <div className="join-options">
           {person === null && <KeySignIn onSignIn={onSignIn} />}
           <button type="button" className="join-option" onClick={onReclaim}><JoinOption icon="arrow-rotate-left" title={t('join.reclaimButton')} detail={t('join.reclaim')} /></button>
+          <a className="join-option" href="/?arcade"><JoinOption icon="play" title={r('arcade')} detail={r('arcadeDetail')} /></a>
           {/* The host link comes from this browser's owner hint. Editor access comes from /api/people/me. */}
           {ownerBrowser && <a className="join-option" href="/?host=1"><JoinOption icon="tv" title={r('hostInstead')} /></a>}
           {!ownerBrowser && person?.canEdit && <a className="join-option" href="/?host=1#my-games"><JoinOption icon="gear" title={r('editGames')} /></a>}
@@ -118,7 +120,13 @@ export function RoomScreen() {
   const [roomCode, setRoomCode] = useState(cleanRoomCode(initial.searchParams.get('code') ?? '')); const [name, setName] = useState('');
   const [error, setError] = useState(''); const [closedMessage, setClosedMessage] = useState(''); const [busy, setBusy] = useState(Boolean(access)); const [ready, setReady] = useState(!access);
   const [draft, setDraft] = useState(emptyDraft(null)); const [editingLook, setEditingLook] = useState(false); const [displayUrl, setDisplayUrl] = useState(''); const [timerSeconds, setTimerSeconds] = useState('30'); const [reclaiming, setReclaiming] = useState(false);
-  const room = useRoom(ready ? sessionId : undefined, initial.searchParams.get('display') === '1'); const state = room.snapshot;
+  const room = useRoom(ready ? sessionId : undefined, initial.searchParams.get('display') === '1'); const language = useLanguage();
+  const snapshot = room.snapshot;
+  const state = useMemo(() => {
+    if (!snapshot?.view.stage) return snapshot;
+    const stage = localizeStage(snapshot.view.stage, language);
+    return stage === snapshot.view.stage ? snapshot : { ...snapshot, view: { ...snapshot.view, stage } };
+  }, [snapshot, language]);
   const account = useMe();
   // An arcade round: keeps this phone in its lobby and goes back there when the round ends.
   useArcadeRound(state);
@@ -274,11 +282,13 @@ export function RoomScreen() {
   const nextAlso = running && stage && stage.status === 'CLOSED' && primary?.label !== t('host.next') && (stage.kind !== 'route' || stage.route?.decision);
 
   return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><main className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''} ${lookClass}`} style={lookStyle}>
-    <header className="room-bar">
+    <header className="room-bar session-bar">
       <h1 className="visually-hidden">{state ? r(role === 'host' ? 'hostScreen' : role === 'display' ? 'sharedScreen' : 'yourPhone', { title: state.view.title }) : r('partyRoom')}</h1>
-      <div className="room-id"><p className="brand">party<span>.</span></p>
-        <div><p className="room-game">{state?.view.title ?? r('connecting')}{state ? ` · ${t(state.view.status === 'LOBBY' ? 'status.waiting' : state.view.status === 'PAUSED' ? 'status.paused' : state.view.status === 'FINISHED' ? 'status.finished' : 'status.playing')}` : ''}</p>
-          {state && <h2 id="room-heading" className="room-code">Room {state.roomCode}</h2>}</div></div>
+      <p className="brand">party<span>.</span></p>
+      <div>
+        <p className="room-game">{state?.view.title ?? r('connecting')}{state ? ` · ${t(state.view.status === 'LOBBY' ? 'status.waiting' : state.view.status === 'PAUSED' ? 'status.paused' : state.view.status === 'FINISHED' ? 'status.finished' : 'status.playing')}` : ''}</p>
+        {state && <h2 id="room-heading" className="room-code">Room {state.roomCode}</h2>}
+      </div>
       <ConnectionMenu status={room.connection} ok={connected} slow={slowConnection(room.samples)} busy={busy} saving={room.saving} onReconnect={room.reconnect} details={<details className="conn-details"><summary>{r('details')}</summary>
         <dl className="metrics"><div><dt>{r('latest')}</dt><dd>{room.samples.length ? `${Math.round(room.samples.at(-1)!)} ms` : r('measuring')}</dd></div>
           <div><dt>{r('p95', { count: room.samples.length })}</dt><dd>{p95 === undefined ? r('measuring') : `${Math.round(p95)} ms`}</dd></div><div><dt>{r('reconnects')}</dt><dd>{room.reconnects}</dd></div><div><dt>{r('lastSaved')}</dt><dd>{room.confirmMs === null ? '—' : `${room.confirmMs} ms`}</dd></div></dl>
@@ -318,11 +328,15 @@ export function RoomScreen() {
               </div></>}
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}`} aria-labelledby="stage-heading">
-          {stage.info && <p className="stage-banner">{stage.info.title}</p>}
-          {/* While teams are picked, the round's question waits: one thing at a time. */}
-          <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard') : stage.prompt)}</h2>
-          {stage.info && <p className="info-text">{stage.prompt}</p>}
-          {stage.media && !forming && !explaining && <StageMedia media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} />}
+          <SceneComposition layout={stage.mediaLayout} media={!forming && !explaining && (
+            stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} />
+              : stage.media ? <StageMedia key={stage.id} media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} /> : null
+          )}>
+            {stage.info && <p className="stage-banner">{stage.info.title}</p>}
+            {/* While teams are picked, the round's question waits: one thing at a time. */}
+            <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard') : stage.prompt)}</h2>
+            {stage.info && <p className="info-text">{stage.prompt}</p>}
+          </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
           <TeamSummary state={state} stage={stage} />

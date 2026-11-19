@@ -26,6 +26,14 @@ test('a tester points at a button and reports it; the owner finds it with its fi
   await panel.getByLabel(/Your name/).fill('Tester Tess');
   await panel.getByRole('button', { name: 'Send' }).click();
   await expect(panel.getByRole('status')).toContainText('Thank you');
+  const receipt = panel.getByRole('status').locator('code');
+  await expect(receipt).toHaveText(/^[a-f0-9-]{36}$/i);
+  const reportId = (await receipt.innerText()).trim();
+  await panel.getByRole('button', { name: 'Send another' }).click();
+  await panel.getByLabel('What went wrong?').fill(`Another report (${test.info().project.name})`);
+  await panel.getByRole('button', { name: 'Send' }).click();
+  await expect(receipt).toHaveText(/^[a-f0-9-]{36}$/i);
+  await expect(receipt).not.toHaveText(reportId);
 
   // Players and strangers cannot read reports.
   await page.goto('/?admin');
@@ -35,13 +43,20 @@ test('a tester points at a button and reports it; the owner finds it with its fi
   try {
     await owner.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await owner.getByRole('link', { name: 'Admin: feedback from testers' }).click();
+    await owner.getByRole('searchbox', { name: 'Search' }).fill(reportId.toUpperCase());
+    await expect(owner.locator('.admin-item')).toHaveCount(1);
     const item = owner.getByRole('listitem').filter({ has: owner.getByRole('heading', { name: title }) });
+    await expect(item.locator('.admin-report-id code')).toHaveText(reportId);
     await expect(item).toContainText('Tester Tess');
     await expect(item).toContainText('join screen');
     await expect(item).toContainText(/JoinScreen in apps\/web\/src\/room\/room-screen\.tsx:\d+/);
     expect((await new AxeBuilder({ page: owner }).analyze()).violations).toEqual([]);
-    await item.getByLabel(`Status of ${title}`).selectOption('planned');
+    await item.getByLabel(`Status of ${title}`).selectOption('done');
+    await expect(item).toHaveCount(0);
     await owner.reload();
-    await expect(owner.getByLabel(`Status of ${title}`)).toHaveValue('planned');
+    await owner.getByLabel('Status', { exact: true }).selectOption('done');
+    await owner.getByRole('searchbox', { name: 'Search' }).fill(reportId);
+    await expect(item.getByLabel(`Status of ${title}`)).toHaveValue('done');
+    await expect(item.locator('.admin-report-id code')).toHaveText(reportId);
   } finally { await ownerContext.close(); }
 });

@@ -4,8 +4,8 @@ import { Icon, sceneIcon } from '../controls/icons.js';
 import { Inspector } from '../scene/inspector.js';
 import { Minimap } from './minimap.js';
 import {
-  addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, curve, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  bendsOf, insertOnEdge, insertPrefab, isBendKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
+  bendsOf, insertOnEdge, insertPrefab, isBendKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { InfoTip } from '../controls/info-tip.js';
@@ -255,7 +255,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const edgeMid = (() => {
     const edge = selectedEdge ? definition.edges.find(entry => entry.key === selectedEdge) : undefined; if (!edge) return null;
     const fromNode = definition.nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
-    return fromNode && from && to ? pointOnRoute(outputPort(fromNode, from, edge.option), inputPort(to), bendsOf(positions, edge.key), 0.5) : null;
+    return fromNode && from && to ? pointOnRoute(routeSegments(outputPort(fromNode, from, edge.option), inputPort(to), bendsOf(positions, edge.key), from.y + cardHeight(fromNode)), 0.5) : null;
   })();
   const selectedBends = selectedEdge ? bendsOf(positions, selectedEdge) : [];
   /**
@@ -264,11 +264,26 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
    */
   const dragBend = (event: ReactPointerEvent<Element>, edge: string, index: number, insert: boolean) => {
     if (event.button !== 0 || readOnly) return; event.stopPropagation(); event.preventDefault();
-    const before = positions; const points = [...bendsOf(positions, edge)]; const at = toCanvas(event.clientX, event.clientY);
-    if (insert) points.splice(index, 0, { x: snap(at.x), y: snap(at.y) });
-    let latest = withBends(before, edge, points); let moved = insert; if (insert) setPositions(latest);
-    const move = (moveEvent: PointerEvent) => { const here = toCanvas(moveEvent.clientX, moveEvent.clientY); points[index] = { x: snap(here.x), y: snap(here.y) }; latest = withBends(before, edge, points); moved = true; setPositions(latest); };
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); if (moved) change(definition, latest, '', before); };
+    const before = positions;
+    const points = [...bendsOf(positions, edge)];
+    let latest: Positions | undefined;
+    const move = (moveEvent: PointerEvent) => {
+      if (!latest && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < 4) return;
+      const here = toCanvas(moveEvent.clientX, moveEvent.clientY);
+      const point = { x: snap(here.x), y: snap(here.y) };
+      if (insert && !latest) points.splice(index, 0, point);
+      else points[index] = point;
+      latest = withBends(before, edge, points);
+      setPositions(latest);
+    };
+    const up = (endEvent: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (!latest) return;
+      if (endEvent.type === 'pointercancel') setPositions(before);
+      else change(definition, latest, '', before);
+    };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   };
   const removeBend = (edge: string, index: number) => { if (!readOnly) change(definition, withBends(positions, edge, bendsOf(positions, edge).filter((_, at) => at !== index))); };
@@ -369,17 +384,17 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
         { label: t('zoomSelected'), icon: 'zoom', shortcut: 'Shift + 2', disabled: !selected.length, onSelect: () => fitTo(selected) },
       ]} />
       {/* The ways to work the map, behind one ⓘ instead of a line of text (A selected arrow's actions are on the arrow itself). */}
-      <InfoTip label={t('tipsLabel')} icon="tips" text={t('tips')} align="start">
-        <span className="tip-list">
+      <InfoTip label={t('tipsLabel')} icon="tips" text={t('tips')} align="start" clickOnly>
+        {close => <span className="tip-list">
           {readOnly && <strong>{t('viewingLong')}</strong>}
           {(['tip1', 'tip2', 'tip3', 'tip4', 'tip5'] as const).map(key => <span key={key}>{marked(t(key))}</span>)}
-          <button type="button" className="small-button" onClick={onHelp}>{t('allShortcuts')}</button>
-        </span>
+          <button type="button" className="small-button" onClick={() => { close(); onHelp(); }}>{t('allShortcuts')}</button>
+        </span>}
       </InfoTip>
       {readOnly && <span className="flow-hint">{t('viewingShort')}</span>}
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
-    <div className="flow-canvas" ref={canvas} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
+    <div className="flow-canvas" ref={canvas} style={{ backgroundSize: `${GRID * view.zoom}px ${GRID * view.zoom}px`, backgroundPosition: `${view.x - GRID * view.zoom / 2}px ${view.y - GRID * view.zoom / 2}px` }} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
         <svg className="flow-lines" width="1" height="1" overflow="visible" aria-hidden="true">
           <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="arrow-head" /></marker>
@@ -387,21 +402,24 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           {guides.x !== null && <line className="guide" x1={guides.x} y1={-5000} x2={guides.x} y2={5000} />}
           {guides.y !== null && <line className="guide" x1={-5000} y1={guides.y} x2={5000} y2={guides.y} />}
           {box && <rect className="select-box" x={Math.min(box.from.x, box.to.x)} y={Math.min(box.from.y, box.to.y)} width={Math.abs(box.to.x - box.from.x)} height={Math.abs(box.to.y - box.from.y)} />}
-          {definition.edges.map(edge => {
+          {[...definition.edges].sort((a, b) => Number(a.key === selectedEdge) - Number(b.key === selectedEdge)).map(edge => {
             const fromNode = nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
             if (!fromNode || !from || !to) return null;
-            const start = outputPort(fromNode, from, edge.option); const end = inputPort(to); const bends = bendsOf(positions, edge.key); const path = routedPath(start, end, bends);
+            const start = outputPort(fromNode, from, edge.option); const end = inputPort(to); const bends = bendsOf(positions, edge.key); const segments = routeSegments(start, end, bends, from.y + cardHeight(fromNode)); const path = routedPath(segments);
             const label = edge.option ? optionsOf(fromNode).find(option => option.key === edge.option)?.label : undefined; const on = selectedEdge === edge.key;
-            const grip = pointOnRoute(start, end, bends, 0.82);
+            // Incoming paths can share their last leg at a rejoin. Keep the grip on this arrow's own leg there.
+            const rejoins = definition.edges.some(other => other.key !== edge.key && other.to === edge.to);
+            const grip = pointOnRoute(segments, rejoins ? 0.25 : 0.82);
             // While an arrow is being moved it stays mounted (the pointer is captured by its handle), just hidden.
             return <g key={edge.key} data-edge={edge.key} className={`edge${on ? ' selected' : ''}${connecting?.rewire === edge.key ? ' moving' : ''}`} onPointerDown={event => { event.stopPropagation(); setSelectedEdge(edge.key); setSelected([]); }}>
               <path d={path} className="edge-hit" /><path d={path} className="edge-line" markerEnd={on ? 'url(#arrow-on)' : 'url(#arrow)'} />
               {label && <text x={end.x - 12} y={end.y - 12} textAnchor="end" className="edge-label">{label}</text>}
-              <circle cx={grip.x} cy={grip.y} r={10} className="edge-end" onPointerDown={event => { setSelectedEdge(edge.key); startConnect(event, edge.from, edge.option, edge.key); }}><title>{t('moveArrow')}</title></circle>
-              {/* A selected arrow's bend points (drag; double-click removes) and + handles between them (drag to add one). */}
+              {(!readOnly && (on || connecting?.rewire === edge.key)) && <rect x={grip.x - 6} y={grip.y - 6} width={12} height={12} rx={2} className="edge-end" onPointerDown={event => { setSelectedEdge(edge.key); startConnect(event, edge.from, edge.option, edge.key); }}><title>{t('moveArrow')}</title></rect>}
               {on && !readOnly && <>
-                {[start, ...bends, end].slice(1).map((point, index) => { const previous = [start, ...bends][index]!; const mid = bends.length ? { x: (previous.x + point.x) / 2, y: (previous.y + point.y) / 2 } : pointOnRoute(start, end, bends, 0.5);
-                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={8} className="edge-bend-add" onPointerDown={event => dragBend(event, edge.key, index, true)}><title>{t('bendHere')}</title></circle>; })}
+                {segments.map((points, index) => {
+                  const mid = pointOnRoute([points], 0.5);
+                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={7} className="edge-bend-add" onPointerDown={event => dragBend(event, edge.key, index, true)}><title>{t('bendHere')}</title></circle>;
+                })}
                 {bends.map((point, index) => <circle key={`bend-${index}`} cx={point.x} cy={point.y} r={8} className="edge-bend" onPointerDown={event => dragBend(event, edge.key, index, false)} onDoubleClick={event => { event.stopPropagation(); removeBend(edge.key, index); }}><title>{t('moveBend')}</title></circle>)}
               </>}
             </g>;
@@ -409,7 +427,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           {connecting && (() => {
             const fromNode = nodes.find(node => node.key === connecting.from)!; const start = outputPort(fromNode, positions[connecting.from]!, connecting.option);
             const end = connecting.target && !connecting.blocked ? inputPort(positions[connecting.target]!) : connecting.pointer;
-            return <path d={curve(start, end)} markerEnd="url(#arrow-on)" className={`edge-line drafting${connecting.target && !connecting.blocked ? ' snapped' : ''}${connecting.blocked ? ' blocked' : ''}`} />;
+            return <path d={routedPath(routeSegments(start, end, [], positions[connecting.from]!.y + cardHeight(fromNode)))} markerEnd="url(#arrow-on)" className={`edge-line drafting${connecting.target && !connecting.blocked ? ' snapped' : ''}${connecting.blocked ? ' blocked' : ''}`} />;
           })()}
         </svg>
         {nodes.map(node => {

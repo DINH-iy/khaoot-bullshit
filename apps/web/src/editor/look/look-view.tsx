@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { Presentation } from '@party/contracts';
+import { mergePresentationTexts, type Presentation } from '@party/contracts';
 import { buildLook, LookContext, themeClass, themeStyle } from '../../presentation/look.js';
+import { useLanguage, type Language } from '../../i18n/language.js';
 import { cardText, type Definition } from '../model.js';
 import type { DraftState } from '../shell/use-draft.js';
 import { layerOf, withLayer, type Scope } from './layer.js';
 import { ThemePanel } from './theme-panel.js';
-import { TextsPanel } from './texts-panel.js';
+import { TranslatedTextsPanel } from './texts-panel.js';
 import { AnimationPanel } from './animation-panel.js';
 import { LookPreview } from './look-preview.js';
 import '../../room/room.css';
@@ -24,6 +25,8 @@ const scopeValue = (scope: Scope) => scope.kind === 'game' ? 'game' : `${scope.n
 /** The look of the game: style, every text and every animation, for the whole game or for a single scene. */
 export function LookView({ d, selected, gameId }: { d: DraftState; selected: string[]; gameId: string }) {
   const definition = d.definition!;
+  const editorLanguage = useLanguage();
+  const [textLanguage, setTextLanguage] = useState<Language | ''>('');
   const [scope, setScope] = useState<Scope>(() => { const node = definition.nodes.find(entry => entry.key === selected[0]); return node && selected.length === 1 ? { kind: 'scene', nodeKey: node.key, stageIndex: 0 } : { kind: 'game' }; });
   // The part of Look & feel last open for this game (K2).
   const [section, setSectionState] = useState<Section>(() => { const saved = readMemory(gameId).lookSection; return saved && saved in SECTIONS ? saved as Section : 'theme'; });
@@ -33,7 +36,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
   const below: Presentation = live.kind === 'game' ? {} : game;
   const update = (patch: Partial<Presentation>, group: string) => d.change(withLayer(definition, live, { ...layer, ...patch }) as Definition, undefined, `look:${scopeValue(live)}:${group}`);
   // The look the preview shows: the game's, with this scene's changes on top.
-  const look = buildLook({ texts: { ...game.texts, ...(live.kind === 'scene' ? layer.texts : {}) }, animations: { ...game.animations, ...(live.kind === 'scene' ? layer.animations : {}) }, themes: [game.theme, live.kind === 'scene' ? layer.theme : undefined].filter(Boolean) });
+  const look = buildLook({ ...mergePresentationTexts(game, live.kind === 'scene' ? layer : undefined), animations: { ...game.animations, ...(live.kind === 'scene' ? layer.animations : {}) }, themes: [game.theme, live.kind === 'scene' ? layer.theme : undefined].filter(Boolean) }, section === 'texts' && textLanguage ? textLanguage : editorLanguage);
   const changedScenes = definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ node, index, stage }))).filter(entry => entry.stage['presentation']);
   return <div className="look-editor">
     <aside className="look-controls" aria-labelledby="look-heading">
@@ -46,7 +49,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
       <div className="tabs" role="tablist" aria-label={t('partOfLook')}>{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{t(SECTIONS[key])}</button>)}</div>
       <fieldset className="view-lock" disabled={d.readOnly}>
       {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} title={definition.title} onChange={theme => update({ theme }, 'theme')} />}
-      {section === 'texts' && <TextsPanel texts={layer.texts} below={below.texts ?? {}} onChange={texts => update({ texts }, 'texts')} />}
+      {section === 'texts' && <TranslatedTextsPanel layer={layer} below={below} language={textLanguage} onLanguageChange={setTextLanguage} onChange={update} />}
       {section === 'animations' && <AnimationPanel animations={layer.animations} below={below.animations ?? {}} onChange={animations => update({ animations }, 'animations')} />}
       </fieldset>
     </aside>

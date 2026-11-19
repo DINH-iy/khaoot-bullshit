@@ -29,14 +29,9 @@
 .app-logo-menu { position: relative; flex: none; }
 .editor .app-logo-button { width: auto; min-height: 40px; height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); cursor: pointer; }
 .editor .app-logo-button:is(:hover, [aria-expanded="true"]) { background: var(--e-accent-soft); border-color: var(--e-accent); }
-.app-logo-label { padding-inline-start: 8px; border-inline-start: 1px solid var(--e-border); font: 650 .8rem/1.35 system-ui, sans-serif; }
-.app-logo-button .fa-icon { width: 10px; height: 10px; flex: none; color: var(--e-muted); }
+.app-logo-mark { line-height: 1; transform: translateY(-.1em); }
+.app-logo-caret { width: 14px; height: 14px; flex: none; }
 .app-logo-button[aria-expanded="true"] .app-logo-caret { transform: rotate(180deg); }
-.app-logo-button .app-logo-bars { display: none; }
-@media (max-width: 530px) {
-  .app-logo-button .app-logo-label, .app-logo-button .app-logo-caret { display: none; }
-  .app-logo-button .app-logo-bars { display: block; width: 13px; height: 13px; }
-}
 .app-menu.app-navigation { left: 0; right: auto; width: min(17rem, calc(100vw - 32px)); min-width: 0; max-height: calc(100dvh - 72px); overflow: auto; align-content: start; gap: 3px; padding: 7px; border-color: var(--e-border); background: var(--e-panel); color: var(--e-text); }
 .app-navigation-heading { margin: 0; padding: 6px 10px 3px; color: var(--e-muted); font-size: .75rem; font-weight: 700; }
 .app-navigation-heading.owner-heading { border-top: 1px solid var(--e-border); margin-top: 3px; padding-top: 8px; }

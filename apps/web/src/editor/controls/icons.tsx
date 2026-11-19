@@ -33,6 +33,8 @@ const paths: Record<string, string> = {
   // Copy: two overlapping sheets; Copied: a tick.
   copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
   check: 'M5 12l5 5L20 7',
+  close: 'M6 6l12 12 M18 6L6 18',
+  sound: 'M4 9h4l5-4v14l-5-4H4z M16 9a4 4 0 0 1 0 6 M19 6a8 8 0 0 1 0 12',
   // Prefabs: two stacked cards.
   prefab: 'M8 8h12v12H8z M4 16V4h12',
   // Help: a question mark in a circle.

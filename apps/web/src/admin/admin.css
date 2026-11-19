@@ -19,6 +19,7 @@ main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .admin-item-head h2 { flex: 1; min-width: 12rem; margin: 0; font-size: 1.1rem; }
 .admin-kind { padding: 3px 10px; border-radius: 999px; background: light-dark(#f1edfb, #2c2840); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .admin-meta { margin: 0; font-size: .85rem; opacity: .75; }
+.admin-report-id { overflow-wrap: anywhere; }
 .admin-details { margin: 0; white-space: pre-wrap; }
 .admin-elements { list-style: none; margin: 0; padding: 10px 12px; border-radius: 10px; background: light-dark(#f7f5fc, #25222f); display: grid; gap: 10px; }
 .admin-elements li { margin: 0; display: grid; gap: 2px; font-size: .88rem; line-height: 1.4; }

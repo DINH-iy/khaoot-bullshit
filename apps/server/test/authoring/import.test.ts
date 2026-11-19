@@ -16,7 +16,10 @@ describe('importing a game from text', () => {
     expect(issues).toEqual([]);
     const game = definition as { formatVersion: number; nodes: { key: string; stages: Record<string, unknown>[] }[]; edges: { from: string; to: string; option?: string }[] };
     expect(game.formatVersion).toBe(2);
+    expect(game).toMatchObject({ presentation: { theme: { backgroundMotion: 'starlight' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
     const stage = (key: string) => game.nodes.find(node => node.key === key)!.stages[0]!;
+    expect(stage('welcome')).toMatchObject({ youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 5, endSeconds: 15 }, mediaLayout: { position: 'left', size: 'wide' } });
+    expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
     expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
     expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', durationMs: 40000 });
     expect(stage('finale')).toMatchObject({ input: { kind: 'order', items: [{ label: 'Walkman' }, { label: 'Discman' }, { label: 'iPod' }, { label: 'Smartphone' }] }, scoring: { kind: 'correct-order', correctOrder: ['walkman', 'discman', 'ipod', 'smartphone'], awardMilli: '15000' } });
@@ -43,6 +46,14 @@ describe('importing a game from text', () => {
 
   it('accepts the answer wrapped in code fences with chatter around it', () => {
     expect(check(`Sure! Here is your game:\n\n\`\`\`json\n${example}\n\`\`\`\nHave fun!`).issues).toEqual([]);
+  });
+
+  it('reports an invalid clip or translation in the imported scene', () => {
+    const { issues } = check(JSON.stringify({ title: 'Invalid scene', scenes: [
+      { type: 'cutscene', title: 'Test', youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 10, endSeconds: 5 }, translations: { fr: { title: 'Test' } } },
+    ] }));
+    expect(issues.map(issue => issue.message).join(' ')).toMatch(/endSeconds|end time/i);
+    expect(issues.map(issue => issue.message).join(' ')).toMatch(/translations/i);
   });
 
   it('takes a scene’s explanation: its own text, or true for a minigame’s standard one', () => {

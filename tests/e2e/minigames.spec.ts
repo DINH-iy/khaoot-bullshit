@@ -25,6 +25,8 @@ test('a player builds their own look and plays minigames on the phone; the scree
     await builder.getByRole('radio', { name: 'Cat' }).click();
     await builder.getByRole('tab', { name: 'Hat' }).click();
     await builder.getByRole('radio', { name: 'Crown' }).click();
+    await builder.getByRole('tab', { name: 'Extra' }).click();
+    await builder.getByRole('radio', { name: 'Nothing' }).click();
     await expect(builder.getByRole('img', { name: 'Speedy: cat with a crown' })).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await builder.getByRole('button', { name: 'Done' }).click();

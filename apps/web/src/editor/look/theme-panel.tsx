@@ -101,6 +101,9 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       <label>{t('roundness', { px: full.radius })}<input type="range" min={0} max={40} value={full.radius} onChange={event => set({ radius: Number(event.target.value) })} /></label>
       <p className="field-title">{t('background')}</p>
       <div className="segmented" role="group" aria-label={t('background')}>{(Object.keys(BACKGROUND_KEYS) as (keyof typeof BACKGROUND_KEYS)[]).map(key => <button key={key} aria-pressed={full.background === key} onClick={() => set({ background: key })}>{t(BACKGROUND_KEYS[key])}</button>)}</div>
+      <p className="field-title">{t('backgroundMotion')}</p>
+      <div className="segmented" role="group" aria-label={t('backgroundMotion')}>{(['none', 'starlight', 'light-lines'] as const).map(key =>
+        <button key={key} type="button" aria-pressed={full.backgroundMotion === key} onClick={() => set({ backgroundMotion: key })}>{t(key === 'none' ? 'motionOff' : key === 'starlight' ? 'motionStars' : 'motionLines')}</button>)}</div>
       {!noAnswers && <><p className="field-title">{t('answerTiles')}</p>
       <div className="segmented" role="group" aria-label={t('answerTiles')}>{(Object.keys(TILE_KEYS) as (keyof typeof TILE_KEYS)[]).map(key => <button key={key} aria-pressed={full.tiles === key} onClick={() => set({ tiles: key })}>{t(TILE_KEYS[key])}</button>)}</div></>}
       <label className="choice"><input type="checkbox" checked={full.gradients} onChange={event => set({ gradients: event.target.checked })} />{t(noAnswers ? 'gradientButton' : 'gradientAll')}</label>

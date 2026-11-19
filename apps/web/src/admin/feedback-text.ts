@@ -20,6 +20,7 @@ export function feedbackText(item: FeedbackItem): string {
   const { context } = item;
   const lines = [
     `## ${KIND[item.kind]}: ${item.title} (${STATUS[item.status].toLowerCase()})`,
+    `Report ID: ${item.id}`,
     `Reported ${item.createdAt.slice(0, 16).replace('T', ' ')}${item.reporterName ? ` by ${item.reporterName}` : ''} on the ${context.screen} (${context.page}, ${context.viewport.width}×${context.viewport.height}).`,
     `Browser: ${context.userAgent}`,
   ];

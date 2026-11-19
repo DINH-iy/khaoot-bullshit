@@ -1,5 +1,5 @@
 import { readExplain } from './explain.js';
-import { isStepMinigame, type MinigameSettings, type Presentation, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
+import { isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
@@ -37,7 +37,7 @@ async function relayView(tx: Transaction, stageRunId: string, plan: ReturnType<t
 type Look = Presentation | undefined;
 /** What the room shows: the scene's texts and animations replace the game's key by key; the themes are layered on the client. */
 export function viewPresentation(game: Look, scene: Look) {
-  return { texts: { ...(game?.texts ?? {}), ...(scene?.texts ?? {}) }, animations: { ...(game?.animations ?? {}), ...(scene?.animations ?? {}) }, themes: [game?.theme, scene?.theme].filter(Boolean) };
+  return { ...mergePresentationTexts(game, scene), animations: { ...(game?.animations ?? {}), ...(scene?.animations ?? {}) }, themes: [game?.theme, scene?.theme].filter(Boolean) };
 }
 
 export async function readSessionView(client: PrismaClient, trustedActor: TrustedActor, sessionId: string, clock: Clock = () => new Date()): Promise<SessionView> {
@@ -105,7 +105,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id).entries } : null;
       const voteAnswer = revealed && voteSource?.success ? { kind: 'vote', entries: candidates.map(candidate => ({ submissionId: candidate.id, playerId: candidate.playerId, teamId: candidate.teamId, votes: votesFor(candidate.id) })).sort((a, b) => b.votes - a.votes || (a.submissionId < b.submissionId ? -1 : 1)) } : null;
       return SessionViewSchema.parse({ formatVersion: 1, sessionId: session.id, revision: session.revision, status: session.status, title: definition.title,
-        stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt,
+        stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt, translations: entry.stage.translations,
           input: entry.stage.kind === 'collect' ? publicInput(entry.stage.input, `${current.id}:${actorKey(actor.data)}`)
             : entry.stage.kind === 'route' && entry.stage.decide.method !== 'host' ? { kind: 'choice', layout: 'tiles', options: entry.stage.options } : null, status: current.status,
           deadlineAt: current.status === 'ACTIVE' ? current.deadlineAt?.toISOString() ?? null : null, pausedRemainingMs: current.status === 'ACTIVE' ? current.pausedRemainingMs : null,
@@ -113,6 +113,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           challenge: entry.stage.kind === 'challenge' ? { maxAwardMilli: entry.stage.maxAwardMilli, placesMilli: stagePlaces(entry.stage), judgedPlayerIds: judged.map(row => row.playerId), judgedTeamIds: [...new Set(judged.map(row => context?.teamOf.get(row.playerId)).filter(id => id !== undefined))] } : null,
           teams, route: choice?.view ?? null,
           explain: current.status === 'ACTIVE' && readExplain(current.presentation) ? { text: entry.stage.explain?.text ?? null, readyIds: readExplain(current.presentation)!.readyIds } : null,
+          youtube: entry.stage.youtube,
+          mediaLayout: entry.stage.mediaLayout,
           media: entry.stage.media ? { ...entry.stage.media, url: sceneMediaUrl(entry.stage.media.id) } : null,
           info: entry.stage.kind === 'info' ? { title: entry.stage.title } : null, scoreboard: entry.stage.kind === 'scoreboard' ? { show: entry.stage.show } : null,
           ballot, minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
@@ -144,11 +146,11 @@ async function songInfo(tx: { gameMedia: { findMany: (args: { where: { id: { in:
  * The room's music: the game's playlist and what the scene on screen does with it (contracts/media.ts).
  * Null when nothing would ever play: no playlist and no song of the scene's own.
  */
-export function musicView(definition: { music?: { tracks: { id: string }[] } | undefined }, stage: { music?: SceneMusic | undefined; media?: SceneMedia | undefined } | null, songs: SongInfo): PublicMusic | null {
+export function musicView(definition: { music?: { tracks: { id: string }[] } | undefined }, stage: { music?: SceneMusic | undefined; media?: SceneMedia | undefined; youtube?: YouTubeClip | undefined } | null, songs: SongInfo): PublicMusic | null {
   const song = (id: string) => { const info = songs.get(id); return info ? { id, url: sceneMediaUrl(id), title: info.title, credit: info.credit } : null; };
   const playlist = (definition.music?.tracks ?? []).map(track => song(track.id)).filter(entry => entry !== null);
   const music = stage?.music ?? { mode: 'keep' as const };
   const own = music.mode === 'play' ? song(music.track.id) : null;
   if (!playlist.length && !own) return null;
-  return { playlist, scene: { mode: music.mode === 'play' && !own ? 'keep' : music.mode, track: own }, duck: stage?.media?.kind === 'video' || stage?.media?.kind === 'audio' };
+  return { playlist, scene: { mode: music.mode === 'play' && !own ? 'keep' : music.mode, track: own }, duck: Boolean(stage?.youtube) || stage?.media?.kind === 'video' || stage?.media?.kind === 'audio' };
 }

@@ -33,6 +33,7 @@
 .feedback-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .feedback-note { margin: 0; font-size: .78rem; opacity: .7; line-height: 1.4; }
 .feedback-sent p { margin: 0 0 14px; }
+.feedback-report-id { font-size: .85rem; overflow-wrap: anywhere; }
 
 .feedback-picker-bar { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 1002; display: flex; gap: 12px; align-items: center;
   padding: 8px 8px 8px 16px; border-radius: 999px; background: #2a1d5c; color: #fff; font: 600 .95rem system-ui, sans-serif; box-shadow: 0 10px 30px rgb(0 0 0 / .35); white-space: nowrap; }

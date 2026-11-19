@@ -18,11 +18,12 @@ export function FeedbackList() {
   const [items, setItems] = useState<FeedbackItem[]>(); const [error, setError] = useState('');
   const [kind, setKind] = useState<'all' | FeedbackItem['kind']>('all'); const [status, setStatus] = useState<StatusFilter>('open'); const [search, setSearch] = useState('');
   const [copied, setCopied] = useState('');
+  const query = search.trim().toLowerCase();
   const load = () => roomApi<unknown>('/api/host/feedback').then(data => { setItems(FeedbackListSchema.parse(data).items); setError(''); }).catch(cause => setError(explain(cause)));
   useEffect(() => { void load(); }, []);
   const shown = useMemo(() => (items ?? []).filter(item => (kind === 'all' || item.kind === kind)
     && (status === 'all' || (status === 'open' ? OPEN.includes(item.status) : item.status === status))
-    && (!search.trim() || `${item.title} ${item.details} ${item.reporterName ?? ''}`.toLowerCase().includes(search.trim().toLowerCase()))), [items, kind, status, search]);
+    && (!query || `${item.id} ${item.title} ${item.details} ${item.reporterName ?? ''}`.toLowerCase().includes(query))), [items, kind, status, query]);
   const update = async (id: string, change: FeedbackUpdate) => {
     try { const saved = FeedbackItemSchema.parse(await roomApi(`/api/host/feedback/${id}`, change, 'PUT')); setItems(list => list?.map(item => item.id === id ? saved : item)); }
     catch (cause) { setError(explain(cause)); }
@@ -55,7 +56,7 @@ export function FeedbackList() {
         <label>Status<select value={status} onChange={event => setStatus(event.target.value as StatusFilter)}>
           <option value="open">Open (new, planned, in progress)</option><option value="all">All</option>
           {FEEDBACK_STATUSES.map(key => <option key={key} value={key}>{STATUS[key]}</option>)}</select></label>
-        <label>Search<input type="search" value={search} onChange={event => setSearch(event.target.value)} /></label>
+        <label>Search<input type="search" placeholder="Report ID or text" value={search} onChange={event => setSearch(event.target.value)} /></label>
         <button type="button" className="quiet" disabled={!shown.length} onClick={() => void copied1('all', shown.map(feedbackText).join('\n\n'))}>{copied === 'all' ? 'Copied' : `Copy ${shown.length} as text`}</button>
         <button type="button" className="quiet" disabled={!notDone.length} onClick={() => void markAllDone()}>{`Mark ${notDone.length} as done`}</button>
         <button type="button" className="quiet" onClick={() => void load()}>Refresh</button>
@@ -69,6 +70,7 @@ export function FeedbackList() {
           <select aria-label={`Status of ${item.title}`} value={item.status} onChange={event => void update(item.id, { status: event.target.value as FeedbackItem['status'] })}>
             {FEEDBACK_STATUSES.map(key => <option key={key} value={key}>{STATUS[key]}</option>)}</select>
         </div>
+        <p className="admin-meta admin-report-id">Report ID <code>{item.id}</code></p>
         <p className="admin-meta">{new Date(item.createdAt).toLocaleString()}{item.reporterName && <> · {item.reporterName}</>} · {item.context.screen} · <a href={item.context.page}>{item.context.page}</a> · {item.context.viewport.width}×{item.context.viewport.height}</p>
         {item.details && <p className="admin-details">{item.details}</p>}
         {item.context.elements.length > 0 && <ul className="admin-elements">{item.context.elements.map((element, index) => <li key={index}>

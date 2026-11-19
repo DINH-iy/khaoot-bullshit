@@ -16,6 +16,24 @@
 .room.bg-dots { background: radial-gradient(color-mix(in srgb, var(--r-text) 12%, transparent) 1.5px, transparent 1.6px) 0 0 / 22px 22px, linear-gradient(160deg, var(--r-bg1), var(--r-bg2)); }
 .room.bg-stripes { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--r-text) 5%, transparent) 0 14px, transparent 14px 28px), linear-gradient(180deg, var(--r-bg1), var(--r-bg2)); }
 .room.bg-grid { background: linear-gradient(color-mix(in srgb, var(--r-accent) 14%, transparent) 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(90deg, color-mix(in srgb, var(--r-accent) 14%, transparent) 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(180deg, var(--r-bg1), var(--r-bg2)); }
+.room:is(.motion-starlight, .motion-light-lines) { position: relative; isolation: isolate; }
+.room:is(.motion-starlight, .motion-light-lines)::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+}
+.room.motion-starlight::before {
+  background: radial-gradient(circle at 25% 30%, var(--r-text) 1px, transparent 2px) 0 0 / 97px 113px,
+    radial-gradient(circle at 70% 65%, var(--r-accent) 1.5px, transparent 2px) 0 0 / 163px 137px;
+  opacity: .15; animation: room-starlight 44s linear infinite;
+}
+.room.motion-light-lines::before {
+  background: linear-gradient(120deg, transparent 30%, var(--r-accent) 49%, transparent 53%) 0 0 / 300% 100%;
+  opacity: .09; animation: room-light-lines 24s ease-in-out infinite alternate;
+}
+@keyframes room-starlight { to { background-position: 97px -113px, -163px -137px; } }
+@keyframes room-light-lines { to { background-position: 100% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .room:is(.motion-starlight, .motion-light-lines)::before { animation: none; }
+}
 .room a { color: #c9b8ff; }
 .room section { background: none; border: 0; padding: 0; margin: 0; border-radius: 0; }
 .room button { background: var(--r-card-strong); color: var(--r-text); border: 1px solid var(--r-line); border-radius: 12px; min-height: 48px; font-weight: 600; }
@@ -32,10 +50,12 @@
 .join-card { width: min(440px, 100%); display: grid; gap: 18px; padding: 28px !important; border-radius: var(--r-radius) !important; background: var(--r-card) !important; border: 1px solid var(--r-line) !important; }
 .join-card h1 { margin: 0; font-size: 2rem; }
 .code-input { font-size: 2rem !important; letter-spacing: .3em; text-transform: uppercase; text-align: center; font-weight: 800; }
-.join-links { margin: 0; color: var(--r-muted); }
 
 /* Top bar */
 .room-bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--r-line); background: rgb(0 0 0 / .2); }
+.room-bar.session-bar { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; column-gap: clamp(8px, 3vw, 20px); }
+.session-bar > .brand { white-space: nowrap; }
+.session-bar .room-code { overflow-wrap: anywhere; }
 .room-id { display: flex; gap: 14px; align-items: center; }
 .room-game { margin: 0; color: var(--r-muted); font-size: .9rem; }
 .room-code { margin: 0; font-size: 1.15rem; letter-spacing: .04em; }
@@ -452,9 +472,21 @@
 /* A scene's picture, video or song (stage-media.tsx): under the question, never wider than the card. */
 .stage-media { margin: 0; display: grid; justify-items: center; gap: 10px; }
 .stage-media.image img, .stage-media.video video { display: block; max-width: 100%; max-height: min(52vh, 560px); border-radius: var(--r-radius, 16px); object-fit: contain; background: rgb(0 0 0 / .2); }
-.stage-media.audio { padding: 16px; border-radius: var(--r-radius, 16px); background: var(--r-card-strong); }
-.stage-media.audio audio { width: min(420px, 100%); }
-.stage-media-art { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--r-accent); color: var(--r-accent-ink); font-size: 1.8rem; }
+.stage-media.image.cropped { margin-inline: auto; width: 100%; max-width: calc(min(42dvh, 480px) * var(--media-crop-ratio)); aspect-ratio: var(--media-crop-ratio); overflow: hidden; border-radius: var(--r-radius, 12px); }
+.stage-media.image.cropped img { width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: cover; object-position: var(--media-crop-position); }
+.stage-media.audio { width: 100%; padding: clamp(8px, 2vw, 14px); border-radius: var(--r-radius, 12px); background: var(--r-card-strong, var(--e-bg)); box-sizing: border-box; }
+.scene-audio-player { --audio-accent: var(--r-accent, var(--e-accent)); width: 100%; min-width: 0; display: grid; gap: 7px; }
+.audio-waveform { display: flex; align-items: center; height: 48px; gap: 1px; width: 100%; }
+.audio-waveform i { flex: 1 1 0; min-width: 0; height: max(2px, var(--wave-height)); background: color-mix(in srgb, var(--audio-accent) 52%, transparent); border-radius: 2px; }
+.audio-waveform i.played { background: var(--audio-accent); }
+.scene-audio-transport { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.stage-media .scene-audio-toggle { display: grid; place-items: center; width: 38px; min-height: 38px; padding: 0; border-radius: calc(var(--r-radius, 12px) / 2 + 4px); border: 0; background: var(--audio-accent); color: var(--r-accent-ink, light-dark(#fff, #1d1730)); }
+.stage-media .scene-audio-toggle:disabled { opacity: .45; }
+.scene-audio-timeline { min-width: 0; display: grid; align-items: center; gap: 1px; }
+.scene-audio-time, .scene-audio-volume { color: var(--r-muted, var(--e-muted)); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.scene-audio-volume { display: flex; gap: 6px; align-items: center; max-width: 135px; }
+.stage-media .scene-audio-player input[type=range] { display: block; width: 100%; min-width: 0; min-height: 18px; height: 18px; padding: 0; accent-color: var(--audio-accent); border: 0; background: transparent; }
+.stage-media.youtube iframe { display: block; width: 100%; min-width: 200px; min-height: 200px; aspect-ratio: 16 / 9; border: 0; border-radius: var(--r-radius); background: #000; }
 .stage-media.note { margin: 0; display: flex; gap: 8px; align-items: center; justify-content: center; color: var(--r-muted); font-weight: 600; }
 .stage-media-play { min-height: 48px; }
 /* The music's start button, when the browser wants a tap before playing sound (music-player.tsx). */

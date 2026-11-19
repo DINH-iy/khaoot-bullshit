@@ -5,7 +5,7 @@ import { defineTexts } from '../i18n/texts.js';
 export const ROOM_TEXTS = defineTexts('room', {
   linked: 'This phone now plays as {name}. Join any room and you are {name}.', linkBroken: 'This personal link no longer works. Ask the organiser for a new one.',
   playingAs: 'Playing as {name}', notYou: 'Not {name}?', makeAccount: 'Make me an account', makeAccountHint: 'next time you are you again (look, chips and stats), with a personal code',
-  arcade: 'Arcade: play minigames with friends', moreOptions: 'More options', hostInstead: 'Host a game instead', editGames: 'Edit games', joinGame: 'Join a game', yourCode: 'Your personal code',
+  arcade: 'Arcade', arcadeDetail: 'Play minigames with friends', moreOptions: 'More options', hostInstead: 'Host a game instead', editGames: 'Edit games', joinGame: 'Join a game', yourCode: 'Your personal code',
   accessFailed: 'Host/display access could not be verified. Open a fresh access link.', moved: 'The game moved to a new lobby. Ask the host for the new room code.',
   nameTaken: 'Someone already has that name. Pick another, or tap your name under “Played with us before?”.', joinFailed: 'Joining failed. Please retry.', signOutFailed: 'Could not sign this phone out. Try again.',
   hostScreen: '{title}: host screen', sharedScreen: '{title}: shared screen', yourPhone: '{title}: your phone', partyRoom: 'Party game room', connecting: 'Connecting…',
@@ -34,7 +34,7 @@ export const ROOM_TEXTS = defineTexts('room', {
   nl: {
     linked: 'Deze telefoon speelt nu als {name}. Doe mee in elke kamer en je bent {name}.', linkBroken: 'Deze persoonlijke link werkt niet meer. Vraag de organisator om een nieuwe.',
     playingAs: 'Speelt als {name}', notYou: 'Niet {name}?', makeAccount: 'Maak een account voor me', makeAccountHint: 'volgende keer ben je weer jezelf (uiterlijk, fiches en statistieken), met een persoonlijke code',
-    arcade: 'Arcade: minigames met vrienden spelen', moreOptions: 'Meer opties', hostInstead: 'Toch een spel hosten', editGames: 'Spellen bewerken', joinGame: 'Doe mee', yourCode: 'Je persoonlijke code',
+    arcade: 'Arcade', arcadeDetail: 'Speel minigames met vrienden', moreOptions: 'Meer opties', hostInstead: 'Toch een spel hosten', editGames: 'Spellen bewerken', joinGame: 'Doe mee', yourCode: 'Je persoonlijke code',
     accessFailed: 'Toegang voor host of scherm kon niet gecontroleerd worden. Open een nieuwe toegangslink.', moved: 'Het spel is naar een nieuwe lobby gegaan. Vraag de host om de nieuwe kamercode.',
     nameTaken: 'Iemand heeft die naam al. Kies een andere, of tik op je naam onder “Al eens met ons gespeeld?”.', joinFailed: 'Meedoen lukte niet. Probeer het opnieuw.', signOutFailed: 'Deze telefoon kon niet uitgelogd worden. Probeer het opnieuw.',
     hostScreen: '{title}: hostscherm', sharedScreen: '{title}: gedeeld scherm', yourPhone: '{title}: je telefoon', partyRoom: 'Partyspelkamer', connecting: 'Verbinden…',
@@ -60,7 +60,7 @@ export const ROOM_TEXTS = defineTexts('room', {
   de: {
     linked: 'Dieses Handy spielt jetzt als {name}. Tritt einem beliebigen Raum bei und du bist {name}.', linkBroken: 'Dieser persönliche Link funktioniert nicht mehr. Bitte den Veranstalter um einen neuen.',
     playingAs: 'Spielt als {name}', notYou: 'Nicht {name}?', makeAccount: 'Ein Konto für mich erstellen', makeAccountHint: 'nächstes Mal bist du wieder du (Aussehen, Chips und Statistiken), mit einem persönlichen Code',
-    arcade: 'Arcade: Minispiele mit Freunden spielen', moreOptions: 'Weitere Optionen', hostInstead: 'Lieber ein Spiel hosten', editGames: 'Spiele bearbeiten', joinGame: 'Mitspielen', yourCode: 'Dein persönlicher Code',
+    arcade: 'Arcade', arcadeDetail: 'Spiele Minispiele mit Freunden', moreOptions: 'Weitere Optionen', hostInstead: 'Lieber ein Spiel hosten', editGames: 'Spiele bearbeiten', joinGame: 'Mitspielen', yourCode: 'Dein persönlicher Code',
     accessFailed: 'Der Zugang für Host oder Bildschirm konnte nicht geprüft werden. Öffne einen neuen Zugangslink.', moved: 'Das Spiel ist in eine neue Lobby gezogen. Frag den Host nach dem neuen Raumcode.',
     nameTaken: 'Jemand hat diesen Namen schon. Wähle einen anderen oder tippe auf deinen Namen unter „Schon mal mit uns gespielt?“.', joinFailed: 'Beitreten hat nicht geklappt. Bitte erneut versuchen.', signOutFailed: 'Dieses Handy konnte nicht abgemeldet werden. Versuche es erneut.',
     hostScreen: '{title}: Host-Bildschirm', sharedScreen: '{title}: gemeinsamer Bildschirm', yourPhone: '{title}: dein Handy', partyRoom: 'Partyspielraum', connecting: 'Verbinde…',
@@ -86,7 +86,7 @@ export const ROOM_TEXTS = defineTexts('room', {
   ro: {
     linked: 'Acest telefon joacă acum ca {name}. Intră în orice cameră și ești {name}.', linkBroken: 'Acest link personal nu mai funcționează. Cere-i organizatorului unul nou.',
     playingAs: 'Joci ca {name}', notYou: 'Nu ești {name}?', makeAccount: 'Fă-mi un cont', makeAccountHint: 'data viitoare ești din nou tu (aspect, jetoane și statistici), cu un cod personal',
-    arcade: 'Arcade: minijocuri cu prietenii', moreOptions: 'Mai multe opțiuni', hostInstead: 'Găzduiește mai bine un joc', editGames: 'Editează jocuri', joinGame: 'Intră în joc', yourCode: 'Codul tău personal',
+    arcade: 'Arcade', arcadeDetail: 'Joacă minijocuri cu prietenii', moreOptions: 'Mai multe opțiuni', hostInstead: 'Găzduiește mai bine un joc', editGames: 'Editează jocuri', joinGame: 'Intră în joc', yourCode: 'Codul tău personal',
     accessFailed: 'Accesul pentru gazdă sau ecran nu a putut fi verificat. Deschide un link de acces nou.', moved: 'Jocul s-a mutat într-un lobby nou. Cere-i gazdei noul cod al camerei.',
     nameTaken: 'Cineva are deja acest nume. Alege altul sau atinge-ți numele la „Ai mai jucat cu noi?”.', joinFailed: 'Intrarea nu a mers. Încearcă din nou.', signOutFailed: 'Acest telefon nu a putut fi deconectat. Încearcă din nou.',
     hostScreen: '{title}: ecranul gazdei', sharedScreen: '{title}: ecranul comun', yourPhone: '{title}: telefonul tău', partyRoom: 'Camera jocului', connecting: 'Se conectează…',

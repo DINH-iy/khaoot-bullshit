@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
+import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields } from './fields/explain-fields.js';
 import { ActionMenu, type MenuAction } from '../controls/action-menu.js';
@@ -55,7 +56,7 @@ const scoreboardShows = () => [{ value: 'players', label: t('showPlayers') }, { 
  * (open), the points, and who plays. The kind of scene (which minigame, how a
  * duel is won) is chosen when adding it, so it is shown here, not asked again.
  */
-export function StageFields({ definition, node, index, onChange }: { definition: Definition; node: Node; index: number; onChange: Change }) {
+export function StageFields({ definition, node, index, onChange, mediaOpen, openMedia, closeMedia }: { definition: Definition; node: Node; index: number; onChange: Change; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void }) {
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
   const input = stage['input'] as { kind?: string; options?: Option[]; items?: Option[]; layout?: string; maxLength?: number; accept?: string[] } | undefined;
@@ -72,7 +73,7 @@ export function StageFields({ definition, node, index, onChange }: { definition:
       {stage.kind === 'info' && <label>{t('title')}<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
       <label>{t(stage.kind === 'info' ? 'lInfo' : stage.kind === 'scoreboard' ? 'lScoreboard' : stage.kind === 'route' ? 'lRoute' : stage.kind === 'minigame' ? 'lMinigame' : 'lQuestion')}
         <textarea rows={3} value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
-      {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} onChange={next => edit(() => next, 'media')} />}
+      {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
       {timed && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : 'timer')}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600} placeholder={t('none')} value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />{t('sec')}</span></label>}
 
@@ -112,6 +113,8 @@ export function StageFields({ definition, node, index, onChange }: { definition:
       {stage.kind === 'teams' && <PickTeamsFields definition={definition} node={node} stage={stage} onChange={(next, field) => edit(() => next, field)} />}
       {isWheelScene(stage) && <WheelOfScene definition={definition} stage={stage} onChange={onChange} />}
     </Section>
+
+    <SceneTranslationFields stage={stage} onChange={next => edit(() => next, 'translations')} />
 
     {hasPoints && <Section title={t('points')} memory="Points" summary={pointsSummary(stage)}>
       {stage.kind === 'collect' && input?.kind === 'choice' && <>

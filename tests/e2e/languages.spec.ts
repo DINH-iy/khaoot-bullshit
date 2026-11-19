@@ -78,7 +78,7 @@ test('a phone chooses its own language: the game’s standard texts follow it, t
     await expect(phone.getByRole('heading', { name: 'Je doet mee!' })).toBeVisible();
     // The phone's menu switches it back, the host never changed.
     await phone.getByRole('button', { name: /^Menu/ }).click();
-    await phone.getByRole('navigation', { name: 'More' }).getByRole('button', { name: 'Nederlands' }).click();
+    await phone.getByRole('navigation', { name: 'Meer' }).getByRole('button', { name: 'Nederlands' }).click();
     await phone.getByRole('group', { name: 'Taal' }).getByRole('button', { name: 'Deutsch' }).click();
     await expect(phone.getByRole('heading', { name: 'Du bist dabei!' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Start the game' })).toBeVisible();

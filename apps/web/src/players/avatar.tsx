@@ -1,4 +1,4 @@
-import { LOOK_COLORS, LOOK_PART_NAMES, type PlayerLook } from '@party/contracts';
+import { LOOK_COLORS, type PlayerLook } from '@party/contracts';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { assetUrl } from '../room/media-upload.js';
 import { loadDrawing, StoredDrawing } from '../drawing/drawing-view.js';
@@ -76,15 +76,6 @@ function hat(kind: PlayerLook['hat']): ReactNode {
     case 'tophat': return <g><rect x="32" y="2" width="36" height="26" rx="3" fill={INK} /><rect x="32" y="20" width="36" height="5" fill="#e8505b" /><rect x="22" y="26" width="56" height="7" rx="3.5" fill={INK} /></g>;
     case 'antenna': return <g><path stroke={INK} strokeWidth="3" d="M50 24V8" /><circle cx="50" cy="7" r="5.5" fill="#f2c230" stroke={INK} strokeWidth="2" /></g>;
   }
-}
-
-/** A plain-language description, for screen readers. */
-export function describeLook(look: PlayerLook): string {
-  const parts = [LOOK_PART_NAMES.body.names[look.body].toLowerCase()];
-  if (look.hat !== 'none') parts.push(`with a ${LOOK_PART_NAMES.hat.names[look.hat].toLowerCase()}`);
-  if (look.extra !== 'none') parts.push(`${look.hat !== 'none' ? 'and' : 'with'} ${LOOK_PART_NAMES.extra.names[look.extra].toLowerCase()}`);
-  if (look.picture) return look.picture.kind === 'photo' ? 'a photo' : 'a drawing';
-  return parts.join(' ');
 }
 
 /** A player's character. Decorative by default (the name is next to it); give a `label` when it stands alone. */

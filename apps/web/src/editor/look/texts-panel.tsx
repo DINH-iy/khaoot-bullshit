@@ -1,10 +1,34 @@
 import { useState } from 'react';
-import { TEXT_DEFAULTS, TEXT_GROUPS, TEXT_KEYS, TEXT_LABELS, type TextKey } from '@party/contracts';
+import { mergePresentationTexts, TEXT_DEFAULTS, TEXT_GROUPS, TEXT_KEYS, TEXT_LABELS, type Presentation, type TextKey } from '@party/contracts';
+import type { Language } from '../../i18n/language.js';
+import { standardText } from '../../presentation/look.js';
+import { TranslationLanguage } from '../scene/fields/translation-fields.js';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
 import { gameName } from '../../presentation/catalog.text.js';
 const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
 import { Section } from '../controls/section.js';
+
+export function TranslatedTextsPanel({ layer, below, language, onLanguageChange, onChange }: {
+  layer: Presentation; below: Presentation; language: Language | ''; onLanguageChange: (language: Language | '') => void;
+  onChange: (patch: Partial<Presentation>, group: string) => void;
+}) {
+  const inherited = mergePresentationTexts(below, layer);
+  const fallback = language ? Object.fromEntries(TEXT_KEYS.map(key => [
+    key, layer.texts?.[key] ?? inherited.translations?.[language]?.[key] ?? inherited.texts[key] ?? standardText(key, language),
+  ])) : below.texts ?? {};
+  const change = (texts: Record<string, string>) => {
+    if (!language) { onChange({ texts }, 'texts'); return; }
+    const translations = { ...layer.translations };
+    if (Object.keys(texts).length) translations[language] = texts;
+    else delete translations[language];
+    onChange({ translations }, `texts:${language}`);
+  };
+  return <>
+    <TranslationLanguage value={language} onChange={onLanguageChange} />
+    <TextsPanel texts={language ? layer.translations?.[language] : layer.texts} below={fallback} onChange={change} />
+  </>;
+}
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]!);
 const PLACEHOLDER_HELP: Record<string, keyof typeof LOOK_TEXTS.en> = { time: 'hTime', host: 'hHost', captain: 'hCaptain', team: 'hTeam', count: 'hCount', total: 'hTotal', answer: 'hAnswer', points: 'hPoints', route: 'hRoute' };

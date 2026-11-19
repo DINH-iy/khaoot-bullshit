@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { emptyDrawing, MINIGAME_COUNTDOWN_MS, type MinigameSettings } from '@party/contracts';
 import { DrawingPad } from '../drawing/drawing-pad.js';
+import { useTexts } from '../i18n/texts.js';
+import { CONTROL_TEXTS } from './controls.text.js';
 import { useText } from '../presentation/look.js';
 import { useServerNow } from './clock.js';
 
@@ -9,8 +11,8 @@ interface Props<S> { settings: S; startsAt: string; goAt: string | null; offset:
 
 /** "3, 2, 1" until play starts, the same moment on every phone. Renders children once it has. */
 export function Countdown({ startsAt, offset, children }: { startsAt: string; offset: number; children: React.ReactNode }) {
-  const t = useText(); const now = useServerNow(offset, true); const left = Date.parse(startsAt) - now;
-  if (left > 0) return <div className="mg-countdown" role="timer" aria-label="Starts in"><span>{t('minigame.getReady')}</span><strong key={Math.ceil(left / 1000)}>{Math.min(Math.ceil(left / 1000), MINIGAME_COUNTDOWN_MS / 1000)}</strong></div>;
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const now = useServerNow(offset, true); const left = Date.parse(startsAt) - now;
+  if (left > 0) return <div className="mg-countdown" role="timer" aria-label={c('starts')}><span>{t('minigame.getReady')}</span><strong key={Math.ceil(left / 1000)}>{Math.min(Math.ceil(left / 1000), MINIGAME_COUNTDOWN_MS / 1000)}</strong></div>;
   return <>{children}</>;
 }
 
@@ -60,11 +62,11 @@ export function TapRace({ settings, startsAt, offset, disabled, onResult, onTaps
 
 /** A clock counts up from the start and vanishes; stop it at the target. */
 export function StopClock({ settings, startsAt, offset, disabled, onResult }: Props<MinigameSettings<'stop-clock'>>) {
-  const t = useText(); const now = useServerNow(offset, true); const sent = useRef(false);
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const now = useServerNow(offset, true); const sent = useRef(false);
   const elapsed = Math.max(0, now - Date.parse(startsAt)); const visible = elapsed < settings.visibleMs;
   const stop = () => { if (sent.current || disabled) return; sent.current = true; onResult({ value: Math.round(Date.now() + offset - Date.parse(startsAt)) }); };
   return <Countdown startsAt={startsAt} offset={offset}>
-    <p className="mg-sub">Target: <strong>{(settings.targetMs / 1000).toFixed(2)} s</strong></p>
+    <p className="mg-sub">{c('target')} <strong>{(settings.targetMs / 1000).toFixed(2)} s</strong></p>
     <p className="mg-big mg-clock" aria-live="off">{visible ? (elapsed / 1000).toFixed(2) : '??.??'}</p>
     <button type="button" className="mg-pad stop" onClick={stop}>{t('minigame.stop')}</button>
   </Countdown>;
@@ -77,11 +79,11 @@ const thin = (points: readonly number[], max: number) => {
 };
 /** Draw one circle in one go; the server measures how round it is. */
 export function PerfectCircle({ settings, startsAt, offset, disabled, onResult }: Props<MinigameSettings<'perfect-circle'>>) {
-  const t = useText(); const [drawing, setDrawing] = useState(emptyDrawing()); const sent = useRef(false);
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const [drawing, setDrawing] = useState(emptyDrawing()); const sent = useRef(false);
   const now = useServerNow(offset, true); const end = Date.parse(startsAt) + settings.seconds * 1000; const over = now >= end;
   return <Countdown startsAt={startsAt} offset={offset}>
     <p className="mg-sub">{t('minigame.drawCircle')} · {t('timer.left', { time: `${Math.max(0, (end - now) / 1000).toFixed(1)} s` })}</p>
-    <DrawingPad value={drawing} onChange={setDrawing} tools={false} oneStroke disabled={disabled || over} label="Your circle" bringIntoView
+    <DrawingPad value={drawing} onChange={setDrawing} tools={false} oneStroke disabled={disabled || over} label={c('circle')} bringIntoView
       onStrokeEnd={stroke => { if (sent.current) return; sent.current = true; const points = stroke.p.length >= 24 ? thin(stroke.p, 400) : [...stroke.p, ...Array.from({ length: 24 - stroke.p.length }, () => stroke.p[0]!)]; onResult({ value: 0, stroke: points }); }} />
   </Countdown>;
 }

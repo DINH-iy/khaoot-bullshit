@@ -7,18 +7,24 @@ import { Icon } from './icons.js';
  * it). Keeps long explanations out of the way of short option names.
  * `align` says which edge of the button the bubble lines up with.
  */
-export function InfoTip({ label, children, icon = 'about', text, align = 'end' }: { label: string; children: ReactNode; icon?: string; text?: string; align?: 'start' | 'end' }) {
+export function InfoTip({ label, children, icon = 'about', text, align = 'end', clickOnly = false }: {
+  label: string; children: ReactNode | ((close: () => void) => ReactNode); icon?: string; text?: string; align?: 'start' | 'end'; clickOnly?: boolean;
+}) {
   const [open, setOpen] = useState(false); const id = useId(); const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      if (clickOnly && box.current?.contains(document.activeElement)) box.current.querySelector('button')?.focus();
+    };
     document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', key);
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', key); };
-  }, [open]);
-  return <span ref={box} className={`info-tip align-${align}${open ? ' open' : ''}${text ? ' with-text' : ''}`}>
-    <button type="button" className="info-tip-button" aria-label={text ? undefined : label} title={text ? label : undefined} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+  }, [open, clickOnly]);
+  return <span ref={box} className={`info-tip align-${align}${open ? ' open' : ''}${text ? ' with-text' : ''}${clickOnly ? ' click-only' : ''}`}>
+    <button type="button" className="info-tip-button" aria-label={text ? undefined : label} title={text && !clickOnly ? label : undefined} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
       <Icon name={icon} size={text ? 18 : 16} />{text}</button>
-    <span id={id} className="info-tip-bubble" role="note">{children}</span>
+    <span id={id} className="info-tip-bubble" role="note">{typeof children === 'function' ? children(() => setOpen(false)) : children}</span>
   </span>;
 }

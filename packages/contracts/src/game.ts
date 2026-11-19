@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from './head-to-head.js';
-import { PresentationSchema, ThemeSchema, AnimationChoiceSchema } from './presentation.js';
+import { GAME_LANGUAGES, PresentationSchema, ThemeSchema, AnimationChoiceSchema, TranslatedTextsSchema } from './presentation.js';
 import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
-import { PublicMusicSchema, PublicSceneMediaSchema } from './media.js';
+import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
 
 export const GameKeySchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/);
 export const GameIdSchema = z.string().uuid().transform(value => value.toLowerCase());
@@ -215,9 +215,17 @@ export const PublicDuelSchema = z.object({
     z.object({ kind: z.literal('game'), game: HeadToHeadKeySchema, view: HeadToHeadViewSchema.nullable() }).strict(),
   ]),
 }).strict();
+export const SceneTranslationsSchema = z.partialRecord(z.enum(GAME_LANGUAGES), z.object({
+  prompt: z.string().trim().min(1).max(2000).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
+  explanation: z.string().trim().min(1).max(1000).optional(),
+  labels: z.record(GameKeySchema, z.string().trim().min(1).max(240)).refine(labels => Object.keys(labels).length <= 12).optional(),
+}).strict());
+export type SceneTranslations = z.infer<typeof SceneTranslationsSchema>;
 export const PublicStageSchema = z.object({
   id: GameIdSchema, nodeKey: GameKeySchema, stageKey: GameKeySchema,
   kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel', 'teams']), prompt: z.string().min(1).max(2000),
+  translations: SceneTranslationsSchema.optional(),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.
@@ -232,6 +240,8 @@ export const PublicStageSchema = z.object({
   explain: z.object({ text: z.string().max(1000).nullable(), readyIds: z.array(GameIdSchema) }).strict().nullable(),
   route: PublicRouteSchema.nullable(),
   // The scene's picture, video or song from the media library (absent in older views).
+  youtube: YouTubeClipSchema.optional(),
+  mediaLayout: MediaLayoutSchema.optional(),
   media: PublicSceneMediaSchema.nullable().optional(),
   // Show-only scenes: an info scene's title, a scoreboard scene's standings selection.
   info: z.object({ title: z.string().min(1).max(120) }).strict().nullable(),
@@ -269,7 +279,7 @@ export const SessionViewSchema = z.object({
   // Only revealed-stage scores and host corrections are visible; awards on an open or unrevealed stage are private.
   standings: z.array(z.object({ playerId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
   // The look and texts for this moment: the game's, with the current scene's changes on top.
-  presentation: z.object({ texts: z.record(z.string(), z.string()), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
+  presentation: z.object({ texts: z.record(z.string(), z.string()), translations: TranslatedTextsSchema.optional(), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
   wheel: WheelViewSchema,
   // The room's music (absent in older views; null: the game has none).
   music: PublicMusicSchema.nullable().optional(),

@@ -39,21 +39,6 @@ export function outputPort(node: Node, position: Point, option?: string): Point 
   const index = Math.max(0, optionsOf(node).findIndex(entry => entry.key === option));
   return { x: position.x + CARD_WIDTH, y: position.y + ROUTE_FIRST + index * OPTION_GAP };
 }
-/** A smooth curve from an output port to an input port, as in the reference. */
-export function curve(from: Point, to: Point): string {
-  if (wrapsBack(from, to)) {
-    // To a scene further left (the next row of a wrapped game): out to the right, along the gap between the rows, in from the left.
-    const mid = returnY(from, to); const r = 72;
-    return `M ${from.x} ${from.y} C ${from.x + r} ${from.y}, ${from.x + r} ${mid}, ${from.x} ${mid} L ${to.x} ${mid} C ${to.x - r} ${mid}, ${to.x - r} ${to.y}, ${to.x} ${to.y}`;
-  }
-  const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
-  return `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
-}
-// An arrow wraps back when it goes clearly to the left (into the next row, or to a scene placed to the left).
-const wrapsBack = (from: Point, to: Point) => to.x < from.x - CARD_WIDTH / 2;
-// The height of the run between the rows: halfway, or just below the start when going up.
-const returnY = (from: Point, to: Point) => to.y > from.y ? (from.y + to.y) / 2 : Math.max(from.y, to.y) + GRID * 4;
-
 // ---------- bend points ----------
 // An arrow's bend points (dragged by the author to lead it around something, while the scenes stay put).
 // They are layout, kept with the card positions under "bend--<arrow>--<n>", so saving, undo, live editing
@@ -71,41 +56,50 @@ export function withBends(positions: Positions, edge: string, points: Point[]): 
   points.forEach((point, index) => { next[bendKey(edge, index)] = point; });
   return next;
 }
-/**
- * An arrow's path: the usual curve, or with bend points a smooth line through them
- * (Catmull-Rom), still leaving the scene to the right and entering the next from the left.
- */
-export function routedPath(from: Point, to: Point, bends: Point[]): string {
-  if (!bends.length) return curve(from, to);
-  const points = [from, ...bends, to]; const lead = 60;
-  let path = `M ${from.x} ${from.y}`;
-  for (let index = 0; index < points.length - 1; index++) {
-    const a = points[index]!; const b = points[index + 1]!; const before = points[index - 1]; const after = points[index + 2];
-    const c1 = index === 0 ? { x: a.x + lead, y: a.y } : { x: a.x + (b.x - before!.x) / 6, y: a.y + (b.y - before!.y) / 6 };
-    const c2 = index === points.length - 2 ? { x: b.x - lead, y: b.y } : { x: b.x - (after!.x - a.x) / 6, y: b.y - (after!.y - a.y) / 6 };
-    path += ` C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${b.x} ${b.y}`;
+/** The path and its edit handles share the same axis-aligned segments. */
+export function routeSegments(from: Point, to: Point, bends: Point[] = [], sourceBottom = from.y + 120): Point[][] {
+  if (!bends.length && to.x <= from.x) {
+    const targetTop = to.y - PORT_Y;
+    const lane = snap(targetTop > sourceBottom ? (sourceBottom + targetTop) / 2 : Math.max(sourceBottom, to.y + 120) + GRID * 2);
+    const exit = snap(from.x + GRID * 2);
+    const entry = snap(to.x - GRID * 2);
+    return [[from, { x: exit, y: from.y }, { x: exit, y: lane }, { x: entry, y: lane }, { x: entry, y: to.y }, to]];
   }
-  return path;
-}
-/** A point a fraction `t` along an arrow (with bend points: along the line through them, by length). */
-export function pointOnRoute(from: Point, to: Point, bends: Point[], t: number): Point {
-  if (!bends.length) return pointOnCurve(from, to, t);
-  const points = [from, ...bends, to]; const lengths = points.slice(1).map((point, index) => Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y));
-  let left = lengths.reduce((sum, length) => sum + length, 0) * t;
-  for (let index = 0; index < lengths.length; index++) {
-    if (left <= lengths[index]! || index === lengths.length - 1) { const a = points[index]!; const b = points[index + 1]!; const f = lengths[index] ? Math.min(1, left / lengths[index]!) : 0; return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f }; }
-    left -= lengths[index]!;
-  }
-  return to;
+  return [from, ...bends].map((start, index) => {
+    const end = bends[index] ?? to;
+    if (start.y === end.y) {
+      if (end.x >= start.x || (index !== 0 && index !== bends.length)) return [start, end];
+      const exit = index === 0 ? snap(start.x + GRID * 2) : start.x;
+      const entry = index === bends.length ? snap(end.x - GRID * 2) : end.x;
+      const y = snap(start.y + GRID * 2);
+      return [start, { x: exit, y: start.y }, { x: exit, y }, { x: entry, y }, { x: entry, y: end.y }, end];
+    }
+    const middle = snap((start.x + end.x) / 2);
+    const x = index === bends.length && end.x <= start.x ? snap(end.x - GRID * 2)
+      : index === 0 && end.x <= start.x ? snap(start.x + GRID * 2)
+      : end.x > start.x && (middle <= start.x || middle >= end.x) ? (start.x + end.x) / 2 : middle;
+    return [start, { x, y: start.y }, { x, y: end.y }, end];
+  });
 }
 
-/** A point a fraction `t` along the curve: where an arrow's grab handle sits, so arrows into the same scene get separate handles. */
-export function pointOnCurve(from: Point, to: Point, t: number): Point {
-  // On a wrapped arrow the handles sit on its long straight run.
-  if (wrapsBack(from, to)) return { x: from.x + (to.x - from.x) * t, y: returnY(from, to) };
-  const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
-  const p1 = { x: from.x + bend, y: from.y }; const p2 = { x: to.x - bend, y: to.y }; const u = 1 - t;
-  return { x: u ** 3 * from.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t ** 3 * to.x, y: u ** 3 * from.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t ** 3 * to.y };
+export function routedPath(segments: Point[][]): string {
+  const points = segments.flatMap((points, index) => index ? points.slice(1) : points)
+    .filter((point, index, all) => index === 0 || point.x !== all[index - 1]!.x || point.y !== all[index - 1]!.y);
+  return points.map(({ x, y }, index) => `${index ? 'L' : 'M'} ${x} ${y}`).join(' ');
+}
+
+/** A point a fraction along an orthogonal path, measured by length. */
+export function pointOnRoute(segments: Point[][], fraction: number): Point {
+  const parts = segments.flatMap(points => points.slice(1).map((end, index) => {
+    const start = points[index]!;
+    return { start, end, length: Math.abs(end.x - start.x) + Math.abs(end.y - start.y) };
+  })).filter(part => part.length > 0);
+  let distance = parts.reduce((sum, part) => sum + part.length, 0) * fraction;
+  for (const { start, end, length } of parts) {
+    if (distance <= length) return { x: start.x + (end.x - start.x) * distance / length, y: start.y + (end.y - start.y) * distance / length };
+    distance -= length;
+  }
+  return segments.at(-1)!.at(-1)!;
 }
 
 // ---------- scene types ----------
@@ -302,7 +296,7 @@ export function autoLayout(definition: Definition, { oneRow = false }: { oneRow?
   const heightOf = (nodes: Node[]) => nodes.reduce((sum, node) => sum + cardHeight(node) + GRID * 2, 0);
   const tallest = Math.max(...[...columns.values()].map(heightOf));
   // A long game wraps into rows of columns, as many per row as keeps the whole game about screen-shaped (16:10);
-  // a short one stays on one row. The arrow from the end of a row runs back to the start of the next (see `curve`).
+  // a short one stays on one row. The arrow from the end of a row runs back to the start of the next .
   // Each row is only as tall as its own tallest column, with a gap the arrows back can run through.
   const count = Math.max(...columns.keys()) + 1; const step = COLUMN_STEP; const rowGap = GRID * 4; const rowHeight = tallest + rowGap;
   const perRow = oneRow || count <= 6 ? count : [...Array(count).keys()].map(index => index + 1).filter(size => size >= 4)
@@ -335,7 +329,7 @@ export function lineUp(definition: Definition, positions: Positions, keys: strin
   }
   return next;
 }
-/** The positions without any bend points: every arrow a plain curve again. */
+/** The positions without any bend points: every arrow takes its default route. */
 export const straightenAll = (positions: Positions): Positions => Object.fromEntries(Object.entries(positions).filter(([key]) => !isBendKey(key)));
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 export interface Guides { x: number | null; y: number | null }
