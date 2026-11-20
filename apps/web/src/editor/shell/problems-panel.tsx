@@ -24,8 +24,8 @@ export function ProblemsPanel({ issues, definition, onGo, onGame }: { issues: De
   const sorted = [...groups].sort(([a], [b]) => (a === null ? -1 : order.get(a)!) - (b === null ? -1 : order.get(b)!));
   const count = t(issues.length === 1 ? 'problemOne' : 'problemMany', { count: issues.length });
   return <section className={`problems-panel${open ? ' open' : ''}`} aria-label={t('problems')}>
-    <button type="button" className="problems-toggle" aria-expanded={open} onClick={toggle}>
-      <span className="problems-dot" aria-hidden="true">!</span>{count}<span className="problems-caret" aria-hidden="true">{open ? '▾' : '▴'}</span></button>
+    <button type="button" className="problems-toggle" title={count} aria-expanded={open} onClick={toggle}>
+      <span className="problems-dot" aria-hidden="true">!</span><span className="corner-label">{count}</span><span className="problems-caret" aria-hidden="true">{open ? '▾' : '▴'}</span></button>
     {open && <div className="problems-list">
       {sorted.map(([key, list]) => <div key={key ?? 'game'} className="problems-group">
         <h3>{key === null ? t('wholeGame') : sceneName(definition, key)}</h3>

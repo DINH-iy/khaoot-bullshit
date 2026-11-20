@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { PeopleListSchema, PeopleStatsSchema, PersonKeyViewSchema, type PersonKeyView, type PersonRow, type PersonStats } from '@party/contracts';
 import { roomApi } from '../room/api.js';
@@ -19,29 +19,39 @@ const explain = (cause: unknown) => problems[cause instanceof Error ? cause.mess
 /** The personal link is opened on the person's phone; the key after # never reaches the server's logs. */
 export const personalLink = (key: string) => `${location.origin}/#person=${key}`;
 
-function KeyCard({ view, fresh, onDone }: { view: PersonKeyView; fresh: boolean; onDone: () => void }) {
+function KeyCard({ view, onDone }: { view: PersonKeyView; onDone: () => void }) {
   const url = personalLink(view.key); const [copied, setCopied] = useState('');
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dialog.current?.showModal(); }, []);
   const image = useMemo(() => { try { const qr = qrcode(0, 'M'); qr.addData(url, 'Byte'); qr.make(); return qr.createDataURL(4, 16); } catch { return null; } }, [url]);
-  const copy = (what: string, text: string) => { void navigator.clipboard.writeText(text).then(() => setCopied(what)).catch(() => setCopied('')); };
-  return <section className="person-link" aria-labelledby="person-link-heading">
-    <h2 id="person-link-heading">Personal key for {view.name}</h2>
-    <p className="person-key"><code>{view.key}</code></p>
-    <p>{fresh ? `Give ${view.name} this key. ` : ''}On the start page, {view.name} opens More options, taps “Sign in” and types it (capitals and dashes do not matter), or opens the link below (scan the code). That phone then always joins as {view.name}. Anyone with the key can become {view.name}, so give it only to them. You can look it up here again, or make a new one if it got out.</p>
-    {image && <img src={image} alt={`QR code with the personal link for ${view.name}`} width={200} height={200} />}
-    <p className="person-url"><code>{url}</code></p>
-    <div className="admin-actions">
-      <button type="button" className="quiet" onClick={() => copy('key', view.key)}>{copied === 'key' ? 'Key copied' : 'Copy key'}</button>
-      <button type="button" className="quiet" onClick={() => copy('link', url)}>{copied === 'link' ? 'Link copied' : 'Copy link'}</button>
-      <button type="button" onClick={onDone}>Done</button>
+  const copy = (what: string, value: string) => { void navigator.clipboard.writeText(value).then(() => setCopied(what)).catch(() => setCopied('')); };
+  return <dialog ref={dialog} className="person-link" aria-labelledby="person-link-heading"
+    onCancel={event => { event.preventDefault(); onDone(); }}
+    onClick={event => { if (event.target === event.currentTarget) onDone(); }}>
+    <div className="person-link-body">
+      <h2 id="person-link-heading">Personal key for {view.name}</h2>
+      <div className="person-link-content">
+        <div>
+          <p className="person-key"><code>{view.key}</code></p>
+          <p className="person-hint">Enter the key under Sign in or scan the QR code. Share it only with {view.name}.</p>
+        </div>
+        {image && <img src={image} alt={`Sign-in QR code for ${view.name}`} width={120} height={120} />}
+      </div>
+      <details className="person-url"><summary>Sign-in link</summary><code>{url}</code></details>
+      <div className="admin-actions">
+        <button type="button" className="quiet" onClick={() => copy('key', view.key)}>{copied === 'key' ? 'Key copied' : 'Copy key'}</button>
+        <button type="button" className="quiet" onClick={() => copy('link', url)}>{copied === 'link' ? 'Link copied' : 'Copy link'}</button>
+        <button type="button" className="primary" onClick={onDone}>Done</button>
+      </div>
     </div>
-  </section>;
+  </dialog>;
 }
 
 /** People: accounts for regular players (and editors), so they always join as themselves and keep their chips. */
 export function PeoplePanel() {
   const [people, setPeople] = useState<PersonRow[]>(); const [error, setError] = useState(''); const [name, setName] = useState('');
   const [canEdit, setCanEdit] = useState(false);
-  const [shown, setShown] = useState<{ view: PersonKeyView; fresh: boolean }>(); const [busy, setBusy] = useState(false);
+  const [shown, setShown] = useState<PersonKeyView>(); const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const found = useMemo(() => people?.filter(person => matches(person.name, search)), [people, search]);
   // One person's own page (?admin=people&person=…): the browser's back button returns to the list.
@@ -57,17 +67,20 @@ export function PeoplePanel() {
   const openPerson = (id: string | null) => go({ person: id, tab: 'people' });
   const [stats, setStats] = useState<PersonStats[]>();
   const load = () => Promise.all([
-    roomApi<unknown>('/api/host/people').then(data => { setPeople(PeopleListSchema.parse(data).people); setError(''); }),
+    roomApi<unknown>('/api/host/people?withKeys=1').then(data => { setPeople(PeopleListSchema.parse(data).people); setError(''); }),
     roomApi<unknown>('/api/host/people/stats').then(data => setStats(PeopleStatsSchema.parse(data).stats)),
   ]).catch(cause => setError(explain(cause)));
   useEffect(() => { void load(); }, []);
   const run = async (work: () => Promise<unknown>) => { setBusy(true); setError(''); try { await work(); await load(); } catch (cause) { setError(explain(cause)); } finally { setBusy(false); } };
-  const show = (data: unknown, fresh: boolean) => setShown({ view: PersonKeyViewSchema.parse(data), fresh });
-  const add = (event: React.FormEvent) => { event.preventDefault(); void run(async () => { show(await roomApi('/api/host/people', { name, canEdit }), true); setName(''); setCanEdit(false); }); };
+  const show = (data: unknown) => setShown(PersonKeyViewSchema.parse(data));
+  const add = (event: React.FormEvent) => { event.preventDefault(); void run(async () => { show(await roomApi('/api/host/people', { name, canEdit })); setName(''); setCanEdit(false); }); };
   const actions: PersonActions = {
     rename: person => { const next = prompt(`New name for ${person.name}`, person.name)?.trim(); if (next && next !== person.name) void run(() => roomApi(`/api/host/people/${person.id}`, { name: next }, 'PUT')); },
-    viewKey: person => { void run(async () => show(await roomApi(`/api/host/people/${person.id}/key`), false)); },
-    newKey: person => { if (confirm(`Make a new key for ${person.name}? The old key and link stop working; phones already signed in stay signed in.`)) void run(async () => show(await roomApi(`/api/host/people/${person.id}/key`, {}), true)); },
+    viewKey: person => {
+      if (person.key) show({ id: person.id, name: person.name, key: person.key });
+      else void run(async () => show(await roomApi(`/api/host/people/${person.id}/key`)));
+    },
+    newKey: person => { if (confirm(`Make a new key for ${person.name}? The old key and link stop working; phones already signed in stay signed in.`)) void run(async () => show(await roomApi(`/api/host/people/${person.id}/key`, {}))); },
     setEditor: (person, next) => {
       if (next ? confirm(`Let ${person.name} edit games? They can make, change, publish, rehearse and remove games. They cannot host rooms or open this admin menu.`) : true)
         void run(() => roomApi(`/api/host/people/${person.id}/editor`, { canEdit: next }));
@@ -75,7 +88,7 @@ export function PeoplePanel() {
     signOut: person => { if (confirm(`Sign out all of ${person.name}’s phones? They join as guests until they sign in with their key again.`)) void run(() => roomApi(`/api/host/people/${person.id}/sign-out`, {})); },
     remove: person => { if (confirm(`Remove ${person.name}? Their phones are signed out, their key stops working and the name is free again. Past games and chips stay in the history.`)) void run(async () => { await roomApi(`/api/host/people/${person.id}/remove`, {}); openPerson(null); }); },
   };
-  const keyCard = shown && <KeyCard view={shown.view} fresh={shown.fresh} onDone={() => setShown(undefined)} />;
+  const keyCard = shown && <KeyCard view={shown} onDone={() => setShown(undefined)} />;
 
   if (personId) {
     const person = people?.find(candidate => candidate.id === personId);
@@ -85,7 +98,7 @@ export function PeoplePanel() {
       {keyCard}
       {!people && !error && <p role="status">Loading…</p>}
       {people && !person && <p className="admin-empty">This person is not in the list (any more).</p>}
-      {person && !shown && <PersonPage person={person} busy={busy} actions={actions} stats={stats?.find(row => row.personId === person.id)} all={stats ?? []} onOpen={openPerson} />}
+      {person && <PersonPage person={person} busy={busy} actions={actions} stats={stats?.find(row => row.personId === person.id)} all={stats ?? []} onOpen={openPerson} />}
     </>;
   }
   const tabs = <div className="people-tabs" role="tablist" aria-label="People">
@@ -101,12 +114,13 @@ export function PeoplePanel() {
     <p className="admin-intro">Make an account for each regular player. Each gets a personal key: typed once on a phone (or opened as a link), that phone then always joins as them, with their look and their chips across games. Editors can also make and change games, but never host or see this menu. Players without an account still join as guests. Click a name for everything about that person.</p>
     {error && <p role="alert" className="error">{error}</p>}
     {people && people.length > 0 && <PeopleSummary people={people} />}
-    {keyCard || <form className="person-add" onSubmit={add} aria-labelledby="person-add-heading">
+    {keyCard}
+    <form className="person-add" onSubmit={add} aria-labelledby="person-add-heading">
       <h2 id="person-add-heading">Add a person</h2>
       <label className="person-add-name">Name<input value={name} maxLength={40} required onChange={event => setName(event.target.value)} /></label>
       <label className="person-check"><input type="checkbox" checked={canEdit} onChange={event => setCanEdit(event.target.checked)} />Can edit games</label>
       <button type="submit" className="primary" disabled={busy || !name.trim()}>Add person</button>
-    </form>}
+    </form>
     {!people && !error && <p role="status">Loading people…</p>}
     {people && !people.length && <p className="admin-empty">No people yet.</p>}
     {people && people.length > 0 && <div className="people-search"><label><span className="visually-hidden">Search people</span>
@@ -114,17 +128,19 @@ export function PeoplePanel() {
       <span role="status">{search.trim() ? `${found!.length} of ${people.length}` : ''}</span></div>}
     {found && people!.length > 0 && !found.length && <p className="admin-empty">Nobody is called “{search.trim()}”.</p>}
     {found && found.length > 0 && <div className="people-table-wrap"><table className="people-table">
-      <thead><tr><th scope="col">Name</th><th scope="col">Editor</th><th scope="col" className="num">Phones</th><th scope="col">Last seen</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
+      <thead><tr><th scope="col">Name</th><th scope="col">Editor</th><th scope="col" className="num">Phones</th><th scope="col">Last seen</th><th scope="col">Personal key</th></tr></thead>
       <tbody>{found.map(person => <tr key={person.id}>
         <th scope="row"><a className="person-name" href={`?admin=people&person=${person.id}`} onClick={event => { event.preventDefault(); openPerson(person.id); }}>
-          <span className={`person-initials${person.canEdit ? ' editor' : ''}`} aria-hidden="true">{initials(person.name)}</span><span className="person-name-text">{person.name}</span></a></th>
+          <span className={`person-initials${person.canEdit ? ' is-editor' : ''}`} aria-hidden="true">{initials(person.name)}</span><span className="person-name-text">{person.name}</span></a></th>
         <td className="wide-only"><label className="person-switch"><input type="checkbox" role="switch" checked={person.canEdit} disabled={busy} onChange={event => actions.setEditor(person, event.target.checked)} /><span className="visually-hidden">{person.name} can edit games</span><span aria-hidden="true">{person.canEdit ? 'Yes' : 'No'}</span></label></td>
         <td className="num wide-only">{person.devices}</td>
-        <td className="person-seen"><LastSeen at={person.lastSeenAt} /><span className="person-chevron" aria-hidden="true">›</span></td>
-        <td className="wide-only"><div className="person-actions">
-          <button type="button" className="quiet" disabled={busy || !person.hasKey} onClick={() => actions.viewKey(person)} aria-label={`Show key of ${person.name}`} title={person.hasKey ? undefined : 'Made before keys could be shown again: make a new key'}>Show key</button>
-          <button type="button" className="quiet" onClick={() => openPerson(person.id)} aria-label={`Open ${person.name}`}>Open ›</button>
-        </div></td>
+        <td className="person-seen"><LastSeen at={person.lastSeenAt} /></td>
+        <td className="person-key-cell">{person.key
+          ? <button type="button" className="person-key-chip" onClick={() => actions.viewKey(person)} aria-label={`Share key for ${person.name}`}><code>{person.key}</code></button>
+          : person.hasKey && person.key === undefined
+            ? <button type="button" className="quiet" onClick={() => actions.viewKey(person)}>Show key</button>
+            : <span className="person-hint">Renew key in profile</span>}
+        </td>
       </tr>)}</tbody>
     </table></div>}
   </>;

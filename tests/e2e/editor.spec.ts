@@ -1,3 +1,4 @@
+import { chooseOption } from './helpers.js';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -29,14 +30,14 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   const tour = page.getByRole('region', { name: 'Editor tour' });
   await expect(tour).toBeVisible();
   await tour.getByRole('button', { name: 'Next tip' }).click();
-  await expect(tour).toContainText('Phone preview');
+  await expect(tour).toContainText('Phone');
   await tour.getByRole('button', { name: 'Skip tour' }).click();
   await page.reload();
   await expect(page.getByRole('application', { name: 'Game flow' })).toBeVisible();
   await expect(tour).toHaveCount(0);
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
-  await help.getByLabel('Show the whole game.').selectOption('3');
+  await chooseOption(help.getByLabel('Show the whole game.'), '3');
   await help.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: /^\d+%$/ }).click();
   await expect(page.getByRole('menuitem', { name: 'Show the whole game' })).toHaveAttribute('aria-keyshortcuts', 'Shift+3');
@@ -61,7 +62,7 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   const replacement = page.getByRole('dialog', { name: 'Replace scene type' });
   await replacement.getByRole('menuitem', { name: /^Scoreboard/ }).click();
   await replacement.getByRole('button', { name: 'Replace scene', exact: true }).click();
-  await expect(props.getByRole('heading', { name: 'Scoreboard' })).toBeVisible();
+  await expect(props.getByRole('heading', { name: 'Results' })).toBeVisible();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(props.getByLabel('Text on every screen')).toHaveValue('Welcome! Get ready to play.');
   await saved(page);
@@ -78,6 +79,20 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await page.keyboard.down('Control');
   try { await drag(page, { x: left, y: top }, { x: right, y: bottom }); } finally { await page.keyboard.up('Control'); }
   await expect(page.getByText('3 scenes selected')).toBeVisible();
+
+  await card(page, /Welcome! Get ready to play/).dblclick();
+  await page.getByRole('button', { name: 'Add after this' }).click();
+  await page.getByRole('tab', { name: 'Games' }).click();
+  await page.getByRole('menuitem', { name: /^Minigame/ }).click();
+  await page.getByRole('menuitem', { name: /^Stop the clock/ }).click();
+  const previewArea = page.getByRole('region', { name: 'Preview' });
+  await expect(previewArea.locator('.minigame-preview')).toContainText('A clock starts counting');
+  await previewArea.getByRole('button', { name: 'Phone', exact: true }).click();
+  await expect(previewArea.locator('.phone-screen .minigame-preview-target')).toContainText('10 sec');
+  await props.getByRole('button', { name: 'Try this scene' }).click();
+  const popup = page.getByRole('dialog', { name: 'Preview' });
+  await expect(popup.locator('.phone-screen .minigame-preview')).toBeVisible();
+  await popup.getByRole('button', { name: 'Close', exact: true }).click();
 
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   await page.getByLabel('Change the look of').click();
@@ -98,7 +113,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Editor test ${Date.now()}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
 
@@ -225,7 +240,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
 
   // The scene's actions are in the ☰ menu next to Close; deleting asks first.
   await inspector.getByRole('button', { name: 'Scene actions' }).click();
-  await expect(page.getByRole('menu', { name: 'Scene actions' }).getByRole('menuitem')).toHaveText(['Start the game here', 'Duplicate', 'Save as prefab…', 'Delete scene…']);
+  await expect(page.getByRole('menu', { name: 'Scene actions' }).getByRole('menuitem')).toHaveText(['Start the game here', 'Duplicate', 'Save as prefab…', 'Replace scene type', 'Delete scene…']);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu', { name: 'Scene actions' })).toHaveCount(0);
   await inspector.getByRole('button', { name: 'Scene actions' }).click();
@@ -259,7 +274,7 @@ async function openCopy(page: Page, baseURL: string, name: string, desktop = tru
   if (desktop) await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await page.getByLabel('Name of your new game').fill(name);
-  await page.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await chooseOption(page.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await page.getByRole('button', { name: 'Create game' }).click();
   await page.getByRole('link', { name: `Edit ${name}` }).click();
   await expect(page.locator('.scene-card')).toHaveCount(5);
@@ -355,7 +370,7 @@ test('View mode: look through a game without changing it by accident; Edit chang
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `View test ${Date.now()}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
   // One button switches between Editing and Viewing.
@@ -449,18 +464,91 @@ test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens 
 });
 
 test('the editor works on a phone: compact top bar, the scene panel and menus as sheets on screen', async ({ page, baseURL }) => {
-  test.skip(test.info().project.name === 'android-chrome', 'Checked here with a phone-sized window.');
   await page.setViewportSize({ width: 390, height: 844 });
   await openCopy(page, baseURL!, `Phone ${Date.now()}`, false);
   // The whole top bar fits in the first quarter of the screen.
   expect((await page.locator('.editor-header').boundingBox())!.height).toBeLessThan(220);
+  const tabs = page.getByRole('tablist', { name: 'Editor view' });
+  const dock = (await tabs.boundingBox())!;
+  expect(dock.x).toBeGreaterThanOrEqual(0);
+  expect(dock.x + dock.width).toBeLessThanOrEqual(390);
+  expect(dock.y + dock.height).toBeCloseTo(836, 0);
+  const history = (await page.getByRole('button', { name: 'History', exact: true }).boundingBox())!;
+  expect(history.y + history.height / 2).toBeCloseTo(dock.y + dock.height / 2, 0);
+  expect(history.x + history.width).toBeLessThan(dock.x);
+  await tabs.getByRole('tab', { name: 'Scene editor' }).click();
+  await expect(tabs.getByRole('tab', { name: 'Scene editor' })).toHaveAttribute('aria-selected', 'true');
+  const timeline = page.getByRole('navigation', { name: 'Scenes in play order' });
+  const track = timeline.locator('.scene-track');
+  const detail = page.locator('.scene-timeline-detail');
+  const choice = track.getByRole('button', { name: /Choose your challenge/ });
+  await expect(track).toHaveCSS('display', 'flex');
+  expect(await track.evaluate(element => element.scrollWidth)).toBeGreaterThan((await track.boundingBox())!.width);
+  if (test.info().project.name === 'android-chrome') {
+    await choice.tap();
+  } else {
+    await choice.hover();
+    await expect(detail).toContainText('Choose your challenge');
+    await expect(choice).not.toHaveAttribute('aria-current', 'true');
+    await track.getByRole('button', { name: /FRIDAY NIGHT/ }).press('Tab');
+    await expect(choice).toBeFocused();
+    await expect(detail).toContainText('Choose your challenge');
+    await choice.press('Enter');
+  }
+  await expect(choice).toHaveAttribute('aria-current', 'true');
+  await expect(detail).toContainText('Choose your challenge');
+  expect((await timeline.boundingBox())!.height).toBeLessThan(86);
+  await page.evaluate(() => window.scrollTo({ top: 280, behavior: 'instant' }));
+  await expect.poll(async () => Math.round((await timeline.boundingBox())!.y)).toBe(0);
+  const first = track.getByRole('button', { name: /FRIDAY NIGHT/ });
+  if (test.info().project.name === 'android-chrome') await first.tap();
+  else await first.click();
+  await expect(first).toHaveAttribute('aria-current', 'true');
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await expect.poll(async () => Math.round((await timeline.boundingBox())!.y)).toBe(0);
+  const add = timeline.getByRole('button', { name: 'Add after this' });
+  await add.click();
+  const palette = (await page.locator('.floating-menu').boundingBox())!;
+  expect(palette.x).toBeGreaterThanOrEqual(0);
+  expect(palette.x + palette.width).toBeLessThanOrEqual(390);
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  for (const width of [390, 820]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const [button, menu] of [[/^Play & publish/, 'Play and publish'], [/^Game menu/, 'Game menu']] as const) {
+      await page.locator('.editor-header').getByRole('button', { name: button }).click();
+      const popup = page.locator('.editor-header').getByRole('menu', { name: menu });
+      expect(await popup.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(bounds.left + 16, bounds.top + 10));
+      })).toBe(true);
+      await page.keyboard.press('Escape');
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await tabs.getByRole('tab', { name: 'Flow editor' }).click();
   await card(page, /Choose your challenge/).locator('.card-title').click();
   const panel = page.getByRole('complementary');
   const inView = async (locator: Locator) => { const box = (await locator.boundingBox())!; return box.y >= 0 && box.y + 40 <= 844 && box.x >= 0 && box.x + box.width <= 391; };
   expect(await inView(panel.getByRole('button', { name: 'Edit this scene →' }))).toBe(true);
   await panel.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Play & publish' }).click();
+  const header = page.locator('.editor-header');
+  const play = header.getByRole('button', { name: 'Play & publish' });
+  const people = header.getByRole('button', { name: 'Everyone editing now' });
+  const burger = header.getByRole('button', { name: /^Game menu/ });
+  expect((await header.boundingBox())!.width).toBeLessThanOrEqual(390);
+  expect((await play.boundingBox())!.width).toBe(40);
+  expect((await people.boundingBox())!.y).toBeCloseTo((await play.boundingBox())!.y, 0);
+  await play.click();
   expect(await inView(page.getByRole('menuitem', { name: 'Publish', exact: true }))).toBe(true);
+  const menu = page.getByRole('menu', { name: 'Play and publish' });
+  const headerBox = (await header.boundingBox())!;
+  expect((await menu.boundingBox())!.y).toBeCloseTo(headerBox.y + headerBox.height + 4, 0);
+  await burger.click();
+  const gameMenu = page.getByRole('menu', { name: 'Game menu' });
+  expect((await gameMenu.boundingBox())!.y).toBeCloseTo(headerBox.y + headerBox.height + 4, 0);
+  await people.click();
+  await expect(page.getByRole('textbox', { name: 'Your name, as others editing this game see it' })).toBeVisible();
 });
 
 test('an arrow gets bend points to lead it around something, while the scenes stay put', async ({ page, baseURL }) => {
@@ -571,6 +659,12 @@ test('the editor header compacts on resize and the invite panel stays reachable'
   await openCopy(page, baseURL!, `Invite layout ${Date.now()}`);
   const header = page.locator('.editor-header');
   const wideHeader = (await header.boundingBox())!;
+  const dock = (await page.getByRole('tablist', { name: 'Editor view' }).boundingBox())!;
+  const history = (await page.getByRole('button', { name: /^History/ }).boundingBox())!;
+  const minimap = (await page.locator('.minimap').boundingBox())!;
+  expect(dock.x).toBeGreaterThan(history.x + history.width);
+  expect(dock.x + dock.width).toBeLessThan(minimap.x);
+  expect(dock.y + dock.height).toBeCloseTo(history.y + history.height, 0);
   await page.setViewportSize({ width: 900, height: 450 });
   await expect(header).toHaveClass(/compact-header/);
   await expect(header.getByRole('button', { name: 'Play & publish' })).toBeVisible();
@@ -643,13 +737,37 @@ test('editor menus close outside and Game settings warnings can fold away', asyn
   await expect(awards.getByRole('alert')).toBeVisible();
   await page.mouse.click(700, 400);
   await expect(settings).toHaveCount(0);
-  await expect(page.locator('.problems-toggle')).toContainText('1 problem');
+  const problems = page.getByRole('button', { name: '1 problem', exact: true });
+  await expect(problems.locator('.corner-label')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const history = page.getByRole('button', { name: 'History', exact: true });
+  await expect(history.locator('.corner-label')).toHaveCSS('clip-path', 'inset(50%)');
+  await expect(problems.locator('.corner-label')).toHaveCSS('clip-path', 'inset(50%)');
+  await expect(history).toHaveCSS('width', '44px');
+  await expect(problems).toHaveCSS('width', '44px');
+  await problems.click();
+  await expect(problems).toHaveAttribute('aria-expanded', 'true');
+  const listBox = (await page.locator('.problems-list').boundingBox())!;
+  expect(listBox.x + listBox.width).toBeLessThanOrEqual(390);
 });
 
 test('the Scene editor lists scenes in play order, previews them, and edits parts and game settings on the same draft', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
   await openCopy(page, baseURL!, `Scenes ${Date.now()}`);
-  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  const dock = page.getByRole('tablist', { name: 'Editor view' });
+  await dock.getByRole('tab', { name: 'Scene editor' }).click();
+  const frame = (await page.locator('.scene-canvas .tv-screen').boundingBox())!;
+  const pill = (await dock.boundingBox())!;
+  expect(frame.y + frame.height).toBeLessThan(pill.y);
+  for (const side of ['.scene-list', '.scene-props']) {
+    const panel = (await page.locator(side).boundingBox())!;
+    expect(panel.y + panel.height).toBeGreaterThan(pill.y + pill.height);
+  }
+  await page.setViewportSize({ width: 1020, height: 900 });
+  const compactPill = (await dock.boundingBox())!;
+  const sidebar = (await page.locator('.scene-props').boundingBox())!;
+  expect(compactPill.x + compactPill.width).toBeLessThan(sidebar.x);
+  await page.setViewportSize({ width: 1440, height: 900 });
   const list = page.getByRole('navigation', { name: 'Scenes in play order' });
   await expect(list.locator('.scene-row')).toContainText(['FRIDAY NIGHT.', 'Choose your challenge!', /Music Mayhem/, /Living Sculpture/, /Shared finale/]);
   await expect(list.getByRole('button', { name: /Music route/ })).toBeVisible();
@@ -749,7 +867,7 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   await fromFinale.getByRole('button', { name: 'Start the game' }).click();
   await expect(fromFinale.getByRole('heading', { name: /^Shared finale/ })).toBeVisible();
   await fromFinale.close();
-  // The scene canvas edits in place. Phone preview and Try this scene use the current draft in a dialog.
+  // The canvas can show either device. Try this scene opens the current draft in a dialog.
   await page.getByRole('tab', { name: 'Scene editor' }).click();
   await page.getByRole('navigation', { name: 'Scenes in play order' }).getByRole('button', { name: /Music Mayhem/ }).first().click();
   const canvas = page.locator('.scene-canvas');
@@ -770,12 +888,12 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   await answer.fill('A live answer edit');
   await expect(page.locator('.scene-props').getByLabel('Answer option 1', { exact: true })).toHaveValue('A live answer edit');
   const pages = context.pages().length;
-  await scene.getByRole('button', { name: 'Phone preview' }).click();
+  await scene.getByRole('button', { name: 'Phone', exact: true }).click();
+  await expect(scene.locator('.phone-screen')).toContainText('A live scene draft');
+  await expect(scene.locator('.phone-screen')).toContainText('A live answer edit');
+  await expect(scene.locator('.tv-screen')).toHaveCount(0);
+  await scene.getByRole('button', { name: 'Shared screen', exact: true }).click();
   const preview = page.getByRole('dialog', { name: 'Preview' });
-  await expect(preview.locator('.phone-screen')).toContainText('A live scene draft');
-  await expect(preview.locator('.phone-screen')).toContainText('A live answer edit');
-  await page.keyboard.press('Escape');
-  await expect(preview).toHaveCount(0);
   const tryScene = page.getByRole('button', { name: 'Try this scene' });
   const sceneActions = page.getByRole('button', { name: 'Scene actions' });
   expect((await tryScene.boundingBox())!.height).toBe((await sceneActions.boundingBox())!.height);

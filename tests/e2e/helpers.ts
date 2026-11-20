@@ -47,3 +47,13 @@ export async function expectPhoneScores(page: Page, expected: string[] | string)
   if (Array.isArray(expected)) await expect(sheet.getByRole('listitem')).toContainText(expected); else await expect(sheet).toContainText(expected);
   await page.keyboard.press('Escape'); await expect(sheet).toHaveCount(0);
 }
+
+/** Opens the shared dropdown and chooses a value from its portaled list. */
+export async function chooseOption(control: Locator, option: string | { label: string }) {
+  await control.click();
+  const id = await control.getAttribute('aria-controls');
+  expect(id).toBeTruthy();
+  const list = control.page().locator(`[id=${JSON.stringify(id)}]`);
+  const choice = typeof option === 'string' ? list.locator(`[data-value=${JSON.stringify(option)}]`) : list.getByRole('option', { name: option.label, exact: true });
+  await choice.click();
+}

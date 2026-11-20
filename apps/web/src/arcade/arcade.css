@@ -22,7 +22,6 @@
 .room .arcade-tabs .small-button { margin: 0; min-height: 40px; }
 .room .arcade-tabs [aria-pressed=true] { background: var(--r-accent); color: var(--r-accent-ink); border-color: var(--r-accent); }
 .arcade-pick { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); }
-.room .arcade-pick select { width: 100%; min-height: 48px; padding: 10px 12px; font: inherit; }
 .arcade-pick label { gap: 6px; font-weight: 700; }
 .arcade-invite img { max-width: 100%; height: auto; justify-self: start; border-radius: 8px; background: #fff; }
 .arcade-join { margin: 24px auto; }

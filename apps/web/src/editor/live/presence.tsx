@@ -1,9 +1,10 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { EditorPeer } from '@party/contracts';
 import type { LiveState } from './use-live.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SETTINGS_TEXTS } from '../shell/settings.text.js';
 import { SHELL_TEXTS } from '../shell/shell.text.js';
+import { FaIcon } from '../../presentation/icons.js';
 import './presence.css';
 
 // One colour per person, each dark enough for white text.
@@ -18,7 +19,16 @@ export const peersOn = (peers: EditorPeer[], key: string) => peers.filter(peer =
  * initial (marked "You"), which opens the field for the name others see.
  */
 export function PeerBar({ live }: { live: LiveState }) {
-  const [naming, setNaming] = useState(false); const [listing, setListing] = useState(false); const t = useTexts(SETTINGS_TEXTS); const v = useTexts(SHELL_TEXTS);
+  const [panel, setPanel] = useState<'name' | 'people'>(); const [listing, setListing] = useState(false); const t = useTexts(SETTINGS_TEXTS); const v = useTexts(SHELL_TEXTS);
+  const self = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const people = live.peers.map(peer => <li key={peer.id} style={tint(peer.color)}><span className="peer-dot" aria-hidden="true">{peer.name.slice(0, 1).toUpperCase()}</span>{peer.name}<small>{v(VIEWS[peer.view])}</small></li>);
+  useEffect(() => {
+    if (!panel) return;
+    const closeOutside = (event: PointerEvent) => { if (!self.current?.contains(event.target as Node)) setPanel(undefined); };
+    document.addEventListener('pointerdown', closeOutside, true);
+    return () => document.removeEventListener('pointerdown', closeOutside, true);
+  }, [panel]);
   return <div className="peer-bar">
     {/* The others: "Also here", then one other person as a named chip; two or more as their initials overlapping (at
         most three) and a count, which lists everyone with where they are. Keeps the top bar on one line. */}
@@ -28,14 +38,22 @@ export function PeerBar({ live }: { live: LiveState }) {
           <span className="peer-dot" aria-hidden="true">{peer.name.slice(0, 1).toUpperCase()}</span>{live.peers.length === 1 && <span className="peer-name">{peer.name}</span>}<span className="visually-hidden">{live.peers.length > 1 ? peer.name : ''}, in the {VIEWS[peer.view]}</span></li>)}
         {live.peers.length > 1 && <li className="peer-more"><button type="button" className="peer-more-button" aria-expanded={listing} onClick={() => setListing(!listing)} title={live.peers.map(peer => peer.name).join(', ')}>
           {live.peers.length}<span className="visually-hidden"> people: show everyone</span></button>
-          {listing && <ul className="peer-more-list" aria-label={t('everyoneEditing')}>{live.peers.map(peer => <li key={peer.id} style={tint(peer.color)}><span className="peer-dot" aria-hidden="true">{peer.name.slice(0, 1).toUpperCase()}</span>{peer.name}<small>{v(VIEWS[peer.view])}</small></li>)}</ul>}</li>}
+          {listing && <ul className="peer-more-list" aria-label={t('everyoneEditing')}>{people}</ul>}</li>}
       </ul></div>}
-    <div className="peer-me" style={live.color === null ? undefined : tint(live.color)}>
-      <button type="button" className="peer-me-button" aria-expanded={naming} aria-label={t('youAre', { name: live.name || t('unnamed') })} title={t('youAreTitle', { name: live.name })} onClick={() => setNaming(!naming)}>
+    <div ref={self} className="peer-me" style={live.color === null ? undefined : tint(live.color)}>
+      <button type="button" className="peer-me-button" aria-expanded={panel === 'name'} aria-label={t('youAre', { name: live.name || t('unnamed') })} title={t('youAreTitle', { name: live.name })} onClick={event => { trigger.current = event.currentTarget; setPanel(panel === 'name' ? undefined : 'name'); }}>
         <span className="peer-dot" aria-hidden="true">{(live.name || '?').slice(0, 1).toUpperCase()}</span></button>
+      <button type="button" className="peer-compact-button" aria-expanded={panel === 'people'} aria-label={t('everyoneEditing')}
+        onClick={event => { trigger.current = event.currentTarget; setPanel(panel === 'people' ? undefined : 'people'); }}>
+        <FaIcon name="users" /><span aria-hidden="true">{live.peers.length + 1}</span>
+      </button>
       <span className="peer-you" aria-hidden="true">You</span>
-      {naming && <div className="peer-me-popover" onKeyDown={event => { if (event.key === 'Escape' || event.key === 'Enter') { event.stopPropagation(); setNaming(false); } }}>
-        <label>{t('yourName')}<input autoFocus value={live.name} maxLength={40} onChange={event => live.setName(event.target.value)} aria-label={t('yourNameLabel')} onBlur={() => setNaming(false)} /></label></div>}
+      {panel && <div className="peer-me-popover" onKeyDown={event => {
+        if (event.key === 'Escape' || event.key === 'Enter') { event.stopPropagation(); setPanel(undefined); trigger.current?.focus(); }
+      }}>
+        <label>{t('yourName')}<input autoFocus={panel === 'name'} value={live.name} maxLength={40} onChange={event => live.setName(event.target.value)} aria-label={t('yourNameLabel')} onBlur={panel === 'name' ? () => setPanel(undefined) : undefined} /></label>
+        {panel === 'people' && people.length > 0 && <ul className="peer-more-list peer-compact-list" aria-label={t('alsoEditing')}>{people}</ul>}
+      </div>}
     </div>
   </div>;
 }

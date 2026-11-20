@@ -4,6 +4,7 @@ import { play, useLook } from '../../presentation/look.js';
 import type { Definition, Stage } from '../model.js';
 import type { Scope } from './layer.js';
 import { answerFit } from '../../room/answer-fit.js';
+import { CorrectRoundAnswer, OwnRoundPoints, RoundResultsCard } from '../../room/results.js';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
 const tx = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
@@ -49,7 +50,11 @@ export function LookPreview({ definition, scope, style, className }: { definitio
               {shown === 'question' || shown === 'saved' ? <><p className="timer">{t('timer.left', { time: '0:15' })}</p>
                 <ol className="options-board" style={answerFit(sample.options)}>{sample.options.map((option, index) => { const mark = answerMark(look.theme, index, sample.options.length); return <li key={index}>{mark !== null && <span className="answer-mark"><Mark text={mark} /></span>}{option}</li>; })}</ol>
                 <p className="progress-line">{t('progress.answered', { count: shown === 'saved' ? 3 : 2, total: 4 })}</p></>
-                : <><h3>{t('results.title')}</h3><p>{t('results.correct', { answer: sample.options[0]! })}</p><h4>{t('results.points')}</h4><ul className="plain-list">{players.slice(0, 2).map(name => <li key={name}>{name} · 10</li>)}</ul></>}
+                : <RoundResultsCard title={t('results.title')}>
+                  <CorrectRoundAnswer>{t('results.correct', { answer: sample.options[0]! })}</CorrectRoundAnswer>
+                  <h4>{t('results.points')}</h4>
+                  <ul className="plain-list round-awards">{players.slice(0, 2).map(name => <li key={name}><span>{name}</span><strong>10</strong></li>)}</ul>
+                </RoundResultsCard>}
             </section>}
         </div></div></figure>
       <figure className="look-phone"><figcaption>{tx('phone')}</figcaption>
@@ -62,7 +67,9 @@ export function LookPreview({ definition, scope, style, className }: { definitio
                 {sample.options.map((option, index) => { const mark = answerMark(look.theme, index, sample.options.length); return <label key={index} className="tile">{mark !== null && <span className="answer-mark tile-mark" aria-hidden="true"><Mark text={mark} /></span>}{option}</label>; })}</fieldset>
                 <button className="primary" type="button">{t('answer.submit')}</button></>
                 : shown === 'saved' ? <p className="answer-in">{t('answer.saved')}</p>
-                : shown === 'results' ? <><h3>{t('results.title')}</h3><p>{t('results.earned', { points: 10 })}</p></>
+                : shown === 'results' ? <RoundResultsCard title={t('results.title')}>
+                  <OwnRoundPoints points="10" message={t('results.earned', { points: 10 })} />
+                </RoundResultsCard>
                 : <><h3>{t('scores.title')}</h3><p>{t('wait.screen')}</p></>}
             </section>}
         </div></div></figure>

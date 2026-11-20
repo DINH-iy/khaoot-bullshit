@@ -39,6 +39,7 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 
 @media (max-width: 820px) { .game-picker { grid-template-columns: 1fr; } .game-detail { position: static; order: -1; } main.host-page { padding: 12px 16px 40px; } .host-hero { padding: 16px 18px; } }
 .host-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.local-owner-signin { margin: 20px 0; }
 
 /* Your games: one card per game (name and two badges, then its actions), and a compact "New game" row. */
 .my-games-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -73,7 +74,6 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .new-game h3 { grid-column: 1 / -1; margin: 0; font-size: 1rem; }
 .new-game label { font-size: .9rem; font-weight: 600; gap: 6px; }
 .new-game input:not([type=radio]), .new-game select { min-height: 44px; }
-.new-game select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid light-dark(#767676, #999); background: light-dark(#fff, #171717); color: inherit; font: inherit; }
 .new-game button { min-height: 44px; }
 @media (max-width: 700px) { .new-game { grid-template-columns: 1fr; } .my-game-actions .quiet-danger, .my-game-confirm { margin-left: 0; } }
 

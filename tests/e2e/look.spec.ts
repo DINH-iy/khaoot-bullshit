@@ -1,3 +1,4 @@
+import { chooseOption } from './helpers.js';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -24,6 +25,9 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   // A style, a colour and a readability warning.
   await page.getByRole('button', { name: /Neon night/ }).click();
   await expect(page.locator('.room-preview').first()).toHaveCSS('font-family', /Arial Narrow/);
+  await page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'Results', exact: true }).click();
+  await expect(page.locator('.look-tv .round-results .result-answer')).toHaveText('Correct answer: Paris');
+  await expect(page.locator('.look-phone .round-results .results-points-large')).toHaveText('+10');
   // The style page is in small groups; only Style starts open.
   await expect(page.getByLabel('Text on main buttons')).toBeHidden();
   await page.locator('summary', { hasText: /^Colours/ }).click();
@@ -140,7 +144,7 @@ test('answer marks can be numbers, square and after the answer, and answers neve
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Marks test ${Date.now()}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
   await page.getByRole('tab', { name: 'Look & feel' }).click();

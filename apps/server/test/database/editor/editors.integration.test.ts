@@ -107,6 +107,14 @@ describe('personal keys', () => {
     const looked = await call('GET', `/api/host/people/${person.id}/key`, undefined, owner);
     expect(looked.json().data).toEqual({ id: person.id, name: expect.any(String), key: person.key });
     expect((await call('GET', `/api/host/people/${person.id}/key`)).statusCode).toBe(401);
+    const directory = '/api/host/people?withKeys=1';
+    expect((await call('GET', directory)).statusCode).toBe(401);
+    expect((await call('GET', directory, undefined, (await makePerson(true)).cookie)).statusCode).toBe(401);
+    const member = (response: Awaited<ReturnType<typeof call>>) => response.json().data.people.find((entry: { id: string }) => entry.id === person.id);
+    expect(member(await call('GET', '/api/host/people', undefined, owner))).not.toHaveProperty('key');
+    const withKeys = await call('GET', directory, undefined, owner);
+    expect(withKeys.headers['cache-control']).toBe('no-store');
+    expect(member(withKeys)).toHaveProperty('key', person.key);
     // Stored as a hash and an encrypted copy, never as the key itself.
     const row = await prisma.person.findUniqueOrThrow({ where: { id: person.id } });
     expect(row.linkHash).toBe(tokenHash(person.key)); expect(row.keySealed).not.toContain(person.key);

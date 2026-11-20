@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
+import { MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
 import { useLanguage } from '../../i18n/language.js';
 import { useTexts } from '../../i18n/texts.js';
 import { buildLook, themeClass, themeStyle } from '../../presentation/look.js';
+import { FaIcon } from '../../presentation/icons.js';
+import { gameName } from '../../presentation/catalog.text.js';
 import { Mark } from '../../presentation/mark-icons.js';
 import { SceneComposition } from '../../presentation/scene-composition.js';
 import { StageMedia, StageYouTube } from '../../room/stage-media.js';
@@ -22,7 +24,7 @@ interface CanvasControls {
   editMedia: () => void;
 }
 
-export function ScenePreview({ definition, node, index, device, canvas }: PreviewProps & { device: Device; canvas?: CanvasControls }) {
+export function ScenePreview({ definition, node, index, device, canvas }: PreviewProps & { device: Device; canvas?: CanvasControls | undefined }) {
   const t = useTexts(FIELDS_TEXTS);
   const fields = useTexts(INSPECTOR_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
@@ -60,6 +62,9 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
   const mediaButton = canvas && ['collect', 'challenge', 'info'].includes(stage.kind)
     ? <button type="button" className="canvas-media-button" disabled={canvas.readOnly} onClick={canvas.editMedia}>{labels(media || clip ? 'editMedia' : 'addMedia')}</button> : null;
   const sharedMedia = contentMedia('display');
+  const game = stage['game'];
+  const minigame = stage.kind === 'minigame' && typeof game === 'string' && isMinigameKey(game) ? game : undefined;
+  const minigameCard = minigame ? <MinigamePreview stage={stage} game={minigame} text={look.text} /> : null;
   return <div className={canvas ? 'preview scene-canvas' : 'preview'}>
     {device !== 'phone' && <figure className="tv"><figcaption>{t('sharedScreen')}</figcaption>
       <div className={`tv-screen room room-display ${classes}`} style={style}>
@@ -72,6 +77,7 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
           </div> : <p className="tv-prompt">{prompt}</p>}
         </SceneComposition>
         {timer && <p className="timer">{timer}</p>}
+        {minigameCard}
         {options.length > 0 && <ul className={`${canvas ? 'tv-options' : 'options-board'}${ordered || (canvas && input?.layout === 'list') ? ' order' : ''}`}
           style={canvas ? undefined : answerFit(options.map(option => option.label))}>{options.map((option, position) => {
           const mark = ordered ? String(position + 1) : answerMark(theme, position, options.length, stage.kind === 'route');
@@ -97,7 +103,7 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
           {stage.kind === 'info' && <p className="phone-hint">{prompt}</p>}
         </SceneComposition>
         {timer && <p className="timer">{timer}</p>}
-        {['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && !ordered
+        {minigameCard ?? (['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && !ordered
           ? (input?.layout === 'tiles' || stage.kind === 'route') ? <fieldset className="tiles" style={answerFit(options.map(option => option.label))}>
             <legend>{look.text('answer.legend')}</legend>
             {options.map((option, index) => {
@@ -105,8 +111,29 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
               return <div key={option.key} className="tile">{mark !== null && <span className="answer-mark tile-mark" aria-hidden="true"><Mark text={mark} /></span>}{option.label}</div>;
             })}
           </fieldset> : <div className="phone-list">{options.map(option => <span key={option.key}>{option.label}</span>)}</div>
-          : <p className="phone-hint">{phoneHint}</p>}
+          : <p className="phone-hint">{phoneHint}</p>)}
       </div></figure>}
+  </div>;
+}
+
+function MinigamePreview({ stage, game, text }: { stage: Stage; game: keyof typeof MINIGAMES; text: ReturnType<typeof buildLook>['text'] }) {
+  const t = useTexts(FIELDS_TEXTS);
+  const settings = stage['settings'] as { targetMs?: number } | undefined;
+  const explanation = stage['explain'] as { text?: string } | undefined;
+  const target = game === 'stop-clock' ? ((settings?.targetMs ?? MINIGAMES['stop-clock'].defaults.targetMs) / 1000).toLocaleString() : null;
+  const cue = game === 'stop-clock' ? text('minigame.stop') : game === 'reaction' ? text('minigame.go') : game === 'lucky-doors' ? text('minigame.pickDoor') : null;
+  return <div className="minigame-preview">
+    <div className={`minigame-preview-symbol game-${game}`} aria-hidden="true">
+      {game === 'stop-clock' ? <FaIcon name="stopwatch" /> : game === 'perfect-circle' ? '◯'
+        : game === 'relay-drawing' ? '✎' : game === 'lucky-doors' ? '▮ ▮ ▮' : game === 'majority' ? '← →'
+        : game === 'bus' ? '♠ ♥' : <FaIcon name="bolt" />}
+    </div>
+    <div className="minigame-preview-copy">
+      <h3>{gameName(game)}</h3>
+      <p>{explanation?.text || text(howToPlayKey(game))}</p>
+      {target && <p className="minigame-preview-target"><span>{t('target')}</span><strong>{target} {t('sec')}</strong></p>}
+    </div>
+    {cue && <span className="minigame-preview-cue">{cue}</span>}
   </div>;
 }
 

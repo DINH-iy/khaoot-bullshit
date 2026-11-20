@@ -1,3 +1,4 @@
+import { Dropdown } from '../ui/dropdown.js';
 import { useText } from '../presentation/look.js';
 import { cloneElement, isValidElement, useEffect, useState, type ReactNode } from 'react';
 import type { RoomSnapshot } from '@party/contracts';
@@ -6,6 +7,7 @@ import { BallotContent, SavedVoteBadge, savedVote } from './vote.js';
 import { TeamStandings, teamName } from './teams.js';
 import { MinigameResults } from '../minigames/minigame-stage.js';
 import { StoredDrawing } from '../drawing/drawing-view.js';
+import { FaIcon } from '../presentation/icons.js';
 import { Avatar } from '../players/avatar.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { ROUND_CONTROL_TEXTS } from './round-control.text.js';
@@ -16,6 +18,24 @@ import { defaultLook, voteChoices } from '@party/contracts';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
+
+export function RoundResultsCard({ title, label, children }: { title: string; label?: string; children: ReactNode }) {
+  return <div className="results round-results" role={label ? 'region' : undefined} aria-label={label}>
+    <header className="results-head"><span aria-hidden="true"><FaIcon name="trophy" /></span><h3>{title}</h3></header>
+    {children}
+  </div>;
+}
+
+export function OwnRoundPoints({ message, points }: { message: string; points?: string | undefined }) {
+  return <p role="status" className={`results-own${points !== undefined ? ' earned' : ''}`}>
+    {points !== undefined && <strong className="results-points-large" aria-hidden="true">{points.startsWith('−') ? points : `+${points}`}</strong>}
+    <span>{message}</span>
+  </p>;
+}
+
+export function CorrectRoundAnswer({ children }: { children: ReactNode }) {
+  return <p className="result-answer"><FaIcon name="check" />{children}</p>;
+}
 
 /** Exact fixed-point display: 1,000 milli-points are one point. No floating point. */
 export function formatPoints(milli: string): string {
@@ -75,15 +95,15 @@ export function StageResults({ state, stage, offset = 0, onNext, disabled = fals
   const cards = (items: ReactNode[]) => <ResultSequence mode={stage.resultCards} items={items} offset={offset} canAdvance={Boolean(onNext && state.view.status === 'RUNNING' && (state.role === 'host' || state.hostPhone))} {...(onNext ? { onNext } : {})} disabled={disabled} />;
   const label = (key: string) => input?.kind === 'choice' ? input.options.find(option => option.key === key)?.label ?? key : input?.kind === 'order' ? input.items.find(item => item.key === key)?.label ?? key : key;
   const own = state.selfPlayerId ? reveal.awards.find(award => award.playerId === state.selfPlayerId) : undefined;
-  return <div className="results" role="region" aria-label={p('roundResults')}>
-    <h3>{t('results.title')}</h3>
+  return <RoundResultsCard title={t('results.title')} label={p('roundResults')}>
     {/* On a phone your own result comes first, big: that is what you look for. */}
-    {state.role === 'player' && stage.input?.kind !== 'media' && <p role="status" className={`results-own${own ? ' earned' : ''}`}>{own ? t('results.earned', { points: formatPoints(own.amountMilli) }) : t('results.nothing')}</p>}
+    {state.role === 'player' && stage.input?.kind !== 'media' && <OwnRoundPoints points={own ? formatPoints(own.amountMilli) : undefined}
+      message={own ? t('results.earned', { points: formatPoints(own.amountMilli) }) : t('results.nothing')} />}
     {answer?.kind === 'choice' && <>
-      {answer.correctChoiceKey && <p>{t('results.correct', { answer: label(answer.correctChoiceKey) })}</p>}
+      {answer.correctChoiceKey && <CorrectRoundAnswer>{t('results.correct', { answer: label(answer.correctChoiceKey) })}</CorrectRoundAnswer>}
       <ul className="plain-list answer-bars">{answer.counts.map(row => { const total = answer.counts.reduce((sum, entry) => sum + entry.count, 0);
         return <li key={row.choiceKey} className={row.choiceKey === answer.correctChoiceKey ? 'correct' : answer.correctChoiceKey ? 'wrong' : undefined} style={{ '--share': `${total ? Math.round(row.count / total * 100) : 0}%` } as React.CSSProperties}>
-          <span className="bar" aria-hidden="true" />{label(row.choiceKey)}{row.choiceKey === answer.correctChoiceKey ? ' ✓' : ''} · {p(row.count === 1 ? 'answerOne' : 'answerMany', { count: row.count })}</li>; })}</ul>
+          <span className="bar" aria-hidden="true" /><span className="results-bar-label">{label(row.choiceKey)}{row.choiceKey === answer.correctChoiceKey ? ' ✓' : ''}</span><span className="results-bar-count">{p(row.count === 1 ? 'answerOne' : 'answerMany', { count: row.count })}</span></li>; })}</ul>
     </>}
     {answer?.kind === 'minigame' && <MinigameResults state={state} answer={answer} />}
     {answer?.kind === 'drawing' && (answer.entries.length ? <ul className="drawing-gallery">{cards(answer.entries.map(entry => { const author = entry.teamId ? teamName(state, entry.teamId) : nameOf(state, entry.playerId ?? '');
@@ -99,9 +119,9 @@ export function StageResults({ state, stage, offset = 0, onNext, disabled = fals
     <PointsFold folded={state.role === 'player'} label={t('results.points')}>
       {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
       {stage.input?.kind !== 'media' && <h4>{t('results.points')}</h4>}
-      {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list">{[...reveal.awards].sort((a, b) => { const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli); return difference > 0n ? 1 : difference < 0n ? -1 : 0; }).map(award => <li key={award.playerId}>{nameOf(state, award.playerId)} · {formatPoints(award.amountMilli)}</li>)}</ul> : <p>{t('results.nobody')}</p>}
+      {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list round-awards">{[...reveal.awards].sort((a, b) => { const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli); return difference > 0n ? 1 : difference < 0n ? -1 : 0; }).map(award => <li key={award.playerId}><span>{nameOf(state, award.playerId)}</span><strong>{formatPoints(award.amountMilli)}</strong></li>)}</ul> : <p>{t('results.nobody')}</p>}
     </PointsFold>
-  </div>;
+  </RoundResultsCard>;
 }
 
 /** Host judging of a closed challenge: one award per player, then reveal. */
@@ -170,9 +190,8 @@ export function Scoreboard({ state, disabled, send, compact = false }: { state: 
         event.preventDefault();
         if (!disabled && milli && milli !== '0') { send('score.adjust', { playerId: selected.id, amountMilli: milli, reason: 'Host correction' }); setEdit(''); }
       }}>
-        <label>{p('scorePlayer')}<select value={selected.id} onChange={event => { setPlayerId(event.target.value); setEdit(''); }}>
-          {rows.map(row => <option key={row.id} value={row.id}>{row.name} · {formatPoints(row.milli)}</option>)}
-        </select></label>
+        <label>{p('scorePlayer')}<Dropdown value={selected.id} onChange={value => { setPlayerId(value); setEdit(''); }}
+          options={rows.map(row => ({ value: row.id, label: `${row.name} · ${formatPoints(row.milli)}` }))} /></label>
         <label>{p('correctFor', { name: selected.name })}<input type="number" step={1} value={edit} onChange={event => setEdit(event.target.value)} /></label>
         <button className="primary" disabled={disabled || !milli || milli === '0'}>{p('correctScore')}</button>
       </form>}

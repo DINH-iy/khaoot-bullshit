@@ -39,6 +39,7 @@ export const RoomStateSchema = z.object({
   music: z.boolean().default(true), musicVolume: z.number().int().min(0).max(100).default(MUSIC_VOLUME_DEFAULT),
   // Set when the host went back to the lobby: the fresh room everyone moves into (see restart.ts).
   nextRoom: GameIdSchema.nullable().default(null),
+  roomClosed: z.boolean().default(false),
   seatRequests: z.array(RequestSchema).max(50).default([]),
   // People in the room (room-people.ts): guests may make their own account while joining; the people the host
   // added to this room, and phones asking to sign in as one of them (the host approves each).

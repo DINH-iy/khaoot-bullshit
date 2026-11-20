@@ -330,7 +330,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).closest('input, textarea, select, dialog, [aria-modal=true], [contenteditable=true]')) return;
+      if ((event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable=true]')) return;
       if (askDelete) return;
       const fitAll = event.code === `Digit${zoomShortcuts.all}`;
       const fitSelection = event.code === `Digit${zoomShortcuts.selection}`;

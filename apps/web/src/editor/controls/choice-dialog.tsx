@@ -44,8 +44,8 @@ export function ChoiceDialog({ title, intro, choices, value, groups, onPick, onC
         <button key={entry.key} type="button" role="tab" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)}>{entry.name}<small>{entry.values.length}</small></button>)}</div>}
       <div className="choice-cards">
         {shown.map(choice => <button key={choice.value} type="button" className="choice-card" aria-pressed={value !== undefined ? choice.value === value : undefined} onClick={() => onPick(choice.value)}>
-          {choice.icon && <Icon name={choice.icon} />}<span><strong>{choice.label}</strong><small>{choice.description}</small></span>
-          {choice.value === value && <span className="choice-current">{t('chosen')}</span>}
+          {choice.icon && <Icon name={choice.icon} />}<span className="choice-copy"><span className="choice-title"><strong>{choice.label}</strong>
+            {choice.value === value && <span className="choice-current">{t('chosen')}</span>}</span><small>{choice.description}</small></span>
         </button>)}
       </div>
       <div className="actions"><button type="button" onClick={onClose}>{t('cancel')}</button></div>

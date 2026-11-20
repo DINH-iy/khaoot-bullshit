@@ -19,6 +19,16 @@ describe('room admission security', () => {
     expect(cookieToken(`${cookieName(sessionId)}=bad`, sessionId)).toBeUndefined();
     expect(cookieToken(roomCookie(config, sessionId, token, new Date(Date.now() + 10000), true), sessionId)).toBeUndefined();
   });
+  it('accepts the other loopback name on the configured development port only for the same host', () => {
+    const local = readConfig({ NODE_ENV: 'development', PUBLIC_ORIGIN: 'http://127.0.0.1:3002' });
+    const headers = { host: 'localhost:3002', origin: 'http://localhost:3002' };
+    expect(allowedOrigin(headers, local)).toBe(true);
+    expect(allowedOrigin({ host: headers.host }, local)).toBe(true);
+    expect(allowedOrigin({ ...headers, 'sec-fetch-site': 'cross-site' }, local)).toBe(false);
+    expect(allowedOrigin({ ...headers, host: '127.0.0.1:3002' }, local)).toBe(false);
+    expect(allowedOrigin({ ...headers, origin: 'http://localhost:3001' }, local)).toBe(false);
+    expect(allowedOrigin(headers, { ...local, NODE_ENV: 'production' })).toBe(false);
+  });
   it('derives opaque retry-safe guest credentials without storing raw tokens', () => {
     const secret = 'a'.repeat(64); const token = joinToken(secret, sessionId, 'opaque-join-id');
     expect(token).toHaveLength(43); expect(tokenHash(token)).toMatch(/^[0-9a-f]{64}$/);

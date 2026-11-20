@@ -49,7 +49,7 @@ export function PersonPage({ person, busy, actions, stats, all, onOpen }: { pers
   ];
   return <article className="person-page" aria-labelledby="person-page-name">
     <header className="person-page-head">
-      <span className={`person-initials large${person.canEdit ? ' editor' : ''}`} aria-hidden="true">{initials(person.name)}</span>
+      <span className={`person-initials large${person.canEdit ? ' is-editor' : ''}`} aria-hidden="true">{initials(person.name)}</span>
       <div><h2 id="person-page-name">{person.name}</h2>
         <p>{person.canEdit ? 'Player and editor' : 'Player'} · added <span title={fullMoment(person.createdAt)}>{shortMoment(person.createdAt)}</span></p></div>
     </header>
@@ -66,9 +66,10 @@ export function PersonPage({ person, busy, actions, stats, all, onOpen }: { pers
       <p className="person-hint">Editors make, change, publish and rehearse games. They never host rooms or see the admin menu.</p></section>
 
     <section className="person-card" aria-labelledby="person-key"><h3 id="person-key">Personal key</h3>
+      {person.key && <p className="person-key"><code>{person.key}</code></p>}
       <p className="person-hint">Typed once on a phone (or opened as a link), that phone always joins as {person.name}.</p>
       <div className="person-buttons">
-        <button type="button" className="quiet" disabled={busy || !person.hasKey} onClick={() => actions.viewKey(person)} title={person.hasKey ? undefined : 'Made before keys could be shown again: make a new key'}>Show key</button>
+        <button type="button" className="quiet" disabled={busy || !person.hasKey || person.key === null} onClick={() => actions.viewKey(person)}>Share key</button>
         <button type="button" className="quiet" disabled={busy} onClick={() => actions.newKey(person)}>New key…</button>
         <button type="button" className="quiet" disabled={busy || !person.devices} onClick={() => actions.signOut(person)}>Sign out phones…</button>
       </div></section>

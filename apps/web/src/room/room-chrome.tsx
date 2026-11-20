@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { howToPlayKey, isStepMinigame, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import { FaIcon, type IconName } from '../presentation/icons.js';
@@ -116,17 +117,18 @@ export function FloatingScores({ children, leader, docked = false }: { children:
  * A wide popup over the host screen for the less frequent things (room settings, shared screen & invite,
  * players during the game), so the host panel stays short. Escape, the × or a click outside closes it.
  */
-export function HostDialog({ title, icon, onClose, children, size = 'wide' }: { title: string; icon: IconName; onClose: () => void; children: ReactNode; size?: 'wide' | 'compact' }) {
+export function HostDialog({ title, icon, onClose, children, portal, size = 'wide' }: { portal: HTMLElement | null; title: string; icon: IconName; onClose: () => void; children: ReactNode; size?: 'wide' | 'compact' }) {
   const box = useRef<HTMLDivElement>(null); const id = useId();
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; box.current?.focus(); return () => previous?.focus?.(); }, []);
   // Escape closes it wherever focus is (a button inside may have been replaced, leaving focus on the page).
   const close = useRef(onClose); close.current = onClose;
   useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close.current(); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, []);
-  return <div className="host-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+  const dialog = <div className="host-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div ref={box} tabIndex={-1} className={`host-dialog ${size}`} role="dialog" aria-modal="true" aria-labelledby={id}>
       <header className="host-dialog-head"><h2 id={id}><FaIcon name={icon} /> {title}</h2>
         <button type="button" className="icon-button" aria-label={r('close')} title={r('close')} onClick={onClose}><FaIcon name="xmark" /></button></header>
       <div className="host-dialog-body">{children}</div>
     </div>
   </div>;
+  return portal ? createPortal(dialog, portal) : dialog;
 }

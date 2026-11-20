@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { RoomReply } from '@party/contracts';
 import type { Config } from '../config.js';
@@ -13,6 +13,7 @@ import { personFromCookie } from '../people/identity.js';
 // Editors (people with editor rights) can work on the owner's games through
 // requireEditor, signed in with their own person cookie; they never host.
 export const OWNER_COOKIE = 'party_owner';
+const loopback = (address: string | undefined) => address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 const digest = (value: string) => createHash('sha256').update(value).digest();
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422, NAME_TAKEN: 409, NOT_ENOUGH_CHIPS: 409, PREFAB_LIMIT: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, MEDIA_IN_USE: 409, FILE_TOO_LARGE: 413, UNSUPPORTED_MEDIA: 415, STORAGE_FULL: 507 };
 
@@ -34,9 +35,31 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
     return { ownerToken: config.LOCAL_OWNER_TOKEN, roomSecret: config.ROOM_TOKEN_SECRET };
   };
   const isOwner = (expected: string, candidate: string | undefined) => candidate !== undefined && timingSafeEqual(digest(candidate), digest(expected));
+  // The loopback session never carries the private owner key and is only valid on the same local origin.
+  const localToken = (settings: ReturnType<typeof guard>, request: FastifyRequest) => {
+    if (config.NODE_ENV === 'production' || config.TRUST_CLOUDFLARE_LOCAL || !(config.HOST === 'localhost' || loopback(config.HOST))) return undefined;
+    const origin = new URL(config.PUBLIC_ORIGIN);
+    if (origin.hostname !== 'localhost' && origin.hostname !== '127.0.0.1') return undefined;
+    const { remoteAddress, localAddress } = request.raw.socket;
+    if (!loopback(remoteAddress) || !loopback(localAddress)) return undefined;
+    const headers = request.headers;
+    if (Object.keys(headers).some(name => /^(forwarded$|x-forwarded-|cf-|via$|x-real-ip$)/.test(name))) return undefined;
+    const port = origin.port ? `:${origin.port}` : '';
+    if (headers.host !== `localhost${port}` && headers.host !== `127.0.0.1${port}`) return undefined;
+    const browserOrigin = `${origin.protocol}//${headers.host}`;
+    if (headers.origin && headers.origin !== browserOrigin) return undefined;
+    return createHmac('sha256', settings.roomSecret).update(`loopback-owner:${browserOrigin}:${settings.ownerToken}`).digest('base64url');
+  };
+  const hasOwnerCookie = (settings: ReturnType<typeof guard>, request: FastifyRequest) => {
+    const cookie = namedCookie(request.headers.cookie, OWNER_COOKIE);
+    if (!cookie) return false;
+    if (isOwner(settings.ownerToken, cookie)) return true;
+    const token = localToken(settings, request);
+    return token !== undefined && isOwner(token, cookie);
+  };
   const requireOwner = (request: FastifyRequest, bucket: 'menu' | 'edit' = 'menu') => {
     const settings = guard(request, bucket);
-    roomAssert(isOwner(settings.ownerToken, namedCookie(request.headers.cookie, OWNER_COOKIE)), 'UNAUTHORIZED');
+    roomAssert(hasOwnerCookie(settings, request), 'UNAUTHORIZED');
     return settings;
   };
   /**
@@ -47,11 +70,11 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
    */
   const requireEditor = async (request: FastifyRequest, bucket: 'menu' | 'edit' = 'menu') => {
     const settings = guard(request, bucket);
-    if (isOwner(settings.ownerToken, namedCookie(request.headers.cookie, OWNER_COOKIE))) return { ...settings, role: 'owner' as const, personId: null };
+    if (hasOwnerCookie(settings, request)) return { ...settings, role: 'owner' as const, personId: null };
     const found = await personFromCookie(client, request.headers.cookie);
     roomAssert(found?.person.canEdit, 'UNAUTHORIZED');
     return { ...settings, role: 'editor' as const, personId: found.person.id };
   };
-  return { fail, guard, isOwner, requireOwner, requireEditor };
+  return { fail, guard, isOwner, localToken, requireOwner, requireEditor };
 }
 export type OwnerAccess = ReturnType<typeof createOwnerAccess>;

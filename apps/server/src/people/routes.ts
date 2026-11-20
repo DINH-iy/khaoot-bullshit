@@ -58,7 +58,8 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
   const activePerson = async (id: string) => roomAssert(await client.person.count({ where: { id, removedAt: null } }) === 1, 'NOT_FOUND');
   app.get('/api/host/people', async (request, reply) => {
     try {
-      owner.requireOwner(request);
+      const { roomSecret } = owner.requireOwner(request);
+      const withKeys = (request.query as { withKeys?: unknown }).withKeys === '1';
       const people = await client.person.findMany({ where: { removedAt: null }, orderBy: { name: 'asc' }, take: 500, select: {
         id: true, name: true, createdAt: true, canEdit: true, keySealed: true,
         devices: { where: { revokedAt: null }, select: { lastSeenAt: true } },
@@ -71,6 +72,7 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
         lastSeenAt: person.devices.reduce<Date | null>((latest, device) => !latest || device.lastSeenAt > latest ? device.lastSeenAt : latest, null)?.toISOString() ?? null,
         games: person._count.players, chips: total(person.id, ['START', 'REFILL', 'BET', 'PAYOUT']), wagered: -total(person.id, ['BET']),
         canEdit: person.canEdit, hasKey: person.keySealed !== null,
+        ...(withKeys ? { key: openPersonKey(roomSecret, person.keySealed) } : {}),
       })) }) };
     } catch (error) { return owner.fail(reply, error); }
   });

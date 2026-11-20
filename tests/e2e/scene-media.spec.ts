@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { closeHostFold, openHostFold } from './helpers.js';
+import { chooseOption, closeHostFold, openHostFold } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -32,7 +32,7 @@ test('scene translations, background motion and a YouTube clip work from editor 
   const headerColor = await chrome.evaluate(el => getComputedStyle(el).backgroundColor);
   const sidebarColor = await sidebar.evaluate(el => getComputedStyle(el).backgroundColor);
   await page.locator('summary').getByText('Translations', { exact: true }).click();
-  await page.getByLabel('Text language').selectOption('nl');
+  await chooseOption(page.getByLabel('Text language'), 'nl');
   await page.getByLabel('Question or scene text').fill('Welke planeet heeft de meeste bekende manen?');
   await page.getByLabel('Saturn', { exact: true }).fill('Saturnus');
   const field = page.getByRole('group', { name: 'Picture, video or song' });
@@ -55,7 +55,7 @@ test('scene translations, background motion and a YouTube clip work from editor 
   await page.getByRole('button', { name: 'Starlight' }).click();
   await expect(page.locator('.room-preview.motion-starlight')).toHaveCount(2);
   await page.getByRole('tab', { name: 'Texts', exact: true }).click();
-  await page.getByLabel('Text language').selectOption('nl');
+  await chooseOption(page.getByLabel('Text language'), 'nl');
   await page.getByRole('searchbox', { name: 'Find a text' }).fill('Join room');
   await page.getByLabel('Join room', { exact: true }).fill('Speel deze quiz');
   await page.getByRole('button', { name: 'Joining', exact: true }).click();
@@ -65,12 +65,11 @@ test('scene translations, background motion and a YouTube clip work from editor 
   await expect(chrome).toHaveCSS('background-color', headerColor);
   await expect(sidebar).toHaveCSS('background-color', sidebarColor);
   await expect(page.locator('.scene-canvas .tv-screen')).toHaveCSS('color', 'rgb(219, 255, 230)');
-  await page.getByRole('button', { name: 'Phone preview' }).click();
-  const themedPreview = page.getByRole('dialog', { name: 'Preview' });
-  await expect(themedPreview).toHaveCSS('background-color', sidebarColor);
-  await expect(themedPreview.locator('.phone-screen')).toHaveCSS('color', 'rgb(219, 255, 230)');
+  const devices = page.getByRole('group', { name: 'Preview device' });
+  await devices.getByRole('button', { name: 'Phone', exact: true }).click();
+  const themedPreview = page.getByRole('region', { name: 'Preview' }).locator('.phone-screen');
+  await expect(themedPreview).toHaveCSS('color', 'rgb(219, 255, 230)');
   await expect(themedPreview.locator('.timer')).toHaveText('0:20 left');
-  await themedPreview.getByRole('button', { name: 'Close' }).click();
   const game = (await (await page.request.get(`${baseURL}/api/host/games/${gameId}`, { headers })).json()).data;
   expect((await page.request.post(`${baseURL}/api/host/games/${gameId}/publish`, { headers, data: { expectedRevision: game.revision } })).ok()).toBe(true);
   const sessionId = randomUUID();
@@ -123,7 +122,7 @@ test('an author puts a picture in a quiz question, and the room shows it with th
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Picture quiz ${randomUUID().slice(0, 4)}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Timed quiz' });
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Timed quiz' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
   const gameId = new URL(page.url()).searchParams.get('edit')!;
@@ -164,26 +163,26 @@ test('an author puts a picture in a quiz question, and the room shows it with th
   await expect.poll(async () => { const result = await position(); return result.copyLeft - result.mediaRight; }).toBeGreaterThan(0);
   const sizes = [];
   for (const size of ['compact', 'standard', 'wide']) {
-    await field.getByLabel('Media size').selectOption(size);
+    await chooseOption(field.getByLabel('Media size'), size);
     sizes.push((await canvas.locator(`.media-${size} .composition-media`).boundingBox())!.width);
   }
   expect(sizes[0]).toBeLessThan(sizes[1]!);
   expect(sizes[1]).toBeLessThan(sizes[2]!);
   await page.setViewportSize({ width: 1440, height: 900 });
   await field.getByRole('button', { name: 'Above the text' }).click();
-  await field.getByLabel('Media size').selectOption('wide');
+  await chooseOption(field.getByLabel('Media size'), 'wide');
   await expect(canvas.locator('.media-above.media-wide .composition-media')).toBeVisible();
   expect((await canvas.locator('.stage-media.image img').boundingBox())!.width).toBeGreaterThan(100);
-  await page.getByRole('button', { name: 'Phone preview' }).click();
-  const phonePreview = page.getByRole('dialog', { name: 'Preview' });
-  await expect(phonePreview.locator('.phone-screen .media-above.media-wide .stage-media img')).toBeVisible();
-  await phonePreview.getByRole('button', { name: 'Close' }).click();
+  const devices = page.getByRole('group', { name: 'Preview device' });
+  await devices.getByRole('button', { name: 'Phone', exact: true }).click();
+  await expect(page.locator('.scene-stage .phone-screen .media-above.media-wide .stage-media img')).toBeVisible();
+  await devices.getByRole('button', { name: 'Shared screen', exact: true }).click();
   await expect(field).toContainText('Shows on the shared screen and the phones.');
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
   // The library lists it; a file a game uses cannot be removed.
   await canvas.getByRole('button', { name: 'Media settings' }).click();
   const crop = page.getByRole('dialog', { name: 'Crop picture' });
-  await crop.getByLabel('Crop shape').selectOption('landscape');
+  await chooseOption(crop.getByLabel('Crop shape'), 'landscape');
   await expect(crop.locator('.stage-media.cropped')).toBeVisible();
   await crop.getByRole('button', { name: 'Use this', exact: true }).click();
   await expect(canvas.locator('.stage-media.cropped')).toBeVisible();
@@ -292,6 +291,9 @@ test('a song plays in one place only: the host screen when no shared screen is c
   const gameId = randomUUID();
   expect((await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: `Song quiz ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' } })).ok()).toBe(true);
   await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  const parts = (await page.locator('.scene-edit-fields > .ed-section').boundingBox())!;
+  const content = (await page.locator('.stage-fields > .ed-section').first().boundingBox())!;
+  expect(parts.y + parts.height).toBeCloseTo(content.y, 0);
   await page.locator('.scene-canvas').getByRole('button', { name: 'Add media' }).click();
   const item = page.getByRole('dialog', { name: 'Media library' }).getByRole('listitem').filter({ hasText: 'Thinking music.wav' });
   await item.getByRole('button', { name: 'Cut clip' }).click();
@@ -300,7 +302,8 @@ test('a song plays in one place only: the host screen when no shared screen is c
   await cut.getByLabel('End time (seconds)').fill('5');
   const waveform = cut.locator('.audio-waveform');
   await expect(waveform).toBeVisible();
-  await expect.poll(() => waveform.locator('i').evaluateAll(bars => new Set(bars.map(bar => bar.getBoundingClientRect().height)).size)).toBeGreaterThan(1);
+  const path = (await waveform.locator('path').getAttribute('d'))!;
+  expect(new Set([...path.matchAll(/,([\d.]+)/g)].map(point => point[1])).size).toBeGreaterThan(2);
   await cut.getByLabel('Show waveform').uncheck();
   await expect(waveform).toHaveCount(0);
   await cut.getByLabel('Show waveform').check();
@@ -308,13 +311,26 @@ test('a song plays in one place only: the host screen when no shared screen is c
   const canvasAudio = page.locator('.scene-canvas .scene-audio-player');
   const sidebar = page.getByRole('group', { name: 'Picture, video or song' });
   await expect(canvasAudio).toBeVisible();
-  await sidebar.getByRole('button', { name: 'Play the song' }).click();
+  const play = sidebar.getByRole('button', { name: 'Play the song' });
+  await expect(play).toHaveCSS('height', '44px');
+  await expect(play.locator('svg')).toHaveCSS('width', '16px');
+  await expect(play.locator('svg')).toHaveCSS('height', '16px');
+  await play.click();
   await sidebar.getByRole('button', { name: 'Pause the song' }).click();
   await expect(sidebar.getByRole('button', { name: 'Play the song' })).toBeVisible();
+  const size = (await sidebar.getByRole('combobox', { name: 'Media size' }).boundingBox())!;
+  const checkbox = (await sidebar.getByLabel('Show waveform').boundingBox())!;
+  expect(checkbox.y + checkbox.height / 2).toBeCloseTo(size.y + size.height / 2, 0);
   await sidebar.getByLabel('Show waveform').uncheck();
   await expect(canvasAudio.locator('.audio-waveform')).toHaveCount(0);
   await sidebar.getByLabel('Show waveform').check();
   await expect(canvasAudio.locator('.audio-waveform')).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Media settings' }).click();
+  await page.getByRole('button', { name: 'Back to library' }).click();
+  await expect(item.locator('.media-item-info')).toContainText('In this scene');
+  const actions = await item.locator('.media-item-actions button').evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().y));
+  expect(new Set(actions).size).toBe(1);
+  await page.getByRole('dialog', { name: 'Media library' }).getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   const saved = (await (await page.request.get(`${baseURL}/api/host/games/${gameId}`, { headers })).json()).data;
   expect((await page.request.post(`${baseURL}/api/host/games/${gameId}/publish`, { headers, data: { expectedRevision: saved.revision } })).ok()).toBe(true);
@@ -446,7 +462,7 @@ test('in the editor, a song goes on the game’s playlist and a scene chooses si
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Music editor ${randomUUID().slice(0, 4)}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Timed quiz' });
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Timed quiz' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
   const gameId = new URL(page.url()).searchParams.get('edit')!;

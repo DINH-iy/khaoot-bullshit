@@ -4,6 +4,7 @@
 .peer-list { gap: 0; } .peer-chip { display: inline-flex; margin-left: -6px; border-radius: 50%; box-shadow: 0 0 0 2px var(--e-panel); } .peer-list .peer-chip:first-child { margin-left: 0; }
 .peer-dot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--peer); color: #fff; font-weight: 700; font-size: .8rem; }
 .peer-me { position: relative; }
+.editor .peer-compact-button { display: none; }
 .editor .peer-me-button { display: grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--peer, var(--e-border)); background: var(--e-panel); }
 .peer-me-button .peer-dot { width: 28px; height: 28px; background: var(--peer, var(--e-muted)); }
 .peer-me-popover { position: absolute; right: 0; top: calc(100% + 6px); z-index: 12; width: 15rem; padding: 10px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
@@ -33,10 +34,16 @@
 .peer-more-list { position: absolute; right: 0; top: calc(100% + 10px); z-index: 12; min-width: 14rem; margin: 0; padding: 8px; list-style: none; display: grid; gap: 4px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
 .peer-more-list li { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; padding: 4px; font-weight: 600; }
 .peer-more-list small { grid-column: 2; color: var(--e-muted); font-weight: 400; }
+.peer-more-list.peer-compact-list { position: static; min-width: 0; padding: 8px 0 0; border: 0; background: none; box-shadow: none; }
 /* Your own circle carries a small "You" under it. */
 .peer-me { display: grid; justify-items: center; }
 .peer-you { position: absolute; bottom: -9px; padding: 0 5px; border-radius: 999px; background: var(--e-panel); color: var(--e-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; pointer-events: none; }
 @media (max-width: 720px) { .peer-label, .peer-name { display: none; } .peer-others { padding: 0 4px; } .peer-others .peer-chip { padding: 0 3px; } }
+@media (max-width: 700px) {
+  .editor .peer-others, .editor .editor-actions .peer-me-button { display: none; }
+  .editor .editor-actions .peer-compact-button { display: inline-flex; gap: 5px; align-items: center; justify-content: center; height: 40px; min-width: 44px; padding: 0 8px; border-radius: 999px; font-size: .82rem; font-variant-numeric: tabular-nums; }
+  .peer-compact-button svg { width: 14px; height: 14px; flex: none; }
+}
 /* Three or more: initials overlapping, then the count. */
 .peer-others.crowd .peer-list { gap: 0; }
 .peer-others.crowd .peer-chip { padding: 0; height: auto; background: none; margin-left: -8px; border-radius: 50%; box-shadow: 0 0 0 2px var(--e-panel); }

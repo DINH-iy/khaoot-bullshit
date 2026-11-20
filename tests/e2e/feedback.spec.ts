@@ -1,3 +1,4 @@
+import { chooseOption } from './helpers.js';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -94,14 +95,14 @@ test('a tester points at a button and reports it; the owner finds it with its fi
     await item.getByRole('button', { name: 'Copy as text' }).click();
     await expect(item.getByRole('button', { name: 'Copied' })).toBeVisible();
     expect(await owner.evaluate(() => navigator.clipboard.readText())).toContain(`Report ID: ${reportId}`);
-    await item.getByLabel(`Status of ${title}`).selectOption('done');
+    await chooseOption(item.getByLabel(`Status of ${title}`), 'done');
     await expect(item).toHaveCount(0);
     await owner.reload();
-    await owner.locator('.admin-filters').getByRole('combobox').selectOption('done');
+    await chooseOption(owner.locator('.admin-filters').getByRole('combobox'), 'done');
     await owner.getByRole('searchbox', { name: 'Search' }).fill(reportId);
-    await expect(item.getByLabel(`Status of ${title}`)).toHaveValue('done');
+    await expect(item.getByLabel(`Status of ${title}`)).toHaveAttribute('value', 'done');
     await expect(item.locator('.admin-report-id code')).toHaveText(reportId);
-    await owner.locator('.admin-filters').getByRole('combobox').selectOption('open');
+    await chooseOption(owner.locator('.admin-filters').getByRole('combobox'), 'open');
     await owner.getByRole('searchbox', { name: 'Search' }).fill(clipTitle);
     await owner.getByRole('button', { name: 'View attachment' }).click();
     await expect.poll(() => owner.locator('video[aria-label="Feedback video"]').evaluate(video => (video as HTMLVideoElement).videoWidth)).toBe(32);

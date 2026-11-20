@@ -14,7 +14,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     roomPause: "Pause the game to pause this on the shared screen. Use the player on that screen to seek or adjust volume.",
     close: "Close",
     devices: "Preview device",
-    phonePreview: "Phone preview", editMedia: "Media settings", addMedia: "Add media",
+    editMedia: "Media settings", addMedia: "Add media",
     rehearseOnly: "Rehearse only this scene",
 }, {
   nl: {
@@ -31,7 +31,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     roomPause: "Pauzeer het spel om dit op het gedeelde scherm te pauzeren. Gebruik de speler op dat scherm om te spoelen of het volume aan te passen.",
     close: "Sluiten",
     devices: "Voorbeeldapparaat",
-    phonePreview: "Telefoonvoorbeeld", editMedia: "Media-instellingen", addMedia: "Media toevoegen",
+    editMedia: "Media-instellingen", addMedia: "Media toevoegen",
     rehearseOnly: "Alleen deze scène oefenen",
   },
   de: {
@@ -48,7 +48,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     roomPause: "Pausiere das Spiel, um die Wiedergabe auf dem gemeinsamen Bildschirm anzuhalten. Spulen und Lautstärke stellst du im Player dort ein.",
     close: "Schließen",
     devices: "Vorschaugerät",
-    phonePreview: "Handyvorschau", editMedia: "Medieneinstellungen", addMedia: "Medien hinzufügen",
+    editMedia: "Medieneinstellungen", addMedia: "Medien hinzufügen",
     rehearseOnly: "Nur diese Szene proben",
   },
   ro: {
@@ -65,7 +65,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     roomPause: "Pune jocul pe pauză pentru a opri redarea pe ecranul comun. Folosește playerul de acolo pentru a derula sau a regla volumul.",
     close: "Închide",
     devices: "Dispozitiv de previzualizare",
-    phonePreview: "Previzualizare pe telefon", editMedia: "Setări media", addMedia: "Adaugă conținut media",
+    editMedia: "Setări media", addMedia: "Adaugă conținut media",
     rehearseOnly: "Repetă doar această scenă",
   },
 });

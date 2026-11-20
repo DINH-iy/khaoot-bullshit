@@ -35,9 +35,17 @@ main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .admin-page button.primary { background: #6d3fd6; border-color: #6d3fd6; color: #fff; font-weight: 700; }
 .admin-page button.primary:disabled { background: light-dark(#cfc7e6, #3a3550); border-color: transparent; color: light-dark(#5f5873, #9a93b0); }
 @media (max-width: 700px) { .person-add { grid-template-columns: 1fr; } }
-.person-link { display: grid; gap: 10px; justify-items: start; } .person-link h2 { margin: 0; } .person-link p { margin: 0; max-width: 44rem; }
-.person-link img { border-radius: 12px; background: #fff; image-rendering: pixelated; }
-.person-url code { overflow-wrap: anywhere; font-size: .85rem; }
+.person-link { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow: auto; margin: auto; padding: 0; border: 1px solid light-dark(#e3def2, #3a3550); border-radius: 18px; background: light-dark(#fff, #1e1c28); color: light-dark(#25222f, #f4f0ff); box-shadow: 0 20px 72px rgb(0 0 0 / .35); }
+.person-link::backdrop { background: rgb(0 0 0 / .5); }
+.person-link-body { display: grid; gap: 14px; padding: 18px; }
+.person-link h2 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.person-link-content { display: grid; grid-template-columns: minmax(0, 1fr) clamp(86px, 23vw, 120px); gap: 12px; align-items: center; }
+.person-link-content img { width: 100%; height: auto; border-radius: 10px; background: #fff; image-rendering: pixelated; }
+.person-link .person-hint { margin-top: 8px; line-height: 1.35; }
+.person-link .admin-actions button { min-height: 40px; padding: 6px 12px; }
+.person-url { color: light-dark(#5f5873, #b3acc8); font-size: .85rem; }
+.person-url summary { cursor: pointer; }
+.person-url code { display: block; margin-top: 6px; overflow-wrap: anywhere; }
 .people-table-wrap { border-radius: 16px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
 .people-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .people-table th, .people-table td { padding: 10px 14px; border-bottom: 1px solid light-dark(#eeeaf7, #2c2840); text-align: left; vertical-align: middle; white-space: nowrap; }
@@ -51,11 +59,12 @@ main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .person-name-text { font-weight: 700; white-space: normal; }
 .person-name small { font-weight: 400; font-size: .8rem; color: light-dark(#5f5873, #b3acc8); }
 .person-initials { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: light-dark(#eeeaf7, #2c2840); font-size: .8rem; font-weight: 800; }
-.person-initials.editor { background: #6d3fd6; color: #fff; }
+.person-initials.is-editor { background: #6d3fd6; color: #fff; }
 .seen-recent::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #1f9d55; vertical-align: middle; }
 .seen-never { color: light-dark(#5f5873, #b3acc8); }
-.person-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-.person-actions button { min-height: 36px; padding: 6px 12px; font-weight: 600; }
+.admin-page button.person-key-chip { min-height: 36px; padding: 4px 10px; border: 1px solid light-dark(#e3def2, #3a3550); border-radius: 8px; background: light-dark(#f1edfb, #2c2840); color: inherit; }
+.admin-page button.person-key-chip:hover { border-color: light-dark(#6d3fd6, #b9a2ff); }
+.person-key-chip code { font-size: .82rem; font-weight: 700; }
 /* A switch for "can edit games": the real checkbox, drawn as a track and knob. */
 .person-switch { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-weight: 600; cursor: pointer; }
 .person-switch input { appearance: none; position: relative; flex: none; width: 38px; height: 22px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 999px; background: light-dark(#cfc7e6, #4a4466); cursor: pointer; transition: background .15s; }
@@ -68,7 +77,8 @@ main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .people-summary-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: light-dark(#5f5873, #b3acc8); }
 .people-summary strong { font-size: 1.8rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .people-summary small { font-size: .82rem; color: light-dark(#5f5873, #b3acc8); }
-.person-key code { display: inline-block; padding: 10px 16px; border-radius: 12px; background: light-dark(#f1edfb, #2c2840); font: 800 1.6rem/1.2 ui-monospace, monospace; letter-spacing: .12em; }
+.person-key { margin: 0; }
+.person-key code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; padding: 6px 8px; border-radius: 8px; background: light-dark(#f1edfb, #2c2840); font: 800 clamp(.88rem, 3.5vw, 1.12rem)/1.2 ui-monospace, monospace; }
 .person-check { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-weight: 600; white-space: nowrap; }
 .person-check input { width: 20px; height: 20px; margin: 0; }
 /* Search above the list. */
@@ -76,23 +86,21 @@ main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .people-search label { flex: 1; max-width: 26rem; }
 .people-search input { min-height: 44px; }
 .people-search [role=status] { font-size: .9rem; color: light-dark(#5f5873, #b3acc8); }
-/* The name opens the person's page; on phones the whole line does. */
+/* The name opens the profile and the key opens its share dialog. */
 a.person-name { color: inherit; text-decoration: none; }
 a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
-.person-chevron { display: none; }
-/* Phones: one short line per person (initials, name, last seen, ›); tapping it opens their page. */
+/* Keep the name and key side by side on phones. */
 @media (max-width: 760px) {
   .people-table-wrap { border: 0; background: none; }
   .people-table, .people-table tbody, .people-table tr { display: block; }
   .people-table thead, .people-table .wide-only { display: none; }
   .people-table tbody { display: grid; gap: 8px; }
-  .people-table tbody tr { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
+  .people-table tbody tr { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; padding: 8px 10px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); }
   .people-table tbody tr:hover { background: light-dark(#faf9fe, #23202d); }
   .people-table th, .people-table td { display: block; padding: 0; border: 0; }
   .people-table th { min-width: 0; } .person-name-text { overflow-wrap: anywhere; }
-  .person-seen { display: flex !important; align-items: center; gap: 10px; font-size: .85rem; }
-  .person-chevron { display: inline; font-size: 1.4rem; line-height: 1; opacity: .6; }
-  a.person-name::after { content: ''; position: absolute; inset: 0; border-radius: 14px; }
+  .person-seen { grid-column: 1; font-size: .8rem; white-space: normal !important; }
+  .person-key-cell { grid-column: 2; grid-row: 1 / 3; }
 }
 /* One person's page. */
 .person-back { margin: 16px 0 8px; } .person-back a { font-weight: 600; text-decoration: none; }
@@ -251,15 +259,25 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .group-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .group-card { margin: 0; padding: 12px 14px; border-radius: 14px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1d1a2b); }
 .group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.admin-page .group-toggle { display: inline-flex; align-items: center; gap: 10px; flex: 1; min-width: 12rem; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.admin-page .group-toggle:hover { background: light-dark(#f6f3fd, #26223a); }
-.group-name { font-weight: 800; }
-.group-count { color: light-dark(#5f5873, #b3acc8); font-size: .9rem; margin-right: auto; }
-.group-members { margin: 4px 8px 0; color: light-dark(#5f5873, #b3acc8); font-size: .9rem; overflow-wrap: anywhere; }
-.group-members-edit { margin-top: 10px; }
-.group-people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0 12px; }
+.group-heading { display: flex; align-items: center; gap: 10px; flex: 1; min-width: min(100%, 12rem); }
+.group-icon { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: light-dark(#f1edfb, #2c2840); color: light-dark(#5b31bf, #c9b6ff); }
+.group-icon svg, .group-toggle svg { width: 16px; height: 16px; flex: none; }
+.group-name { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.group-count { margin: 2px 0 0; color: light-dark(#5f5873, #b3acc8); font-size: .85rem; }
+.group-head .admin-actions { justify-content: start; }
+.group-head .admin-actions button { min-height: 40px; padding: 6px 10px; font-size: .9rem; }
+.group-head .group-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.group-members { margin: 8px 0 0 46px; color: light-dark(#5f5873, #b3acc8); font-size: .9rem; overflow-wrap: anywhere; }
+.group-members-edit { display: grid; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid light-dark(#e3def2, #3a3550); }
+.group-members-edit .people-search { flex-wrap: wrap; gap: 8px; margin: 0; }
+.group-members-edit .people-search label { min-width: min(100%, 12rem); }
+.group-people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 6px; max-height: 20rem; overflow: auto; }
 .group-people li { margin: 0; }
-.group-people .person-check { white-space: normal; }
+.group-people .person-check { width: 100%; padding: 4px 8px; border: 1px solid light-dark(#e3def2, #3a3550); border-radius: 8px; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+.group-people .person-check:has(:checked) { background: light-dark(#f1edfb, #2c2840); }
+.group-people input { flex: none; accent-color: #6d3fd6; }
 
 .admin-feedback-attachment { display: grid; justify-items: start; gap: 8px; }
 .admin-feedback-attachment :is(img, video) { display: block; max-width: 100%; max-height: min(420px, 60vh); object-fit: contain; border-radius: 10px; }
+
+.admin-item-head > .ed-dropdown, .admin-actions > .ed-dropdown { width: auto; max-width: 100%; }

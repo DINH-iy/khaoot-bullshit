@@ -21,7 +21,8 @@ export function HistoryPanel({ steps, disabled, onRestore }: { steps: { undo: En
     <button type="button" disabled={disabled || count === 0} onClick={() => onRestore(kind, count)} title={t(count === 0 ? 'youAreHere' : undone ? 'redoToHere' : 'undoToHere')}>
       <span>{entry.label}</span><time>{clock.format(entry.at)}</time></button></li>;
   return <section className={`history-panel${open ? ' open' : ''}`} aria-label={t('history')}>
-    <button type="button" className="history-toggle" aria-expanded={open} onClick={toggle}><Icon name="history" size={18} />{t('history')}{total ? <span className="history-count">{undo.length}</span> : null}<span className="problems-caret" aria-hidden="true">{open ? '▾' : '▴'}</span></button>
+    <button type="button" className="history-toggle" title={t('history')} aria-expanded={open} onClick={toggle}>
+      <Icon name="history" size={18} /><span className="corner-label">{t('history')}</span>{total ? <> <span className="history-count">{undo.length}</span></> : null}<span className="problems-caret" aria-hidden="true">{open ? '▾' : '▴'}</span></button>
     {open && <div className="history-list">
       {!total && <p className="history-empty">{t('historyEmpty')}</p>}
       {total > 0 && <ol>

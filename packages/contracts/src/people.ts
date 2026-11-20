@@ -27,6 +27,8 @@ export const PersonRowSchema = z.object({
   canEdit: z.boolean(),
   // False for people made before keys could be looked up again: make a new key to see one.
   hasKey: z.boolean(),
+  // Included only when the owner opens the People directory with keys enabled.
+  key: PersonKeySchema.nullable().optional(),
 }).strict();
 export type PersonRow = z.infer<typeof PersonRowSchema>;
 export const PeopleListSchema = z.object({ people: z.array(PersonRowSchema) }).strict();

@@ -1,13 +1,34 @@
+import { chooseOption } from './helpers.js';
 import { expect, test } from '@playwright/test';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
 
+test('the join page has a readable keyboard-operated language list at phone width', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/');
+  const switcher = page.getByRole('combobox', { name: 'Language' });
+  await switcher.focus();
+  await page.keyboard.press('ArrowDown');
+  const list = page.getByRole('listbox');
+  await expect(list.getByRole('option')).toHaveCount(4);
+  const bounds = (await list.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+  await page.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await expect(switcher).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'nl');
+});
+
 test('the host chooses Dutch: the host menu and the host’s room controls switch, and the choice is remembered', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Hosting is checked on the desktop.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await expect(page.getByRole('heading', { name: 'Host a game' })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Language' }).selectOption('nl');
+  await chooseOption(page.getByRole('combobox', { name: 'Language' }), 'nl');
   await expect(page.getByRole('heading', { name: 'Een spel hosten' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Kies een spel' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.lang)).toBe('nl');
@@ -26,7 +47,7 @@ test('the host chooses Dutch: the host menu and the host’s room controls switc
 
   // Back to English for the other tests in this browser profile (each test has its own, but tidy anyway).
   await page.goto(`${baseURL}/?host=1`);
-  await page.getByRole('combobox', { name: 'Taal' }).selectOption('en');
+  await chooseOption(page.getByRole('combobox', { name: 'Taal' }), 'en');
   await expect(page.getByRole('heading', { name: 'Host a game' })).toBeVisible();
 });
 
@@ -37,7 +58,7 @@ test('the editor’s frame in Dutch: tabs, menus, help and game settings', async
   const mine = page.getByRole('region', { name: 'Your games' });
   await mine.getByLabel('Name of your new game').fill(`Taaltest ${Date.now()}`);
   await mine.getByRole('button', { name: 'Create game' }).click();
-  await page.getByRole('combobox', { name: 'Language' }).selectOption('nl');
+  await chooseOption(page.getByRole('combobox', { name: 'Language' }), 'nl');
   await page.getByRole('link', { name: /bewerken$/ }).first().click();
   await expect(page.getByRole('tab', { name: 'Scène-editor' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Spelen & publiceren' })).toBeVisible();
@@ -71,7 +92,7 @@ test('a phone chooses its own language: the game’s standard texts follow it, t
   const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } }); const phone = await phoneContext.newPage();
   try {
     await phone.goto(`${baseURL}/?code=${roomCode}`);
-    await phone.getByRole('combobox', { name: 'Language' }).selectOption('nl');
+    await chooseOption(phone.getByRole('combobox', { name: 'Language' }), 'nl');
     await expect(phone.getByLabel('Je naam')).toBeVisible();
     await phone.getByLabel('Je naam').fill('Taalspeler');
     await phone.getByRole('button', { name: 'Meedoen', exact: true }).click();

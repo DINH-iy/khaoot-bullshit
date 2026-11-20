@@ -5,9 +5,9 @@
   --e-border: light-dark(#d9d9e0, #3a3d48); --e-text: light-dark(#1d1d22, #eceef3); --e-muted: light-dark(#5f6170, #a9adbb);
   --e-accent: light-dark(#6d4fe0, #b8a2ff); --e-accent-soft: light-dark(#ece7ff, #3a3354); --e-line: light-dark(#8d90a0, #8a8fa0);
   --e-danger: light-dark(#a3122a, #ff9aa8); --e-dot: light-dark(#cfd0d8, #343744);
-  position: relative; display: grid; grid-template-rows: auto 1fr; height: 100dvh; background: var(--e-bg); color: var(--e-text);
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; height: 100dvh; background: var(--e-bg); color: var(--e-text);
 }
-.editor-main { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; max-width: none; margin: 0; padding: 0; }
+.editor-main { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; min-height: 0; max-width: none; margin: 0; padding: 0; }
 .editor-message { max-width: 640px; margin: 64px auto; padding: 0 16px; }
 .editor-header { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--e-border); background: var(--e-panel); }
 .editor-title { display: flex; gap: 14px; align-items: center; min-width: 0; }
@@ -140,6 +140,7 @@
 .scene-list-head .scene-add-after svg { flex: none; }
 .scene-list ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .scene-list li { margin: 0; }
+.scene-list .scene-unconnected-label { margin-top: 8px; }
 .editor .scene-row { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; border: 1px solid transparent !important; background: transparent !important; border-radius: 10px; padding-block: 8px; min-height: 52px; }
 .editor .scene-row:hover { background: var(--e-bg) !important; }
 .editor .scene-row.current { border-color: var(--e-accent) !important; background: var(--e-accent-soft) !important; }
@@ -151,6 +152,7 @@
 .row-text { display: grid; min-width: 0; } .row-text small { color: var(--e-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
 .row-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-problems { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--e-danger); color: light-dark(#fff, #2a0d12); font-size: .75rem; font-weight: 700; }
+.scene-timeline-detail { display: none; }
 .scene-stage { overflow: auto; padding: 24px; display: grid; gap: 16px; align-content: start; background-color: var(--e-bg); background-image: radial-gradient(var(--e-dot) 1.2px, transparent 1.2px); background-size: 24px 24px; }
 .part-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .part-tabs button { background: var(--e-panel); color: var(--e-muted); border: 1px solid var(--e-border); min-height: 40px; }
@@ -250,6 +252,7 @@
 .ed-kind-text { display: grid; } .ed-kind-text small { color: var(--e-muted); font-size: .8rem; }
 .inspector-problems ul { margin: 0; padding-left: 18px; font-size: .9rem; }
 .stage-fields { display: grid; gap: 0; }
+.scene-edit-fields > h3 { padding-block: 4px 10px; }
 .ed-section { border-top: 1px solid var(--e-border); }
 .ed-section > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 46px; cursor: pointer; font-weight: 700; user-select: none; }
 .ed-section > summary::-webkit-details-marker { display: none; }
@@ -405,7 +408,7 @@
 .choice-dialog .choice-card[aria-pressed=true] { border-color: var(--e-accent); box-shadow: inset 0 0 0 1px var(--e-accent); }
 .choice-dialog .choice-card svg { flex: none; color: var(--e-accent); margin-top: 2px; }
 .choice-dialog .choice-card span { display: grid; gap: 4px; } .choice-dialog .choice-card small { color: var(--e-muted); font-size: .82rem; line-height: 1.35; font-weight: 400; }
-.choice-dialog .choice-current { position: absolute; top: 8px; right: 10px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--e-accent); }
+.choice-dialog .choice-current { width: fit-content; flex: none; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--e-accent); }
 .ed-chosen .small-button { justify-self: start; margin-top: 4px; }
 @media (max-width: 520px) { .choice-cards { grid-template-columns: 1fr; } }
 /* The editor's own dropdown: a button showing the choice, and a list drawn over the page. */
@@ -419,9 +422,8 @@
 .scene-next { display: grid; gap: 6px; margin: 4px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--e-border); font-size: .9rem; }
 .scene-props .inspector-head { display: flex; align-items: center; gap: 10px; } .scene-props .inspector-head h2 { margin: 0; }
 
-/* The compact top bar: the editors' tabs in the middle; the title takes what is left. */
+/* The title takes the space left by the header actions. */
 .editor-title { flex: 1 1 18rem; } .editor-title > div { min-width: 0; }
-.editor-tabs { flex: none; }
 .editor-actions { flex: 0 1 auto; justify-content: flex-end; }
 .editor-actions .action-menu { margin-left: 0; }
 .editor-header.compact-header { flex-wrap: nowrap; gap: 8px 12px; }
@@ -430,7 +432,6 @@
 .editor .compact-header .title-input { width: 100%; }
 .compact-header .crumb { max-width: 100%; }
 .compact-header .game-overview, .compact-header .peer-you { display: none; }
-.compact-header .editor-tabs button { font-size: .9rem; padding-inline: 8px; }
 .compact-header .editor-actions { flex: none; flex-wrap: nowrap; gap: 6px; }
 .compact-header .peer-bar { gap: 6px; flex-wrap: nowrap; }
 .compact-header .peer-others { padding-inline: 4px; }
@@ -467,18 +468,19 @@
 @media (max-width: 700px) {
   /* The page scrolls as a whole instead of squeezing everything into one screen. */
   .editor-page { height: auto; min-height: 100dvh; } .editor-page > .editor { flex: none; height: auto; min-height: 100dvh; }
-  /* The title and actions share the first row, with the editor tabs underneath. */
+  /* The title and actions share the header. */
   .editor-header { gap: 8px; padding: 8px 12px; }
-  .editor-header.compact-header { flex-wrap: wrap; gap: 8px; }
+  .editor-header.compact-header { flex-wrap: nowrap; gap: 8px; }
   .editor-logo, .game-overview { display: none; }
-  .editor-actions { display: contents; }
-  .editor-title { order: 1; flex: 1 1 0; min-width: 0; } .editor .title-input { width: 100%; }
-  .editor-actions .action-menu, .peer-bar { order: 2; }
-  .editor-tabs { order: 3; flex: 1 1 100%; } .editor-tabs button { flex: 1; padding-inline: 6px; }
-  .compact-header .peer-others.crowd .peer-chip:nth-child(n + 2) { display: none; }
+  .editor .editor-header .editor-actions { display: flex; flex: none; gap: 4px; }
+  .editor-title { flex: 1 1 0; min-width: 0; } .editor .title-input { width: 100%; }
+  .editor .editor-header .editor-actions .action-menu-text { display: inline-grid; place-items: center; width: 40px; padding: 0; }
+  .editor-header .action-menu-caret { display: none; }
   .crumb { max-width: 100%; }
   /* Menus and popovers open as a sheet at the bottom, so they always fit. */
   .action-menu-list, .peer-me-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; min-width: 0; width: auto; max-height: 70dvh; overflow: auto; z-index: 70; }
+  .editor-header :is(.action-menu, .peer-me) { position: static; }
+  .editor .editor-header :is(.action-menu-list, .peer-me-popover) { position: absolute; inset: calc(100% + 4px) 12px auto; min-width: 0; width: auto; max-width: none; }
   .invite-panel { position: fixed; grid-area: auto; inset: auto 12px 12px; width: auto; max-height: calc(100% - 24px); }
   /* The map: one row of tools (scrolls sideways if needed), a canvas that fills the screen, the scene panel as a bottom sheet. */
   .flow-tools { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 8px 12px; }
@@ -487,7 +489,7 @@
   .inspector { position: fixed; z-index: 30; max-height: 65dvh; border-radius: 16px 16px 0 0; }
   .add-menu-anchor { position: fixed; left: 8px !important; right: 8px; top: auto !important; bottom: 8px; z-index: 40; } .add-menu-anchor .add-menu { width: auto; max-height: 75dvh; overflow: auto; }
   /* The Scene editor: scenes (scrolling list), then the preview, then the scene's settings. */
-  .scene-list { max-height: 34dvh; } .scene-stage { padding: 12px; }
+  .scene-stage { padding: 12px; }
   /* The rough phone preview: as wide as half the screen and not taller than its content needs. */
   .phone { flex: 1 1 160px; } .phone-screen { width: 100%; aspect-ratio: auto; min-height: 200px; }
 }
@@ -535,6 +537,35 @@
 .route-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .route-group small { margin-left: auto; flex: none; font-weight: 500; text-transform: none; letter-spacing: normal; }
 @media (prefers-reduced-motion: reduce) { .route-group .ed-chevron { transition: none; } }
+@media (max-width: 1000px) {
+  .editor-header { position: relative; z-index: 40; }
+  .scene-editor .scene-list {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "track actions" "detail detail";
+    align-items: start; min-width: 0; padding: 3px 8px 5px; overflow: visible; gap: 2px 4px;
+    border-bottom: 1px solid var(--e-border); scrollbar-gutter: auto;
+  }
+  .scene-list .scene-list-head { grid-area: actions; gap: 4px; padding-block: 2px; }
+  .scene-list-head h2, .scene-list-head .scene-add-after span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .editor .scene-list-head :is(.scene-add-after, .icon-only) { display: inline-grid; place-items: center; width: 44px; min-height: 44px; padding: 0; }
+  .scene-list .scene-track { grid-area: track; display: flex; align-items: center; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 2px 4px; }
+  .scene-track > li { position: relative; display: flex; flex: none; align-items: center; }
+  .scene-track > li:not(:last-child, .scene-unconnected, .scene-unconnected-label, :has(+ .scene-unconnected-label))::after { content: ''; position: absolute; inset-inline-start: 100%; top: 50%; width: 6px; border-top: 1px solid var(--e-line); pointer-events: none; }
+  .editor .scene-track .scene-row { position: relative; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0 !important; }
+  .scene-track .row-icon { width: 30px; height: 30px; }
+  .scene-list .scene-unconnected-label { margin: 0; padding-inline: 7px 2px; border-inline-start: 1px dashed var(--e-line); }
+  .scene-list .scene-unconnected-label h3 { color: var(--e-muted); font-size: .75rem; white-space: nowrap; }
+  .scene-track .scene-row:focus-visible, .scene-track .route-group:focus-visible { outline: 2px solid var(--e-accent); outline-offset: 1px; }
+  .scene-track .row-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .scene-track .row-problems { position: absolute; top: 0; inset-inline-end: 0; padding-inline: 4px; line-height: 1.25; }
+  .scene-track .row-peers { position: absolute; bottom: 0; max-width: 100%; overflow: hidden; white-space: nowrap; font-size: .65rem; }
+  .scene-list .scene-track .route-group-item { margin: 0; }
+  .scene-list .scene-track .route-group { max-width: 138px; min-height: 44px; padding-inline: 6px !important; gap: 3px; background: var(--e-bg); }
+  .scene-track .route-group small { display: none; }
+  .scene-timeline-detail { grid-area: detail; display: flex; align-items: baseline; gap: 6px; min-width: 0; margin: 0; padding-inline: 4px; font-size: .82rem; }
+  .scene-timeline-detail strong { flex: none; color: var(--e-muted); font-size: .75rem; }
+  .scene-timeline-detail span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 /* R4: "Add after this" opens inside the scene list, as wide as the list. */
 .scene-list .add-menu.inline { padding: 8px; }
 /* R5: the add menu's tabs: one height, text centred; in a narrow panel they share the row. */
@@ -667,9 +698,43 @@
 .editor .problems-group button:hover, .editor .problems-group button:focus-visible { background: var(--e-accent-soft); }
 .problems-group button svg { flex: none; color: var(--e-muted); }
 /* The bottom-left corner of every editor: History and Problems side by side; an open list rises above its button. */
-.editor-main { position: relative; }
+.editor-main { position: relative; --editor-dock-space: 76px; }
+.editor-main[data-view="scene"] { padding-bottom: var(--editor-dock-space); background-image: radial-gradient(var(--e-dot) 1.2px, transparent 1.2px); background-size: 24px 24px; }
+.editor-bottom-tools { display: contents; }
+.editor-tabs {
+  position: absolute; z-index: 25; inset-inline-start: 50%; bottom: 16px; translate: -50%;
+  max-width: calc(100% - 24px); border: 1px solid var(--e-border); border-radius: 999px;
+  background: color-mix(in srgb, var(--e-panel) 80%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 6px 24px rgb(0 0 0 / .16);
+}
+.editor-tabs button { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 6px 14px; border-radius: 999px; line-height: 1.15; }
+.editor-tabs button:hover { background: var(--e-bg); color: var(--e-text); }
+.editor-tabs button[aria-selected="true"] { background: var(--e-accent-soft); color: var(--e-text); }
+.editor-tab-icon { display: none; }
 .editor-corner { position: absolute; left: 16px; bottom: 16px; z-index: 30; display: flex; align-items: flex-end; gap: 8px; max-width: calc(100% - 32px); pointer-events: none; }
 .editor-corner > * { pointer-events: auto; }
+@media (max-width: 1050px) {
+  .editor-body .minimap { bottom: 76px; }
+  .editor .editor-corner :is(.history-toggle, .problems-toggle) { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; }
+  .editor-corner .corner-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .editor-corner :is(.history-count, .problems-caret) { display: none; }
+  .editor-corner .problems-panel { position: static; }
+}
+@media (max-width: 700px) {
+  .editor-main { --editor-dock-space: calc(68px + env(safe-area-inset-bottom)); padding-bottom: var(--editor-dock-space); }
+  .editor-bottom-tools { position: fixed; z-index: 30; inset: auto 12px calc(8px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none; }
+  .editor-bottom-tools .editor-corner, .editor-bottom-tools .editor-tabs { position: relative; inset: auto; translate: none; }
+  .editor-tabs { pointer-events: auto; max-width: none; }
+  .editor-tabs button { padding-inline: 10px; font-size: .9rem; }
+}
+@media (max-width: 520px) {
+  .editor-tab-icon, .editor-tabs button { display: grid; place-items: center; }
+  .editor-tabs button { width: 44px; padding: 0; }
+  .editor-tab-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .editor-tabs { background: var(--e-panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 .history-panel { gap: 8px; justify-items: start; max-width: min(400px, calc(100vw - 32px)); }
 .editor .history-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 10px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 700; box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
 .history-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--e-accent-soft); font-size: .8rem; text-align: center; }
@@ -719,12 +784,13 @@
 .media-field { display: grid; gap: 8px; }
 .media-field .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .scene-media-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 125px), 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--e-border); }
+.scene-media-layout > .choice { align-self: end; display: flex; align-items: center; min-height: 44px; }
 .scene-media-layout .hint { grid-column: 1 / -1; margin: 0; }
 .scene-canvas-tools { display: flex; justify-content: flex-end; }
 .editor .scene-canvas-tools .small-button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
 .scene-canvas .tv, .scene-preview-dialog .tv { max-width: none; min-width: 0; }
 .scene-canvas .tv > figcaption { color: var(--e-muted); font-weight: 650; }
-.scene-canvas .tv-screen { aspect-ratio: auto; min-height: clamp(280px, 42vw, 500px); overflow: visible; box-shadow: 0 16px 35px rgb(0 0 0 / .2); }
+.scene-canvas .tv-screen { aspect-ratio: auto; min-height: 280px; overflow: visible; box-shadow: 0 16px 35px rgb(0 0 0 / .2); }
 .scene-canvas :is(.canvas-title, .canvas-prompt), .scene-canvas .canvas-answer input[type=text] {
   width: 100%; min-width: 0; color: inherit; background: color-mix(in srgb, var(--r-surface) 80%, transparent);
   border: 1px solid var(--r-line); padding: 8px 10px; font-family: inherit;
@@ -789,10 +855,11 @@
 .media-item-info { grid-area: info; display: grid; gap: 1px; min-width: 0; }
 .media-item-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-item-info .hint { font-size: .8rem; }
+.media-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
 .media-item-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; align-items: center; }
 .media-item-actions:empty { display: none; }
-.editor .media-item-actions .small-button { min-height: 32px; padding: 4px 8px; font-size: .8rem; }
-.editor .media-item-actions .icon-only { width: 32px; padding: 0; }
+.editor .media-item-actions .small-button { min-height: 36px; padding: 4px 8px; font-size: .8rem; }
+.editor .media-item-actions .icon-only { width: 36px; padding: 0; }
 .media-current { display: inline-flex; align-items: center; gap: 4px; color: var(--e-accent); font-size: .78rem; }
 .media-item-details { grid-area: details; min-width: 0; font-size: .8rem; color: var(--e-muted); }
 .media-item-details summary { width: max-content; cursor: pointer; }
@@ -859,3 +926,33 @@
 .scene-next-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 
 .scene-next-destinations { display: grid; gap: 6px; }
+
+.choice-dialog .choice-copy { flex: 1; min-width: 0; }
+.choice-dialog .choice-card .choice-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.choice-title strong { min-width: 0; overflow-wrap: anywhere; }
+.choice-dialog .choice-card .choice-current { align-self: start; }
+.scene-editor > .scene-stage { display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0; min-height: 0; padding: clamp(8px, 1.3vw, 20px); gap: 10px; }
+@media (min-width: 1001px) {
+  .editor-main[data-view="scene"] { padding-bottom: 0; }
+  .scene-editor > .scene-stage { margin-bottom: var(--editor-dock-space); }
+}
+@media (min-width: 1001px) and (max-width: 1220px) {
+  .scene-editor { grid-template-columns: 250px minmax(0, 1fr) 300px; }
+}
+.scene-stage > .preview { min-width: 0; }
+.scene-stage > .scene-canvas { flex: 1 0 auto; align-items: stretch; }
+.scene-stage .scene-canvas .tv { grid-template-rows: auto 1fr; }
+.scene-stage > .preview:has(.phone) { justify-content: center; }
+.scene-stage .phone { flex: 0 1 390px; min-width: 0; }
+.scene-stage .phone-screen { width: 100%; aspect-ratio: auto; min-height: min(570px, 70dvh); }
+.scene-canvas-tools .segmented { flex-wrap: wrap; justify-content: end; }
+.minigame-preview { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px 18px; align-items: center; padding: clamp(12px, 3vw, 28px); border: 1px solid var(--r-line); border-radius: var(--r-radius); background: var(--r-card); overflow-wrap: anywhere; }
+.minigame-preview-symbol { display: grid; place-items: center; width: clamp(60px, 10vw, 104px); aspect-ratio: 1; border-radius: 18px; background: color-mix(in srgb, var(--r-surface) 80%, var(--r-accent)); color: var(--r-text); font-size: clamp(1.75rem, 5vw, 3.5rem); line-height: 1; font-weight: 750; }
+.minigame-preview-copy { display: grid; gap: 6px; }
+.minigame-preview-copy :is(h3, p) { margin: 0; }
+.minigame-preview-copy p { color: var(--r-muted); }
+.minigame-preview .minigame-preview-target { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; color: var(--r-text); }
+.minigame-preview-target strong { font-size: 1.45em; font-variant-numeric: tabular-nums; }
+.minigame-preview-cue { grid-column: 2; justify-self: start; border-radius: 8px; padding: 6px 12px; color: var(--r-accent-ink); background: var(--r-accent); font-weight: 750; }
+.phone-screen .minigame-preview { grid-template-columns: minmax(0, 1fr); }
+.phone-screen .minigame-preview-cue { grid-column: 1; justify-self: stretch; text-align: center; }

@@ -26,27 +26,33 @@
 @media (prefers-reduced-motion: reduce) { .challenge-alert, .challenge-alert-icon { animation: none; } }
 
 .sheet-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; align-items: end; justify-items: center; background: rgb(0 0 0 / .5); padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-.room .bottom-sheet { width: min(560px, 100%); max-height: min(80dvh, 720px); display: grid; grid-template-rows: auto 1fr; border-radius: var(--r-radius) var(--r-radius) 18px 18px; background: var(--r-surface); border: 1px solid var(--r-line); overflow: hidden; }
+.room .bottom-sheet { width: min(560px, 100%); max-height: min(80dvh, 720px); display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; border-radius: var(--r-radius) var(--r-radius) 18px 18px; background: var(--r-surface); border: 1px solid var(--r-line); overflow: hidden; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px 10px; }
-.sheet-head h2 { margin: 0; font-size: 1.25rem; }
-.sheet-body { overflow: auto; padding: 6px 18px 20px; display: grid; gap: 14px; align-content: start; }
+.sheet-head h2 { min-width: 0; margin: 0; font-size: 1.25rem; overflow-wrap: anywhere; }
+.sheet-head > button { flex: none; }
+.sheet-body { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 6px 18px 20px; display: grid; gap: 14px; align-content: start; }
 .room .sheet-body section[aria-labelledby="scores-heading"] { padding: 0 !important; border: 0 !important; background: none !important; }
 .sheet-body #scores-heading { display: none; }
 .sheet-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .sheet-players li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 14px; background: var(--r-card-strong); font-weight: 700; }
-.sheet-players .dot { margin-left: auto; width: 10px; height: 10px; border-radius: 50%; background: var(--r-ok); } .sheet-players .dot.off { background: var(--r-bad); }
+.sheet-players li { min-width: 0; overflow-wrap: anywhere; }
+.sheet-players .dot { flex: none; margin-left: auto; width: 10px; height: 10px; border-radius: 50%; background: var(--r-ok); } .sheet-players .dot.off { background: var(--r-bad); }
 .sheet-title { margin: 0; color: var(--r-muted); }
-.reaction-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
-.room .reaction-grid button { min-height: 52px; padding: 4px; font-size: 1.7rem; border-radius: 14px; }
-.room .reaction-grid button.sticker { grid-column: span 2; font-size: 1rem; font-weight: 900; letter-spacing: .04em; background: var(--r-accent); color: var(--r-accent-ink); }
-.room .reaction-grid button:active { transform: scale(.94); }
+.reaction-tray { display: grid; gap: 10px; min-width: 0; }
+.reaction-tray .hint { margin: 0; }
+.reaction-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.room .reaction-grid button { min-width: 0; min-height: 44px; padding: 4px; font-size: clamp(1.15rem, 6vw, 1.6rem); border-radius: 12px; }
+.room .reaction-grid button.sticker { grid-column: span 2; font-size: clamp(.75rem, 3.4vw, .95rem); font-weight: 850; line-height: 1.2; overflow-wrap: anywhere; background: var(--r-accent); color: var(--r-accent-ink); }
+.room .reaction-grid button:active { transform: scale(.96); }
 
-/* Shared screen: reactions float up in the bottom right, then fade. */
-.reactions-overlay { position: fixed; right: 24px; bottom: 18px; z-index: 25; width: min(320px, 40vw); height: 60vh; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; gap: 6px; overflow: hidden; }
-.reaction { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: color-mix(in srgb, var(--r-surface) 85%, transparent); border: 1px solid var(--r-line); animation: reaction-float 4.2s ease-out forwards; translate: var(--drift) 0; }
-.reaction-value { font-size: 2rem; line-height: 1; } .reaction.sticker .reaction-value { font-size: 1.1rem; font-weight: 900; padding: 4px 10px; border-radius: 10px; background: var(--r-accent); color: var(--r-accent-ink); }
-.reaction-name { font-size: .8rem; font-weight: 700; color: var(--r-muted); max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@keyframes reaction-float { 0% { opacity: 0; transform: translateY(30px) scale(.6); } 10% { opacity: 1; transform: translateY(0) scale(1.08); } 18% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-140px); } }
+.reactions-overlay { position: fixed; inset-inline-end: max(14px, env(safe-area-inset-right)); bottom: 16px; z-index: 25; width: min(350px, calc(100vw - 28px)); pointer-events: none; display: grid; justify-items: end; gap: 5px; }
+.room-host .reactions-overlay { inset-inline: 16px auto; justify-items: start; }
+.reaction { display: flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0; padding: 5px 10px 5px 6px; border-radius: 14px; background: var(--r-surface); border: 1px solid var(--r-line); box-shadow: 0 8px 18px rgb(0 0 0 / .25); animation: reaction-float 4.2s ease-out forwards; }
+.reaction-value { flex: 0 1 auto; min-width: 0; font-size: 1.5rem; line-height: 1.1; }
+.reaction.sticker .reaction-value { font-size: clamp(.72rem, 2.7vw, 1rem); font-weight: 900; padding: 4px 6px; border-radius: 7px; overflow-wrap: anywhere; background: var(--r-accent); color: var(--r-accent-ink); }
+.reaction-name { min-width: 0; font-size: .8rem; font-weight: 700; color: var(--r-muted); max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes reaction-float { 0% { opacity: 0; transform: translateY(8px); } 12%, 78% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-24px); } }
+@media (max-height: 560px) { .reaction:nth-last-child(n+4) { display: none; } }
 
 /* Points for this player: a big "+10" with confetti. */
 .celebration { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: grid; place-items: center; overflow: hidden; }

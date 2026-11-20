@@ -30,6 +30,7 @@ const SAVE_TEXT = { saved: 'saved', pending: 'pending', saving: 'saving', error:
 type View = 'flow' | 'scene' | 'look';
 const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const VIEW_NAMES = { flow: 'viewFlow', scene: 'viewScene', look: 'viewLook' } as const satisfies Record<View, keyof typeof SHELL_TEXTS.en>;
+const VIEW_ICONS = { flow: 'route', scene: 'edit', look: 'tidy' } as const satisfies Record<View, string>;
 const COMPACT_HEADER = '(max-width: 1320px)';
 
 /**
@@ -83,8 +84,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       // ? opens Help & shortcuts (not while typing).
-      if (event.key === '?' && !(event.target as HTMLElement).closest('input, textarea, select, dialog, [aria-modal=true], [contenteditable]')) { event.preventDefault(); setHelping(true); return; }
-      if ((event.target as HTMLElement).closest('input, textarea, select, dialog, [aria-modal=true], [contenteditable]') || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y') return;
+      if (event.key === '?' && !(event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable]')) { event.preventDefault(); setHelping(true); return; }
+      if ((event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable]') || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y') return;
       event.preventDefault(); if (event.key.toLowerCase() === 'y' || event.shiftKey) d.redo(); else d.undo();
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
@@ -110,15 +111,13 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   const modeLabel = t(d.readOnly ? 'viewingSwitch' : 'editingSwitch');
   const overview = `${t('minutes', { minutes: estimateMinutes(definition) })} · ${t(nodes.length === 1 ? 'sceneOne' : 'sceneMany', { count: nodes.length })}${routes ? `, ${t(routes === 1 ? 'choiceOne' : 'choiceMany', { count: routes })}` : ''} · ${d.issues.length ? problemCount : t('noProblems')}`;
   return <div className={`editor${d.readOnly ? ' viewing' : ''}`}>
-    {/* One compact bar: the game and its state, the three editors, and the actions; the rest is in the ☰ menu. */}
+    {/* The header holds the game title, save status, and actions. */}
     <header className={`editor-header${compactHeader ? ' compact-header' : ''}`}>
       <h1 className="visually-hidden">{t(VIEW_NAMES[view])}: {definition.title}</h1>
       <div className="editor-title"><AppMenu role={role} />
         <div><label className="visually-hidden" htmlFor="game-title">{t('gameName')}</label>
           <input id="game-title" className="title-input" readOnly={d.readOnly} value={definition.title} maxLength={160} onChange={event => d.change({ ...definition, title: event.target.value }, undefined, 'title')} />
           <p className="crumb" title={overview}>{draft.builtIn ? <><a href="/?host=1">{t('builtInGames')}</a> / <span className="crumb-builtin" title={t('yourVersionTitle', { title: draft.builtIn.title })}>{t('yourVersionOf', { title: draft.builtIn.title })}</span></> : <a href="/?host=1">{t('yourGames')}</a>} / {t('draft')}{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : t('changes')}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{t(SAVE_TEXT[d.save])}</span>{compactHeader && d.readOnly && <> · {t('viewing')}</>}<span className="game-overview"> · {overview}</span></p></div></div>
-      <div className="tabs editor-tabs" role="tablist" aria-label={t('editorView')}>
-        {(Object.keys(VIEW_NAMES) as View[]).map(key => <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}>{t(VIEW_NAMES[key])}</button>)}</div>
       <div className="editor-actions">
         {!compactHeader && <>
         <div className="history-buttons">
@@ -160,13 +159,20 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}
-    <main className="editor-main">
+    <main className="editor-main" data-view={view}>
       {view === 'flow' ? <FlowView zoomShortcuts={zoomShortcuts} d={d} selected={selected} setSelected={setSelected} focus={focus} live={live} onHelp={() => setHelping(true)} onOpenScene={key => { setSelected([key]); setView('scene'); }} />
         : view === 'scene' ? <SceneView d={d} selected={selected} setSelected={setSelected} peers={live.peers} onOpenFlow={key => { setSelected([key]); setView('flow'); }} /> : <LookView d={d} selected={selected} gameId={gameId} />}
       {/* Bottom left: your edits (History) and every problem of the game; each folds into a small button. A problem goes to its scene. */}
-      <div className="editor-corner">
-        <HistoryPanel steps={d.steps} disabled={d.readOnly} onRestore={d.restore} />
-        <ProblemsPanel issues={d.issues} definition={definition} onGo={key => { setSelected([key]); if (view === 'look') setView('scene'); setFocus({ key, at: Date.now() }); }} onGame={() => openPanel('settings')} />
+      <div className="editor-bottom-tools">
+        <div className="editor-corner">
+          <HistoryPanel steps={d.steps} disabled={d.readOnly} onRestore={d.restore} />
+          <ProblemsPanel issues={d.issues} definition={definition} onGo={key => { setSelected([key]); if (view === 'look') setView('scene'); setFocus({ key, at: Date.now() }); }} onGame={() => openPanel('settings')} />
+        </div>
+        <div className="tabs editor-tabs" role="tablist" aria-label={t('editorView')}>
+          {(Object.keys(VIEW_NAMES) as View[]).map(key => <button key={key} type="button" role="tab" title={t(VIEW_NAMES[key])} aria-selected={view === key} onClick={() => setView(key)}>
+            <span className="editor-tab-icon"><Icon name={VIEW_ICONS[key]} size={18} /></span><span className="editor-tab-label">{t(VIEW_NAMES[key])}</span>
+          </button>)}
+        </div>
       </div>
     </main>
   </div>;

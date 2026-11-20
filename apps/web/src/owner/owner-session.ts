@@ -3,6 +3,8 @@
 // The server decides who is the owner, from the HttpOnly cookie on /api/host.
 const SEEN = 'party.ownerBrowser';
 
+export const isLocalOwnerPage = () => ['localhost', '127.0.0.1'].includes(location.hostname);
+
 export function rememberOwner(signedIn: boolean) {
   try { if (signedIn) localStorage.setItem(SEEN, '1'); else localStorage.removeItem(SEEN); } catch { /* private window: no hint */ }
 }

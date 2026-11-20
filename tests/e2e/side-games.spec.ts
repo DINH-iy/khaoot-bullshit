@@ -20,6 +20,11 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     expect(link).toMatch(/\/#person=[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     await host.getByRole('button', { name: 'Done' }).click();
     await expect(host.getByRole('row', { name: new RegExp(name) })).toBeVisible();
+    const key = host.getByRole('button', { name: `Share key for ${name}` });
+    await expect(key).toHaveText(new URLSearchParams(new URL(link).hash.slice(1)).get('person')!);
+    await key.click();
+    await expect(host.getByRole('dialog', { name: `Personal key for ${name}` })).toBeVisible();
+    await host.getByRole('button', { name: 'Done' }).click();
 
     await host.goto(`${baseURL}/?host=1`);
     await host.getByRole('radio', { name: /Timed quiz/ }).check();

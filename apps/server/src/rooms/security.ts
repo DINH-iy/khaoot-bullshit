@@ -22,10 +22,16 @@ export function roomCookie(config: Config, sessionId: string, token: string, exp
   return `${cookieName(sessionId, display)}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))}${config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : ''}`;
 }
 export function allowedOrigin(headers: IncomingHttpHeaders, config: Config): boolean {
-  if (headers.origin) return headers.origin === config.PUBLIC_ORIGIN;
+  if (headers.origin === config.PUBLIC_ORIGIN) return true;
   // Same-origin polling GETs can omit Origin. Cookies remain independently
   // verified; a non-browser client forging Host does not gain authentication.
-  return headers.host === new URL(config.PUBLIC_ORIGIN).host && headers['sec-fetch-site'] !== 'cross-site';
+  if (headers['sec-fetch-site'] === 'cross-site') return false;
+  const configured = new URL(config.PUBLIC_ORIGIN);
+  if (!headers.origin && headers.host === configured.host) return true;
+  // A local install can be opened under either loopback name at the same port.
+  if (config.NODE_ENV === 'production' || !['127.0.0.1', 'localhost'].includes(configured.hostname)) return false;
+  configured.hostname = configured.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+  return headers.host === configured.host && (!headers.origin || headers.origin === configured.origin);
 }
 
 // Bounded fixed windows: no room/player state is authoritative in this cache.

@@ -1,4 +1,5 @@
 import type { Transaction } from '../game/model.js';
+import { readRoomState } from './reclaim.js';
 import { lockRoom, recordRoomChange } from './gateway.js';
 
 // Closing a room from the host menu: it ends as it is, like a finished game. Scores and
@@ -10,7 +11,7 @@ export async function closeRoom(tx: Transaction, sessionId: string, now = new Da
   const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId } });
   if (session.status === 'FINISHED') return false;
   await tx.stageRun.updateMany({ where: { sessionId, status: 'ACTIVE' }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
-  await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'FINISHED', endedAt: session.endedAt ?? now, currentNodeKey: null, idleCloseAt: null } });
+  await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'FINISHED', endedAt: session.endedAt ?? now, currentNodeKey: null, idleCloseAt: null, state: { ...readRoomState(session.state), roomClosed: true } } });
   await recordRoomChange(tx, sessionId, 'room.closed');
   return true;
 }

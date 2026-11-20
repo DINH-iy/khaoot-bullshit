@@ -6,7 +6,7 @@ import { ImportGame } from './import-game.js';
 import { GamePicker } from './game-picker.js';
 import { OwnerNav } from '../owner/owner-nav.js';
 import { Icon } from '../editor/controls/icons.js';
-import { rememberOwner } from '../owner/owner-session.js';
+import { isLocalOwnerPage, rememberOwner } from '../owner/owner-session.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { rich } from '../i18n/rich.js';
 import { OWNER_TEXTS } from '../owner/owner.text.js';
@@ -36,18 +36,26 @@ function CopyCode({ code }: { code: string }) {
 export function HostMenu() {
   const [menu, setMenu] = useState<HostMenu>(); const [error, setError] = useState(''); const [busy, setBusy] = useState(true);
   const [gameKey, setGameKey] = useState(''); const t = useTexts(HOSTING_TEXTS);
+  const ownerText = useTexts(OWNER_TEXTS);
   // One request identity per page load: a repeated click or retry returns the same room.
   const [request] = useState(() => ({ sessionId: newId(), commandId: newId() }));
   useEffect(() => {
     let mounted = true;
     void (async () => {
       if (ownerToken) await roomApi('/api/host/claim', { token: ownerToken });
+      else if (isLocalOwnerPage() && initial.searchParams.get('localOwner') === '1') {
+        await roomApi('/api/host/claim-local', {});
+        const url = new URL(location.href);
+        url.searchParams.delete('localOwner');
+        history.replaceState(null, '', url);
+      }
       const loaded = HostMenuSchema.parse(await roomApi('/api/host'));
       rememberOwner(loaded.role === 'owner');
       if (mounted) { setMenu(loaded); setGameKey(loaded.games[0]?.key ?? ''); }
     })().catch(cause => {
-      if (cause instanceof Error && cause.message === 'UNAUTHORIZED') rememberOwner(false);
-      if (mounted) setError(explain(cause));
+      const signedOut = cause instanceof Error && cause.message === 'UNAUTHORIZED';
+      if (signedOut) rememberOwner(false);
+      if (mounted && (!signedOut || !isLocalOwnerPage() || ownerToken)) setError(explain(cause));
     }).finally(() => { if (mounted) setBusy(false); });
     // A page restored from the back/forward cache would reuse the previous room request.
     const restored = (event: PageTransitionEvent) => { if (event.persisted) location.reload(); };
@@ -80,6 +88,8 @@ export function HostMenu() {
         <p>{t('heroEditorText')}</p></header>}
     {error && <p role="alert" className="error">{error}</p>}
     {busy && !menu && <p role="status">{t('loadingGames')}</p>}
+    {isLocalOwnerPage() && !owner && !busy && <button type="button" className="primary local-owner-signin"
+      onClick={() => location.assign('/?host=1&localOwner=1')}>{ownerText('ownerSignIn')}</button>}
     {menu && <>
       {menu.rooms.length > 0 && <section aria-labelledby="rooms-heading"><div className="my-games-head"><h2 id="rooms-heading">{t('openRooms')}</h2><span className="my-games-count">{menu.rooms.length}</span></div>
         <ul className="open-rooms">{menu.rooms.map(room => <li key={room.sessionId} className={`open-room status-${room.status.toLowerCase()}`}>

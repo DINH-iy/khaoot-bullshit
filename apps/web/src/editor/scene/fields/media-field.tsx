@@ -223,10 +223,11 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
             : <Icon name={item.kind === 'video' ? 'play' : 'sound'} size={20} />}</div>
           <div className="media-item-info">
             <span className="media-item-name" title={item.name}>{item.name}</span>
-            <span className="hint">{kindName(item.kind)} · {size(item.byteSize)}</span>
+            <div className="media-item-meta"><span className="hint">{kindName(item.kind)} · {size(item.byteSize)}</span>
+              {active && <span className="media-current"><Icon name="check" size={14} />{t('inThisScene')}</span>}
+            </div>
           </div>
           <div className="media-item-actions">
-            {active && <span className="media-current"><Icon name="check" size={14} />{t('inThisScene')}</span>}
             {!readOnly && <>
               {(onPick || scene) && !active && <button type="button" className="small-button" disabled={busy} onClick={() => useItem(item)}>{t('useThis')}</button>}
               {scene && <button type="button" className="small-button" disabled={busy} onClick={() => setSceneFile(active && scene.media ? scene.media : { id: item.id, kind: item.kind })}>{sceneText(item.kind === 'image' ? 'crop' : 'cut')}</button>}

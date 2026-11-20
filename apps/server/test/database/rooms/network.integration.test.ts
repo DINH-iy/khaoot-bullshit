@@ -83,7 +83,7 @@ describe('verified HTTP admission and actual Socket.IO networking', () => {
     const other = await room();
     await expect(joinAsPerson(other.roomCode)).resolves.toMatchObject({ sessionId: other.sessionId });
     expect((await api(`/api/rooms/${f.sessionId}/close`, {}, f.cookie)).statusCode).toBe(200);
-    expect((await sync(phone, f.sessionId)).view.status).toBe('FINISHED');
+    expect(await sync(phone, f.sessionId)).toMatchObject({ roomClosed: true, view: { status: 'FINISHED' } });
   });
 
   it('persists empty room deadlines, resets them on reconnect and honors keep open', async () => {

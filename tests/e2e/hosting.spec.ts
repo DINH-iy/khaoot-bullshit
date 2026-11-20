@@ -1,10 +1,65 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { closeRoundsByHand, expectPhoneScores, openHostFold, openHostTool } from './helpers.js';
+import { chooseOption, closeRoundsByHand, expectPhoneScores, openHostFold, openHostTool } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
+
+test('owner options sign in without a key on both localhost addresses', async ({ page, baseURL }) => {
+  for (const hostname of ['127.0.0.1', 'localhost']) {
+    const local = new URL(baseURL!);
+    local.hostname = hostname;
+    await page.goto(local.href);
+    const headers = { origin: local.origin, 'x-party-request': '1', 'sec-fetch-site': 'same-origin' };
+    expect((await page.request.get(new URL('/api/host', local).href, { headers })).status()).toBe(401);
+    expect((await page.request.post(new URL('/api/host/claim-local', local).href, { headers: { ...headers, 'x-forwarded-for': '192.0.2.1' }, data: {} })).status()).toBe(403);
+    await page.getByRole('link', { name: 'Owner options' }).click();
+    await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+    expect(new URL(page.url()).searchParams.has('localOwner')).toBe(false);
+    const cookie = (await page.context().cookies(`${local.origin}/api/host`)).find(item => item.name === 'party_owner');
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.value).not.toBe(ownerToken);
+    expect((await page.request.get(new URL('/api/host/people', local).href, { headers })).status()).toBe(200);
+    expect((await page.request.get(new URL('/api/host/people', local).href, { headers: { ...headers, forwarded: 'for=192.0.2.1' } })).status()).toBe(401);
+  }
+});
+
+test('the test bench caps at four phones in two columns and keeps reactions inside a phone', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The four-phone bench is exercised on the desktop.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await page.getByRole('radio', { name: /Timed quiz/ }).check();
+  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await openHostFold(page, 'Shared screen & invite');
+  const url = await page.getByRole('link', { name: 'Open test bench ↗' }).getAttribute('href');
+  await page.evaluate(() => localStorage.setItem('party_bench_phones', '8'));
+  await page.goto(url!);
+
+  await expect(page.getByRole('button', { name: 'One phone more' })).toBeDisabled();
+  const phones = page.locator('.bench-phone');
+  await expect(phones).toHaveCount(4);
+  const boxes = await phones.evaluateAll(items => items.map(item => item.getBoundingClientRect().toJSON() as DOMRect));
+  expect(boxes[0]!.y).toBe(boxes[1]!.y);
+  expect(boxes[2]!.y).toBe(boxes[3]!.y);
+  expect(boxes[2]!.y).toBeGreaterThan(boxes[0]!.y);
+  expect(await page.locator('.bench-phones').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+  const first = page.frameLocator('iframe[title="Phone of Player 1"]');
+  await first.getByRole('button', { name: 'Menu', exact: true }).click();
+  await first.getByRole('button', { name: 'React', exact: true }).click();
+  const tray = first.getByRole('dialog', { name: 'Send a reaction' });
+  await expect(tray).toBeVisible();
+  expect(await tray.locator('.reaction-grid').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await tray.getByRole('button', { name: /TY FOR TUTORIAL/ }).click();
+  const host = page.frameLocator('iframe[title="Host screen"]');
+  const reaction = host.locator('.reactions-overlay .reaction').filter({ hasText: 'TY FOR TUTORIAL' });
+  await expect(reaction).toContainText('Player 1');
+  expect(await reaction.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.left >= 0 && bounds.top >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight;
+  })).toBe(true);
+});
 
 test('an assigned host phone still answers and can close a round with immediate auto-reveal', async ({ browser, page, baseURL }) => {
   await page.setViewportSize({ width: 375, height: 667 });
@@ -22,7 +77,7 @@ test('an assigned host phone still answers and can close a round with immediate 
 
     await expect(host.getByText('Playing host · connected', { exact: false })).toBeVisible();
     const phonePicker = host.getByRole('combobox', { name: 'Host phone', exact: true });
-    await phonePicker.selectOption({ label: 'Playing host' });
+    await chooseOption(phonePicker, { label: 'Playing host' });
     const menu = page.getByRole('button', { name: 'Host controls', exact: true });
     const controls = page.getByRole('dialog', { name: 'Host controls' });
     await menu.click();
@@ -104,9 +159,9 @@ test('ranked ballots preserve the saved choices and advance result cards on the 
 });
 
 test('owner opens a room from the host menu and stays in control of a timed stage', async ({ browser, page, baseURL }) => {
-  // A browser without the owner key gets an explanation, not a menu.
+  // A signed-out local browser can sign in before seeing the games.
   await page.goto('/?host=1');
-  await expect(page.getByRole('alert')).toContainText('not signed in as the owner');
+  await expect(page.getByRole('button', { name: 'Sign in as owner' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open room', exact: true })).toHaveCount(0);
 
   const hostContext = await browser.newContext(); const host = await hostContext.newPage();
@@ -330,8 +385,8 @@ test('players can save the active look, leave the room, and see host moderation 
     await openHostFold(host, 'Room settings');
     host.once('dialog', dialog => dialog.accept());
     await host.getByRole('button', { name: 'Close room', exact: true }).click();
-    await expect(page.getByRole('link', { name: 'Leave room', exact: true })).toBeVisible();
-    await page.getByRole('link', { name: 'Leave room', exact: true }).click();
+    await expect(host).toHaveURL(new URL('/', baseURL).href);
     await expect(page).toHaveURL(new URL('/', baseURL).href);
+    await expect(page.getByRole('button', { name: 'Join room', exact: true })).toBeVisible();
   } finally { await hostContext.close(); }
 });

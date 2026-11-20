@@ -19,13 +19,17 @@ test('the owner groups people in admin and adds a whole group to a room at once'
   const groupName = `Friday club ${tag}`;
   await page.getByLabel('Name').fill(groupName);
   await page.getByRole('button', { name: 'Make group' }).click();
+  const group = page.locator('.group-card').filter({ has: page.getByRole('heading', { name: groupName, exact: true }) });
+  await group.getByRole('button', { name: 'Done' }).click();
+  await group.getByRole('button', { name: 'Add people' }).click();
   const members = page.getByRole('group', { name: `Who is in ${groupName}` });
   await members.getByRole('searchbox').fill(tag);
-  await members.getByLabel(ann).check(); await expect(members.getByLabel(ann)).toBeChecked();
-  await members.getByLabel(bo).check(); await expect(members.getByLabel(bo)).toBeChecked();
+  await members.getByLabel(ann).click(); await expect(members.getByLabel(ann)).toBeChecked();
+  await members.getByLabel(bo).click(); await expect(members.getByLabel(bo)).toBeChecked();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.getByRole('button', { name: new RegExp(`${groupName}.*2 people`) }).click();
-  await expect(page.locator('.group-card').filter({ hasText: groupName })).toContainText(`${ann}, ${bo}`);
+  await expect(group).toContainText('2 people');
+  await group.getByRole('button', { name: 'Done' }).click();
+  await expect(group).toContainText(`${ann}, ${bo}`);
 
   // In a room: Add people, tick the group, and both are on the list (Cy is not).
   await page.goto(`${baseURL}/?host=1`);

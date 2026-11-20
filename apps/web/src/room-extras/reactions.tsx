@@ -30,9 +30,9 @@ export function ReactionsOverlay({ state, store }: { state: RoomSnapshot; store:
   const items = useSyncExternalStore(store.subscribe, store.items);
   useEffect(() => { const timer = setInterval(() => store.expire(Date.now()), 500); return () => clearInterval(timer); }, [store]);
   if (!items.length) return null;
-  return <div className="reactions-overlay" aria-hidden="true">{items.map(item => {
-    const player = state.players.find(entry => entry.id === item.playerId); const value = REACTIONS[item.reaction]!; const sticker = /^[A-Z!]+$/.test(value);
-    return <div key={item.id} className={`reaction${sticker ? ' sticker' : ''}`} style={{ '--drift': `${-(item.id % 5) * 10}px` } as React.CSSProperties}>
+  return <div className="reactions-overlay" aria-hidden="true">{items.slice(-6).map(item => {
+    const player = state.players.find(entry => entry.id === item.playerId); const value = REACTIONS[item.reaction]!; const sticker = /^[A-Z]/.test(value);
+    return <div key={item.id} className={`reaction${sticker ? ' sticker' : ''}`}>
       {player && <Avatar look={player.look} size={34} />}<span className="reaction-value">{value}</span>{player && <span className="reaction-name">{player.displayName}</span>}</div>;
   })}</div>;
 }
@@ -46,7 +46,8 @@ export function ReactionTray({ onSend, choices, limit }: { onSend: (reaction: nu
   const live = recent.filter(at => now - at < 10_000); const waiting = live.length >= limit;
   const send = (index: number) => { const at = Date.now(); const kept = recent.filter(time => at - time < 10_000); if (kept.length >= limit) return; setRecent([...kept, at]); setNow(at); onSend(index); setSent(index); };
   return <div className="reaction-tray">
-    <p className="sheet-title">{t('react.title')}</p>    <div className="reaction-grid">{REACTIONS.map((value, index) => choices.includes(index) && <button key={value} type="button" className={/^[A-Z!]+$/.test(value) ? 'sticker' : undefined}
+    <p className="sheet-title">{t('react.title')}</p>
+    <div className="reaction-grid">{REACTIONS.map((value, index) => choices.includes(index) && <button key={value} type="button" className={/^[A-Z]/.test(value) ? 'sticker' : undefined}
       aria-label={x('send', { reaction: value })} disabled={waiting} onClick={() => send(index)}>{value}</button>)}</div>
     <p className="hint" role="status">{waiting ? x('slowDown', { limit, seconds: Math.ceil((10_000 - (now - live[0]!)) / 1000) }) : x('leftForNow', { count: limit - live.length, limit })}</p>
     {sent !== null && <p role="status" className="visually-hidden">Sent {REACTIONS[sent]}</p>}

@@ -1,3 +1,4 @@
+import { chooseOption } from './helpers.js';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -81,7 +82,7 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     expect((await new AxeBuilder({ page: ann.page }).analyze()).violations).toEqual([]);
 
     // Ann picks Left or right; every phone goes into the round by itself.
-    await ann.page.getByLabel('Minigame').selectOption({ label: 'Left or right' });
+    await chooseOption(ann.page.getByLabel('Minigame'), { label: 'Left or right' });
     await ann.page.getByRole('button', { name: 'Play Left or right' }).click();
     const players: Page[] = [ann.page, bo.page, cy.page];
     for (const page of players) await expect(page.getByRole('button', { name: 'Got it!' })).toBeVisible({ timeout: 15_000 });

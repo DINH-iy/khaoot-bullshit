@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PersonGroupListSchema, type PersonGroup, type PersonRow } from '@party/contracts';
+import { PersonGroupListSchema, PersonGroupSchema, type PersonGroup, type PersonRow } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { FaIcon } from '../presentation/icons.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
@@ -18,12 +18,12 @@ export function GroupsPanel({ people }: { people: PersonRow[] | undefined }) {
   const [name, setName] = useState(''); const [open, setOpen] = useState<string | null>(null);
   const load = () => roomApi<unknown>('/api/host/groups').then(data => { setGroups(PersonGroupListSchema.parse(data).groups); setError(''); });
   useEffect(() => { void load().catch(cause => setError(explain(cause))); }, []);
-  const run = async (work: () => Promise<unknown>) => { setBusy(true); setError(''); try { await work(); } catch (cause) { setError(explain(cause)); } finally { await load().catch(() => undefined); setBusy(false); } };
+  const run = async (work: () => Promise<unknown>, refresh = true) => { setBusy(true); setError(''); try { await work(); if (refresh) await load(); } catch (cause) { setError(explain(cause)); } finally { setBusy(false); } };
   const add = (event: React.FormEvent) => { event.preventDefault(); void run(async () => { const made = await roomApi<{ id: string }>('/api/host/groups', { name }); setName(''); setOpen(made.id); }); };
   const names = useMemo(() => new Map(people?.map(person => [person.id, person.name])), [people]);
 
   return <>
-    <p className="admin-intro">Put people in groups (work, family, the Friday club…) to add a whole group to a room at once: in the room, open <strong>Add people</strong> in the Players sheet and tick the group. Someone can be in as many groups as you like.</p>
+    <p className="admin-intro">Save groups here, then add a whole group from the room’s Players menu.</p>
     {error && <p role="alert" className="error">{error}</p>}
     <form className="person-add" onSubmit={add} aria-labelledby="group-add-heading">
       <h2 id="group-add-heading">Make a group</h2>
@@ -36,21 +36,20 @@ export function GroupsPanel({ people }: { people: PersonRow[] | undefined }) {
       const expanded = open === group.id; const members = group.personIds.map(id => names.get(id)).filter(Boolean);
       return <li key={group.id} className="group-card">
         <div className="group-head">
-          <button type="button" className="group-toggle" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : group.id)}>
-            <FaIcon name="users" /><span className="group-name">{group.name}</span>
-            <span className="group-count">{group.personIds.length} {group.personIds.length === 1 ? 'person' : 'people'}</span>
-            <FaIcon name={expanded ? 'chevron-up' : 'chevron-down'} /></button>
+          <div className="group-heading"><span className="group-icon"><FaIcon name="users" /></span>
+            <div><h3 className="group-name">{group.name}</h3><p className="group-count">{group.personIds.length} {group.personIds.length === 1 ? 'person' : 'people'}</p></div></div>
           <div className="admin-actions">
+            <button type="button" className="quiet group-toggle" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : group.id)}>
+              {expanded ? 'Done' : group.personIds.length ? 'Edit members' : 'Add people'}<FaIcon name={expanded ? 'chevron-up' : 'chevron-down'} /></button>
             <button type="button" className="quiet" disabled={busy} onClick={() => { const next = prompt(`New name for ${group.name}`, group.name)?.trim(); if (next && next !== group.name) void run(() => roomApi(`/api/host/groups/${group.id}`, { name: next }, 'PUT')); }}>Rename</button>
             <button type="button" className="quiet" disabled={busy} onClick={() => { if (confirm(`Delete the group ${group.name}? The people in it stay; only the group goes.`)) void run(() => roomApi(`/api/host/groups/${group.id}/remove`, {})); }}>Delete</button>
           </div>
         </div>
-        {!expanded && members.length > 0 && <p className="group-members">{members.join(', ')}</p>}
-        {expanded && <GroupMembers group={group} people={people} busy={busy} onChange={personIds => {
-          // Shown at once; the server's answer (or, on failure, the reload) puts the saved list back.
-          setGroups(current => current?.map(entry => entry.id === group.id ? { ...entry, personIds } : entry));
-          void run(() => roomApi(`/api/host/groups/${group.id}`, { personIds }, 'PUT'));
-        }} />}
+        {!expanded && members.length > 0 && <p className="group-members">{members.slice(0, 5).join(', ')}{members.length > 5 ? ` +${members.length - 5}` : ''}</p>}
+        {expanded && <GroupMembers group={group} people={people} busy={busy} onChange={personIds => void run(async () => {
+          const saved = PersonGroupSchema.parse(await roomApi(`/api/host/groups/${group.id}`, { personIds }, 'PUT'));
+          setGroups(current => current?.map(entry => entry.id === saved.id ? saved : entry));
+        }, false)} />}
       </li>;
     })}</ul>}
   </>;
@@ -64,9 +63,11 @@ function GroupMembers({ group, people, busy, onChange }: { group: PersonGroup; p
   const chosen = new Set(group.personIds); const shown = people.filter(person => fold(person.name).includes(fold(search.trim())));
   const allShown = shown.length > 0 && shown.every(person => chosen.has(person.id));
   return <div className="group-members-edit" role="group" aria-label={`Who is in ${group.name}`}>
+    <p className="person-hint">Check names to add them to the group. Changes save automatically.</p>
     <div className="people-search"><label><span className="visually-hidden">Search people</span><input type="search" placeholder="Search a person…" value={search} onChange={event => setSearch(event.target.value)} /></label>
       <button type="button" className="quiet" disabled={busy || !shown.length} onClick={() => onChange(allShown ? group.personIds.filter(id => !shown.some(person => person.id === id)) : [...new Set([...group.personIds, ...shown.map(person => person.id)])])}>
-        {allShown ? (search.trim() ? 'Untick these' : 'Untick everyone') : (search.trim() ? 'Tick these' : 'Tick everyone')}</button></div>
+        {allShown ? (search.trim() ? 'Remove matches' : 'Remove all') : (search.trim() ? 'Add matches' : 'Add all')}</button></div>
+    {!shown.length && <p className="person-hint">No matching people.</p>}
     <ul className="group-people">{shown.map(person => <li key={person.id}><label className="person-check"><input type="checkbox" disabled={busy} checked={chosen.has(person.id)}
       onChange={event => onChange(event.target.checked ? [...group.personIds, person.id] : group.personIds.filter(id => id !== person.id))} />{person.name}</label></li>)}</ul>
   </div>;

@@ -21,6 +21,7 @@ import type { DraftState } from '../shell/use-draft.js';
 // What a part is, without the scene's own route or rejoin label.
 const partLabel = (definition: Definition, stage: Node['stages'][number]) => cardText(definition, { key: '\u0000part', stages: [stage] }).label;
 const PART_TYPES: SceneType[] = ['info', 'quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote', 'scoreboard', 'minigame', 'duel'];
+const TIMELINE_LAYOUT = '(max-width: 1000px)';
 /**
  * A scene in the list. `via`: the route this scene starts (its first scene); `branch`: the routes
  * it is on, outermost first, as "<party choice>:<option>", so a route can be folded away.
@@ -66,6 +67,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   const canRehearseOnly = !d.issues.some(issue => !issue.nodeKey || issue.nodeKey === current.key)
     && !current.stages.some(stage => stage.kind === 'vote');
   const replacement = useTexts(REPLACE_TEXTS); const [replacing, setReplacing] = useState(false);
+  const [canvasDevice, setCanvasDevice] = useState<'sharedScreen' | 'phone'>('sharedScreen');
   const [previewDevice, setPreviewDevice] = useState<'sharedScreen' | 'phone'>();
   const [mediaKey, setMediaKey] = useState<string>();
   const scenePart = `${current.key}:${index}`;
@@ -99,6 +101,24 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   const removePart = (at: number) => { change({ ...definition, nodes: definition.nodes.map(node => node.key === current.key ? { ...node, stages: node.stages.filter((_, position) => position !== at) } : node) }); setPart(0); };
   // A party choice's routes fold open and closed in the list; the route of the selected scene always opens.
   const [folded, setFolded] = useState<Set<string>>(() => new Set());
+  const [hoveredScene, setHoveredScene] = useState<string>();
+  const [focusedScene, setFocusedScene] = useState<string>();
+  const selectedMarker = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const compact = matchMedia(TIMELINE_LAYOUT);
+    const reveal = () => {
+      const button = selectedMarker.current;
+      const track = button?.closest('ol');
+      if (!compact.matches || !button || !track) return;
+      const marker = button.getBoundingClientRect();
+      const strip = track.getBoundingClientRect();
+      if (marker.left < strip.left) track.scrollLeft += marker.left - strip.left - 6;
+      else if (marker.right > strip.right) track.scrollLeft += marker.right - strip.right + 6;
+    };
+    reveal();
+    compact.addEventListener('change', reveal);
+    return () => compact.removeEventListener('change', reveal);
+  }, [current.key, folded]);
   const currentBranch = rows.find(entry => entry.node.key === current.key)?.branch;
   // Only when another scene is selected (folding the selected scene's own route by hand stays folded).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,9 +134,14 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       {!open && problemsIn > 0 && <span className="row-problems" aria-label={t('problemsN', { count: problemsIn })}>{problemsIn}</span>}
     </button></li>;
   };
-  const row =(node: Node, depth: number, _via: string | null) => {
+  const row = (node: Node, depth: number, unconnected = false) => {
     const text = cardText(definition, node); const count = problemsFor(node.key);
-    return <li key={node.key}><button className={`scene-row${node.key === current.key ? ' current' : ''}${count ? ' has-problems' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={node.key === current.key ? 'true' : undefined} onClick={() => setSelected([node.key])}>
+    const selected = node.key === current.key;
+    return <li key={node.key} className={unconnected ? 'scene-unconnected' : undefined}><button type="button" ref={selected ? selectedMarker : null}
+      className={`scene-row${selected ? ' current' : ''}${count ? ' has-problems' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={selected ? 'true' : undefined}
+      onPointerEnter={event => { if (event.pointerType === 'mouse' && matchMedia(TIMELINE_LAYOUT).matches) setHoveredScene(node.key); }}
+      onFocus={event => { if (event.currentTarget.matches(':focus-visible')) { setHoveredScene(undefined); setFocusedScene(node.key); } }} onBlur={() => setFocusedScene(undefined)}
+      onClick={() => setSelected([node.key])}>
       <span className={`row-icon thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`}><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
       <span className="row-text"><small>{definition.startNodeKey === node.key ? t('start') : ''}{text.label}</small><span>{text.banner || text.title}</span></span>
       <PeerTags peers={peersOn(peers, node.key)} className="row-peers" />
@@ -127,18 +152,25 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
     const hidden = entry.branch.some(id => folded.has(id));
     // A route's heading shows when the routes around it are open, even while its own scenes are folded away.
     const head = entry.via && !entry.branch.slice(0, -1).some(id => folded.has(id)) ? [routeHead(entry)] : [];
-    return [...head, ...(hidden ? [] : [row(entry.node, entry.depth, entry.via)])];
+    return [...head, ...(hidden ? [] : [row(entry.node, entry.depth)])];
   });
+  const timelineDetail = cardText(definition, definition.nodes.find(node => node.key === (hoveredScene ?? focusedScene)) ?? current);
   const routeIds = [...new Set(rows.flatMap(entry => entry.branch))];
   const allFolded = routeIds.length > 0 && routeIds.every(id => folded.has(id));
   return <div className="scene-editor">
-    <nav className="scene-list" aria-label={t('playOrder')}>
+    <nav className="scene-list" aria-label={t('playOrder')} onPointerLeave={() => setHoveredScene(undefined)}>
       <div className="scene-list-head"><h2>{t('scenes')}</h2>
         {routeIds.length > 0 && <button type="button" className="small-button icon-only" aria-label={t(allFolded ? 'unfoldAll' : 'foldAll')} title={t(allFolded ? 'unfoldAll' : 'foldAll')}
           onClick={() => setFolded(allFolded ? new Set() : new Set(routeIds))}><Icon name={allFolded ? 'unfold-all' : 'fold-all'} size={16} /></button>}
-        <button ref={addButton} className="scene-add-after with-icon small-button" disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} /><span>{t('addAfter')}</span></button></div>
-      <ol>{listed}</ol>
-      {loose.length > 0 && <><h3>{t('notConnected')}</h3><ol>{loose.map(node => row(node, 0, null))}</ol></>}
+        <button ref={addButton} type="button" className="scene-add-after with-icon small-button" title={t('addAfter')}
+          disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} /><span>{t('addAfter')}</span></button></div>
+      <ol className="scene-track">{listed}
+        {loose.length > 0 && <li className="scene-unconnected-label"><h3>{t('notConnected')}</h3></li>}
+        {loose.map(node => row(node, 0, true))}
+      </ol>
+      <p className="scene-timeline-detail" aria-hidden="true" title={timelineDetail.banner || timelineDetail.title}>
+        <strong>{timelineDetail.label}</strong><span>{timelineDetail.banner || timelineDetail.title}</span>
+      </p>
     </nav>
     {/* Floating over the preview, next to the list (on top of everything, so nothing covers it). */}
     {adding === 'scene' && <FloatingMenu anchor={addButton.current} onClose={() => setAdding(null)}><ScenePalette label={t('addAfterLabel')} onPick={insertAfter} onCancel={() => setAdding(null)} /></FloatingMenu>}
@@ -146,17 +178,21 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       {current.stages.length > 1 && <div className="part-tabs" role="tablist" aria-label={t('partsOf')}>{current.stages.map((stage, position) =>
         <button key={stage.key} role="tab" aria-selected={position === index} onClick={() => setPart(position)}>Part {position + 1} · {partLabel(definition, stage)}</button>)}</div>}
       <div className="scene-canvas-tools">
-        <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => setPreviewDevice('phone')}>{labels('phonePreview')}</button>
+        <div className="segmented" role="group" aria-label={labels('devices')}>
+          {(['sharedScreen', 'phone'] as const).map(device => <button key={device} type="button" aria-pressed={canvasDevice === device}
+            onClick={() => setCanvasDevice(device)}>{t(device)}</button>)}
+        </div>
       </div>
-      <ScenePreview key={scenePart} definition={definition} node={current} index={index} device="sharedScreen" canvas={{
-        readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
-      }} />
+      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice}
+        canvas={canvasDevice === 'sharedScreen' ? {
+          readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
+        } : undefined} />
       {previewDevice && <ScenePreviewDialog definition={definition} node={current} index={index} initialDevice={previewDevice} onClose={() => setPreviewDevice(undefined)} />}
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>
     <aside className="scene-props" aria-labelledby="scene-props-heading">
       <div className="inspector-head"><h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
-        <button type="button" className="small-button with-icon try-scene" aria-haspopup="dialog" title={t('tryScene')} onClick={() => setPreviewDevice('sharedScreen')}><Icon name="try" size={16} /><span>{t('tryScene')}</span></button>
+        <button type="button" className="small-button with-icon try-scene" aria-haspopup="dialog" title={t('tryScene')} onClick={() => setPreviewDevice(canvasDevice)}><Icon name="try" size={16} /><span>{t('tryScene')}</span></button>
         <ActionMenu label={t('sceneActions')} actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
           { label: t('rehearseHere'), icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
           { label: labels('rehearseOnly'), icon: 'try', disabled: d.busy || d.save !== 'saved' || !canRehearseOnly, onSelect: () => d.rehearse(current.key, true) },
@@ -164,18 +200,20 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       {replacing && !readOnly && <ReplaceSceneDialog key={current.key} definition={definition} node={current} onChange={next => { change(next); setPart(0); }} onClose={() => setReplacing(false)} />}
       {definition.startNodeKey === current.key && <p className="start-note">{t('startsHere')}</p>}
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
-      {/* A small named group (K4), like the scene's settings: open as left last time. */}
-      {!isRoute(current) && <Section title={t('parts')} memory="scene:parts" summary={current.stages.length === 1 ? t('partOne') : t('partsMany', { count: current.stages.length })}>
-        <ol className="part-list">{current.stages.map((stage, position) => <li key={stage.key} className={position === index ? 'current' : undefined}>
-          <button className="link-button" onClick={() => setPart(position)}>{t('partN', { number: position + 1, label: partLabel(definition, stage) })}</button>
-          <button className="icon-button" aria-label={t('movePartUp', { number: position + 1 })} disabled={readOnly || position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
-          <button className="icon-button" aria-label={t('removePart', { number: position + 1 })} disabled={readOnly || current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
-        <button className="small-button with-icon" disabled={readOnly} onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />{t('addPart')}</button>
-        {adding === 'part' && <div className="part-palette"><ScenePalette label={t('addPart')} only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
-        <p className="hint">{t('partsHint')}</p>
-      </Section>}
-      {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
-      <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
+      <div className="scene-edit-fields">
+        {/* A small named group (K4), like the scene's settings: open as left last time. */}
+        {!isRoute(current) && <Section title={t('parts')} memory="scene:parts" summary={current.stages.length === 1 ? t('partOne') : t('partsMany', { count: current.stages.length })}>
+          <ol className="part-list">{current.stages.map((stage, position) => <li key={stage.key} className={position === index ? 'current' : undefined}>
+            <button className="link-button" onClick={() => setPart(position)}>{t('partN', { number: position + 1, label: partLabel(definition, stage) })}</button>
+            <button className="icon-button" aria-label={t('movePartUp', { number: position + 1 })} disabled={readOnly || position === 0} onClick={() => movePart(position, position - 1)}>↑</button>
+            <button className="icon-button" aria-label={t('removePart', { number: position + 1 })} disabled={readOnly || current.stages.length === 1} onClick={() => removePart(position)}>×</button></li>)}</ol>
+          <button className="small-button with-icon" disabled={readOnly} onClick={() => setAdding(adding === 'part' ? null : 'part')}><Icon name="plus" size={16} />{t('addPart')}</button>
+          {adding === 'part' && <div className="part-palette"><ScenePalette label={t('addPart')} only={PART_TYPES} inline onPick={addPart} onCancel={() => setAdding(null)} /></div>}
+          <p className="hint">{t('partsHint')}</p>
+        </Section>}
+        {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
+        <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
+      </div>
       {/* Where it leads: a button to go there (changing it is the Flow editor's business, in the ☰ menu). */}
       <NextScenes definition={definition} node={current} onGo={key => setSelected([key])} onEdit={readOnly ? undefined : () => onOpenFlow(current.key)} />
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
@@ -211,7 +249,9 @@ function FloatingMenu({ anchor, onClose, children }: { anchor: HTMLElement | nul
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', key); };
   }, [anchor, onClose]);
   const top = rect ? Math.min(rect.bottom + 6, window.innerHeight - 200) : 120;
-  return createPortal(<div ref={box} className="floating-menu" style={{ top, left: rect ? Math.max(8, rect.left) : 8, maxHeight: `calc(100dvh - ${top + 12}px)` }}>{children}</div>, anchor?.closest('.editor') ?? document.body);
+  const maxLeft = window.innerWidth - Math.min(420, window.innerWidth - 24) - 12;
+  const left = Math.max(8, Math.min(rect?.left ?? 8, maxLeft));
+  return createPortal(<div ref={box} className="floating-menu" style={{ top, left, maxHeight: `calc(100dvh - ${top + 12}px)` }}>{children}</div>, anchor?.closest('.editor') ?? document.body);
 }
 
 function Problems({ problems, parts }: { problems: DefinitionIssue[]; parts: number }) {

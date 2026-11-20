@@ -1,3 +1,4 @@
+import { chooseOption } from './helpers.js';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -22,7 +23,7 @@ async function twoEditors(browser: Browser, baseURL: string, startFrom: string, 
   const [ada, ben] = pages as [Page, Page];
   const mine = ada.getByRole('region', { name: 'Your games' }); const name = `Together ${Date.now()}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: startFrom });
+  await chooseOption(mine.getByLabel('Start from'), { label: startFrom });
   await mine.getByRole('button', { name: 'Create game' }).click();
   const href = await mine.getByRole('link', { name: `Edit ${name}` }).getAttribute('href');
   for (const page of pages) { await page.goto(`${baseURL}${href}`); await expect(page.getByRole('application', { name: 'Game flow' })).toBeVisible(); }
@@ -87,8 +88,14 @@ test('two people edit one game at once: each sees the other’s work, selection 
   await ada.getByRole('tab', { name: 'Scene editor' }).click();
   await expect(ada.getByRole('navigation', { name: 'Scenes in play order' }).locator('.scene-row', { hasText: 'Standings' }).locator('.peer-tag')).toHaveText('Ben');
   await ben.getByRole('button', { name: /^You are .*change your name/ }).click(); await nameField(ben).fill('Benjamin'); await expect(peers(ada)).toContainText('Benjamin');
+  await ada.setViewportSize({ width: 390, height: 844 });
+  const people = ada.getByRole('button', { name: 'Everyone editing now' });
+  await expect(people).toHaveText('2');
+  await people.click();
+  await expect(peers(ada)).toContainText('Benjamin');
   await ben.context().close();
   await expect(peers(ada)).toHaveCount(0);
+  await expect(people).toHaveText('1');
   await ada.context().close();
 });
 

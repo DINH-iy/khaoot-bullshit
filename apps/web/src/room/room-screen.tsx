@@ -28,7 +28,8 @@ import { formatPoints } from './results.js';
 import { Avatar, RoomSessionContext } from '../players/avatar.js';
 import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js';
 import { useMe, type Person } from '../people/use-me.js';
-import { wasOwner } from '../owner/owner-session.js';
+import { isLocalOwnerPage, wasOwner } from '../owner/owner-session.js';
+import { OWNER_TEXTS } from '../owner/owner.text.js';
 import { KeySignIn } from '../people/key-sign-in.js';
 import { JoinOption } from './join-option.js';
 import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
@@ -102,6 +103,7 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
         <button className="primary big" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
       {person === null && roomCode.length === ROOM_CODE_LENGTH && <PickYourName roomCode={roomCode} people={expected} onSignedIn={onPicked} />}
+      {isLocalOwnerPage() && <a className="join-option join-owner" href="/?host=1&localOwner=1"><JoinOption icon="gear" title={translate(OWNER_TEXTS, 'ownerOptions')} /></a>}
       {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
       <details className="join-more">
         <summary>{r('moreOptions')}<FaIcon name="chevron-down" /></summary>
@@ -110,7 +112,7 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
           <button type="button" className="join-option" onClick={onReclaim}><JoinOption icon="arrow-rotate-left" title={t('join.reclaimButton')} detail={t('join.reclaim')} /></button>
           <a className="join-option" href="/?arcade"><JoinOption icon="play" title={r('arcade')} detail={r('arcadeDetail')} /></a>
           {/* The host link comes from this browser's owner hint. Editor access comes from /api/people/me. */}
-          {ownerBrowser && <a className="join-option" href="/?host=1"><JoinOption icon="tv" title={r('hostInstead')} /></a>}
+          {ownerBrowser && !isLocalOwnerPage() && <a className="join-option" href="/?host=1"><JoinOption icon="tv" title={r('hostInstead')} /></a>}
           {!ownerBrowser && person?.canEdit && <a className="join-option" href="/?host=1#my-games"><JoinOption icon="gear" title={r('editGames')} /></a>}
         </div>
       </details>
@@ -154,6 +156,13 @@ export function RoomScreen() {
     void follow.then(next => { if (mounted) moveTo(next); }).catch(() => { if (mounted) setError(r('moved')); });
     return () => { mounted = false; };
   }, [nextRoom, sessionId, myRole]);
+  const roomRoot = useRef<HTMLElement>(null);
+  const leaveClosedRoom = () => {
+    const target = initial.searchParams.has('bench') ? window.top : window;
+    (target ?? window).location.replace('/');
+  };
+  const roomClosed = state?.view.sessionId === sessionId && state?.roomClosed === true;
+  useEffect(() => { if (roomClosed) leaveClosedRoom(); }, [roomClosed]);
   // The host panel's one open sheet (settings, invite, players, back to lobby), or none.
   const [sheet, setSheet] = useState<'settings' | 'invite' | 'players' | 'lobby' | null>(null);
   const backToLobby = () => {
@@ -296,7 +305,7 @@ export function RoomScreen() {
   const ownPoints = role === 'player' && stage?.revealed && state ? stage.reveal?.awards.find(award => award.playerId === state.selfPlayerId)?.amountMilli ?? null : null;
   const nextAlso = running && stage && stage.status === 'CLOSED' && primary?.label !== t('host.next') && (stage.kind !== 'route' || stage.route?.decision);
 
-  return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><main className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''} ${lookClass}`} style={lookStyle}>
+  return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''} ${lookClass}`} style={lookStyle}>
     <header className="room-bar session-bar">
       <h1 className="visually-hidden">{state ? r(role === 'host' ? 'hostScreen' : role === 'display' ? 'sharedScreen' : 'yourPhone', { title: state.view.title }) : r('partyRoom')}</h1>
       <p className="brand">party<span>.</span></p>
@@ -432,30 +441,30 @@ export function RoomScreen() {
           {([['settings', 'gear', h('roomSettings')], ['invite', 'tv', h('sharedAndInvite')], ['players', 'users', h('playersCount', { count: state.players.length })], ['lobby', 'arrow-rotate-left', h('backToLobby')]] as const).map(([key, icon, label]) =>
             (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">{h('playersHidden')}</span><span className="tool-count">{state.players.length}</span></>}</button>)}
         </div>
-        {sheet === 'settings' && <HostDialog title={h('roomSettings')} icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
+        {sheet === 'settings' && <HostDialog portal={roomRoot.current} title={h('roomSettings')} icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
           <div className="settings-col"><h3>{h('phonesWaiting')}</h3><SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
             <h3>{h('joining')}</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} /><TestBenchSetting state={state} sessionId={state.view.sessionId} onError={setError} />
             <p className="control-back"><a href="/?host=1">{h('backToHostMenu')}</a></p>
             {state.view.status !== 'FINISHED' && <button type="button" className="danger" disabled={disabled || busy} onClick={() => {
               if (!confirm(management('closeAsk'))) return;
               setBusy(true);
-              void roomApi(`/api/rooms/${sessionId}/close`, {}).then(() => setSheet(null)).catch(() => setError(management('closeFailed'))).finally(() => setBusy(false));
+              void roomApi(`/api/rooms/${sessionId}/close`, {}).then(leaveClosedRoom).catch(() => setError(management('closeFailed'))).finally(() => setBusy(false));
             }}>{management('closeRoom')}</button>}</div>
           <RoomSettings state={state} sessionId={state.view.sessionId} onError={setError} /></div></HostDialog>}
-        {sheet === 'invite' && <HostDialog title={h('sharedAndInvite')} icon="tv" size="compact" onClose={() => setSheet(null)}>
+        {sheet === 'invite' && <HostDialog portal={roomRoot.current} title={h('sharedAndInvite')} icon="tv" size="compact" onClose={() => setSheet(null)}>
           <div className="invite-join"><JoinQr origin={location.origin} roomCode={state.roomCode} link={false} />
             <div className="invite-code"><h3>{h('invitePlayers')}</h3><BigCode roomCode={state.roomCode} copy /><JoinLink url={publicJoinUrl(location.origin, state.roomCode)} copy /></div></div>
           {/* Testing alone: the host screen with phones next to it, each its own player (virtual phones; real ones can join too). */}
           <div className="invite-display"><FaIcon name="users" /><p><strong>{h('testWithPhones')}</strong> {h('testWithPhonesText')}</p>
-            <a className="invite-bench" href={`/?bench=${sessionId}`} target="_blank" rel="noreferrer">{h('openTestBench')}</a></div>
+            <a className="invite-bench invite-action" href={`/?bench=${sessionId}`} target="_blank" rel="noreferrer">{h('openTestBench')}</a></div>
           <div className="invite-display"><FaIcon name="tv" /><p><strong>{h('sharedScreen')}</strong> {h('sharedScreenText')}</p>
-            {displayUrl ? <span className="invite-display-open"><a href={displayUrl} target="_blank" rel="noreferrer">{h('openDisplay')}</a><CopyIcon text={displayUrl} label={h('copyDisplayLink')} icon="link" /></span>
+            {displayUrl ? <span className="invite-display-open"><a className="invite-action" href={displayUrl} target="_blank" rel="noreferrer">{h('openDisplay')}</a><CopyIcon text={displayUrl} label={h('copyDisplayLink')} icon="link" /></span>
               : <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError(h('displayFailed'))); }}>{h('createDisplayLink')}</button>}</div>
         </HostDialog>}
         {state.view.status === 'LOBBY' && <section className="host-sheet players" aria-labelledby="players-heading"><h2 id="players-heading">{t('players.title', { count: state.players.length })}</h2>
           <HostPlayerList state={state} disabled={disabled} send={command} onError={setError} />
           <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section>}
-        {sheet === 'players' && state.view.status !== 'LOBBY' && <HostDialog title={t('players.title', { count: state.players.length })} icon="users" onClose={() => setSheet(null)}><section className="host-sheet players in-dialog" aria-label={h('players')}>
+        {sheet === 'players' && state.view.status !== 'LOBBY' && <HostDialog portal={roomRoot.current} title={t('players.title', { count: state.players.length })} icon="users" onClose={() => setSheet(null)}><section className="host-sheet players in-dialog" aria-label={h('players')}>
           {me && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
           <HostPlayerList state={state} disabled={disabled} send={command} onError={setError} listRef={playersRef} />
           <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section></HostDialog>}

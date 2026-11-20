@@ -1,3 +1,4 @@
+import { chooseOption } from './helpers.js';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -10,7 +11,7 @@ test('the owner creates a game, sees its problems per scene, publishes it and op
   await expect(mine.getByRole('button', { name: 'Create game' })).toBeVisible();
   const name = `Office party ${Date.now()}`;
   await mine.getByLabel('Name of your new game').fill(name);
-  await mine.getByLabel('Start from').selectOption({ label: 'A copy of Friday Night Chaos' });
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
   await expect(mine).toContainText(`${name}Not publishedReady to publish`);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

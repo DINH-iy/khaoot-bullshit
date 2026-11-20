@@ -23,10 +23,11 @@ import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
 const HOST_ACCESS_MS = 8 * 60 * 60 * 1000;
 
 export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess, live?: EditorLive) {
-  const { fail, guard, isOwner, requireOwner, requireEditor } = owner;
+  const { fail, guard, isOwner, localToken, requireOwner, requireEditor } = owner;
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
   const authoring = createAuthoring(client);
   const secure = config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : '';
+  const ownerCookie = (token: string) => `${OWNER_COOKIE}=${token}; Path=/api/host; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`;
   const ownerCreator = () => sharedOwnerCreator(client);
   async function versionFor(creatorId: string, game: (typeof builtInGames)[number]): Promise<string> {
     const hash = contentHash(game.definition);
@@ -60,7 +61,17 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       const settings = guard(request, 'claim');
       const parsed = ClaimRoomSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(isOwner(settings.ownerToken, parsed.data.token), 'UNAUTHORIZED');
-      reply.header('set-cookie', `${OWNER_COOKIE}=${parsed.data.token}; Path=/api/host; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`);
+      reply.header('set-cookie', ownerCookie(parsed.data.token));
+      return { ok: true, data: {} };
+    } catch (error) { return fail(reply, error); }
+  });
+  app.post('/api/host/claim-local', async (request, reply) => {
+    try {
+      const settings = guard(request, 'claim');
+      roomAssert(request.headers.origin && request.headers['sec-fetch-site'] === 'same-origin', 'ORIGIN_REJECTED');
+      const token = localToken(settings, request);
+      roomAssert(token, 'FORBIDDEN');
+      reply.header('set-cookie', ownerCookie(token));
       return { ok: true, data: {} };
     } catch (error) { return fail(reply, error); }
   });
