@@ -1,37 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type Draft } from '@party/contracts';
 import { newId, roomApi } from '../../room/api.js';
 import { SIGNED_OUT_TEXT } from '../../owner/owner-session.js';
 import { convertLegacyTeams, type Definition, type Positions } from '../model.js';
 import { combine, fromDoc, toDoc, type Doc, type Snapshot } from '../live/document.js';
 import { same } from '../live/merge.js';
+import { useLanguage } from '../../i18n/language.js';
+import { localizeDiagnostics } from './diagnostics.js';
+import { HISTORY_LIMIT, readEditHistory, writeEditHistory, type EditHistory } from './history-storage.js';
 import { describeStep } from './history-labels.js';
 
 export type SaveState = 'saved' | 'pending' | 'saving' | 'error';
-/**
- * One of your own edits: the game just before and just after it. Undo and redo replay only this difference.
- * `label` says what it was (for the history list), `at` when.
- */
-interface Step { before: Snapshot; after: Snapshot; label: string; at: number }
-const HISTORY = 100;
-
 /**
  * One game draft shared by both editor views: loading, automatic saving, undo/redo,
  * publishing and playing. Several people can edit at once: a save by someone
  * else is merged into this copy (see live/document.ts), never overwritten.
  */
 const MODE_KEY = 'party-editor-mode';
-export function useDraft(gameId: string) {
+export function useDraft(gameId: string, historyIdentity: string | undefined) {
   const [draft, setDraft] = useState<Draft>(); const [loadError, setLoadError] = useState('');
   const [definition, setDefinition] = useState<Definition>(); const [positions, setPositions] = useState<Positions>({});
   const [issues, setIssues] = useState<DefinitionIssue[]>([]); const [save, setSave] = useState<SaveState>('saved');
+  const language = useLanguage();
+  const displayIssues = useMemo(() => localizeDiagnostics(issues, language), [issues, language]);
   const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
   // View mode: look through the game without changing it by accident. Every edit passes `change` (and undo/redo),
   // so this one switch is what makes viewing safe; the screens also lock their controls. Remembered in this browser.
   const [readOnly, setReadOnlyState] = useState(() => { try { return localStorage.getItem(MODE_KEY) === 'view'; } catch { return false; } });
   const viewing = useRef(readOnly); viewing.current = readOnly;
   const setReadOnly = (next: boolean) => { setReadOnlyState(next); try { localStorage.setItem(MODE_KEY, next ? 'view' : 'edit'); } catch { /* storage blocked: this visit only */ } };
-  const [history, setHistory] = useState<{ undo: Step[]; redo: Step[] }>({ undo: [], redo: [] });
+  const [history, setHistory] = useState<EditHistory>({ undo: [], redo: [] });
+  const [loadedHistory, setLoadedHistory] = useState<string>();
   const revision = useRef(0); const dirty = useRef(false); const saving = useRef(false); const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // The last version known to be saved on the server: what our unsaved edits are measured against.
   const server = useRef<Doc | undefined>(undefined);
@@ -48,7 +47,6 @@ export function useDraft(gameId: string) {
       const loaded = DraftSchema.parse(data);
       setDraft(loaded); setIssues(loaded.issues); revision.current = loaded.revision; server.current = loaded.definition as Doc; waiting.current = undefined;
       show(fromDoc(loaded.definition as Doc)); setSave('saved'); dirty.current = false;
-      setHistory({ undo: [], redo: [] });
       // A game from before Pick teams scenes gets its teams as a scene at the start (left of the old start), and is saved like that.
       const opened = fromDoc(loaded.definition as Doc); const converted = convertLegacyTeams(opened.definition);
       if (converted) {
@@ -59,6 +57,15 @@ export function useDraft(gameId: string) {
     }).catch((cause: unknown) => setLoadError(cause instanceof Error && cause.message === 'UNAUTHORIZED' ? SIGNED_OUT_TEXT : 'This game could not be opened. It may have been removed, or the server is not running.'));
   }, [gameId]);
   useEffect(load, [load]);
+  const draftLoaded = draft?.gameId === gameId;
+  useEffect(() => {
+    if (!draftLoaded || !historyIdentity || loadedHistory === historyIdentity) return;
+    setHistory(previous => loadedHistory === undefined && (previous.undo.length || previous.redo.length) ? previous : readEditHistory(historyIdentity, gameId));
+    setLoadedHistory(historyIdentity);
+  }, [draftLoaded, gameId, historyIdentity, loadedHistory]);
+  useEffect(() => {
+    if (draftLoaded && historyIdentity && loadedHistory === historyIdentity && save === 'saved') writeEditHistory(historyIdentity, gameId, history);
+  }, [draftLoaded, gameId, history, historyIdentity, loadedHistory, save]);
 
   const flush = useCallback(async () => {
     const current = latest.current; if (!current.definition || saving.current || !dirty.current) return;
@@ -120,7 +127,7 @@ export function useDraft(gameId: string) {
     const grouped = Boolean(group) && group === lastRecord.current.group && now - lastRecord.current.at < 1200;
     setHistory(previous => {
       if (grouped && previous.undo.length) { const first = previous.undo.at(-1)!.before; return { undo: [...previous.undo.slice(0, -1), { before: first, after: to, label: describeStep(first as Required<Snapshot>, to as Required<Snapshot>), at: now }], redo: [] }; }
-      return { undo: [...previous.undo.slice(-HISTORY + 1), { before: from, after: to, label: describeStep(from as Required<Snapshot>, to as Required<Snapshot>), at: now }], redo: [] };
+      return { undo: [...previous.undo.slice(-HISTORY_LIMIT + 1), { before: from, after: to, label: describeStep(from as Required<Snapshot>, to as Required<Snapshot>), at: now }], redo: [] };
     });
     lastRecord.current = { at: now, group };
     show(to); schedule();
@@ -164,7 +171,7 @@ export function useDraft(gameId: string) {
     code => code === 'INVALID_DEFINITION' ? (startNodeKey ? 'This scene cannot be played on its own: it needs something earlier in the game, such as the teams it plays in. Use Rehearse from here on an earlier scene.' : 'Fix the problems listed before rehearsing.')
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.');
 
-  return { draft, loadError, definition, positions, setPositions, issues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
+  return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
     undo: () => restore('undo'), redo: () => restore('redo'), restore,
     // Your steps in words, for the history list: done (oldest first) and undone (the next redo last).
     steps: { undo: history.undo.map(step => ({ label: step.label, at: step.at })), redo: history.redo.map(step => ({ label: step.label, at: step.at })) }, canUndo: !readOnly && history.undo.length > 0, canRedo: !readOnly && history.redo.length > 0 };

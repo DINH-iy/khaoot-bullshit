@@ -1,3 +1,6 @@
+import { SettingToggle } from './setting-toggle.js';
+import { RoomChat } from './chat.js';
+import { CHAT_TEXTS } from './chat.text.js';
 import { useState } from 'react';
 import { MAX_OPEN_INVITES, REACTIONS, type RoomSnapshot } from '@party/contracts';
 import { roomApi } from '../room/api.js';
@@ -12,24 +15,29 @@ const LABELS = { showScores: 'sShowScores', reactions: 'sReactions', autoClose: 
 
 /** Host: how the room behaves. Changes apply straight away for everyone. */
 export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
+  const chat = useTexts(CHAT_TEXTS);
   const [busy, setBusy] = useState(false); const h = useTexts(HOST_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const [limit, setLimit] = useState(state.settings.reactionLimit); const [volume, setVolume] = useState(state.settings.musicVolume);
   // A change shows at once and is confirmed by the server; if the server refuses, it goes back.
   const [pending, setPending] = useState<Partial<RoomSnapshot['settings']>>({});
   const shown = { ...state.settings, ...pending };
-  const change = (setting: Setting | 'reactionLimit' | 'reactionChoices' | 'autoCloseSeconds' | 'breakPercent' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'keepOpen' | 'autoRevealSeconds', value: boolean | number | number[] | null) => {
+  const change = (setting: Setting | 'chat' | 'reactionLimit' | 'reactionChoices' | 'autoCloseSeconds' | 'breakPercent' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'keepOpen' | 'autoRevealSeconds', value: boolean | number | number[] | null) => {
     setBusy(true); setPending(previous => ({ ...previous, [setting]: value }));
     void roomApi(`/api/rooms/${sessionId}/settings`, { [setting]: value }).catch(() => onError(h('settingFailed')))
       // The room update that follows carries the saved value; until then the chosen value stays visible.
       .finally(() => { setBusy(false); setTimeout(() => setPending(previous => { const { [setting]: _done, ...rest } = previous; return rest; }), 1500); });
   };
   return <fieldset className="room-settings"><legend>{h('duringGame')}</legend>
-    {(Object.keys(LABELS) as Setting[]).map(setting => <label key={setting} className="choice"><input type="checkbox" checked={shown[setting]}
-      onChange={event => change(setting, event.target.checked)} />{h(LABELS[setting])}</label>)}
-    {Boolean(shown.idleCloseMinutes) && <label className="choice"><input type="checkbox" checked={shown.keepOpen ?? false} disabled={busy}
-      onChange={event => change('keepOpen', event.target.checked)} />{management('keepOpen')} · {shown.idleCloseMinutes} min</label>}
-    <label className="choice"><input type="checkbox" checked={shown.autoRevealSeconds != null} disabled={busy}
-      onChange={event => change('autoRevealSeconds', event.target.checked ? 0 : null)} />{rounds('autoReveal')}</label>
+    {(Object.keys(LABELS) as Setting[]).map(setting => <SettingToggle key={setting} label={h(LABELS[setting])}
+      checked={shown[setting]} disabled={busy} onChange={value => change(setting, value)} />)}
+    {state.role === 'host' && <>
+      <SettingToggle label={chat('enable')} checked={shown.chat === true} disabled={busy} onChange={value => change('chat', value)} />
+      {state.settings.chat && <ChatModeration state={state} />}
+    </>}
+    {Boolean(shown.idleCloseMinutes) && <SettingToggle label={management('keepOpen')} hint={`${shown.idleCloseMinutes} min`}
+      checked={shown.keepOpen ?? false} disabled={busy} onChange={value => change('keepOpen', value)} />}
+    <SettingToggle label={rounds('autoReveal')} checked={shown.autoRevealSeconds != null} disabled={busy}
+      onChange={value => change('autoRevealSeconds', value ? 0 : null)} />
     {shown.autoRevealSeconds != null && <label className="inline-setting">{rounds('delay')}
       <input type="number" inputMode="numeric" min={0} max={120} key={shown.autoRevealSeconds} defaultValue={shown.autoRevealSeconds}
         onBlur={event => {
@@ -43,34 +51,25 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
       <input type="number" inputMode="numeric" min={5} max={600} step={5} value={shown.quickTimeSeconds} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 5 && value <= 600) change('quickTimeSeconds', value); }} /></label>
     {/* Only for a game with music: it plays on the shared screen (or this screen without one). */}
     {state.view.music && <div className="music-settings">
-      <label className="choice"><input type="checkbox" checked={shown.music} onChange={event => change('music', event.target.checked)} />{h('musicPlays')}</label>
+      <SettingToggle label={h('musicPlays')} checked={shown.music} disabled={busy} onChange={value => change('music', value)} />
       {shown.music && <label>{h('musicVolume', { volume })}
         <input type="range" min={0} max={100} step={5} value={volume} onChange={event => setVolume(Number(event.target.value))}
           onPointerUp={() => { if (volume !== state.settings.musicVolume) change('musicVolume', volume); }} onKeyUp={() => { if (volume !== state.settings.musicVolume) change('musicVolume', volume); }} /></label>}
     </div>}
     {shown.breakVotes && <label className="inline-setting">{h('mustAgree')}
       <input type="number" inputMode="numeric" min={10} max={100} step={10} value={shown.breakPercent} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 10 && value <= 100) change('breakPercent', value); }} /></label>}
-    {shown.reactions && <div className="reaction-settings">
+    {shown.reactions && <details className="reaction-settings"><summary>{h('allowedReactions')}</summary>
       <label>{h('reactionsPer', { count: limit })}
         <input type="range" min={1} max={30} value={limit} disabled={busy} onChange={event => setLimit(Number(event.target.value))}
           onPointerUp={() => { if (limit !== state.settings.reactionLimit) change('reactionLimit', limit); }} onKeyUp={() => { if (limit !== state.settings.reactionLimit) change('reactionLimit', limit); }} /></label>
-      <p className="field-title" id="allowed-reactions">{h('allowedReactions')}</p>
-      <div className="reaction-picks" role="group" aria-labelledby="allowed-reactions">{REACTIONS.map((value, index) => {
+      <div className="reaction-picks" role="group" aria-label={h('allowedReactions')}>{REACTIONS.map((value, index) => {
         const on = shown.reactionChoices.includes(index); const last = on && shown.reactionChoices.length === 1;
         return <button key={value} type="button" aria-pressed={on} disabled={last} aria-label={`${value}${h(on ? 'allowed' : 'notAllowed')}`}
           onClick={() => change('reactionChoices', on ? shown.reactionChoices.filter(entry => entry !== index) : [...shown.reactionChoices, index].sort((a, b) => a - b))}>{value}</button>;
       })}</div>
-    </div>}
+    </details>}
     {!shown.showScores && <p className="hint">{h('scoresSecret')}</p>}
   </fieldset>;
-}
-
-/** One on/off switch with a line saying what it means right now. */
-function Switch({ label, on, disabled = false, onToggle, hint }: { label: string; on: boolean; disabled?: boolean; onToggle: () => void; hint: string }) {
-  return <div className={`side-switch${on ? ' on' : ''}${disabled ? ' disabled' : ''}`}>
-    <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={onToggle}><span className="side-switch-track" aria-hidden="true"><span /></span>{label}</button>
-    <p className="hint">{hint}</p>
-  </div>;
 }
 
 /**
@@ -87,11 +86,20 @@ export function SideGamesSwitch({ state, sessionId, onError }: { state: RoomSnap
       .finally(() => setTimeout(() => setPending(current => { const { [setting]: _done, ...rest } = current; return rest; }), 1500));
   };
   return <div className="side-switches" role="group" aria-label={h('phonesWaiting')}>
-    <Switch label={h('sideGames')} on={games} onToggle={() => change('sideGames', !games)}
+    <SettingToggle label={h('sideGames')} checked={games} onChange={value => change('sideGames', value)}
       hint={h(games ? 'sideGamesOn' : 'sideGamesOff')} />
-    <Switch label={h('chips')} on={games && chips} disabled={!games} onToggle={() => change('chips', !chips)}
+    <SettingToggle label={h('chips')} checked={games && chips} disabled={!games} onChange={value => change('chips', value)}
       hint={h(!games ? 'chipsNeedGames' : chips ? 'chipsOn' : 'chipsOff')} />
     {games && <label className="inline-setting">{h('openInvites')}
       <input type="number" inputMode="numeric" min={1} max={MAX_OPEN_INVITES} value={invites} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 1 && value <= MAX_OPEN_INVITES) change('openInvites', value); }} /></label>}
   </div>;
+}
+
+function ChatModeration({ state }: { state: RoomSnapshot }) {
+  const [open, setOpen] = useState(false);
+  const t = useTexts(CHAT_TEXTS);
+  return <details className="chat-moderation" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>{t('moderate')}</summary>
+    {open && <RoomChat state={state} />}
+  </details>;
 }

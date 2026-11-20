@@ -6,7 +6,7 @@ import { readRoomState } from './reclaim.js';
 
 /** Per room: at most 25 a second reach the screen, whatever the per-player limit. */
 const ROOM_PER_SECOND = 25;
-interface Rules { on: boolean; limit: number; choices: Set<number> }
+interface Rules { on: boolean; finished: boolean; limit: number; choices: Set<number> }
 
 /**
  * Emoji and stickers from phones, floating up on the shared screen. Passed on
@@ -20,7 +20,7 @@ export function registerReactions(io: Server, client: PrismaClient) {
     const hit = cached.get(sessionId); if (hit && Date.now() - hit.at < 2000) return hit.rules;
     const room = await client.gameSession.findUnique({ where: { id: sessionId }, select: { state: true, status: true } });
     const state = readRoomState(room?.state);
-    const result = { on: Boolean(room && room.status !== 'FINISHED' && state.reactions), limit: state.reactionLimit, choices: new Set(state.reactionChoices) };
+    const result = { on: Boolean(room && !state.roomClosed && state.reactions), finished: room?.status === 'FINISHED', limit: state.reactionLimit, choices: new Set(state.reactionChoices) };
     cached.set(sessionId, { at: Date.now(), rules: result }); if (cached.size > 1024) cached.delete(cached.keys().next().value!);
     return result;
   };
@@ -38,6 +38,12 @@ export function registerReactions(io: Server, client: PrismaClient) {
       const room = totals.get(sessionId); if (!room?.size) return null; const count = Math.max(...room.values());
       return { playerIds: [...room.entries()].filter(([, value]) => value === count).map(([id]) => id), count };
     },
+    async showText(sessionId: string, playerId: string, text: string) {
+      const settings = await rules(sessionId);
+      if (!settings.on || !settings.finished) return false;
+      io.to(`display:${sessionId}`).to(`host:${sessionId}`).emit('room.reaction', { id: ++next, playerId, text: text.slice(0, 60) });
+      return true;
+    },
     connect(socket: Socket, principal: Principal) {
       if (principal.actor.role !== 'player') return;
       const playerId = principal.actor.playerId; const sessionId = principal.sessionId;
@@ -50,7 +56,12 @@ export function registerReactions(io: Server, client: PrismaClient) {
           const second = Math.floor(now / 1000); const rate = roomRate.get(sessionId);
           if (rate?.second === second && rate.count >= ROOM_PER_SECOND) return;
           roomRate.set(sessionId, { second, count: rate?.second === second ? rate.count + 1 : 1 }); if (roomRate.size > 1024) roomRate.delete(roomRate.keys().next().value!);
-          const room_ = totals.get(sessionId) ?? new Map<string, number>(); room_.set(playerId, (room_.get(playerId) ?? 0) + 1); totals.set(sessionId, room_); if (totals.size > 512) totals.delete(totals.keys().next().value!);
+          if (!room.finished) {
+            const counts = totals.get(sessionId) ?? new Map<string, number>();
+            counts.set(playerId, (counts.get(playerId) ?? 0) + 1);
+            totals.set(sessionId, counts);
+            if (totals.size > 512) totals.delete(totals.keys().next().value!);
+          }
           const message = { id: ++next, playerId, reaction: parsed.data.reaction };
           io.to(`display:${sessionId}`).to(`host:${sessionId}`).emit('room.reaction', message);
         }).catch(() => undefined);

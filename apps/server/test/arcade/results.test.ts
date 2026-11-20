@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MINIGAME_KEYS, TEAM_MINIGAMES, type SessionView } from '@party/contracts';
+import { MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, type SessionView } from '@party/contracts';
 import { arcadeDefinition, arcadeRoundFits } from '../../src/arcade/definition.js';
 import { roundResults } from '../../src/arcade/results.js';
 import { assertExecutable } from '../../src/game/definition.js';
@@ -9,12 +9,17 @@ const seats = [{ memberId: 'm-a', playerId: ids.a, personId: 'p-a' }, { memberId
 const viewWith = (stage: Record<string, unknown>) => ({ stage }) as unknown as SessionView;
 
 describe('arcade rounds', () => {
-  it('makes a playable one-scene game of every minigame, alone where possible and in teams', () => {
-    for (const game of MINIGAME_KEYS) {
+  it('makes a playable one-scene game of every phone-only minigame, alone where possible and in teams', () => {
+    for (const game of MINIGAME_KEYS.filter(key => !SHARED_SCREEN_MINIGAMES.includes(key))) {
       expect(arcadeRoundFits(game, null)).toBe(!TEAM_MINIGAMES.includes(game));
       if (arcadeRoundFits(game, null)) expect(() => assertExecutable(arcadeDefinition(game, null))).not.toThrow();
       for (const formation of ['random', 'players'] as const) expect(() => assertExecutable(arcadeDefinition(game, { count: 2, formation }))).not.toThrow();
     }
+  });
+
+  it('keeps Count the Dots out of phone-only lobbies even if the leader asks for it directly', () => {
+    expect(arcadeRoundFits('count-the-dots', null)).toBe(false);
+    expect(arcadeRoundFits('count-the-dots', { count: 2, formation: 'random' })).toBe(false);
   });
 
   it('records nothing for a round whose results were never shown', () => {

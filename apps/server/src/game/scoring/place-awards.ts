@@ -1,9 +1,9 @@
 import { ballotTally } from './ballot.js';
-import { SubmissionValueSchema, type SubmissionValue } from '@party/contracts';
+import { isSharedPrediction, SubmissionValueSchema, type SubmissionValue } from '@party/contracts';
 import type { StageRun } from '../../generated/prisma/client.js';
 import { minigameRules, stagePlaces, type StageDefinition } from '../definition.js';
-import { minigameOutcome } from '../../minigames/outcome.js';
-import { places } from '../../minigames/rules.js';
+import { minigameOutcome } from '../../minigames/shared/outcome.js';
+import { places, readMinigameRun } from '../../minigames/shared/rules.js';
 import { route, teamContext, type Award } from '../teams/teams.js';
 import { VotePresentationSchema, type Transaction } from '../model.js';
 
@@ -24,8 +24,9 @@ export function earned(stage: StageDefinition, value: SubmissionValue): { amount
  */
 export async function revealAwards(tx: Transaction, stage: StageRun, definition: StageDefinition): Promise<Award[]> {
   if (definition.kind === 'minigame') {
-    const rows = await tx.submission.findMany({ where: { stageRunId: stage.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true }, orderBy: { receivedAt: 'asc' } });
-    return minigameOutcome(minigameRules(definition), rows, await teamContext(tx, stage), stage.id).awards;
+    const rows = await tx.submission.findMany({ where: { stageRunId: stage.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true, receivedAt: true }, orderBy: { receivedAt: 'asc' } });
+    const run = isSharedPrediction(definition.game) ? readMinigameRun(stage.presentation) : undefined;
+    return minigameOutcome(minigameRules(definition), rows, await teamContext(tx, stage), stage.id, run).awards;
   }
   const points = stagePlaces(definition);
   if (!points) return [];

@@ -1,6 +1,6 @@
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
-import { placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
+import { isSharedPrediction, MINIGAMES, placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields } from './fields/explain-fields.js';
@@ -69,6 +69,8 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
   const fastest = (legendFor: string) => <PlacesFields legend={t('extraFastest', { what: legendFor })} hint={t('extraFastestHint')} value={scoring?.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring ?? {}, places) }), 'places')} />;
   const id = (field: string) => `${node.key}-${index}-${field}`;
   const timed = !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
+  const dotRound = stage.kind === 'minigame' && stage['game'] === 'count-the-dots';
+  const graphRound = stage.kind === 'minigame' && stage['game'] === 'draw-the-graph';
   const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || stage.kind === 'duel' || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
   const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
   const voting = stage['voteMode'] === 'multi' || stage['voteMode'] === 'ranked' ? stage['voteMode'] : 'single';
@@ -85,8 +87,10 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
           onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
       </details>}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
-      {timed && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : 'timer')}
-        <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600} placeholder={t('none')} value={toSeconds(stage.durationMs)} onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />{t('sec')}</span></label>}
+      {timed && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : dotRound ? 'dotGuessTime' : 'timer')}
+        <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600}
+          placeholder={dotRound ? String(MINIGAMES['count-the-dots'].defaultSeconds) : graphRound ? String(MINIGAMES['draw-the-graph'].defaultSeconds) : t('none')} value={toSeconds(stage.durationMs)}
+          onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />{t('sec')}</span></label>}
 
       {stage.kind === 'collect' && input?.kind === 'choice' && <Segmented label={t('kindOfQuestion')} value={quizKind(input)} choices={QUIZ_KINDS}
         onChange={kind => edit(current => withQuizKind(current, kind), 'quiz-kind')} />}
@@ -164,7 +168,7 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
 
     {hasPlay && <Section title={t('explanation')} memory="Explanation first" summary={t(stage['explain'] ? 'explanationOn' : 'off')}><ExplainFields definition={definition} stage={stage} onChange={(next, field) => edit(() => next, field)} /></Section>}
 
-    {hasPlay && <Section title={t('whoPlays')} memory="Who plays" summary={playSummary(stage)}><PlayFields definition={definition} node={node} index={index} onChange={onChange} /></Section>}
+    {hasPlay && !graphRound && !(stage.kind === 'minigame' && isSharedPrediction(String(stage['game']))) && <Section title={t('whoPlays')} memory="Who plays" summary={playSummary(stage)}><PlayFields definition={definition} node={node} index={index} onChange={onChange} /></Section>}
     <Section title={t('music')} memory="scene-music" summary={musicSummary(stage)}><SceneMusicFields stage={stage} onChange={next => edit(() => next, 'music')} /></Section>
   </div>;
 }
@@ -228,7 +232,7 @@ export function FormFields({ form, onChange }: { form: Form; onChange: (form: Fo
         const parts = event.target.value.split(',').map(part => part.trim().toLowerCase()).filter(Boolean).map(part => part === 'rest' ? 'rest' as const : Math.round(Number(part)));
         if (parts.length >= 2 && parts.every(part => part === 'rest' || (Number.isInteger(part) && part >= 1 && part <= 50))) onChange({ ...form, split: { kind: 'sizes', sizes: parts } });
       }} /></label>}
-    <Segmented label={t('teamsMade')} value={form.formation} choices={[{ value: 'random', label: t('atRandom') }, { value: 'host', label: t('byHost') }, { value: 'players', label: t('playersChoose') }]} onChange={formation => onChange({ ...form, formation })} />
+    <Segmented label={t('teamsMade')} value={form.formation} choices={[{ value: 'random', label: t('atRandom') }, { value: 'skill', label: t('bySkill') }, { value: 'host', label: t('byHost') }, { value: 'players', label: t('playersChoose') }]} onChange={formation => onChange({ ...form, formation })} />
     <p className="hint">{t('hostSeesFirst')}</p>
   </>;
 }

@@ -17,7 +17,8 @@ export function savedLook(): PlayerLook | undefined {
 export function rememberLook(look: PlayerLook) { const { picture: _picture, ...parts } = look; try { localStorage.setItem(SAVED, JSON.stringify(parts)); } catch { /* only a convenience */ } }
 
 type Tab = 'color' | LookPart | 'photo' | 'draw';
-const TABS: Tab[] = ['body', 'color', 'eyes', 'mouth', 'hat', 'extra', 'photo', 'draw'];
+const PARTS = ['body', 'color', 'eyes', 'mouth', 'hat', 'extra'] as const;
+const MODES = ['body', 'photo', 'draw'] as const;
 const withoutPicture = (look: PlayerLook): PlayerLook => { const { picture: _picture, ...parts } = look; return parts; };
 
 /**
@@ -45,6 +46,8 @@ export async function sendPhoto(sessionId: string, file: File, playerId?: string
 export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, confirm = true, onApply, finishSignal = 0 }: { initial: PlayerLook; name: string; busy: boolean; sessionId: string; onSave: (look: PlayerLook) => void; onCancel: () => void; confirm?: boolean; onApply?: (look: PlayerLook) => void; finishSignal?: number }) {
   const t = useTexts(BUILDER_TEXTS);
   const [look, setLookState] = useState(initial); const [tab, setTab] = useState<Tab>('body');
+  const mode = tab === 'photo' || tab === 'draw' ? tab : 'body';
+  const lastPart = useRef<typeof PARTS[number]>('body');
   const [draftPhoto, setDraftPhoto] = useState<PlayerLook['picture']>();
   const [drawing, setDrawingState] = useState(emptyDrawing()); const [working, setWorking] = useState(false); const [error, setError] = useState('');
   // Used at once (debounced, so tapping through options sends one change), unless the room wants a confirmation.
@@ -93,29 +96,44 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, 
     void finish();
   }, [finishSignal, confirm, working]);
   return <section className="look-builder" aria-labelledby="look-builder-heading">
-    <h2 id="look-builder-heading" tabIndex={-1} ref={heading}>{t('yourLook')}</h2>
-    <div className="look-hero"><Avatar look={shown} size={132} label={`${name}: ${describeLook(shown)}`} />
-      <div className="actions">{shown.picture ? <button type="button" className="ghost" onClick={() => { setDraftPhoto(undefined); setLook(character); }}>{t('character')}</button>
-        : <button type="button" className="ghost" onClick={() => setLook(defaultLook(`${Date.now()}-${Math.random()}`))}>{t('surprise')}</button>}</div></div>
-    <div className="look-tabs" role="tablist" aria-label={t('part')}>{TABS.map(entry => <button key={entry} type="button" role="tab" aria-selected={tab === entry} onClick={() => setTab(entry)}>{t(entry)}</button>)}</div>
-    {options.length > 0 && <div className={`look-options${tab === 'color' ? ' colors' : ''}`} role="radiogroup" aria-label={t(tab)}>
-      {options.map(option => <button key={option.key} type="button" role="radio" aria-checked={chosen === option.key} aria-label={option.label} onClick={() => setLook(option.look)}>
-        {tab === 'color' ? <span className="swatch" style={{ background: LOOK_COLORS[Number(option.key)] }} /> : <Avatar look={option.look} size={56} />}
-        {tab !== 'color' && <span className="option-name">{option.label}</span>}</button>)}
-    </div>}
-    {tab === 'photo' && <div className="look-picture">
-      <p>{t('photoHint')}</p>
-      <label className="button-like">{t('choosePhoto')}<input className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" capture="user" disabled={working}
-        onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void attempt(() => sendPhoto(sessionId, file), 'photo'); }} /></label>
-    </div>}
-    {tab === 'draw' && <div className="look-picture">
-      <DrawingPad value={drawing} onChange={setDrawing} maxStrokes={200} label={t('drawPicture')} disabled={working} />
-      <button type="button" disabled={working || !drawing.strokes.length} onClick={() => { void attempt(async () => (await uploadDrawing(sessionId, 'avatar', drawing)).assetId, 'drawing'); }}>{t('useDrawing')}</button>
-      {!confirm && <p className="hint">{t('drawingHint')}</p>}
-    </div>}
-    {working && <p role="status">{t('sending')}</p>}
-    {error && <p role="alert" className="error">{error}</p>}
-    <div className="actions">{confirm ? <><button type="button" className="primary" disabled={busy || working} onClick={() => void finish()}>{t('save')}</button><button type="button" className="ghost" onClick={onCancel}>{t('cancel')}</button></>
-      : <button type="button" className="primary" disabled={working} onClick={() => void finish()}>{t('done')}</button>}</div>
+    <header className="look-header">
+      <h2 id="look-builder-heading" tabIndex={-1} ref={heading}>{t('yourLook')}</h2>
+      <div className="look-tabs look-modes" role="tablist" aria-label={t('style')}>{MODES.map(entry =>
+        <button key={entry} type="button" role="tab" disabled={working} aria-selected={mode === entry}
+          onClick={() => setTab(entry === 'body' ? lastPart.current : entry)}>{t(entry)}</button>)}</div>
+    </header>
+    <div className="look-content">
+      {mode !== 'draw' && <div className="look-hero"><Avatar look={shown} size={90} label={`${name}: ${describeLook(shown)}`} />
+        <div className="actions">{shown.picture ? <button type="button" className="ghost" onClick={() => { setDraftPhoto(undefined); setLook(character); }}>{t('character')}</button>
+          : <button type="button" className="ghost" onClick={() => setLook(defaultLook(`${Date.now()}-${Math.random()}`))}>{t('surprise')}</button>}</div></div>}
+      {mode === 'body' && <div className="look-tabs look-parts" role="tablist" aria-label={t('part')}>{PARTS.map(entry =>
+        <button key={entry} type="button" role="tab" aria-selected={tab === entry} onClick={() => {
+          lastPart.current = entry;
+          setTab(entry);
+        }}>{t(entry === 'body' ? 'shape' : entry)}</button>)}</div>}
+      {options.length > 0 && <div className={`look-options${tab === 'color' ? ' colors' : ''}`} role="radiogroup" aria-label={t(tab)}>
+        {options.map(option => <button key={option.key} type="button" role="radio" aria-checked={chosen === option.key} aria-label={option.label} onClick={() => setLook(option.look)}>
+          {tab === 'color' ? <span className="swatch" style={{ background: LOOK_COLORS[Number(option.key)] }} /> : <Avatar look={option.look} size={56} />}
+          {tab !== 'color' && <span className="option-name">{option.label}</span>}</button>)}
+      </div>}
+      {tab === 'photo' && <div className="look-picture">
+        <p>{t('photoHint')}</p>
+        <label className="button-like">{t('choosePhoto')}<input className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" capture="user" disabled={working}
+          onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void attempt(() => sendPhoto(sessionId, file), 'photo'); }} /></label>
+      </div>}
+      {tab === 'draw' && <div className="look-picture">
+        <DrawingPad value={drawing} onChange={setDrawing} maxStrokes={200} label={t('drawPicture')} disabled={working} />
+      </div>}
+    </div>
+    <footer className="look-footer">
+      {working && <p role="status">{t('sending')}</p>}
+      {error && <p role="alert" className="error">{error}</p>}
+      <div className="actions">
+        {confirm && <button type="button" className="ghost" disabled={working} onClick={onCancel}>{t('cancel')}</button>}
+        <button type="button" className="primary" disabled={busy || working} onClick={() => void finish()}>
+          {tab === 'draw' && drawn && drawing.strokes.length ? t('useDrawing') : t(confirm ? 'save' : 'done')}
+        </button>
+      </div>
+    </footer>
   </section>;
 }

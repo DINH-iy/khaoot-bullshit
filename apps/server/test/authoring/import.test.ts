@@ -16,7 +16,7 @@ describe('importing a game from text', () => {
     expect(issues).toEqual([]);
     const game = definition as { formatVersion: number; nodes: { key: string; stages: Record<string, unknown>[] }[]; edges: { from: string; to: string; option?: string }[] };
     expect(game.formatVersion).toBe(2);
-    expect(game).toMatchObject({ idleCloseMinutes: 30, autoRevealSeconds: 2, presentation: { theme: { preset: 'space' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
+    expect(game).toMatchObject({ idleCloseMinutes: 30, autoRevealSeconds: 2, presentation: { theme: { preset: 'neptune' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
     const stage = (key: string) => game.nodes.find(node => node.key === key)!.stages[0]!;
     expect(stage('welcome')).toMatchObject({ youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 5, endSeconds: 15 }, mediaLayout: { position: 'left', size: 'wide' } });
     expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
@@ -24,8 +24,17 @@ describe('importing a game from text', () => {
     expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', voteMode: 'ranked', voteLimit: 3, resultCards: 'manual', durationMs: 40000 });
     expect(stage('finale')).toMatchObject({ input: { kind: 'order', items: [{ label: 'Walkman' }, { label: 'Discman' }, { label: 'iPod' }, { label: 'Smartphone' }] }, scoring: { kind: 'correct-order', correctOrder: ['walkman', 'discman', 'ipod', 'smartphone'], awardMilli: '15000' } });
     expect(game.edges.filter(edge => edge.from === 'choose')).toEqual([expect.objectContaining({ to: 'music', option: 'music' }), expect.objectContaining({ to: 'sculpture', option: 'physical' })]);
-    expect(game.edges.filter(edge => edge.to === 'finale').map(edge => edge.from).sort()).toEqual(['music', 'sculpture']);
-    expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(8);
+    expect(game.edges.filter(edge => edge.to === 'finale').map(edge => edge.from).sort()).toEqual(['sculpture', 'sprint']);
+    expect(stage('sprint')).toMatchObject({ kind: 'minigame', game: 'speed-run', durationMs: 45_000 });
+    expect(stage('cut')).toMatchObject({ kind: 'minigame', game: 'cut-the-line', durationMs: 20_000, placementMilli: ['10000', '6000', '3000'] });
+    expect(stage('angle')).toMatchObject({ kind: 'minigame', game: 'match-the-angle', durationMs: 20_000, placementMilli: ['10000', '6000', '3000'] });
+    expect(stage('dots')).toMatchObject({ kind: 'minigame', game: 'count-the-dots', durationMs: 15_000, settings: { viewSeconds: 6 } });
+    expect(stage('coin')).toMatchObject({ kind: 'minigame', game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['10000'] });
+    expect(stage('graph')).toMatchObject({ kind: 'minigame', game: 'draw-the-graph', durationMs: 30_000,
+      settings: { graph: { visible: [10, 20, 35, 50], hidden: [55, 65, 62, 80], yLabel: 'Index' } } });
+    expect(stage('roulette')).toMatchObject({ kind: 'minigame', game: 'red-or-black-roulette', durationMs: 15_000, placementMilli: ['10000'] });
+    expect(game).toMatchObject({ presentation: { phoneMenuIcons: { scores: 'star', games: 'wheel', packs: 'sparkles', blackjack: 'cards' } } });
+    expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(15);
   });
 
   it('makes teams in a Pick teams scene and plays the rounds after it in them; a game without one is solo', () => {
@@ -191,4 +200,12 @@ describe('music in imported games', () => {
     expect(game.music).toEqual({ tracks: [song] });
     expect(game.nodes.map(node => node.stages[0]!['music'])).toEqual([{ mode: 'quiet' }, { mode: 'play', track: song }, { mode: 'stop' }, undefined]);
   });
+});
+
+it('reports a Speed run course with no path to the finish', () => {
+  const { issues } = check(JSON.stringify({ title: 'Obstacle course', scenes: [{
+    id: 'race', type: 'minigame', game: 'speed-run', question: 'Race!',
+    settings: { course: ['S######', '#######', '#######', '#######', '######F'] },
+  }] }));
+  expect(issues.some(issue => issue.code === 'Minigame settings are not valid')).toBe(true);
 });

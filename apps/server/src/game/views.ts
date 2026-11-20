@@ -1,16 +1,17 @@
 import { ballotTally } from './scoring/ballot.js';
 import { readExplain } from './explain.js';
 import { isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
-import { stepView } from '../minigames/steps/engine.js';
+import { stepView } from '../minigames/shared/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
 import { isVoteSource, minigameRules, parseDefinition, stagePlaces, type StageDefinition } from './definition.js';
 import { duelView } from './duel.js';
-import { readMinigameRun } from '../minigames/rules.js';
-import { relayPlan } from '../minigames/relay.js';
+import { readMinigameRun } from '../minigames/shared/rules.js';
+import { graphHue } from '../minigames/draw-the-graph/graph.js';
+import { relayPlan } from '../minigames/relay-drawing/relay.js';
 import { wheelView } from './show/wheel.js';
 import { finaleSlides } from './show/finale.js';
-import { minigameOutcome } from '../minigames/outcome.js';
+import { minigameOutcome } from '../minigames/shared/outcome.js';
 import { locateStage } from './graph.js';
 import { routeView } from './routes/route-views.js';
 import { GameError, requireGame } from './errors.js';
@@ -28,17 +29,24 @@ function publicInput(input: Input, seed: string): Input {
 }
 
 /** Pass the pencil as screens see it: the turns, each team's drawers in turn order and the parts drawn so far. */
-async function relayView(tx: Transaction, stageRunId: string, plan: ReturnType<typeof relayPlan>, teamOf: Map<string, string>) {
+async function relayView(tx: Transaction, stageRunId: string, plan: ReturnType<typeof relayPlan>, teamOf: Map<string, string>, viewer: string | null, revealed: boolean) {
   const names = new Map((await tx.sessionTeam.findMany({ where: { id: { in: plan.teams.map(team => team.teamId) } }, select: { id: true, name: true } })).map(team => [team.id, team.name]));
   const parts = await tx.submission.findMany({ where: { stageRunId, slotKey: { startsWith: 'part-' } }, select: { playerId: true, slotKey: true, value: true }, orderBy: { receivedAt: 'asc' } });
-  return { turns: plan.turns, voteAt: new Date(plan.voteAt).toISOString(), teams: plan.teams.map(team => ({ teamId: team.teamId, name: names.get(team.teamId) ?? 'Team', drawers: team.members,
-    parts: parts.filter(part => part.playerId && teamOf.get(part.playerId) === team.teamId).flatMap(part => { const value = SubmissionValueSchema.safeParse(part.value); return value.success && value.data.kind === 'drawing' ? [{ turn: Number(part.slotKey.slice(5)), assetId: value.data.assetId }] : []; }).sort((a, b) => a.turn - b.turn) })) };
+  const animation = viewer ? plan.animation(teamOf.get(viewer) ?? '') : undefined;
+  return { ...(animation ? { animation } : {}), ...(plan.teams.some(team => plan.animation(team.teamId)) ? { guessUntil: new Date(plan.guessUntil).toISOString() } : {}), turns: plan.turns, voteAt: new Date(plan.voteAt).toISOString(), teams: plan.teams.map(team => {
+    const word = revealed ? plan.animation(team.teamId)?.prompt : undefined;
+    return { teamId: team.teamId, name: names.get(team.teamId) ?? 'Team', ...(word === undefined ? {} : { word }), drawers: team.members,
+      parts: parts.filter(part => part.playerId && teamOf.get(part.playerId) === team.teamId).flatMap(part => {
+        const value = SubmissionValueSchema.safeParse(part.value);
+        return value.success && value.data.kind === 'drawing' ? [{ turn: Number(part.slotKey.slice(5)), assetId: value.data.assetId }] : [];
+      }).sort((a, b) => a.turn - b.turn) };
+  }) };
 }
 
 type Look = Presentation | undefined;
 /** What the room shows: the scene's texts and animations replace the game's key by key; the themes are layered on the client. */
 export function viewPresentation(game: Look, scene: Look) {
-  return { ...mergePresentationTexts(game, scene), animations: { ...(game?.animations ?? {}), ...(scene?.animations ?? {}) }, themes: [game?.theme, scene?.theme].filter(Boolean) };
+  return { ...mergePresentationTexts(game, scene), ...(game?.phoneMenuIcons ? { phoneMenuIcons: game.phoneMenuIcons } : {}), animations: { ...(game?.animations ?? {}), ...(scene?.animations ?? {}) }, themes: [game?.theme, scene?.theme].filter(Boolean) };
 }
 
 export async function readSessionView(client: PrismaClient, trustedActor: TrustedActor, sessionId: string, clock: Clock = () => new Date()): Promise<SessionView> {
@@ -96,14 +104,46 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       // A minigame shows its settings and start times while it runs; places (and what was behind each door) only once revealed.
       const rules = stageEntry?.kind === 'minigame' ? minigameRules(stageEntry) : null;
       const run = rules && current ? readMinigameRun(current.presentation) : null;
+      const dotRun = run?.dots;
+      const graph = run?.graph;
+      const graphChart = graph ? { visible: graph.visible, startLabel: graph.startLabel, splitLabel: graph.splitLabel,
+        endLabel: graph.endLabel, yLabel: graph.yLabel } : null;
+      const graphColors = graph && eligible?.success
+        ? new Map(eligible.data.playerIds.map((id, index) => [id, graphHue(graph.seed, index)])) : null;
+      const ownGraphHue = viewer ? graphColors?.get(viewer) : undefined;
+      const showPattern = actor.data.role !== 'player' && current?.status === 'ACTIVE' && session.status === 'RUNNING'
+        && dotRun && clock().getTime() < Date.parse(dotRun.guessAt);
       // A step game: every side's progress (secrets never; a team's vote counts only for its own members and the host).
       const steps = rules && isStepMinigame(rules.game) && current ? await stepView(tx, current, rules, context, eligible?.success ? eligible.data.playerIds : [], { playerId: viewer, host: actor.data.role === 'host' }) : null;
-      const relay = rules?.game === 'relay-drawing' && run && context && current ? await relayView(tx, current.id, relayPlan(context, rules.settings as MinigameSettings<'relay-drawing'>, run), context.teamOf) : null;
-      const minigame = rules ? { game: rules.game, settings: rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
+      const relay = rules?.game === 'relay-drawing' && run && context && current ? await relayView(tx, current.id, relayPlan(context, rules.settings as MinigameSettings<'relay-drawing'>, run), context.teamOf, viewer, revealed) : null;
+      const minigame = rules ? { game: rules.game, settings: rules.game === 'draw-the-graph' ? {} : rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
+        ...(run?.cutTarget === undefined ? {} : { cutTarget: run.cutTarget }),
+        ...(run?.angleTarget === undefined ? {} : { angleTarget: run.angleTarget }),
+        ...(graphChart ? { graph: { chart: graphChart, ...(ownGraphHue === undefined ? {} : { hue: ownGraphHue }) } } : {}),
+        ...(dotRun ? { dots: { guessAt: dotRun.guessAt, ...(showPattern ? { pattern: dotRun.pattern } : {}) } } : {}),
         // A paused room shows no GO: continuing restarts the duel with a fresh countdown and a new GO.
         goAt: current?.status === 'ACTIVE' && session.status === 'RUNNING' && run?.goAt &&Date.parse(run.goAt) <= clock().getTime() ? run.goAt : null } : null;
       const minigameAnswer = rules && revealed ? { kind: 'minigame', game: rules.game, doorsMilli: run?.doorsMilli ?? null,
-        entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id).entries } : null;
+        ...(graph && graphChart ? { graph: { ...graphChart, hidden: graph.hidden } } : {}),
+        ...(dotRun ? { dotCount: dotRun.pattern.length } : {}),
+        ...(run?.coin ? { coin: run.coin } : {}),
+        ...(run?.roulette === undefined ? {} : { roulette: run.roulette }),
+        entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true, receivedAt: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id, run).entries.map(result => {
+          const hue = result.playerId ? graphColors?.get(result.playerId) : undefined;
+          return hue === undefined ? result : { ...result, graphHue: hue };
+        }) } : null;
+      let ownValue = own ? SubmissionValueSchema.parse(own.value) : null;
+      if (!revealed && rules?.game === 'count-the-dots' && ownValue?.kind === 'minigame') {
+        // The scored error would let a player infer the correct count before the reveal.
+        ownValue = { kind: 'minigame', value: ownValue.dotGuess ?? 0 };
+      }
+      if (!revealed && rules?.game === 'draw-the-graph' && ownValue?.kind === 'minigame') {
+        // A score is feedback about the hidden line. Only the player's own drawing may be shown early.
+        ownValue = { kind: 'minigame', value: 0, graphLine: ownValue.graphLine };
+      }
+      if (!revealed && rules?.game === 'relay-drawing' && (rules.settings as MinigameSettings<'relay-drawing'>).animation && own) {
+        ownValue = { kind: 'minigame', value: 0 };
+      }
       const voteAnswer = revealed && voteSource?.success ? { kind: 'vote', entries: candidates.map(candidate => ({ submissionId: candidate.id, playerId: candidate.playerId, teamId: candidate.teamId, votes: totalsByAnswer?.get(candidate.id) ?? 0 })).sort((a, b) => b.votes - a.votes || (a.submissionId < b.submissionId ? -1 : 1)) } : null;
       return SessionViewSchema.parse({ formatVersion: 1, sessionId: session.id, revision: session.revision, status: session.status, title: definition.title,
         stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt, translations: entry.stage.translations,
@@ -125,11 +165,12 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           revealed, reveal: revealed ? { answer: voteAnswer ?? minigameAnswer ?? answer, awards: awards.map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
             teamAwards: teamAwards.map(row => ({ teamId: row.recipientTeamId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })) } : null } : null,
         serverTime: clock().toISOString(),
-        ownSubmission: own ? { id: own.id, value: SubmissionValueSchema.parse(own.value) } : null,
+        ownSubmission: own && ownValue ? { id: own.id, value: ownValue } : null,
         standings: totals.filter(row => row.recipientPlayerId !== null).map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
         teamStandings: await teamStandings(tx, session.id, playerTotals),
         presentation: viewPresentation(definition.presentation, entry?.stage.presentation),
         wheel: await wheelView(tx, session.id, definition, current, actor.data.role === 'host'),
+        ...(definition.phoneEffects ? { phoneEffects: true } : {}),
         music: musicView(definition, current && entry ? entry.stage : null, await songInfo(tx, definition, current && entry ? entry.stage : null)),
         awards: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
       });

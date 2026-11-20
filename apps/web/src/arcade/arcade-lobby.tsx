@@ -1,6 +1,6 @@
 import { Dropdown } from '../ui/dropdown.js';
 import { useEffect, useRef, useState } from 'react';
-import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, MINIGAMES, MINIGAME_KEYS, TEAM_MINIGAMES, type ArcadeLobbyView, type ArcadeTeams, type MinigameKey } from '@party/contracts';
+import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, MINIGAMES, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, type ArcadeLobbyView, type ArcadeTeams, type MinigameKey } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { navigate } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
@@ -146,7 +146,8 @@ function PickRound({ players, onStart }: { players: number; onStart: (game: Mini
     <h2 id="pick-heading">Next round</h2>
     <div className="arcade-pick">
       <label>Minigame<Dropdown value={game} onChange={value => setGame(value as MinigameKey)}
-        options={MINIGAME_KEYS.map(value => ({ value, label: MINIGAMES[value].name + (TEAM_MINIGAMES.includes(value) ? ' (teams)' : '') }))} /></label>
+        options={MINIGAME_KEYS.filter(value => !SHARED_SCREEN_MINIGAMES.includes(value))
+          .map(value => ({ value, label: MINIGAMES[value].name + (TEAM_MINIGAMES.includes(value) ? ' (teams)' : '') }))} /></label>
       <label>Play<Dropdown value={String(count)} onChange={value => setTeamCount(Number(value))}
         options={[...(teamOnly ? [] : [{ value: '0', label: 'Everyone alone' }]),
           ...Array.from({ length: most - 1 }, (_, index) => ({ value: String(index + 2), label: `In ${index + 2} teams` }))]} /></label>

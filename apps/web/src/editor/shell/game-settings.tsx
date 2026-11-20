@@ -1,3 +1,4 @@
+import { PHONE_FEEDBACK_TEXTS } from '../../room-extras/phone-feedback.text.js';
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { ROOM_MANAGEMENT_TEXTS } from '../../room/room-management.text.js';
 import { useEffect, useRef } from 'react';
@@ -32,6 +33,7 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
   const GROUP: Record<string, string> = { finale: 'awards', wheels: 'wheels', quickTimeSeconds: 'host', idleCloseMinutes: 'host', autoRevealSeconds: 'host', birthdayVote: 'host', sideGames: 'side', chips: 'side' };
   const problemsIn = (group: string) => problems.filter(problem => (GROUP[problem.path.split('.')[0] ?? ''] ?? 'general') === group).map(problem => problem.message);
   const heading = useRef<HTMLHeadingElement>(null); const t = useTexts(SETTINGS_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
+  const phone = useTexts(PHONE_FEEDBACK_TEXTS);
   useEffect(() => { heading.current?.focus(); }, []);
   const teamGame = definition.nodes.some(node => node.stages.some(stage => stage.kind === 'teams'));
   return <div className="game-settings-layer">
@@ -78,6 +80,8 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
       {typeof definition['autoRevealSeconds'] === 'number' && <label>{rounds('delay')}<input type="number" min={0} max={120} value={definition['autoRevealSeconds']}
         onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= 120) onChange({ ...definition, autoRevealSeconds: value }); }} /></label>}
       <p className="hint">{rounds('autoHelp')}</p>
+      <label className="choice"><input type="checkbox" checked={definition['phoneEffects'] === true}
+        onChange={event => onChange({ ...definition, phoneEffects: event.target.checked })} />{phone('enable')}</label>
       <label className="choice"><input type="checkbox" checked={definition['birthdayVote'] === true}
         onChange={event => onChange({ ...definition, birthdayVote: event.target.checked })} />{rounds('birthday')}</label>
     </Section>

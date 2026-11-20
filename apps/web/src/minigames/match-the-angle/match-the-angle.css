@@ -1,0 +1,22 @@
+.mg-angle-target { font-size: clamp(1.8rem, 7vw, 3.5rem); }
+.mg-angle-dial {
+  position: relative; box-sizing: border-box; width: min(100%, 15rem); aspect-ratio: 1;
+  border: 2px solid var(--r-line); border-radius: 50%; background: var(--r-card-strong);
+  touch-action: none; user-select: none; cursor: crosshair;
+}
+.mg-angle-dial:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 4px; }
+.mg-angle-dial[aria-disabled="true"] { opacity: .6; cursor: default; }
+.mg-angle-baseline, .mg-angle-ray {
+  position: absolute; top: 50%; left: 50%; width: 44%; transform-origin: left center;
+  pointer-events: none;
+}
+.mg-angle-baseline { height: 0; width: 50%; border-top: 2px dashed var(--r-muted); }
+.mg-angle-ray { height: 4px; margin-top: -2px; border-radius: 2px; background: var(--r-accent); }
+.mg-angle-ray::after {
+  content: ""; position: absolute; right: -7px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; border-radius: 50%; background: var(--r-accent);
+}
+.mg-angle-pivot {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--r-text); pointer-events: none;
+}

@@ -5,11 +5,11 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import { minigameRules, parseDefinition } from '../game/definition.js';
 import { locateStage } from '../game/graph.js';
 import { EligibilitySchema } from '../game/model.js';
-import { readMinigameRun } from '../minigames/rules.js';
-import { relayPlan, TURN_GRACE_MS } from '../minigames/relay.js';
+import { readMinigameRun } from '../minigames/shared/rules.js';
+import { relayPlan, TURN_GRACE_MS } from '../minigames/relay-drawing/relay.js';
 import { teamContext } from '../game/teams/teams.js';
 import type { Transaction } from '../game/model.js';
-import type { Live } from '../minigames/live.js';
+import type { Live } from '../minigames/tap-race/live.js';
 import type { Principal } from './gateway.js';
 
 const TapsSchema = z.object({ stageRunId: GameIdSchema, count: z.number().int().min(0).max(10_000) }).strict();

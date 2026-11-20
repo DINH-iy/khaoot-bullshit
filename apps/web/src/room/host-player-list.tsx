@@ -30,15 +30,23 @@ export function HostPlayerList({ state, disabled, send, onError, listRef }: {
       setAssigning(true);
       void roomApi(`/api/rooms/${sessionId}/host-phone`, { playerId: value || null })
         .catch(() => onError(rounds('hostPhoneFailed'))).finally(() => setAssigning(false));
-    }} options={[{ value: '', label: rounds('none') }, ...state.players.map(player => ({ value: player.id, label: player.displayName, disabled: !player.connected }))]} /></label><ul ref={listRef}>{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}>
-    <span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />{player.displayName}<span className="visually-hidden"> · </span>
-    <span className="player-state">{h(player.connected ? 'connected' : 'disconnected')}</span>
-    {player.look.picture && <button type="button" className="small-button ghost" disabled={disabled} aria-label={h('removePictureOf', { name: player.displayName })}
-      onClick={() => send('player.removePicture', { playerId: player.id })}>{h('removePicture')}</button>}
-    <button type="button" className="small-button ghost" aria-expanded={editing === player.id}
-      onClick={() => setEditing(editing === player.id ? undefined : player.id)}>{t('manage', { name: player.displayName })}</button>
-    <button type="button" className="icon-button player-revoke" disabled={disabled} aria-label={h('revokeFor', { name: player.displayName })} title={h('kickOut', { name: player.displayName })}
-      onClick={() => kick(player, false)}><FaIcon name="boot" /></button>
+    }} options={[{ value: '', label: rounds('none') }, ...state.players.map(player => ({ value: player.id, label: player.displayName, disabled: !player.connected }))]} /></label>
+  <ul ref={listRef} className="host-player-list">{state.players.map(player => <li key={player.id} className={player.connected ? 'online' : 'offline'}>
+    <div className="host-player-row">
+      <div className="host-player-identity">
+        <span className="dot" aria-hidden="true" /><Avatar look={player.look} size={28} />
+        <span className="host-player-name">{player.displayName}</span><span className="visually-hidden"> · </span>
+        <span className="player-state">{h(player.connected ? 'connected' : 'disconnected')}</span>
+      </div>
+      <div className="host-player-actions">
+        {player.look.picture && <button type="button" className="small-button ghost" disabled={disabled} aria-label={h('removePictureOf', { name: player.displayName })}
+          onClick={() => send('player.removePicture', { playerId: player.id })}>{h('removePicture')}</button>}
+        <button type="button" className="small-button ghost" aria-expanded={editing === player.id}
+          onClick={() => setEditing(editing === player.id ? undefined : player.id)}>{t('manage', { name: player.displayName })}</button>
+        <button type="button" className="icon-button player-revoke" disabled={disabled} aria-label={h('revokeFor', { name: player.displayName })} title={h('kickOut', { name: player.displayName })}
+          onClick={() => kick(player, false)}><FaIcon name="boot" /></button>
+      </div>
+    </div>
     {editing === player.id && <PlayerModeration key={player.id} player={player} disabled={disabled} sessionId={sessionId}
       change={fields => send('player.moderate', { playerId: player.id, ...fields })} onError={onError} onBan={() => kick(player, true)} />}
   </li>)}</ul></>;

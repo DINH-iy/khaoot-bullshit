@@ -15,7 +15,7 @@ The separate build plan tracks the 41 feature requests from Admin → Feedback b
 
 | Item | Remaining work |
 | --- | --- |
-| **Authoring diagnostics** | Server-generated problem descriptions in the editor are still English. Admin and People are intentionally English. |
+| **Authoring diagnostics** | **Done for known editor problems.** The editor shows them in English, Dutch, German and Romanian. Unknown validation errors show a localized explanation with the original technical detail. Dutch is covered in Chromium. |
 | **Roulette** | Optional side-game idea, awaiting a decision. |
 
 The product plan also tracks media follow-ups such as captions and alt text, more host playback control, playlist shuffle and fades, and event sounds. The People leaderboard still needs individual credit for answers submitted as a team. [Product plan](../../APP_PLAN.md#owner-queue-19-november-2026)
@@ -100,7 +100,7 @@ Sources: Nielsen Norman Group ([Dropdowns: when to use them](https://www.nngroup
 - G1: zoom the Flow canvas with the mouse wheel. **Done:** the plain scroll wheel zooms around the pointer (smoothly; a trackpad pinch too), Shift + scroll moves the map, and you can zoom out to 25%.
 - G2: a long game zooms far out; wrap scenes into rows. **Done:** *Tidy up* (and a game without a layout) wraps a long game into rows of columns, about screen-shaped (16:10); games up to 6 steps stay on one row. The arrow from the end of a row runs back neatly along the gap between the rows.
 - G3: the Look & feel page is very long. **Done** with K4: its style page and texts are small groups that open and close.
-- G4, G5: the editor on phones (the rehearse menu does not fit). **Done:** the top bar uses a compact layout as the window narrows. Undo, Redo and Editing / Viewing move into the Game menu, and the editor tabs get their own row on phones. The map toolbar scrolls sideways, the scene panel and menus open as bottom sheets, and the Scene editor stacks the list, preview and settings on one scrolling page. Checked in Chromium at desktop and phone-sized widths. Real-device acceptance is still open.
+- G4, G5: the editor on phones (the rehearse menu does not fit). **Done:** the top bar uses compact actions and a single chip for people editing. Play & publish and the Game menu open below the toolbar, above the sticky scene timeline. The scene panel opens as a bottom sheet, the view tabs sit in a bottom dock, and the Scene editor stacks the preview and settings beneath the timeline. Real-device acceptance is still open.
 
 ### H. Host menu and admin
 
@@ -222,7 +222,7 @@ Scene editor:
 
 - S5: The scene list keeps *Add after this* on one line. The picker floats over the canvas, and the header also has **Fold all routes / Unfold all routes**.
 - S6: *Next:* with an underlined *Change in the Flow editor*. **Done:** a button per way out (*Music → Music Mayhem*) goes to that scene; changing where it leads is in the scene's ☰ (*Change where it leads (Flow editor)*), with *Rehearse from here*.
-- S7: **Try this scene** opens the current draft in a large popup. To play a minigame or round, **Rehearse only this scene** remains in Scene actions.
+- S7: **Try this scene** opens a playable popup for the current draft. **Try minigame** opens the same popup with the phone controls. Practice runs locally with sample entries for group play.
 - S8: options with a lot of text (*How a team decides* and every list of choices). **Done:** a short name with a round marker; the explanation is behind an ⓘ (on hover, focus or tap) and is still read out with the option. Long checkbox texts (Drive the bus's rainbow) work the same way.
 - S9: the minigame popup. **Done:** tabs by sort (All, Speed, Drawing, Luck & choices, Drinking), cards in equal columns, and the chosen one filled (purple with white text).
 - S10: checkboxes in the editor have their own style: a rounded box in the editor's colour, aligned with their words.
@@ -295,7 +295,7 @@ Side games:
 - X9: **no separate dark bar any more.** The host and admin pages have a header in the page's own colours: the logo, then Play, Host and Editor (the current one underlined) on the left; Feedback and, for the owner only, an *Owner ▾* menu (Feedback reports, People, Chips & packs, Join screen) on the right. An editor sees only Play and Editor; anyone else sees no header. In the editor the bar is gone: its *p.* button with a chevron opens the same places. On phones Feedback and the owner menu show only their icon.
 - X10: side games: one button with the game being played (*🎰 Slots ▾*) opens all games as a grid over the screen (it pushes nothing down; Escape or a tap outside closes it), so there is room for many more games.
 - X11: editing together: the wide header shows a single collaborator by name. With several collaborators it shows initials and a count that opens the full list. Compact windows keep the avatar controls in less space.
-- X12: **Try this scene** previews the draft in the editor, including scenes with validation issues. The Scene editor uses a single editable canvas; **Phone preview** opens separately.
+- X12: **Try this scene** previews the draft in the editor, including scenes with validation issues. The Scene editor uses a single editable canvas with a **Shared screen / Phone** toggle.
 - X13: **Moving backgrounds** offer Starlight and Light lines in **Look & feel → Shapes and background**, and in **Admin → Join screen**. The motion stops when the device requests reduced motion.
 - X14: opening the editor, the admin pages or the arcade (the parts phones never download unless needed) shows a **loader** instead of *Opening the …*: nothing for the first moment, then the party logo with a soft pulse and three dots, in the page's colours (still with *Reduce motion*). The owner's pages fetch the editor and the admin menu ahead while idle, and the start page the arcade, so switching usually shows no loader at all. Never during a game: the room screen is in the first download.
 

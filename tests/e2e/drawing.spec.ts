@@ -39,8 +39,8 @@ test('players draw blind and vote, draw the roundest circle, and pass the pencil
   const builder = ada.getByRole('dialog', { name: 'Your look' });
   await builder.getByRole('tab', { name: 'Draw' }).click();
   await draw(ada, [[0.3, 0.3], [0.7, 0.3], [0.7, 0.7], [0.3, 0.7], [0.3, 0.3]]);
-  // No need to tap Use this drawing: unless the host wants confirmation, Done uses the drawing.
-  await builder.getByRole('button', { name: 'Done' }).click();
+  // The persistent save button uses the drawing in one step.
+  await builder.getByRole('button', { name: 'Save drawing' }).click();
   await expect(builder).toHaveCount(0);
   await expect(host.locator('.lobby-seats .avatar-picture')).toHaveCount(1);
   await expect(host.locator('.lobby-seats .avatar-picture path')).not.toHaveCount(0);

@@ -45,3 +45,11 @@
 .h2h-last-picks .won { border-color: #5ee6a8; background: rgb(94 230 168 / .15); }
 .h2h-last-picks .lost { opacity: .55; }
 .h2h-last-result { font-size: 1.15rem; font-weight: 800; }
+
+.creature-battle, .creature-teams section { display: grid; gap: .6rem; min-width: 0; }
+.creature-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; align-items: start; }
+.creature-teams h4 { margin: 0; overflow-wrap: anywhere; }
+.creature-card { display: grid; gap: .25rem; border: 1px solid var(--line); border-radius: .5rem; padding: .5rem; overflow-wrap: anywhere; }
+.creature-card.active { border-color: var(--r-accent); }
+.creature-card meter { max-width: 100%; width: 100%; }
+.creature-moves { flex-wrap: wrap; }

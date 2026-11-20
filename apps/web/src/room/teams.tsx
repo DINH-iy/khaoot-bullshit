@@ -11,7 +11,7 @@ type Teams = NonNullable<Stage['teams']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
 const nameOf = (state: RoomSnapshot, playerId: string) => state.players.find(player => player.id === playerId)?.displayName ?? p('formerPlayer');
 const list = (state: RoomSnapshot, ids: string[]) => ids.length ? ids.map(id => nameOf(state, id)).join(', ') : p('nobodyYet');
-const how = { random: 'tRandom', host: 'tHost', players: 'tPlayers' } as const satisfies Record<Teams['formation'], keyof typeof PLAY_TEXTS.en>;
+const how = { random: 'tRandom', skill: 'tSkill', host: 'tHost', players: 'tPlayers' } as const satisfies Record<Teams['formation'], keyof typeof PLAY_TEXTS.en>;
 const pointsText = { team: 'pTeam', members: 'pMembers', both: 'pBoth' } as const satisfies Record<Teams['points'], keyof typeof PLAY_TEXTS.en>;
 
 export const captainAnswers = (teams: Teams | null) => Boolean(teams && !teams.forming && teams.answers === 'captain');
@@ -76,6 +76,7 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
     {host && <div className="actions team-actions">
       {picked && pickedTeam && captains && pickedTeam.captainId !== picked && <button type="button" disabled={disabled} onClick={() => { send('teams.captain', { stageRunId: stage.id, playerId: picked }); setPicked(null); }}>Make {nameOf(state, picked)} captain</button>}
       <button type="button" className="ghost" disabled={disabled} onClick={() => { send('teams.shuffle', { stageRunId: stage.id }); setPicked(null); }}>{p('shuffle')}</button>
+      <button type="button" className="ghost" disabled={disabled} onClick={() => { send('teams.shuffle', { stageRunId: stage.id, method: 'skill' }); setPicked(null); }}>{p('balanceSkill')}</button>
     </div>}
     {host && teams.teams.every(team => team.memberIds.length === 0) && <p className="wait-note">{p('putOne')}</p>}
   </div>;

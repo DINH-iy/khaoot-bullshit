@@ -1,80 +1,113 @@
-import { useEffect, useRef, useState } from 'react';
-import { packPrice, REFILL_CHIPS, WalletSchema, type Wallet } from '@party/contracts';
-import { FaIcon } from '../presentation/icons.js';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { packPrice, REFILL_CHIPS, type PhoneMenuAction, type PhoneMenuIcons, type Wallet } from '@party/contracts';
+import { Icon } from '../presentation/line-icons.js';
+import { BottomSheet } from '../room-extras/bottom-sheet.js';
+import { PhoneMenuIcon } from '../room-extras/phone-menu-icon.js';
 import { SlotPays, Slots } from './slots.js';
 import { Blackjack } from './blackjack.js';
+import { SoloRoulette } from './roulette-table.js';
+import { SoloCoin } from './prediction.js';
 import { Packs } from './packs.js';
 import { Board } from './board.js';
 import { chips, sideApi, sideProblem, st } from './side-api.js';
+import type { useSideWallet } from './use-side-wallet.js';
 import './side-games.css';
 
-type Tab = 'slots' | 'blackjack' | 'packs' | 'board';
-// `short`: the name in the switcher (it has to fit next to the chips on a phone); `label`: the full name, read out.
-const TAB_KEYS: { key: Tab; icon: string; label: 'nSlots' | 'nBlackjack' | 'nPacks' | 'nBoard'; short: 'tSlots' | 'tBlackjack' | 'tPacks' | 'tBoard' }[] = [
-  { key: 'slots', icon: '🎰', label: 'nSlots', short: 'tSlots' }, { key: 'blackjack', icon: '🃏', label: 'nBlackjack', short: 'tBlackjack' },
-  { key: 'packs', icon: '🎁', label: 'nPacks', short: 'tPacks' }, { key: 'board', icon: '📊', label: 'nBoard', short: 'tBoard' },
-];
-const tabList = () => TAB_KEYS.map(entry => ({ ...entry, label: st(entry.label), short: st(entry.short) }));
+const TABS = [
+  { key: 'slots', icon: 'slots', label: 'nSlots', short: 'tSlots' },
+  { key: 'blackjack', icon: 'blackjack', label: 'nBlackjack', short: 'tBlackjack' },
+  { key: 'red-or-black-roulette', icon: 'roulette', label: 'nRoulette', short: 'tRoulette' },
+  { key: 'heads-or-tails', icon: 'coin', label: 'nCoin', short: 'tCoin' },
+  { key: 'packs', icon: 'packs', label: 'nPacks', short: 'tPacks' },
+  { key: 'board', icon: 'leaderboard', label: 'nBoard', short: 'tBoard' },
+] as const satisfies readonly { key: string; icon: PhoneMenuAction; label: Parameters<typeof st>[0]; short: Parameters<typeof st>[0] }[];
+export type SideGame = typeof TABS[number]['key'];
 
-/** The side games sheet on a player's phone: chips at the top, one game at a time. */
-export default function SideGames({ sessionId, selfId }: { sessionId: string; selfId: string | null }) {
-  const [wallet, setWallet] = useState<Wallet>(); const [error, setError] = useState(''); const [tab, setTab] = useState<Tab>('slots');
-  const [collection, setCollection] = useState(new Map<string, number>()); const [info, setInfo] = useState(false); const [picking, setPicking] = useState(false);
-  useEffect(() => {
-    void sideApi(sessionId, '').then(data => { const loaded = WalletSchema.parse(data); setWallet(loaded); setCollection(new Map(loaded.collection.map(entry => [entry.itemKey, entry.count]))); if (loaded.blackjack) setTab('blackjack'); })
-      .catch(cause => setError(sideProblem(cause)));
-  }, [sessionId]);
-  // The games grid closes on Escape or a tap anywhere outside the switcher line.
-  const top = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!picking) return;
-    const outside = (event: PointerEvent) => { if (!top.current?.contains(event.target as Node)) setPicking(false); };
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setPicking(false); } };
-    document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', escape, true);
-    return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape, true); };
-  }, [picking]);
-  if (error && !wallet) return <p role="alert" className="error">{error}</p>;
-  if (!wallet) return <p role="status">{st('opening')}</p>;
-  if (!wallet.enabled) return <p>{st('hostOff')}</p>;
-  // Without chips the slot machine and blackjack are played just for fun: no balance, no bets, no leaderboard.
-  // Packs are bought with chips, so without chips there is nothing to collect (and no leaderboard).
-  const forChips = wallet.chips; const all = tabList(); const tabs = forChips ? all : all.filter(entry => entry.key !== 'board' && entry.key !== 'packs');
-  const current = tabs.find(entry => entry.key === tab) ?? tabs[0]!;
-  const setBalance = (balance: number) => setWallet(current => current && { ...current, balance, canRefill: balance < 10 });
-  const refill = () => { setError(''); void sideApi<{ balance: number }>(sessionId, '/refill', {}).then(result => setWallet(current => current && { ...current, balance: result.balance, canRefill: false, refills: current.refills + 1 })).catch(cause => setError(sideProblem(cause))); };
-  // One slim line on top: a small game switcher (the chosen game named, the others by their icon) and the chips;
-  // the game itself is the main thing below it.
-  return <div className="side-games">
-    <div className="side-top" ref={top}>
-      {/* One button with the game being played; it opens every game as a grid (room for many more games). */}
-      <div className="side-picker">
-        <button type="button" className="side-picker-button" aria-expanded={picking} aria-controls="side-picker-grid" onClick={() => setPicking(!picking)}>
-          <span aria-hidden="true">{current.icon}</span><span>{current.short}</span><span className="side-picker-caret" aria-hidden="true">▾</span><span className="visually-hidden">{st('chooseOther')}</span></button>
-      </div>
-      <div className="side-top-end">
-        {forChips && <p className="chip-pill" title={chips(wallet.balance)}><span aria-hidden="true">🪙</span> <strong><span className="visually-hidden">{st('chipsLabel')}</span>{wallet.balance.toLocaleString()}</strong>{wallet.account === 'guest' && <span className="visually-hidden">{st('roomOnly')}</span>}</p>}
-      <button type="button" className="side-info-button" aria-expanded={info} aria-controls="side-info" aria-label={st('about')} title={st('about')} onClick={() => setInfo(!info)}><FaIcon name="circle-info" /></button>
-        {/* Floats over the game below (it never pushes the game down); Escape or a tap outside closes it. */}
-      {picking && <ul id="side-picker-grid" className="side-picker-grid" aria-label={st('sideGames')}>{tabs.map(entry => <li key={entry.key}>
-      <button type="button" aria-current={tab === entry.key ? 'true' : undefined} onClick={() => { setTab(entry.key); setPicking(false); }}>
-        <span className="side-picker-icon" aria-hidden="true">{entry.icon}</span><span>{entry.label}</span></button></li>)}</ul>}
-    </div>
-    </div>
-    {forChips && wallet.canRefill && <button type="button" className="small-button refill" onClick={refill}>{st('refill', { count: REFILL_CHIPS })}</button>}
-    {info && <SideInfo wallet={wallet} tab={tab} />}
-    {error && <p role="alert" className="error">{error}</p>}
-    <div id="side-panel" role="region" aria-label={current.label}>
-      {tab === 'slots' && <Slots sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} chips={forChips} />}
-      {tab === 'blackjack' && <Blackjack sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} open={wallet.blackjack} chips={forChips} />}
-      {tab === 'packs' && forChips && <Packs sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} collection={collection} sets={wallet.packSets} otherItems={wallet.otherItems}
-        onCollected={items => setCollection(current => { const next = new Map(current); for (const key of items) next.set(key, (next.get(key) ?? 0) + 1); return next; })} />}
-      {tab === 'board' && forChips && <Board sessionId={sessionId} self={selfId} />}
-    </div>
-  </div>;
+/** Show the picker immediately. Chip balances, packs and open hands still come from the server. */
+export function SideGamesSheet({ title, onClose, sessionId, selfId, selected, onSelect, withChips, icons, state }: {
+  title: string; onClose: () => void; sessionId: string; selfId: string | null; selected: SideGame | null; onSelect: (game: SideGame) => void;
+  withChips: boolean; icons: PhoneMenuIcons | undefined; state: ReturnType<typeof useSideWallet>;
+}) {
+  const [info, setInfo] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState('');
+  const tabs = withChips ? TABS : TABS.filter(entry => entry.key !== 'board');
+  const current = tabs.find(entry => entry.key === selected);
+  const tab = current?.key;
+  const showingPicker = picking || !current;
+  const wallet = state.wallet?.chips === withChips ? state.wallet : undefined;
+  const picker = useRef<HTMLUListElement>(null);
+  const switcher = useRef<HTMLButtonElement>(null);
+  const moveFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (!moveFocus.current) return;
+    moveFocus.current = false;
+    if (showingPicker) (picker.current?.querySelector<HTMLButtonElement>('[aria-current]') ?? picker.current?.querySelector('button'))?.focus();
+    else switcher.current?.focus();
+  }, [showingPicker]);
+  const setBalance = (balance: number) => state.update(current => ({ ...current, balance, canRefill: balance < 10 }));
+  const refill = () => {
+    setError('');
+    void sideApi<{ balance: number }>(sessionId, '/refill', {}).then(result => state.update(current =>
+      ({ ...current, balance: result.balance, canRefill: false, refills: current.refills + 1 }))).catch(cause => setError(sideProblem(cause)));
+  };
+  const enabled = wallet?.enabled !== false;
+  const about = <button type="button" className="side-info-button" disabled={!wallet} aria-expanded={info}
+    aria-controls={info && wallet ? 'side-info' : undefined} aria-label={st('about')} title={st('about')}
+    onClick={() => setInfo(!info)}><Icon name="about" /></button>;
+
+  return <BottomSheet title={title} onClose={onClose} resizable actions={enabled ? about : undefined}>
+    {enabled ? <div className="side-games" onKeyDown={event => {
+      if (event.key === 'Escape' && picking && current) {
+        event.preventDefault();
+        moveFocus.current = true;
+        setPicking(false);
+      }
+    }}>
+      {(current || (withChips && wallet)) && <div className="side-top">
+        {current && <button ref={switcher} type="button" className="side-picker-button" aria-expanded={showingPicker}
+          onClick={() => { moveFocus.current = true; setPicking(!showingPicker); setInfo(false); }}>
+          <PhoneMenuIcon action={current.icon} icons={icons} /><span>{st(current.short)}</span><span className="side-picker-caret" aria-hidden="true">▾</span>
+          <span className="visually-hidden">{st('chooseOther')}</span>
+        </button>}
+        {withChips && wallet && <p className="chip-pill" title={chips(wallet.balance)}><Icon name="coin" size={18} /> <strong><span className="visually-hidden">{st('chipsLabel')}</span>{wallet.balance.toLocaleString()}</strong>{wallet.account === 'guest' && <span className="visually-hidden">{st('roomOnly')}</span>}</p>}
+      </div>}
+      {withChips && wallet?.canRefill && <button type="button" className="small-button refill" onClick={refill}>{st('refill', { count: REFILL_CHIPS })}</button>}
+      {info && wallet && <SideInfo wallet={wallet} tab={showingPicker ? undefined : tab} />}
+      {error && <p role="alert" className="error">{error}</p>}
+      {showingPicker && <ul ref={picker} className="side-picker-grid" aria-label={st('sideGames')}>{tabs.map(entry => <li key={entry.key}>
+        <button type="button" aria-current={tab === entry.key ? 'true' : undefined} onClick={() => {
+          moveFocus.current = true;
+          onSelect(entry.key);
+          setPicking(false);
+          setInfo(false);
+        }}><PhoneMenuIcon action={entry.icon} icons={icons} /><span>{st(entry.label)}</span></button>
+      </li>)}</ul>}
+      {!showingPicker && current && <div role="region" aria-label={st(current.label)} aria-busy={!wallet && !state.error}>
+        {!wallet && (state.error ? <><p role="alert" className="error">{state.error}</p>
+          <button type="button" className="small-button" onClick={state.retry}>{st('retry')}</button></> : <p className="hint" role="status">{st('openingGame')}</p>)}
+        {wallet && <>
+          {tab === 'slots' && <Slots sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} chips={withChips} />}
+          {tab === 'blackjack' && <Blackjack sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} open={wallet.blackjack} chips={withChips}
+            onHand={hand => state.update(current => ({ ...current, blackjack: hand }))} />}
+          {tab === 'heads-or-tails' && <SoloCoin sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} forChips={withChips} />}
+          {tab === 'red-or-black-roulette' && <SoloRoulette sessionId={sessionId} balance={wallet.balance} onBalance={setBalance} forChips={withChips} />}
+          {tab === 'packs' && <Packs forChips={withChips} sessionId={sessionId} balance={wallet.balance} onBalance={setBalance}
+            collection={new Map(wallet.collection.map(entry => [entry.itemKey, entry.count]))} sets={wallet.packSets} otherItems={wallet.otherItems}
+            onCollected={items => state.update(current => {
+              const counts = new Map(current.collection.map(entry => [entry.itemKey, entry.count]));
+              for (const key of items) counts.set(key, (counts.get(key) ?? 0) + 1);
+              return { ...current, collection: Array.from(counts, ([itemKey, count]) => ({ itemKey, count })) };
+            })} />}
+          {tab === 'board' && <Board sessionId={sessionId} self={selfId} />}
+        </>}
+      </div>}
+    </div> : <p>{st('hostOff')}</p>}
+  </BottomSheet>;
 }
 
 /** The (i): short blocks with icons and numbers (no paragraphs): the open game's payouts, how to earn chips, prices. */
-function SideInfo({ wallet, tab }: { wallet: Wallet; tab: Tab }) {
+function SideInfo({ wallet, tab }: { wallet: Wallet; tab: SideGame | undefined }) {
   const forChips = wallet.chips; const { earn, startChips } = wallet.economy;
   const prices = wallet.packSets.map(packPrice); const cheapest = prices.length ? Math.min(...prices) : null;
   const tile = (icon: string, value: string, label: string) => <li><span className="info-icon" aria-hidden="true">{icon}</span><strong>{value}</strong><small>{label}</small></li>;

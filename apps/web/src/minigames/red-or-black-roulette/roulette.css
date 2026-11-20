@@ -1,0 +1,37 @@
+.roulette-choices, .roulette-reveal, .roulette-table {
+  --roulette-red: #a62036; --roulette-black: #1c1b28; --roulette-green: #126348;
+}
+.roulette-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; width: min(100%, 23rem); margin-inline: auto; }
+.room button.roulette-choice { min-height: 5.25rem; color: #fff; font-size: clamp(1.1rem, 5vw, 1.55rem); font-weight: 850; border: 1px solid #fff5; }
+.room button.roulette-choice.red, .roulette-result.red { background: var(--roulette-red); }
+.room button.roulette-choice.black, .roulette-result.black { background: var(--roulette-black); }
+.roulette-result.green { background: var(--roulette-green); }
+.roulette-reveal { display: grid; justify-items: center; gap: .7rem; }
+.roulette-display { position: relative; width: min(58vw, 14rem); aspect-ratio: 1; margin-top: .8rem; }
+.roulette-wheel {
+  position: absolute; inset: 0; box-sizing: border-box; border-radius: 50%; border: .4rem solid #c39b56;
+  background: radial-gradient(circle, #e5b962 0 8%, #93643a 9% 12%, #242330 13% 43%, #bf9857 44% 46%, transparent 47%), var(--roulette-pockets);
+  box-shadow: inset 0 0 0 2px #f9dfae, 0 .5rem 1.5rem #0005;
+  transform: rotate(var(--roulette-stop));
+}
+.roulette-pointer { position: absolute; top: -.6rem; left: 50%; width: 1.2rem; height: 1.3rem; transform: translateX(-50%); background: #ffdc97; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.roulette-result { margin: 0; padding: .3em .85em; border: 1px solid #fff4; border-radius: 999px; color: #fff; font-size: clamp(1rem, 5vw, 1.5rem); font-weight: 800; }
+@media (prefers-reduced-motion: no-preference) {
+  .roulette-animated .roulette-wheel { animation: roulette-spin 1.45s cubic-bezier(.16,.77,.29,1) both; }
+  .roulette-animated .roulette-result, .roulette-results-animated { animation: roulette-result-in .2s 1.3s both; }
+}
+@keyframes roulette-spin { from { transform: rotate(calc(var(--roulette-stop) - 1080deg)); } }
+@keyframes roulette-result-in { from { opacity: 0; } to { opacity: 1; } }
+.roulette-wheel-number { position: absolute; inset: 2.5% 0 2.5%; text-align: center; color: #fff; font: 700 clamp(.4rem, 2vw, .68rem)/1 system-ui; transform: rotate(var(--pocket-angle)); }
+.roulette-table { display: grid; gap: 8px; }
+.roulette-number-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.roulette-number-board .green { grid-column: 1 / -1; }
+.roulette-outside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.room .roulette-square { position: relative; display: grid; place-items: center; align-content: center; min-height: 44px; min-width: 0; padding: 2px; color: #fff; font-weight: 800; border: 1px solid #fff5; border-radius: 8px; }
+.room .roulette-square.red { background: var(--roulette-red); }
+.room .roulette-square.black { background: var(--roulette-black); }
+.room .roulette-square.green { background: var(--roulette-green); }
+.room .roulette-square[aria-pressed=true] { outline: 2px solid var(--r-accent); outline-offset: -2px; }
+.roulette-chip { align-self: center; padding: 0 .35em; border-radius: 999px; background: #ffe497; color: #292115; font-size: .75rem; font-weight: 800; }
+.roulette-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.roulette-controls > span { flex: 1 1 auto; }

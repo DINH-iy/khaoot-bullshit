@@ -139,3 +139,10 @@
 @media (prefers-reduced-motion: reduce) { .timeline-playhead { display: none; } }
 .timeline-axis { position: relative; display: flex; justify-content: space-between; font-size: .7rem; color: var(--e-muted); font-variant-numeric: tabular-nums; }
 .timeline-axis-wait { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.phone-menu-editor { display: grid; gap: .7rem; }
+.phone-menu-editor > label {
+  display: grid; grid-template-columns: 2rem minmax(0, 1fr) minmax(6rem, 1fr);
+  align-items: center; gap: .5rem; min-height: 2.25rem;
+}
+.phone-menu-editor .phone-menu-icon { color: var(--e-accent); }
+.phone-menu-editor > label > span { min-width: 0; overflow-wrap: anywhere; }

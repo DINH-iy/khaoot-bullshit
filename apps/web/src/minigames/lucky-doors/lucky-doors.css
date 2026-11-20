@@ -1,0 +1,5 @@
+.mg-doors { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 12px; width: 100%; }
+.room .mg-door { min-height: 9rem; border-radius: calc(var(--r-radius) * .6) calc(var(--r-radius) * .6) 6px 6px; font-size: 1.2rem; font-weight: 800; color: var(--a-text);
+  background: linear-gradient(180deg, var(--a2), color-mix(in srgb, var(--a2) 70%, black)); border: 3px solid color-mix(in srgb, var(--a2) 60%, black); display: grid; place-items: center; gap: 4px; padding: 10px; }
+.mg-doors.revealed .mg-door strong { font-size: 1.8rem; }
+.step-doors { margin: 0; } .mg-door.picked { outline: 3px solid var(--r-accent); }

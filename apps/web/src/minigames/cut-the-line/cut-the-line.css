@@ -1,0 +1,16 @@
+.mg-cut-line .mg-big, .mg-cut-the-line .mg-big, .mg-results .mg-cut-target { font-size: clamp(1.8rem, 7vw, 3.5rem); }
+.mg-cut-line input.mg-cut-range {
+  appearance: none; width: 100%; min-height: 48px; padding: 0; margin: 0; border: 0;
+  background: transparent; cursor: pointer;
+}
+.mg-cut-range:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 3px; }
+.mg-cut-range::-webkit-slider-runnable-track { height: 12px; border-radius: 999px; background: var(--r-muted); }
+.mg-cut-range::-moz-range-track { height: 12px; border-radius: 999px; background: var(--r-muted); }
+.mg-cut-range::-webkit-slider-thumb {
+  appearance: none; width: 14px; height: 34px; margin-top: -11px;
+  border: 2px solid var(--r-text); border-radius: 4px; background: var(--r-accent);
+}
+.mg-cut-range::-moz-range-thumb {
+  box-sizing: border-box; width: 14px; height: 34px;
+  border: 2px solid var(--r-text); border-radius: 4px; background: var(--r-accent);
+}

@@ -15,6 +15,7 @@ function tidy(layer: Presentation): Presentation | undefined {
   const next: Presentation = {};
   if (layer.texts && Object.keys(layer.texts).length) next.texts = layer.texts;
   if (layer.translations && Object.keys(layer.translations).length) next.translations = layer.translations;
+  if (layer.phoneMenuIcons && Object.keys(layer.phoneMenuIcons).length) next.phoneMenuIcons = layer.phoneMenuIcons;
   if (layer.animations && Object.keys(layer.animations).length) next.animations = layer.animations;
   if (layer.theme) {
     const theme = { ...layer.theme }; if (theme.colors && !Object.keys(theme.colors).length) delete theme.colors;

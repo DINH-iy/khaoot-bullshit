@@ -821,6 +821,16 @@
 .scene-preview-window h2 { margin: 0; font-size: 1.25rem; }
 .scene-preview-window .preview { justify-content: center; }
 .scene-preview-window .phone { flex-basis: min(260px, 100%); }
+.scene-preview-window .phone:has(.scene-practice) { flex-basis: min(100%, 350px); }
+.scene-preview-window .phone-screen:has(.scene-practice) { width: 100%; aspect-ratio: auto; }
+.scene-preview-window .tv-screen:has(.scene-practice) { min-height: min(32rem, 55dvh); }
+.scene-preview-window .practice-note { color: var(--e-muted); margin: 0; font-size: .85rem; }
+.practice-parts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .9rem; }
+.scene-practice { display: grid; min-width: 0; gap: 12px; }
+.scene-practice > button { justify-self: start; }
+.scene-practice .practice-input { min-width: 0; padding: 0; border: 0; }
+.scene-practice .practice-input > button { margin-top: 10px; }
+.practice-wheel .wheel-frame { width: min(100%, 18rem); justify-self: center; }
 .youtube-fields, .youtube-times { display: grid; gap: 10px; }
 .youtube-times { grid-template-columns: repeat(auto-fit, minmax(min(100%, 125px), 1fr)); }
 .youtube-fields input { width: 100%; min-width: 0; }
@@ -956,3 +966,9 @@
 .minigame-preview-cue { grid-column: 2; justify-self: start; border-radius: 8px; padding: 6px 12px; color: var(--r-accent-ink); background: var(--r-accent); font-weight: 750; }
 .phone-screen .minigame-preview { grid-template-columns: minmax(0, 1fr); }
 .phone-screen .minigame-preview-cue { grid-column: 1; justify-self: stretch; text-align: center; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .editor :is(.ed-dialog, .game-settings-panel, .history-list, .problems-list),
+  .editor-page :is(.ed-dialog, .game-settings-panel) { animation: editor-panel-enter 150ms ease-out both; }
+  .editor :is(button, .scene-card, .scene-row) { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
+}

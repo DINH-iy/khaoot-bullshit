@@ -1,0 +1,24 @@
+.graph-chart { width: min(100%, 840px); margin-inline: auto; border: 1px solid #ccd4dc; border-radius: 14px; background: #fcfdff; color: #192734; overflow: hidden; }
+.graph-chart svg { display: block; width: 100%; }
+.graph-chart text { fill: #405260; font-size: 11px; }
+.graph-future { fill: #eaf1f7; }
+.graph-grid { stroke: #cbd6e0; }
+.graph-boundary { stroke: #617686; stroke-dasharray: 4 4; }
+.graph-past, .graph-answer, .graph-guess { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.graph-past, .graph-answer { stroke: #182c3c; }
+.graph-answer { stroke-dasharray: 5 4; }
+.graph-guess:not(.graph-winner) { opacity: .8; }
+.graph-winner { stroke-width: 3; }
+.graph-anchor { fill: #fff; stroke: #192734; stroke-width: 2; }
+.graph-label path { fill: none; }
+.graph-label text { font-size: 10px; font-weight: 700; }
+.graph-controller { touch-action: none; }
+.graph-draw-area { cursor: crosshair; }
+.graph-key-cursor { display: none; stroke: #fff; stroke-width: 1; }
+.graph-controller:focus-visible .graph-key-cursor { display: block; }
+.graph-phone { display: grid; gap: .75rem; width: 100%; }
+.graph-phone > p { margin: 0; }
+.graph-phone .actions { justify-content: end; }
+.graph-swatch { display: inline-block; margin-inline-end: .35em; width: .8em; height: .8em; vertical-align: baseline; border: 1px solid currentColor; border-radius: 50%; }
+.graph-reveal-key { margin: 0; text-align: center; }
+.graph-reveal-key::before { content: ''; display: inline-block; width: 1.25em; margin-inline-end: .4em; vertical-align: middle; border-top: 2px dashed currentColor; }

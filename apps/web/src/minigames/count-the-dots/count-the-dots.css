@@ -1,0 +1,12 @@
+.mg-dot-board {
+  position: relative; width: min(100%, 46rem); margin-inline: auto;
+  border: 1px solid var(--r-line); border-radius: var(--r-radius); background: var(--r-card-strong);
+}
+.mg-dot-board > span {
+  position: absolute; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%); background: var(--r-text);
+}
+.mg-dot-form { display: grid; gap: .75rem; width: min(100%, 16rem); margin-inline: auto; text-align: start; }
+.mg-dot-form label { display: grid; gap: .35rem; }
+.mg-dot-form input, .mg-dot-form button { min-height: 44px; }
+.mg-dot-total { font-size: clamp(1.75rem, 7vw, 3.5rem); }

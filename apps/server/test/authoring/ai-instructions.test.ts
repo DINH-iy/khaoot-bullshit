@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ANIMATION_PRESETS, AWARD_RULES, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, THEME_PRESETS, ThemeSchema } from '@party/contracts';
+import { ANIMATION_PRESETS, AWARD_RULES, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MOMENTS, THEME_PRESETS, ThemeSchema } from '@party/contracts';
 
 // The instructions the app copies for an AI ("Copy instructions for an AI") must know every
 // feature an author can use, or AI-made games silently miss them. When a feature is added,
@@ -33,7 +33,7 @@ describe('the instructions for an AI know every feature', () => {
     const fields = Object.keys(ThemeSchema.shape);
     expect(missing(quoted(fields))).toEqual([]);
     expect(missing(quoted(fields.flatMap(field => optionsOf(ThemeSchema.shape[field as keyof typeof ThemeSchema.shape]))))).toEqual([]);
-    expect(missing(quoted(Object.keys(ANIMATION_PRESETS)))).toEqual([]);
+    expect(missing(quoted([...Object.keys(ANIMATION_PRESETS), ...Object.keys(MOMENTS)]))).toEqual([]);
   });
   it('asks the user its questions before writing the game', () => {
     expect(instructions).toMatch(/ask/i);

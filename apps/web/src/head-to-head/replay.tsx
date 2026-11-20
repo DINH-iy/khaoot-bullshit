@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { HeadToHeadReplay } from '@party/contracts';
+import { CREATURE_NAMES } from './creature-board.js';
 import { h } from './h2h.text.js';
 import { PIECES, RPS_ICONS, squaresOf } from './pieces.js';
 
@@ -27,6 +28,20 @@ function draw(ctx: CanvasRenderingContext2D, replay: HeadToHeadReplay, index: nu
     for (const line of [1, 2]) { ctx.beginPath(); ctx.moveTo(line * cell, 10); ctx.lineTo(line * cell, SIZE - 10); ctx.moveTo(10, line * cell); ctx.lineTo(SIZE - 10, line * cell); ctx.stroke(); }
     ctx.font = '700 72px system-ui, sans-serif';
     replay.moves.slice(0, index).forEach((square, move) => { ctx.fillStyle = move % 2 === 0 ? '#ffcf4a' : '#9ad8ff'; ctx.fillText(move % 2 === 0 ? '✕' : '◯', (square % 3 + 0.5) * cell, (Math.floor(square / 3) + 0.5) * cell); });
+    return;
+  }
+  if (replay.game === 'creature-duel') {
+    const frame = replay.frames[index]!;
+    frame.teams.forEach((team, seat) => {
+      const y = 40 + seat * 145;
+      ctx.font = '700 18px system-ui, sans-serif';
+      ctx.fillText(names[seat as 0 | 1], SIZE / 2, y, SIZE - 20);
+      ctx.font = '600 15px system-ui, sans-serif';
+      team.forEach((creature, at) => {
+        const mark = at === frame.active[seat as 0 | 1] ? '● ' : '';
+        ctx.fillText(`${mark}${CREATURE_NAMES[creature.kind]} · ${creature.hp} HP`, SIZE / 2, y + 30 + at * 25, SIZE - 20);
+      });
+    });
     return;
   }
   const frame = replay.frames[index]!; const cell = SIZE / 8;

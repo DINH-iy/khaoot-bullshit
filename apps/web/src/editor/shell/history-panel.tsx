@@ -9,8 +9,8 @@ const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-dig
 interface Entry { label: string; at: number }
 
 /**
- * Your edits in this visit, newest on top (undone ones above "Now", greyed): click one to go back to just
- * after it, or forward again to it; "When you opened the game" undoes everything. The same as pressing
+ * Your edits in this browser, newest on top (undone ones above "Now", greyed): click one to go back to just
+ * after it, or forward again to it; "Before these edits" undoes everything. The same as pressing
  * Undo or Redo that many times, so other people's changes stay. Folded, it is a small "History" button.
  */
 export function HistoryPanel({ steps, disabled, onRestore }: { steps: { undo: Entry[]; redo: Entry[] }; disabled: boolean; onRestore: (kind: 'undo' | 'redo', count: number) => void }) {

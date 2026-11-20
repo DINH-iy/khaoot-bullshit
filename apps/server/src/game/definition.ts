@@ -1,7 +1,7 @@
 import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, isSharedPrediction, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -23,7 +23,7 @@ const SplitSchema = z.discriminatedUnion('kind', [
     .refine(split => split.sizes.filter(size => size === 'rest').length <= 1, 'At most one team takes the rest'),
 ]);
 export const FormationSchema = z.object({
-  split: SplitSchema, formation: z.enum(['random', 'host', 'players']),
+  split: SplitSchema, formation: z.enum(['random', 'skill', 'host', 'players']),
   names: z.array(z.string().trim().min(1).max(30)).max(12).optional(),
 }).strict().superRefine((form, ctx) => {
   if (form.names && (form.names.length < teamCount(form) || new Set(form.names.map(name => name.toLowerCase())).size !== form.names.length)) ctx.addIssue({ code: 'custom', message: 'Give every team a unique name' });
@@ -60,7 +60,7 @@ export const WheelSchema = z.object({
 // All optional, so earlier definitions keep their hash.
 // `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
 // `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
-const look = { mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+const look = { mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An explanation shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   explain: z.object({ text: z.string().trim().min(1).max(1000).optional() }).strict().optional() };
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), resultCards: ResultCardsSchema.optional(), countdownSeconds: z.number().int().min(0).max(15).optional(), ...look };
@@ -139,6 +139,7 @@ export const GameDefinitionSchema = z.object({
   openInvites: z.number().int().min(1).max(MAX_OPEN_INVITES).optional(),
   // The host's quick time button (+30 s by default): how many seconds it adds to a round.
   birthdayVote: z.boolean().optional(),
+  phoneEffects: z.boolean().optional(),
   autoRevealSeconds: AutoRevealSecondsSchema.optional(),
   idleCloseMinutes: IdleCloseMinutesSchema.optional(),
   quickTimeSeconds: z.number().int().min(5).max(600).optional(),
@@ -184,6 +185,9 @@ export const GameDefinitionSchema = z.object({
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'duel' && stage.contest?.kind === 'game' && !parseHeadToHeadSettings(stage.contest.game, stage.contest.settings)) ctx.addIssue({ code: 'custom', message: 'Duel game settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && stage.places && stage.placementMilli) ctx.addIssue({ code: 'custom', message: 'Give the minigame either points per place or places, not both', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'minigame' && stage.game === 'clap-beat' && stage.durationMs !== null && stage.durationMs < CLAP_END_MS) {
+        ctx.addIssue({ code: 'custom', message: 'Clap the beat needs at least 9 seconds', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'durationMs'] });
+      }
       if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-order') {
         const rule = stage.scoring; const keys = stage.input.kind === 'order' ? stage.input.items.map(item => item.key) : [];
@@ -241,6 +245,7 @@ export function minigameRules(stage: MinigameStage): { game: MinigameKey; settin
 export { MINIGAMES };
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {
   if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'duel' || stage.kind === 'teams') throw new GameError('INVALID_STATE');
+  if (stage.kind === 'minigame' && (isSharedPrediction(stage.game) || stage.game === 'draw-the-graph')) return { kind: 'solo' };
   return stage.play ?? definition.play ?? { kind: 'solo' };
 }
 /** Points by place for a stage that has them (fastest correct, most votes, host places), or null. */

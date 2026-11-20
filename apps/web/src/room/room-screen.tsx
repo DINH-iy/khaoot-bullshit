@@ -1,7 +1,7 @@
-import { Countdown } from '../minigames/controllers.js';
+import { Countdown } from '../minigames/shared/countdown.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
-import { answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
+import { isSharedPrediction, answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { BigCode, CopyIcon, JoinLink, JoinQr, publicJoinUrl } from './join-qr.js';
@@ -17,7 +17,7 @@ import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
 import { ExplainPanel } from './explain-panel.js';
 import { DuelPanel } from './duel.js';
-import { MinigameStage } from '../minigames/minigame-stage.js';
+import { MinigameStage } from '../minigames/shared/minigame-stage.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
@@ -35,7 +35,8 @@ import { JoinOption } from './join-option.js';
 import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
 import './room.css';
 import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
-import { useSiteTheme } from '../presentation/site-look.js';
+import { useSiteThemeState } from '../presentation/site-look.js';
+import { LeaveRoom } from '../room-extras/leave-room.js';
 import { SceneComposition } from '../presentation/scene-composition.js';
 import { StageMedia, StageYouTube } from './stage-media.js';
 import { MusicPlayer } from './music-player.js';
@@ -44,7 +45,6 @@ import { useLanguage } from '../i18n/language.js';
 import { localizeStage } from '../presentation/scene-translations.js';
 import { LanguagePicker } from '../i18n/language-picker.js';
 import { rich } from '../i18n/rich.js';
-import { EXTRAS_TEXTS } from './extras.text.js';
 import { PHONE_TEXTS } from './phone.text.js';
 import { ROOM_TEXTS } from './room.text.js';
 // The room's own words in this device's language (the game's texts are `t`, the host's controls `h`).
@@ -220,11 +220,18 @@ export function RoomScreen() {
     if (value) command('submission.submit', { stageRunId: stage.id, value });
   }, [timeUp]);
   // The game's look: from the room once joined, or (on the join screen) the look of the room whose code was entered.
-  const [joinLook, setJoinLook] = useState<{ title: string; presentation: LookInput; signup?: boolean; expected?: { id: string; name: string }[] } | null>(null);
+  const [roomLook, setRoomLook] = useState<{ code: string; look: typeof RoomLookSchema['_output'] | null }>();
+  const firstCode = useRef(/^[A-Z2-9]{6}$/.test(roomCode) ? roomCode : null);
+  const joinLook = roomLook?.code === roomCode ? roomLook.look : null;
   useEffect(() => {
-    if (sessionId) return; const code = roomCode.trim().toUpperCase(); if (!/^[A-Z2-9]{6}$/.test(code)) { setJoinLook(null); return; }
+    if (sessionId || !/^[A-Z2-9]{6}$/.test(roomCode)) return;
+    const code = roomCode;
     let mounted = true;
-    const fetchLook = () => { void roomApi(`/api/rooms/look/${code}`).then(data => { if (mounted) setJoinLook(RoomLookSchema.parse(data) as { title: string; presentation: LookInput; signup?: boolean; expected?: { id: string; name: string }[] }); }).catch(() => { if (mounted) setJoinLook(null); }); };
+    const fetchLook = () => { void roomApi(`/api/rooms/look/${code}`).then(data => {
+      if (mounted) { firstCode.current = null; setRoomLook({ code, look: RoomLookSchema.safeParse(data).data ?? null }); }
+    }).catch(() => {
+      if (mounted) { firstCode.current = null; setRoomLook(previous => previous?.code === code ? previous : { code, look: null }); }
+    }); };
     // Looked at again now and then: the host may add people (or allow accounts) while someone waits on this screen.
     fetchLook(); const again = setInterval(fetchLook, 10_000);
     return () => { mounted = false; clearInterval(again); };
@@ -232,7 +239,8 @@ export function RoomScreen() {
   // Before a room is known, the join screen wears the site's look (Admin → Join screen); a room code typed in
   // shows that room's game look, and in the room the game's look applies.
   // The arcade wears the site's look too: an arcade round's own look (its texts) goes on top of it.
-  const siteTheme = useSiteTheme(); const presentation = state?.view.presentation; const inArcade = Boolean(state?.arcade);
+  const siteLook = useSiteThemeState();
+  const siteTheme = siteLook?.theme; const presentation = state?.view.presentation; const inArcade = Boolean(state?.arcade);
   const lookInput = useMemo<LookInput | undefined>(() => {
     if (presentation) return inArcade && siteTheme ? { ...presentation, themes: [siteTheme, ...(presentation.themes ?? [])] } : presentation;
     return joinLook?.presentation ?? (siteTheme ? { themes: [siteTheme] } : undefined);
@@ -244,6 +252,25 @@ export function RoomScreen() {
   // Animation moments.
   const stageRef = useRef<HTMLElement>(null); const answersRef = useRef<HTMLDivElement>(null); const savedRef = useRef<HTMLParagraphElement>(null);
   const timerRef = useRef<HTMLDivElement>(null); const resultsRef = useRef<HTMLDivElement>(null); const scoresRef = useRef<HTMLDivElement>(null); const playersRef = useRef<HTMLUListElement>(null);
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const teamMomentRef = useRef<HTMLDivElement>(null);
+  const explanationRef = useRef<HTMLDivElement>(null);
+  const ballotRef = useRef<HTMLDivElement>(null);
+  const miniRef = useRef<HTMLDivElement>(null);
+  const routeRef = useRef<HTMLDivElement>(null);
+  const duelRef = useRef<HTMLDivElement>(null);
+  const finaleRef = useRef<HTMLDivElement>(null);
+  const choosingTeams = Boolean(stage?.teams?.forming);
+  const explainingScene = !choosingTeams && Boolean(stage?.explain);
+  const showingScene = !choosingTeams && !explainingScene;
+  useMoment(mediaRef, 'mediaEnter', showingScene && (stage?.media || stage?.youtube) ? stage.id : null, {}, look);
+  useMoment(teamMomentRef, 'teamsEnter', stage?.teams ? `${stage.id}:${choosingTeams}` : null, {}, look);
+  useMoment(explanationRef, 'explanationEnter', explainingScene ? stage?.id : null, {}, look);
+  useMoment(ballotRef, 'voteEnter', showingScene && stage?.kind === 'vote' && !stage.revealed ? stage.id : null, { staggerChildren: true }, look);
+  useMoment(miniRef, 'minigameEnter', showingScene && stage?.kind === 'minigame' && !stage.revealed ? stage.id : null, {}, look);
+  useMoment(routeRef, 'routeEnter', showingScene && stage?.kind === 'route' ? stage.id : null, {}, look);
+  useMoment(duelRef, 'duelEnter', showingScene && stage?.kind === 'duel' && stage.status === 'CLOSED' ? stage.id : null, {}, look);
+  useMoment(finaleRef, 'finaleEnter', state?.view.status === 'FINISHED' ? state.view.sessionId : null, {}, look);
   useMoment(stageRef, stage?.kind === 'info' ? 'cutscene' : 'sceneEnter', stage?.id, {}, look);
   useMoment(answersRef, 'answersEnter', stage?.status === 'ACTIVE' && stage.input ? stage.id : null, { staggerChildren: true }, look);
   useMoment(savedRef, 'answerSaved', state?.view.ownSubmission?.id, {}, look);
@@ -252,6 +279,8 @@ export function RoomScreen() {
   useMoment(scoresRef, 'scoreboard', stage?.scoreboard ? stage.id : state?.view.status === 'FINISHED' ? 'finished' : null, { staggerChildren: true }, look);
   useMoment(playersRef, 'lobbyJoin', state?.view.status === 'LOBBY' && state.players.length ? state.players.length : null, {}, look);
 
+  const waitingForRoomLook = firstCode.current === roomCode && roomLook?.code !== roomCode;
+  if (!sessionId && (waitingForRoomLook || (!joinLook && !siteLook))) return <main className="join-startup" aria-busy="true"><p role="status">{r('connecting')}</p></main>;
   if (!sessionId && reclaiming) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">{r('joinGame')}</h1><div className="join-card"><SeatReclaim roomCode={roomCode.trim().toUpperCase()} onCancel={() => setReclaiming(false)} onJoined={id => { history.replaceState(null, '', `/?room=${id}`); setReady(true); setSessionId(id); }} /></div></main>;
   if (!sessionId && newKey) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">{r('yourCode')}</h1><div className="join-card"><NewKeyCard name={newKey.name} personalKey={newKey.key} busy={busy} onContinue={() => { void join(newKey.name); }} />{error && <p role="alert" className="join-error">{error}</p>}</div></main>;
   if (!sessionId) return <LookContext.Provider value={look}><JoinScreen style={lookStyle} className={lookClass} title={joinLook?.title ?? null} roomCode={roomCode} setRoomCode={setRoomCode} name={name} setName={setName} busy={busy} error={error} onJoin={() => { void join(); }} onReclaim={() => { setError(''); setReclaiming(true); }}
@@ -302,6 +331,7 @@ export function RoomScreen() {
   // Scores: the host always; phones and the shared screen when the host allows it, and always at a scoreboard scene and the end.
   const scoreMoment = state?.view.status === 'FINISHED' || (stage?.kind === 'scoreboard' && stage.status === 'ACTIVE');
   const canSeeScores = Boolean(state && (host || state.settings.showScores || scoreMoment));
+  const scoreBubbles = scoreMoment && canSeeScores && (state?.view.status === 'FINISHED' || stage?.scoreboard?.show !== 'teams');
   const ownPoints = role === 'player' && stage?.revealed && state ? stage.reveal?.awards.find(award => award.playerId === state.selfPlayerId)?.amountMilli ?? null : null;
   const nextAlso = running && stage && stage.status === 'CLOSED' && primary?.label !== t('host.next') && (stage.kind !== 'route' || stage.route?.decision);
 
@@ -366,32 +396,37 @@ export function RoomScreen() {
               </div></>}
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}`} aria-labelledby="stage-heading">
-          <SceneComposition layout={stage.mediaLayout} media={!forming && !explaining && (
-            stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} />
+          <SceneComposition layout={stage.mediaLayout} media={showingScene && (stage.youtube || stage.media) ? <div ref={mediaRef}>
+            {stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} />
               : stage.media ? <StageMedia key={stage.id} media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} /> : null
-          )}>
+            }
+          </div> : null}>
             {stage.info && <p className="stage-banner">{stage.info.title}</p>}
             {/* While teams are picked, the round's question waits: one thing at a time. */}
             <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard') : stage.prompt)}</h2>
             {stage.info && <p className="info-text">{stage.prompt}</p>}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
-          <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
-          <TeamSummary state={state} stage={stage} />
-          {explaining && <ExplainPanel state={state} stage={stage} disabled={disabled} send={command} />}
+          {stage.teams && <div ref={teamMomentRef}>
+            <TeamForming state={state} stage={stage} disabled={disabled} send={command} />
+            <TeamSummary state={state} stage={stage} />
+          </div>}
+          {explaining && <div ref={explanationRef}><ExplainPanel state={state} stage={stage} disabled={disabled} send={command} /></div>}
           {!forming && !explaining && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
-          {stage.kind === 'vote' && !stage.revealed && <VoteBallot key={stage.id} state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
-            onVote={value => command('submission.submit', { stageRunId: stage.id, value })} />}
+          {stage.kind === 'vote' && !stage.revealed && <div ref={ballotRef}><VoteBallot key={stage.id} state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
+            onVote={value => command('submission.submit', { stageRunId: stage.id, value })} /></div>}
           {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
           {host && stage.kind === 'challenge' && stage.status === 'CLOSED' && !stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
           {stage.countdownUntil && role !== 'player' && <Countdown startsAt={stage.countdownUntil} offset={room.clockOffset}>{null}</Countdown>}
-          {stage.kind === 'minigame' && <MinigameStage state={state} stage={stage} offset={room.clockOffset} disabled={disabled}
+          {stage.kind === 'minigame' && <div ref={miniRef}><MinigameStage state={state} stage={stage} offset={room.clockOffset}
+            disabled={disabled || (timeUp && (stage.minigame?.game === 'cut-the-line' || stage.minigame?.game === 'match-the-angle'
+              || stage.minigame?.game === 'count-the-dots' || stage.minigame?.game === 'draw-the-graph' || isSharedPrediction(stage.minigame?.game ?? '')))}
             canPlay={role === 'player' && !answerBlock && stage.status === 'ACTIVE' && running}
             onResult={result => command('submission.submit', { stageRunId: stage.id, value: { kind: 'minigame', ...result } })}
             live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })}
-            onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} />}
-          <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />
-          <DuelPanel state={state} stage={stage} disabled={disabled} send={command} />
+            onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} /></div>}
+          {stage.kind === 'route' && <div ref={routeRef}><RouteChoice state={state} stage={stage} disabled={disabled} send={command} /></div>}
+          {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel state={state} stage={stage} disabled={disabled} send={command} /></div>}
           {stage.kind !== 'route' && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })} disabled={disabled} /></div>}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>{r('shownWithoutNames')}</p>}
           {stage.kind === 'minigame' ? (role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p> : null)
@@ -407,10 +442,11 @@ export function RoomScreen() {
             : role === 'player' ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly ? '' : t('wait.screen')}</p> : null}</div></>}
         </section>}
         {role !== 'display' && <WheelBadge wheel={state.view.wheel} />}
-        {state.view.status === 'FINISHED' && <FinaleShow state={state} />}
+        {state.view.status === 'FINISHED' && <div ref={finaleRef}><FinaleShow state={state} /></div>}
         {/* Phones keep the scores one tap away (the dock). The shared screen shows them with the results of a round, at scoreboard scenes and at the end: nothing it does not need. */}
-        {scoreMoment && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command} /></div>}
-        {state.view.status === 'FINISHED' && role === 'player' && !state.arcade && <div className="actions"><a className="room-exit" href="/">{translate(EXTRAS_TEXTS, 'leaveRoom')}</a></div>}
+        {scoreMoment && canSeeScores && <div ref={scoresRef}><Scoreboard state={state} disabled={disabled} send={command}
+          reactions={scoreBubbles && role !== 'player' && state.settings.reactions ? room.reactions : undefined} /></div>}
+        {state.view.status === 'FINISHED' && role === 'player' && !state.arcade && <div className="actions"><LeaveRoom /></div>}
       </div>
 
       {host && <aside className="room-controls" aria-label={h('hostControls')}>
@@ -484,12 +520,12 @@ export function RoomScreen() {
     {/* The music plays where sound plays: the shared screen, or the host's screen without one. */}
     {state?.view.music && state.settings.music && (role === 'display' || (role === 'host' && !state.displayConnected)) && <MusicPlayer music={state.view.music} volume={state.settings.musicVolume / 100} />}
     {state && <BreakOverlay state={state} host={host} disabled={disabled} onContinue={() => command('session.resume')} />}
-    {state && role === 'player' && <PhoneDock state={state} challengeTick={room.challengeTick} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
+    {state && role === 'player' && <PhoneDock key={`${state.view.sessionId}:${state.selfPlayerId}`} state={state} challengeTick={room.challengeTick} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
       onBreak={vote => { void roomApi(`/api/rooms/${sessionId}/break`, { vote }).catch(() => setError(r('voteFailed'))); }}
       scores={<Scoreboard state={state} disabled={disabled} send={command} />} />}
-    {state && role === 'player' && <PointsCelebration roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
+    {state && role === 'player' && <PointsCelebration customizable={state.view.phoneEffects === true} roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
     {state && role === 'display' && canSeeScores && !scoreMoment && state.view.status !== 'LOBBY' && stage?.revealed && <FloatingScores leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
-    {state && role !== 'player' && state.settings.reactions && <ReactionsOverlay state={state} store={room.reactions} />}
+    {state && role !== 'player' && state.settings.reactions && !scoreBubbles && <ReactionsOverlay state={state} store={room.reactions} />}
   </main></RoomSessionContext.Provider></LookContext.Provider>;
 }
 

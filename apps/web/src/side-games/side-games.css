@@ -18,11 +18,19 @@
 .odds { font-size: .9rem; color: var(--r-muted); } .odds summary { cursor: pointer; font-weight: 700; } .odds ul { margin: 8px 0; padding-left: 18px; } .odds li { margin: 0 0 4px; }
 
 /* Slot machine */
-.reels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; border-radius: 18px; background: linear-gradient(180deg, #1b1236, #3b1f6e); box-shadow: inset 0 0 0 3px var(--r-accent); }
-.reel { display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; background: #fff; font-size: clamp(2rem, 12vw, 3.2rem); }
-.reels.spinning .reel { animation: reel-spin .18s linear infinite; }
-.reels.spinning .reel:nth-child(2) { animation-duration: .22s; } .reels.spinning .reel:nth-child(3) { animation-duration: .26s; }
-@keyframes reel-spin { from { transform: translateY(-8%); filter: blur(1px); } to { transform: translateY(8%); filter: blur(2px); } }
+.reels { --reel-cell: clamp(46px, 15vw, 76px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 16px; background: #22173b; box-shadow: inset 0 0 0 2px var(--r-accent); }
+.reel { position: relative; height: calc(var(--reel-cell) * 1.65); overflow: hidden; border-radius: 8px; background: #fdf5e3; font-size: clamp(1.8rem, 9vw, 2.9rem); }
+.reel::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#27184499, transparent 35% 65%, #27184499); box-shadow: inset 0 0 0 1px #27184455; }
+.reel-strip { position: absolute; inset: calc(50% - var(--reel-cell) * 1.5) 0 auto; }
+.reel-strip.rolling { animation: reel-turn 420ms linear infinite; }
+.reel-strip.landing { animation: reel-turn var(--reel-duration) cubic-bezier(.12,.68,.24,1) both; }
+.reel-symbol { display: grid; place-items: center; height: var(--reel-cell); border-bottom: 1px solid #d6cab9; }
+.reels-win .reel { outline: 2px solid var(--r-accent); }
+@keyframes reel-turn { to { transform: translateY(calc(-1 * var(--reel-steps) * var(--reel-cell))); } }
+@media (prefers-reduced-motion: reduce) {
+  .reel-strip.rolling { animation: none; }
+  .reel-strip.landing { animation: none; transform: translateY(calc(-1 * var(--reel-steps) * var(--reel-cell))); }
+}
 
 /* Blackjack */
 .table { display: grid; gap: 12px; padding: 14px; border-radius: 18px; background: radial-gradient(circle at 50% 30%, #1f7a4a, #0e4a2c); color: #fff; }
@@ -64,20 +72,20 @@
 /* Opening a pack (packs.tsx), like trading cards: a foil pack torn open, then the cards turned over one by one. */
 .pack-stage { display: grid; justify-items: center; gap: 12px; padding: 8px 0 4px; }
 .pack-hint { margin: 0; font-size: .9rem; color: var(--r-muted); text-align: center; min-height: 1.3em; }
-.room .foil-pack { position: relative; display: block; width: 190px; height: 260px; min-height: 0; padding: 0; border: 0; border-radius: 16px; background: none; cursor: pointer; animation: pack-wobble 2.4s ease-in-out infinite; }
+.room .foil-pack { position: relative; display: block; width: 190px; height: 260px; min-height: 0; padding: 0; border: 0; border-radius: 16px; background: none; cursor: grab; touch-action: none; user-select: none; }
 .foil-top, .foil-body { position: absolute; left: 0; right: 0; border-radius: 16px; background: linear-gradient(135deg, #6d3fd6, #c2185b 45%, #ffcf4a 70%, #6d3fd6); box-shadow: 0 10px 30px rgb(0 0 0 / .4); }
 .foil-top { top: 0; height: 40px; border-radius: 16px 16px 4px 4px; background-size: 200% 200%; filter: brightness(1.1);
-  -webkit-mask: linear-gradient(#000, #000); clip-path: polygon(0 0, 100% 0, 100% 78%, 92% 100%, 84% 80%, 76% 100%, 68% 80%, 60% 100%, 52% 80%, 44% 100%, 36% 80%, 28% 100%, 20% 80%, 12% 100%, 4% 80%, 0 100%); }
+  display: grid; place-items: center; color: #fff; font-weight: 800; letter-spacing: .16em; z-index: 1;
+  transform: translate(var(--foil-x, 0px), var(--foil-y, 0px)); -webkit-mask: linear-gradient(#000, #000); clip-path: polygon(0 0, 100% 0, 100% 78%, 92% 100%, 84% 80%, 76% 100%, 68% 80%, 60% 100%, 52% 80%, 44% 100%, 36% 80%, 28% 100%, 20% 80%, 12% 100%, 4% 80%, 0 100%); }
 .foil-body { top: 34px; bottom: 0; display: grid; place-content: center; justify-items: center; gap: 4px; overflow: hidden; border-radius: 4px 4px 16px 16px; color: #fff; text-shadow: 0 2px 8px rgb(0 0 0 / .4); }
 .foil-body strong { font-size: 1.5rem; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; } .foil-body small { font-weight: 700; opacity: .9; }
 .foil-shine { position: absolute; inset: -40%; background: linear-gradient(105deg, transparent 40%, rgb(255 255 255 / .55) 50%, transparent 60%); animation: foil-shine 2.6s ease-in-out infinite; }
 .foil-pack.tearing { animation: pack-shake .25s ease-in-out 2; }
 .foil-pack.tearing .foil-top { animation: foil-tear .55s .2s cubic-bezier(.3, .7, .4, 1) forwards; }
 .foil-pack.tearing .foil-body { animation: foil-drop .5s .3s ease-in forwards; }
-@keyframes pack-wobble { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) translateY(-4px); } }
 @keyframes pack-shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
 @keyframes foil-shine { from { transform: translateX(-60%); } to { transform: translateX(60%); } }
-@keyframes foil-tear { to { transform: translate(120px, -90px) rotate(28deg); opacity: 0; } }
+@keyframes foil-tear { from { transform: translate(var(--foil-x, 0px), var(--foil-y, 0px)); } to { transform: translate(120px, -90px) rotate(28deg); opacity: 0; } }
 @keyframes foil-drop { to { transform: translateY(60px); opacity: 0; } }
 
 /* The stack: the current card big and turned over, earlier ones small above, the rest face down behind. */
@@ -115,12 +123,8 @@
   .pack-card .card-front::after, .pack-card.rarity-epic .card-front, .card-rays, .card-burst i, .pack-row li { animation: none !important; }
 }
 
-/* The slim top line: the game switcher (a small segmented control) and the chips. */
+/* The top line holds the game switcher and chip balance. */
 .side-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.side-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--r-card-strong); }
-.room .side-tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; min-width: 40px; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--r-text); font-size: .9rem; font-weight: 800; justify-content: center; }
-.side-tabs button > span:first-child { font-size: 1.2rem; }
-.room .side-tabs button[aria-selected=true] { background: var(--r-accent); color: var(--r-accent-ink); border: 0; }
 .chip-pill { display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 6px 10px; border-radius: 999px; background: var(--r-card-strong); font-size: .85rem; white-space: nowrap; }
 .room .side-games .sheet-title { font-size: .8rem; color: var(--r-muted); }
 .chip-pill.quiet { color: var(--r-muted); font-size: .82rem; font-weight: 700; }
@@ -173,18 +177,14 @@
 @media (prefers-reduced-motion: reduce) { .god-pack-banner { animation: none; } }
 
 /* Fits a phone: the switcher and chips shrink, the chips go to the next line when there is no room. */
-.side-games, .side-games > *, #side-panel { min-width: 0; }
-.side-tabs { flex: 0 1 auto; max-width: 100%; }
-.side-tab-name { white-space: nowrap; }
-.side-top-end { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
-.room .side-info-button { display: inline-grid; place-items: center; flex: none; width: 38px; height: 38px; min-height: 0; padding: 0; border-radius: 12px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-muted); font-size: 1.1rem; }
+.side-games, .side-games > * { min-width: 0; }
+.side-top .chip-pill { margin-left: auto; }
+.room .side-info-button { display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 12px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-muted); font-size: 1.1rem; }
 .room .side-info-button[aria-expanded=true] { border-color: var(--r-accent); color: var(--r-accent); }
 .side-info { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--r-card-strong); font-size: .9rem; line-height: 1.45; }
 .side-info p { margin: 0; }
 .slot-pays { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
 .slot-pays li { margin: 0; display: flex; justify-content: space-between; gap: 8px; align-items: center; } .slot-pays li > span:first-child { white-space: nowrap; letter-spacing: -.1em; }
-.room .side-tabs button { min-width: 44px; padding: 0; }
-.side-top { flex-wrap: nowrap; }
 /* The (i): small blocks with icons and numbers. */
 .side-info { gap: 12px; }
 .side-info section { display: grid; gap: 6px; }
@@ -205,18 +205,11 @@
 .pack-set s { opacity: .7; }
 /* An item's uploaded picture: the size of its emoji (1em square), rounded a little. */
 .item-art { display: inline-block; width: 1em; height: 1em; object-fit: cover; border-radius: .14em; vertical-align: middle; }
-/* The game switcher: one button with the current game; it opens a grid of every game (there will be many). */
-.side-picker { min-width: 0; }
-.room button.side-picker-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 10px; border-radius: 999px; border: 0; background: var(--r-card-strong); color: var(--r-text); font-weight: 800; max-width: 100%; }
-.side-picker-button > span:first-child { font-size: 1.3rem; }
+/* The picker sits in the sheet's scrollable body. */
+.room button.side-picker-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 8px; border-radius: 999px; border: 0; background: var(--r-card-strong); color: var(--r-text); font-weight: 800; max-width: 100%; }
+.side-picker-button > .phone-menu-icon { flex: none; }
 .side-picker-caret { font-size: .75em; color: var(--r-muted); }
-.side-picker-grid { list-style: none; margin: 0; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; border-radius: 16px; background: var(--r-card-strong); max-height: 50dvh; overflow: auto; }
+.side-picker-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 124px), 1fr)); gap: 8px; }
 .side-picker-grid li { margin: 0; }
-.room .side-picker-grid button { width: 100%; display: grid; justify-items: center; gap: 4px; min-height: 84px; padding: 10px 6px; border-radius: 12px; border: 2px solid transparent; background: var(--r-card); color: var(--r-text); font-size: .85rem; font-weight: 700; text-align: center; }
+.room .side-picker-grid button { width: 100%; height: 100%; display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 84px; padding: 10px 6px; border-radius: 12px; border: 1px solid var(--r-line); background: var(--r-card); color: var(--r-text); font-size: .85rem; font-weight: 700; text-align: center; }
 .room .side-picker-grid button[aria-current=true] { border-color: var(--r-accent); }
-.side-picker-icon { font-size: 1.8rem; line-height: 1; }
-.room .side-picker-grid button > span:last-child { overflow-wrap: normal; word-break: normal; hyphens: manual; font-size: .82rem; }
-.side-picker-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
-/* The grid of games floats over the sheet, under the switcher. */
-.side-top { position: relative; }
-.side-picker-grid { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30; box-shadow: 0 16px 40px rgb(0 0 0 / .45); border: 1px solid var(--r-line); }

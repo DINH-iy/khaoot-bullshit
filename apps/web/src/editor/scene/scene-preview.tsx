@@ -1,8 +1,10 @@
+import { GraphChart } from '../../minigames/draw-the-graph/graph-chart.js';
+import { SpeedRunBoard } from '../../minigames/speed-run/speed-run.js';
 import { useEffect, useId, useRef, useState } from 'react';
-import { MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
+import { GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
 import { useLanguage } from '../../i18n/language.js';
 import { useTexts } from '../../i18n/texts.js';
-import { buildLook, themeClass, themeStyle } from '../../presentation/look.js';
+import { buildLook, LookContext, themeClass, themeStyle } from '../../presentation/look.js';
 import { FaIcon } from '../../presentation/icons.js';
 import { gameName } from '../../presentation/catalog.text.js';
 import { Mark } from '../../presentation/mark-icons.js';
@@ -15,6 +17,9 @@ import { optionsOf, quizKind, uniqueKey, type Definition, type Node, type Stage 
 import { FIELDS_TEXTS } from './fields.text.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
+import { MinigamePractice } from './minigame-practice.js';
+import { ScenePractice } from './scene-practice.js';
+import { PRACTICE_TEXTS } from './scene-practice.text.js';
 
 type Device = 'sharedScreen' | 'phone';
 interface PreviewProps { definition: Definition; node: Node; index: number }
@@ -24,10 +29,13 @@ interface CanvasControls {
   editMedia: () => void;
 }
 
-export function ScenePreview({ definition, node, index, device, canvas }: PreviewProps & { device: Device; canvas?: CanvasControls | undefined }) {
+export function ScenePreview({ definition, node, index, device, canvas, interactive, onTry }: PreviewProps & {
+  device: Device; canvas?: CanvasControls | undefined; interactive?: boolean; onTry?: () => void;
+}) {
   const t = useTexts(FIELDS_TEXTS);
   const fields = useTexts(INSPECTOR_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
+  const practiceText = useTexts(PRACTICE_TEXTS);
   const radioGroup = useId();
   const language = useLanguage();
   const stage = node.stages[index]!;
@@ -64,7 +72,15 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
   const sharedMedia = contentMedia('display');
   const game = stage['game'];
   const minigame = stage.kind === 'minigame' && typeof game === 'string' && isMinigameKey(game) ? game : undefined;
-  const minigameCard = minigame ? <MinigamePreview stage={stage} game={minigame} text={look.text} /> : null;
+  const minigameIntro = minigame ? <MinigamePreview stage={stage} game={minigame} text={look.text} /> : null;
+  const practice = interactive ? <LookContext.Provider value={look}>
+    {minigame === 'count-the-dots' && device === 'phone' ? minigameIntro
+      : minigame ? <MinigamePractice stage={stage} game={minigame} intro={minigameIntro} /> : <ScenePractice definition={definition} stage={stage} options={options} />}
+  </LookContext.Provider> : null;
+  const minigameCard = minigame && !interactive ? <>
+    {minigameIntro}
+    {onTry && <button type="button" className="canvas-media-button" aria-haspopup="dialog" onClick={onTry}>{practiceText('tryMinigame')}</button>}
+  </> : null;
   return <div className={canvas ? 'preview scene-canvas' : 'preview'}>
     {device !== 'phone' && <figure className="tv"><figcaption>{t('sharedScreen')}</figcaption>
       <div className={`tv-screen room room-display ${classes}`} style={style}>
@@ -76,9 +92,10 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
               value={prompt} readOnly={canvas.readOnly} maxLength={2000} onChange={event => canvas.edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} />
           </div> : <p className="tv-prompt">{prompt}</p>}
         </SceneComposition>
-        {timer && <p className="timer">{timer}</p>}
+        {!interactive && timer && <p className="timer">{timer}</p>}
         {minigameCard}
-        {options.length > 0 && <ul className={`${canvas ? 'tv-options' : 'options-board'}${ordered || (canvas && input?.layout === 'list') ? ' order' : ''}`}
+        {practice}
+        {!interactive && options.length > 0 && <ul className={`${canvas ? 'tv-options' : 'options-board'}${ordered || (canvas && input?.layout === 'list') ? ' order' : ''}`}
           style={canvas ? undefined : answerFit(options.map(option => option.label))}>{options.map((option, position) => {
           const mark = ordered ? String(position + 1) : answerMark(theme, position, options.length, stage.kind === 'route');
           return <li key={option.key} className={canvas && choices ? 'canvas-answer' : undefined}
@@ -102,8 +119,10 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
           <p className="phone-prompt">{label}</p>
           {stage.kind === 'info' && <p className="phone-hint">{prompt}</p>}
         </SceneComposition>
-        {timer && <p className="timer">{timer}</p>}
-        {minigameCard ?? (['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && !ordered
+        {!interactive && timer && <p className="timer">{timer}</p>}
+        {minigameCard}
+        {practice}
+        {!interactive && !minigameCard && (['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && !ordered
           ? (input?.layout === 'tiles' || stage.kind === 'route') ? <fieldset className="tiles" style={answerFit(options.map(option => option.label))}>
             <legend>{look.text('answer.legend')}</legend>
             {options.map((option, index) => {
@@ -118,16 +137,18 @@ export function ScenePreview({ definition, node, index, device, canvas }: Previe
 
 function MinigamePreview({ stage, game, text }: { stage: Stage; game: keyof typeof MINIGAMES; text: ReturnType<typeof buildLook>['text'] }) {
   const t = useTexts(FIELDS_TEXTS);
-  const settings = stage['settings'] as { targetMs?: number } | undefined;
+  const settings = stage['settings'] as { targetMs?: number; course?: string[] } | undefined;
   const explanation = stage['explain'] as { text?: string } | undefined;
   const target = game === 'stop-clock' ? ((settings?.targetMs ?? MINIGAMES['stop-clock'].defaults.targetMs) / 1000).toLocaleString() : null;
   const cue = game === 'stop-clock' ? text('minigame.stop') : game === 'reaction' ? text('minigame.go') : game === 'lucky-doors' ? text('minigame.pickDoor') : null;
   return <div className="minigame-preview">
-    <div className={`minigame-preview-symbol game-${game}`} aria-hidden="true">
+    {game === 'speed-run' ? <SpeedRunBoard {...(settings?.course ? { course: settings.course } : {})} />
+      : game === 'draw-the-graph' ? <GraphChart chart={GraphSettingsSchema.safeParse(settings).data?.graph ?? SAMPLE_GRAPH} />
+      : <div className={`minigame-preview-symbol game-${game}`} aria-hidden="true">
       {game === 'stop-clock' ? <FaIcon name="stopwatch" /> : game === 'perfect-circle' ? '◯'
         : game === 'relay-drawing' ? '✎' : game === 'lucky-doors' ? '▮ ▮ ▮' : game === 'majority' ? '← →'
-        : game === 'bus' ? '♠ ♥' : <FaIcon name="bolt" />}
-    </div>
+        : game === 'cut-the-line' ? '━╋━━' : game === 'match-the-angle' ? '∠' : game === 'count-the-dots' ? '•••' : game === 'red-or-black-roulette' ? '◉' : game === 'bus' ? '♠ ♥' : <FaIcon name="bolt" />}
+    </div>}
     <div className="minigame-preview-copy">
       <h3>{gameName(game)}</h3>
       <p>{explanation?.text || text(howToPlayKey(game))}</p>
@@ -140,13 +161,17 @@ function MinigamePreview({ stage, game, text }: { stage: Stage; game: keyof type
 export function ScenePreviewDialog({ onClose, initialDevice, ...preview }: PreviewProps & { initialDevice: Device; onClose: () => void }) {
   const t = useTexts(FIELDS_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
+  const practice = useTexts(PRACTICE_TEXTS);
   const [device, setDevice] = useState(initialDevice);
+  const [part, setPart] = useState(preview.index);
+  const index = Math.min(part, preview.node.stages.length - 1);
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    dialog.current?.showModal();
-    return () => previous?.focus();
+    const element = dialog.current;
+    element?.showModal();
+    return () => { element?.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={`scene-preview-dialog${device === 'phone' ? ' phone-preview-dialog' : ''}`} aria-labelledby={title}
     onCancel={event => { event.preventDefault(); onClose(); }}
@@ -158,7 +183,13 @@ export function ScenePreviewDialog({ onClose, initialDevice, ...preview }: Previ
       <div className="segmented" role="group" aria-label={labels('devices')}>
         {(['sharedScreen', 'phone'] as const).map(choice => <button key={choice} type="button" aria-pressed={device === choice} onClick={() => setDevice(choice)}>{t(choice)}</button>)}
       </div>
-      <ScenePreview {...preview} device={device} />
+      <p className="practice-note">{practice('practice')}</p>
+      {preview.node.stages.length > 1 && <div className="practice-parts">
+        <button type="button" disabled={index === 0} onClick={() => setPart(index - 1)}>{practice('previous')}</button>
+        <span>{practice('part', { part: index + 1, total: preview.node.stages.length })}</span>
+        <button type="button" disabled={index + 1 >= preview.node.stages.length} onClick={() => setPart(index + 1)}>{practice('next')}</button>
+      </div>}
+      <ScenePreview key={`${preview.node.key}:${preview.node.stages[index]?.key}`} {...preview} index={index} device={device} interactive />
     </div>
   </dialog>;
 }

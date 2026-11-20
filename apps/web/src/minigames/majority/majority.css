@@ -1,0 +1,2 @@
+.side-choice { display: inline-flex; align-items: center; gap: 10px; } .side-choice .mark-icon { width: 1em; height: 1em; }
+.step-chosen { color: var(--r-muted); } .step-chosen.yes { color: var(--r-ok); font-weight: 800; }

@@ -35,7 +35,7 @@ export function GameMusicFields({ definition, onChange }: { definition: Definiti
   // The standard songs (DEFAULT_SONGS) that this server's library has: put on the server by `npm run music:defaults`.
   const addStandard = () => { setNote(''); void roomApi('/api/host/media').then(data => {
     const there = new Set(MediaLibrarySchema.parse(data).items.map(item => item.id));
-    const standard = DEFAULT_SONGS.filter(song => song.use === 'playlist' && there.has(song.id) && !tracks.some(track => track.id === song.id));
+    const standard = DEFAULT_SONGS.filter(song => song.use === 'playlist' && there.has(song.id) && !tracks.some(track => track.id === song.id)).slice(0, 30 - tracks.length);
     if (standard.length) set([...tracks, ...standard.map(song => ({ id: song.id, kind: 'audio' as const }))]);
     setNote(standard.length ? t(standard.length === 1 ? 'standardAddedOne' : 'standardAddedMany', { count: standard.length }) : t(DEFAULT_SONGS.some(song => there.has(song.id)) ? 'standardThere' : 'noStandard'));
   }).catch(() => setNote(t('libraryFailed'))); };
@@ -50,7 +50,7 @@ export function GameMusicFields({ definition, onChange }: { definition: Definiti
     </li>)}</ol>}
     <div className="actions">
       <button type="button" className="small-button with-icon" disabled={tracks.length >= 30} onClick={() => setAdding(true)}><Icon name="plus" size={16} />{t('addSong')}</button>
-      <button type="button" className="small-button" onClick={addStandard}>{t('useStandard')}</button></div>
+      <button type="button" className="small-button" disabled={tracks.length >= 30} onClick={addStandard}>{t('useStandard')}</button></div>
     {note && <p className="hint" role="status">{note}</p>}
     {adding && <MediaLibraryDialog current={undefined} only="audio" title={t('addSong')} onPick={(item: LibraryItem) => { set([...tracks, { id: item.id, kind: 'audio' }]); setAdding(false); }} onClose={() => setAdding(false)} />}
   </div>;

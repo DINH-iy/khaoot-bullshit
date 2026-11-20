@@ -97,3 +97,34 @@ describe('replays', () => {
     expect(frames).toHaveLength(5); expect(frames[0]).toMatchObject({ from: null, to: null }); expect(frames[4]).toMatchObject({ from: 'd8', to: 'h4' });
   });
 });
+
+describe('Creature duel', () => {
+  it('gives the active player a random hand, protects turn order, and supports switching in a team', () => {
+    const match = startMatch('creature-duel', { size: 3 })!;
+    const turn = matchView(match, null).turn as 0 | 1;
+    const opponent = turn === 0 ? 1 : 0;
+    const hand = matchView(match, turn);
+    if (hand.board.game !== 'creature-duel') throw new Error('Wrong board');
+    expect(hand.board.moves).toHaveLength(3);
+    expect(new Set(hand.board.moves).size).toBe(3);
+    expect(matchView(match, opponent).board).toMatchObject({ moves: [] });
+    expect(() => playMove(match, opponent, { game: 'creature-duel', pick: hand.board.game === 'creature-duel' ? hand.board.moves[0]! : 'jab' })).toThrow(IllegalMove);
+    const moved = playMove(match, turn, { game: 'creature-duel', pick: 1 });
+    expect(matchView(moved, null)).toMatchObject({ turn: opponent, board: { last: 'switch', active: turn === 0 ? [1, 0] : [0, 1] } });
+    expect(matchView(match, null).board).toMatchObject({ active: [0, 0] });
+    expect(startMatch('creature-duel', { size: 2 })).toBeNull();
+  });
+
+  it('reaches a server-decided outcome and a valid replay', () => {
+    let match = startMatch('creature-duel', { size: 1 })!;
+    for (let step = 0; step < 40 && !matchOutcome(match); step++) {
+      const turn = matchView(match, null).turn as 0 | 1;
+      const board = matchView(match, turn).board;
+      if (board.game !== 'creature-duel') throw new Error('Wrong board');
+      const pick = board.moves.find(move => move === 'crush' || move === 'surge' || move === 'jab')!;
+      match = playMove(match, turn, { game: 'creature-duel', pick });
+    }
+    expect(matchOutcome(match)).not.toBeNull();
+    expect(HeadToHeadViewSchema.parse(matchView(match, null)).replay?.game).toBe('creature-duel');
+  });
+});

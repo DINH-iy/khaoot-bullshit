@@ -319,3 +319,37 @@ describe('taking over a seat from a new phone', () => {
     expect((await hostPost(f, 'seat-requests', { requestId: first, approve: true })).statusCode).toBe(403);
   });
 });
+
+it('keeps room chat opt-in, limits team and private messages to their audiences, and gives the host report and mute controls', async () => {
+  const f = await room();
+  const [ada, bo, cal] = await Promise.all([player(f, 'Ada'), player(f, 'Bo'), player(f, 'Cal')]);
+  const chat = `/api/rooms/${f.sessionId}/chat`;
+  const get = (cookie: string) => app.inject({ method: 'GET', url: chat, headers: { ...headers, cookie } });
+  expect((await api(chat, { channel: 'room', text: 'Disabled' }, ada.cookie)).statusCode).toBe(403);
+  const settings = `/api/rooms/${f.sessionId}/settings`;
+  expect((await api(settings, { chat: true }, ada.cookie)).statusCode).toBe(403);
+  expect((await api(settings, { chat: true }, f.cookie)).statusCode).toBe(200);
+  const seats = await prisma.sessionPlayer.findMany({ where: { sessionId: f.sessionId } });
+  const id = (name: string) => seats.find(seat => seat.displayName === name)!.id;
+  const lineup = await prisma.teamLineup.create({ data: { sessionId: f.sessionId, number: 1, carryover: { formatVersion: 1, scope: 'game', carryover: 'fresh' } } });
+  const team = await prisma.sessionTeam.create({ data: { sessionId: f.sessionId, name: 'Red' } });
+  await prisma.teamMember.createMany({ data: ['Ada', 'Bo'].map(name => ({ sessionId: f.sessionId, lineupId: lineup.id, teamId: team.id, playerId: id(name) })) });
+  expect((await api(chat, { channel: 'room', text: 'Everyone' }, ada.cookie)).statusCode).toBe(200);
+  expect((await api(chat, { channel: 'team', text: 'Red team' }, ada.cookie)).statusCode).toBe(200);
+  expect((await api(chat, { channel: 'private', recipientId: id('Cal'), text: 'Private to Cal' }, ada.cookie)).statusCode).toBe(200);
+  const messages = async (cookie: string) => (await get(cookie)).json().data.messages as { id: string; text: string; reported?: boolean }[];
+  expect((await messages(bo.cookie)).map(entry => entry.text)).toEqual(['Everyone', 'Red team']);
+  expect((await messages(cal.cookie)).map(entry => entry.text)).toEqual(['Everyone', 'Private to Cal']);
+  expect((await messages(f.cookie)).map(entry => entry.text)).toEqual(['Everyone']);
+  const secret = (await messages(cal.cookie))[1]!;
+  expect((await api(`${chat}/moderation`, { action: 'report', messageId: secret.id }, bo.cookie)).statusCode).toBe(403);
+  expect((await api(`${chat}/moderation`, { action: 'report', messageId: secret.id }, cal.cookie)).statusCode).toBe(200);
+  expect((await messages(f.cookie))[1]).toMatchObject({ text: 'Private to Cal', reported: true });
+  expect((await api(`${chat}/moderation`, { action: 'show', messageId: secret.id }, f.cookie)).statusCode).toBe(403);
+  expect((await api(`${chat}/moderation`, { action: 'mute', playerId: id('Ada'), muted: true }, f.cookie)).statusCode).toBe(200);
+  expect((await api(chat, { channel: 'room', text: 'Muted' }, ada.cookie)).statusCode).toBe(403);
+  expect((await api(settings, { chat: false }, f.cookie)).statusCode).toBe(200);
+  expect((await get(cal.cookie)).statusCode).toBe(403);
+  expect((await api(settings, { chat: true }, f.cookie)).statusCode).toBe(200);
+  expect(await messages(cal.cookie)).toEqual([]);
+});

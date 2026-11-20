@@ -2,8 +2,8 @@ import { deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { circleScore, DrawingSchema, MAX_DRAWING_POINTS } from '@party/contracts';
 import { cleanPicture } from '../../src/assets/media.js';
-import { relayPlan } from '../../src/minigames/relay.js';
-import { minigameOutcome } from '../../src/minigames/outcome.js';
+import { relayPlan } from '../../src/minigames/relay-drawing/relay.js';
+import { minigameOutcome } from '../../src/minigames/shared/outcome.js';
 import type { TeamContext } from '../../src/game/teams/teams.js';
 
 const ring = (points: number, radius: (angle: number) => number, turns = 1) => Array.from({ length: points }, (_, index) => {

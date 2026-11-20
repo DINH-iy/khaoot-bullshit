@@ -64,11 +64,13 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   useEffect(() => { setPart(0); setConfirming(false); }, [current.key]);
   const index = Math.min(part, current.stages.length - 1);
   const problems = d.issues.filter(issue => issue.nodeKey === current.key);
-  const canRehearseOnly = !d.issues.some(issue => !issue.nodeKey || issue.nodeKey === current.key)
-    && !current.stages.some(stage => stage.kind === 'vote');
   const replacement = useTexts(REPLACE_TEXTS); const [replacing, setReplacing] = useState(false);
   const [canvasDevice, setCanvasDevice] = useState<'sharedScreen' | 'phone'>('sharedScreen');
   const [previewDevice, setPreviewDevice] = useState<'sharedScreen' | 'phone'>();
+  const tryScene = () => {
+    const stage = current.stages[index];
+    setPreviewDevice(stage?.kind === 'minigame' ? (stage['game'] === 'count-the-dots' ? 'sharedScreen' : 'phone') : canvasDevice);
+  };
   const [mediaKey, setMediaKey] = useState<string>();
   const scenePart = `${current.key}:${index}`;
   const editMedia = () => { if (!readOnly) setMediaKey(scenePart); };
@@ -183,7 +185,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
             onClick={() => setCanvasDevice(device)}>{t(device)}</button>)}
         </div>
       </div>
-      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice}
+      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice} onTry={tryScene}
         canvas={canvasDevice === 'sharedScreen' ? {
           readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
         } : undefined} />
@@ -192,10 +194,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
     </section>
     <aside className="scene-props" aria-labelledby="scene-props-heading">
       <div className="inspector-head"><h2 id="scene-props-heading">{cardText(definition, current).label}</h2>
-        <button type="button" className="small-button with-icon try-scene" aria-haspopup="dialog" title={t('tryScene')} onClick={() => setPreviewDevice(canvasDevice)}><Icon name="try" size={16} /><span>{t('tryScene')}</span></button>
+        <button type="button" className="small-button with-icon try-scene" aria-haspopup="dialog" title={t('tryScene')} onClick={tryScene}><Icon name="try" size={16} /><span>{t('tryScene')}</span></button>
         <ActionMenu label={t('sceneActions')} actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
-          { label: t('rehearseHere'), icon: 'play', disabled: d.busy || d.save !== 'saved', onSelect: () => d.rehearse(current.key) },
-          { label: labels('rehearseOnly'), icon: 'try', disabled: d.busy || d.save !== 'saved' || !canRehearseOnly, onSelect: () => d.rehearse(current.key, true) },
           { label: t('changeLeads'), icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: replacement('action'), icon: 'edit', onSelect: () => setReplacing(true) }, { label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
       {replacing && !readOnly && <ReplaceSceneDialog key={current.key} definition={definition} node={current} onChange={next => { change(next); setPart(0); }} onClose={() => setReplacing(false)} />}
       {definition.startNodeKey === current.key && <p className="start-note">{t('startsHere')}</p>}

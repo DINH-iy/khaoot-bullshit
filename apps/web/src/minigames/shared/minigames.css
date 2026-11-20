@@ -1,0 +1,41 @@
+/* Minigames: big, thumb-sized controls; colours follow the game's look. */
+.mg-play, .mg-screen, .mg-done { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.mg-how { margin: 0; color: var(--r-muted); max-width: 36rem; }
+.mg-name { margin: 0; font-family: var(--r-heading-font); font-size: 1.6rem; font-weight: 900; color: var(--r-accent); }
+.mg-big { margin: 0; font-family: var(--r-heading-font); font-size: clamp(3rem, 14vw, 6rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.mg-big.go { color: var(--r-ok); } .mg-big.wait { color: var(--r-bad); }
+.mg-sub { margin: 0; font-size: 1.15rem; }
+.mg-countdown { display: grid; gap: 6px; justify-items: center; }
+.mg-countdown strong { font-size: clamp(4rem, 20vw, 8rem); line-height: 1; font-family: var(--r-heading-font); color: var(--r-accent); }
+/* The pad: as big as the phone allows, no double-tap zoom, no text selection while hammering it. */
+.room .mg-pad { width: min(100%, 26rem); min-height: min(52vh, 22rem); border-radius: calc(var(--r-radius) * 1.2); font-size: clamp(2rem, 10vw, 3.4rem); font-weight: 900;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; border: 0; }
+.room .mg-pad.wait { background: var(--r-bad); color: #1a0505; }
+.room .mg-pad.go { background: var(--r-ok); color: #04170e; }
+.room .mg-pad:active { transform: scale(.98); }
+.mg-cut-line, .mg-match-angle { display: grid; gap: 1rem; place-items: center; width: min(100%, 28rem); }
+.mg-cut-line button, .mg-match-angle button { min-height: 44px; min-width: min(100%, 11rem); }
+.mg-results { display: grid; gap: 8px; }
+.mg-podium { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mg-podium li { display: flex; gap: 10px; align-items: center; margin: 0; padding: 8px 12px; border-radius: 14px; background: var(--r-card-strong); }
+.mg-podium li.first { outline: 3px solid var(--r-accent); }
+.mg-podium li span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+.mg-place { min-width: 1.6em; font-weight: 900; font-size: 1.3rem; color: var(--r-accent); }
+@media (prefers-reduced-motion: reduce) { .room .mg-pad:active { transform: none; } }
+/* ---------- Step games (Drive the bus, Lucky doors, Left or right) ---------- */
+.step-phone, .step-question { display: grid; gap: 12px; justify-items: stretch; }
+.step-team-title { margin: 0; font-weight: 800; font-size: 1.1rem; text-align: center; }
+.step-ask { margin: 0; font-family: var(--r-heading-font); font-weight: 800; font-size: 1.25rem; text-align: center; }
+.step-stake, .step-vote-note { margin: 0; text-align: center; color: var(--r-muted); }
+.step-options { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.step-options.options-1 { grid-template-columns: 1fr; }
+.room .step-option { min-height: 72px; font-size: 1.2rem; font-weight: 800; }
+.step-votes { display: grid; gap: 10px; } .step-votes p { margin: 0; text-align: center; }
+.step-split { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.step-split li { display: grid; grid-template-columns: minmax(5rem, auto) 1fr 2ch; gap: 10px; align-items: center; }
+.step-bar { height: 12px; border-radius: 999px; background: rgb(0 0 0 / .2); overflow: hidden; } .step-bar span { display: block; height: 100%; background: var(--r-accent); transition: width .3s; }
+.room .step-decide { justify-self: center; }
+.step-sides { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; width: 100%; }
+.step-sides li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 10px 14px; border-radius: calc(var(--r-radius) * .6); background: var(--r-card-strong); }
+.step-sides li.done { outline: 2px solid var(--r-ok); }
+.step-side-name { font-weight: 800; min-width: 6rem; } .step-status { margin-left: auto; color: var(--r-muted); font-weight: 700; }

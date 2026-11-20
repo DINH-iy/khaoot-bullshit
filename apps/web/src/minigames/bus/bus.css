@@ -1,0 +1,14 @@
+.room .step-option.option-red, .room .step-option.option-hearts, .room .step-option.option-diamonds { background: #c62f3d; color: #fff; border-color: #c62f3d; }
+.room .step-option.option-black, .room .step-option.option-clubs, .room .step-option.option-spades { background: #1d1d22; color: #fff; border-color: #1d1d22; }
+/* Drive the bus: playing cards. */
+.bus-board-side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; justify-content: center; }
+.bus-cards { display: inline-flex; gap: 6px; } .bus-cards.big { gap: 10px; }
+.bus-card { position: relative; display: inline-grid; place-items: center; align-content: center; width: 2.6rem; height: 3.6rem; border-radius: 8px; background: #fff; color: #1d1d22; border: 1px solid rgb(0 0 0 / .2); box-shadow: 0 2px 6px rgb(0 0 0 / .25); font-weight: 800; line-height: 1; }
+.bus-cards.big .bus-card { width: 3.6rem; height: 5rem; font-size: 1.3rem; }
+.bus-card.red { color: #c62f3d; } .bus-card.wrong { opacity: .75; }
+.bus-card.down { background: repeating-linear-gradient(45deg, var(--r-accent) 0 6px, color-mix(in srgb, var(--r-accent) 70%, black) 6px 12px); border-color: rgb(255 255 255 / .5); }
+.bus-suit { font-size: 1.1em; }
+.bus-mark { position: absolute; right: -6px; top: -6px; display: grid; place-items: center; width: 1.3rem; height: 1.3rem; border-radius: 50%; font-size: .75rem; color: #fff; }
+.bus-mark.right { background: #137a52; } .bus-mark.wrong { background: #b3261e; }
+.bus-sips { font-weight: 800; } .bus-drink { margin: 0; color: var(--r-bad); font-weight: 800; text-align: center; } .bus-safe { margin: 0; color: var(--r-ok); font-weight: 800; text-align: center; }
+.bus-rainbow { margin: 0; font-weight: 900; text-align: center; background: linear-gradient(90deg, #e63946, #f4a261, #e9c46a, #2a9d8f, #457b9d, #8e44ad); -webkit-background-clip: text; background-clip: text; color: transparent; }

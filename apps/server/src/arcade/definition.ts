@@ -1,15 +1,16 @@
-import { MINIGAMES, TEAM_MINIGAMES, type ArcadeTeams, type MinigameKey } from '@party/contracts';
+import { MINIGAMES, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, type ArcadeTeams, type MinigameKey } from '@party/contracts';
 import { parseDefinition, type GameDefinition } from '../game/definition.js';
 
 // The room's standard texts speak of a host; in the arcade the leader runs the round.
 const LEADER_TEXTS = {
   'explain.waiting': 'Waiting for the leader to start…',
   'wait.forming': 'Answers open once the leader starts the round with these teams.',
-  'minigame.paused': 'Paused. When the leader continues, you get a new countdown.',
+  'minigame.paused': 'Paused. Waiting for the leader to continue…',
 };
 
 /** Whether a minigame can be played in an arcade round with these teams (team-only games need teams). */
-export const arcadeRoundFits = (game: MinigameKey, teams: ArcadeTeams | null) => teams !== null || !TEAM_MINIGAMES.includes(game);
+export const arcadeRoundFits = (game: MinigameKey, teams: ArcadeTeams | null) => !SHARED_SCREEN_MINIGAMES.includes(game)
+  && (teams !== null || !TEAM_MINIGAMES.includes(game));
 
 /**
  * An arcade round as a game: one minigame scene with its standard settings and

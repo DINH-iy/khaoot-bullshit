@@ -93,7 +93,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
     case 'info': return { key, kind: 'info', title: text(raw['title'], prompt).slice(0, 120), prompt: text(raw['text'] ?? raw['prompt'], prompt), durationMs };
     // Pick teams: `"teams": 3` (equal teams, default 2) or a full `form`; `"how"`: random, host or players (default players).
     case 'teams': {
-      const how = ['random', 'host', 'players'].includes(text(raw['how'] ?? raw['formation'])) ? text(raw['how'] ?? raw['formation']) : 'players';
+      const how = ['random', 'skill', 'host', 'players'].includes(text(raw['how'] ?? raw['formation'])) ? text(raw['how'] ?? raw['formation']) : 'players';
       const count = Math.max(2, Math.min(12, Math.round(Number(raw['teams']) || 2)));
       return { key, kind: 'teams', prompt: text(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how },
         ...(raw['captains'] === true ? { captains: true } : {}) };
@@ -225,6 +225,7 @@ export function importDefinition(input: string): Json | null {
     // Side games on the phones are on unless switched off; chips only with an explicit true.
     ...(raw['sideGames'] === false ? { sideGames: false } : {}), ...(raw['chips'] === true ? { chips: true } : {}),
     ...(raw['autoRevealSeconds'] !== undefined ? { autoRevealSeconds: raw['autoRevealSeconds'] } : {}),
+    ...(raw['phoneEffects'] === true ? { phoneEffects: true } : {}),
     ...(raw['birthdayVote'] === true ? { birthdayVote: true } : {}),
     // The host's quick time button in seconds (default 30).
     ...(IdleCloseMinutesSchema.safeParse(raw['idleCloseMinutes']).success ? { idleCloseMinutes: raw['idleCloseMinutes'] } : {}),

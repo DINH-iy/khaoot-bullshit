@@ -47,6 +47,7 @@
 
 /* Join */
 .room-join { position: relative; display: grid; place-items: center; padding: 24px 16px; }
+.join-startup { min-height: 100dvh; display: grid; place-items: center; color: #d7d9e0; background: #161820; }
 .join-card { width: min(460px, 100%); display: grid; gap: 16px; padding: clamp(18px, 5vw, 30px) !important; border-radius: var(--r-radius) !important; background: var(--r-card) !important; border: 1px solid var(--r-line) !important; box-shadow: 0 20px 60px rgb(0 0 0 / .2); }
 .join-card > .brand { justify-self: start; padding: 8px 12px; border: 1px solid var(--r-line); border-radius: calc(var(--r-radius) * .6); background: var(--r-surface); }
 .join-card .join-head { overflow-wrap: anywhere; }
@@ -414,7 +415,7 @@
 .host-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .host-dialog-head h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.35rem; }
 .host-dialog h3 { margin: 4px 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); }
-.settings-layout { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+.settings-layout { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(0, 2fr); gap: 12px; align-items: start; }
 .settings-col { display: grid; gap: 10px; }
 .host-dialog .room-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
 .host-dialog .room-settings > :is(.reaction-settings, .hint) { grid-column: 1 / -1; }
@@ -429,7 +430,7 @@
 .invite-display p { flex: 1; margin: 0; font-size: .92rem; color: var(--r-muted); } .invite-display strong { display: block; color: var(--r-text); font-size: 1rem; }
 .invite-display button { flex: none; white-space: nowrap; }
 .invite-display-open { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
-.host-sheet.players.in-dialog ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.host-sheet.players.in-dialog .host-player-list { grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
 @media (max-width: 760px) {
   .host-dialog-backdrop { padding: 0; place-items: end stretch; }
   .host-dialog { width: 100%; max-height: 92dvh; border-radius: var(--r-radius) var(--r-radius) 0 0; padding: 16px; }
@@ -526,7 +527,15 @@
 .score-correction { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--r-line); border-radius: 12px; background: var(--r-card-strong); }
 .score-correction label { display: grid; gap: 4px; font-size: .9rem; }
 .score-correction :is(select, input, button) { width: 100%; }
-.player-moderation { flex: 1 0 100%; min-width: 0; display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--r-card); }
+.players .host-player-list { display: grid; }
+.players .host-player-list > li { display: grid; align-content: start; min-width: 0; border-radius: 12px; }
+.host-player-row, .host-player-identity, .host-player-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-width: 0; }
+.host-player-identity { flex: 1 1 11rem; }
+.host-player-identity > .dot, .host-player-identity > .avatar { flex: none; }
+.host-player-name { overflow-wrap: anywhere; }
+.host-player-actions { max-width: 100%; }
+.host-player-actions > button { max-width: 100%; }
+.player-moderation { min-width: 0; display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--r-card); }
 .player-moderation label { display: grid; gap: 4px; }
 .player-moderation input { min-width: 0; width: 100%; }
 .host-phone-controls { display: flex; justify-content: end; padding: 8px var(--room-pad, 12px); }
@@ -564,3 +573,12 @@
 .round-results .round-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 6px; }
 .round-awards > li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; margin: 0; border: 1px solid var(--r-line); border-radius: 10px; background: var(--r-surface); }
 .round-awards strong { color: var(--r-text); font-variant-numeric: tabular-nums; }
+
+@keyframes room-panel-enter {
+  from { opacity: 0; transform: translateY(.35rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .room :is(.bottom-sheet, .host-dialog) { animation: room-panel-enter 150ms ease-out both; }
+  .room button { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
+}

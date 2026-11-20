@@ -13,7 +13,7 @@ const EASING_LABELS = { smooth: 'eSmooth', linear: 'eLinear', 'ease-in': 'eIn', 
 /** A moment's and a ready-made animation's name in the editor's language. */
 export const momentName = (moment: Moment) => t(`m.${moment}` as keyof typeof LOOK_TEXTS.en);
 export const presetName = (key: string) => `a.${key}` in LOOK_TEXTS.en ? t(`a.${key}` as keyof typeof LOOK_TEXTS.en) : ANIMATION_PRESETS[key]?.name ?? key;
-const LISTS: Moment[] = ['answersEnter', 'reveal', 'scoreboard'];
+const LISTS: Moment[] = ['answersEnter', 'voteEnter', 'reveal', 'scoreboard'];
 /** One slider per thing a block can change. The empty state means "keep it as in the block before". */
 const PROPERTIES: { key: Exclude<keyof Frame, 'at'>; label: string; min: number; max: number; step: number; rest: number; unit: string }[] = [
   { key: 'opacity', get label() { return t('pOpacity'); }, min: 0, max: 1, step: .05, rest: 1, unit: '' },

@@ -87,3 +87,40 @@ describe('drawings', () => {
     expect((await prisma.sessionPlayer.findUniqueOrThrow({ where: { id: f.players[0]!.id } })).look).toEqual(look);
   });
 });
+
+it('assigns animation prompts privately, checks guesses, and publishes the words only at reveal', async () => {
+  const w = world();
+  const definition = parseDefinition({ formatVersion: 2, title: 'Animation', startNodeKey: 'relay', edges: [],
+    nodes: [{ key: 'relay', stages: [{ key: 'play', kind: 'minigame', prompt: 'Animate your secret prompt!', game: 'relay-drawing',
+      settings: { secondsPerTurn: 5, voteSeconds: 30, animation: true }, durationMs: null, placementMilli: ['10000'],
+      play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: 2 }, formation: 'host' } }, answers: 'everyone', points: 'members' } }] }] });
+  const f = await fixture(2, definition);
+  const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+  for (const [index, player] of f.players.entries()) await host(w, f, 'teams.assign', { stageRunId, playerId: player.id, teamIndex: index });
+  await host(w, f, 'teams.confirm', { stageRunId });
+  const expected = async (index: number) => (await readSessionView(prisma, as(f, index), f.sessionId)).stage!.minigame!.relay!;
+  const first = (await expected(0)).animation!;
+  const second = (await expected(1)).animation!;
+  expect(first.prompt).not.toBe(second.prompt);
+  const shared = (await readSessionView(prisma, f.host, f.sessionId)).stage!.minigame!.relay!;
+  expect(shared.animation).toBeUndefined();
+  expect(shared.teams.every(team => team.word === undefined)).toBe(true);
+  w.advance(4000);
+  for (const index of [0, 1]) await send(w, f, index, {
+    type: 'minigame.part', stageRunId, turn: 0, assetId: (await drawingAsset(f, index, stageRunId)).id,
+  });
+  const guess = (teamId: string | null, word: number) => ({ type: 'submission.submit', stageRunId, value: { kind: 'minigame', value: word, teamId } });
+  await expect(send(w, f, 0, guess(first.targetTeamId, second.prompt))).rejects.toMatchObject({ code: 'INVALID_STATE' });
+  w.advance(5000);
+  await expect(send(w, f, 0, guess(second.targetTeamId, second.prompt))).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+  await send(w, f, 0, guess(first.targetTeamId, second.prompt));
+  await send(w, f, 1, guess(second.targetTeamId, second.prompt));
+  expect((await readSessionView(prisma, as(f, 0), f.sessionId)).ownSubmission?.value).toEqual({ kind: 'minigame', value: 0 });
+  await host(w, f, 'stage.close', { stageRunId });
+  await host(w, f, 'stage.reveal', { stageRunId });
+  const result = await readSessionView(prisma, f.host, f.sessionId);
+  expect(result.stage!.minigame!.relay!.teams.find(team => team.teamId === first.targetTeamId)?.word).toBe(second.prompt);
+  expect(result.stage!.reveal!.answer).toMatchObject({ kind: 'minigame', entries: [
+    { teamId: second.targetTeamId, value: 100, place: 1 }, { teamId: first.targetTeamId, value: 0, place: null },
+  ] });
+});

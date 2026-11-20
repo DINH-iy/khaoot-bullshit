@@ -64,6 +64,9 @@ Legend: **Built** · **Parts ready** (can be made in the editor now, maybe as a 
 | Reaction duel | Tap at GO; early is out | Built |
 | Tap race | Tap as fast as you can; live race bars | Built |
 | Stop the clock | Stop a vanishing clock at the target | Built |
+| Cut the Line | Estimate a target percentage on an unmarked bar | Built |
+| Match the Angle | Aim a ray at a shared target, with speed breaking ties | Built |
+| Count the Dots | Count a brief pattern on the shared screen, then enter a number on a phone | Built for hosted rooms |
 | Lucky doors | Pick a door with hidden points | Built |
 | Hot potato | A bomb passes between phones; whoever holds it when it blows loses | New mechanic: passing between players |
 | Simon says / memory | Repeat a growing colour sequence | New mechanic |
@@ -128,7 +131,32 @@ What drinking games need from the app:
 - **Prompt decks**: lists of statements or cards, drawn at random without repeats; the editor gets a deck builder and the text import gets decks.
 - **Safety and comfort**: a "drinking game" game setting that the host must switch on; an age note on joining; any player can choose "no alcohol" (their forfeit is shown as "take a sip of water" or a dare); the host can cap sips per round and call a water break; no score for drinking itself.
 
-## Suggested order
+## November minigame feedback
+
+The queue starts with short whole-room rounds. It groups ideas that can reuse controls, scoring or the submission flow. Each item gets its own playtest.
+
+| Order | Idea | First playable version |
+| --- | --- | --- |
+| 1 | Cut the Line | Implemented with a shared target, whole-percent cuts and placement points. |
+| 2 | Match the Angle | Implemented with 1° steps, targets away from common angles, and server submission time breaking ties in circular distance. |
+| 3 | Count the Dots | Implemented. Only the host and shared display see the pattern. Phones open the guessing field when the viewing timer ends. |
+| 4 | Heads or Tails | Built as a secret-pick hosted round with one shared reveal, and as a solo phone game with optional play-chip stakes. |
+| 5 | Red or Black Roulette | Built with one shared spin and points for correct guesses. Solo play supports optional play-chip stakes. Green zero pays neither colour. |
+| 6 | Build Your Meme | Add captions to an author-provided image. Show entries anonymously and vote for the funniest. |
+| 7 | Draw the Graph | Implemented. Players finish the same partial graph with assigned colours. The host and TV reveal all guesses with the actual line. Lowest average vertical error wins, with submission time breaking ties. |
+| 8 | Program the Robot | Use Blockly for the phone’s block editor. Author a grid and let players arrange movement blocks. Rank finishes first, then progress and time. Add loops, conditions or enemies after playtesting the basic round. |
+| 9 | Shared-Screen Jump Runner | Use the phone as a jump controller for an original distance race visible on the TV. |
+| 10 | One-Tap Flight | Make an original aerial obstacle course with one-tap lift. |
+| 11 | Fruit Slice | Make an original swipe game with original visuals and rules. Validate touch input and scoring across phones. |
+| 12 | Territory Drawing | Cover the most area. Prototype simultaneous strokes in free-for-all first, then add two-player and team modes. |
+| 13 | 8-Ball Pool | Build a physics prototype and verify shot replay before adding solo and two-player modes. |
+| 14 | Kart Race | Treat the report's “Mario card game” as a possible kart race. Confirm the mechanic and landscape controls before implementation. |
+| 15 | Krillion | Park until someone can describe the objective and the phone controls. |
+| 16 | Creature Adventure | Scope an original short adventure set around the existing Creature Duel. A full adventure is a separate project-sized decision. |
+
+Feedback attachments are already implemented. A report can include one image up to 2 MB or one video up to 5 MB. The owner can open it in Admin. Capturing and playing clips across physical phones remains a device check. [Feedback build plan](feedback-build-plan.md#editor-themes-and-media)
+
+## Earlier suggestions
 
 1. Drinking basics: sips as a forfeit, vote for a player, confession answers, prompt decks (unlocks most of section 7 and several of section 2).
 2. Host media in scenes (pictures, music, sounds) and the show host character (already next in the plan).

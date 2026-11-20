@@ -6,17 +6,28 @@ import { buildLook, themeClass, themeStyle } from './look.js';
 // The site's own look (Admin → Join screen): worn by the join screen and the arcade, where no game look applies.
 // Read once per page load; without one (or when the server cannot be reached) the default look stays.
 let loading: Promise<Theme | undefined> | undefined;
-const readSiteTheme = () => loading ??= roomApi('/api/site/look').then(data => { const parsed = SiteLookSchema.safeParse(data); return parsed.success ? parsed.data.theme : undefined; }, () => { loading = undefined; return undefined; });
-
-/** The site's theme once loaded, or undefined (default look) until then. */
-export function useSiteTheme(): Theme | undefined {
-  const [theme, setTheme] = useState<Theme | undefined>();
-  useEffect(() => { let mounted = true; void readSiteTheme().then(value => { if (mounted) setTheme(value); }); return () => { mounted = false; }; }, []);
+let loaded: { theme: Theme | undefined } | undefined;
+const readSiteTheme = () => loading ??= roomApi('/api/site/look').then(data => {
+  const parsed = SiteLookSchema.safeParse(data);
+  const theme = parsed.success ? parsed.data.theme : undefined;
+  loaded = { theme };
   return theme;
+}, () => { loading = undefined; return undefined; });
+
+/** An absent result means loading. A resolved result without a theme uses the default. */
+export function useSiteThemeState(): { theme: Theme | undefined } | undefined {
+  const [result, setResult] = useState(() => loaded);
+  useEffect(() => {
+    if (loaded) { setResult(loaded); return; }
+    let mounted = true;
+    void readSiteTheme().then(theme => { if (mounted) setResult(loaded ?? { theme }); });
+    return () => { mounted = false; };
+  }, []);
+  return result;
 }
 
 /** Style and classes for a page in the site's look (the arcade's home and lobby pages). */
 export function useSiteLookFrame(): { style: CSSProperties; className: string } {
-  const theme = useSiteTheme();
+  const theme = useSiteThemeState()?.theme;
   return useMemo(() => { const look = buildLook(theme ? { themes: [theme] } : undefined); return { style: themeStyle(look.theme), className: themeClass(look.theme) }; }, [theme]);
 }

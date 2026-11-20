@@ -13,10 +13,10 @@ import { FieldLimit } from '../controls/field-limit.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { readMemory, rememberPlace } from './editor-memory.js';
 import { EditorTour, finishEditorTour, needsEditorTour, TOUR_TEXTS } from './editor-tour.js';
-import { readZoomShortcuts, rememberZoomShortcuts, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
+import { editingAction, editingLabel, readZoomShortcuts, rememberZoomShortcuts, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
 import { HelpPanel } from './help-panel.js';
 import { Icon } from '../controls/icons.js';
-import { pendingClaim } from '../../people/use-me.js';
+import { pendingClaim, useMe } from '../../people/use-me.js';
 import { chooseTheme, currentTheme } from '../../theme.js';
 import { ProblemsPanel } from './problems-panel.js';
 import { HistoryPanel } from './history-panel.js';
@@ -28,7 +28,6 @@ import '../editor.css';
 
 const SAVE_TEXT = { saved: 'saved', pending: 'pending', saving: 'saving', error: 'saveError' } as const satisfies Record<SaveState, keyof typeof SHELL_TEXTS.en>;
 type View = 'flow' | 'scene' | 'look';
-const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const VIEW_NAMES = { flow: 'viewFlow', scene: 'viewScene', look: 'viewLook' } as const satisfies Record<View, keyof typeof SHELL_TEXTS.en>;
 const VIEW_ICONS = { flow: 'route', scene: 'edit', look: 'tidy' } as const satisfies Record<View, string>;
 const COMPACT_HEADER = '(max-width: 1320px)';
@@ -45,13 +44,15 @@ export function EditorShell({ gameId }: { gameId: string }) {
 
 function EditorPage({ gameId }: { gameId: string }) {
   const role = useHostRole();
+  const { person } = useMe();
+  const historyIdentity = role === 'owner' ? 'owner' : role === 'editor' ? person?.id : undefined;
   // No separate bar above the editor: its own "p." logo opens the other places (AppMenu), so it keeps one header.
-  return <div className="editor-page"><EditorBody gameId={gameId} role={role} /><FieldLimit /></div>;
+  return <div className="editor-page"><EditorBody key={gameId} gameId={gameId} role={role} historyIdentity={historyIdentity} /><FieldLimit /></div>;
 }
 
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
-function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null }) {
-  const d = useDraft(gameId); const t = useTexts(SHELL_TEXTS);
+function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: HostRole | null; historyIdentity: string | undefined }) {
+  const d = useDraft(gameId, historyIdentity); const t = useTexts(SHELL_TEXTS);
   const mediaText = useTexts(MEDIA_TEXTS); const tourText = useTexts(TOUR_TEXTS);
   const [tour, setTour] = useState(needsEditorTour);
   const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
@@ -83,10 +84,10 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
   const setView = (next: View) => { setViewState(next); const url = new URL(location.href); url.searchParams.set('view', next); history.replaceState(null, '', url); };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      // ? opens Help & shortcuts (not while typing).
-      if (event.key === '?' && !(event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable]')) { event.preventDefault(); setHelping(true); return; }
-      if ((event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable]') || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y') return;
-      event.preventDefault(); if (event.key.toLowerCase() === 'y' || event.shiftKey) d.redo(); else d.undo();
+      if ((event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable]')) return;
+      const action = editingAction(event, zoomShortcuts);
+      if (action === 'help') { event.preventDefault(); setHelping(true); }
+      if (action === 'undo' || action === 'redo') { event.preventDefault(); d[action](); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
   });
@@ -121,8 +122,8 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
       <div className="editor-actions">
         {!compactHeader && <>
         <div className="history-buttons">
-          <button type="button" className="icon-only" aria-label={t('undo')} title={t('undoTitle', { key: MOD })} disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" size={18} /></button>
-          <button type="button" className="icon-only" aria-label={t('redo')} title={t('redoTitle', { key: MOD })} disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" size={18} /></button></div>
+          <button type="button" className="icon-only" aria-label={t('undo')} title={`${t('undo')} (${editingLabel('undo', zoomShortcuts.edits.undo)})`} disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" size={18} /></button>
+          <button type="button" className="icon-only" aria-label={t('redo')} title={`${t('redo')} (${editingLabel('redo', zoomShortcuts.edits.redo)})`} disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" size={18} /></button></div>
         {/* View mode: look through the game without changing anything by accident. One button switches. */}
         <button type="button" className={`mode-toggle${d.readOnly ? ' viewing' : ''}`} aria-label={modeLabel}
           title={t(d.readOnly ? 'viewingTitle' : 'editingTitle')} onClick={toggleMode}>
@@ -146,7 +147,7 @@ function EditorBody({ gameId, role }: { gameId: string; role: HostRole | null })
             { label: t('redo'), icon: 'redo', disabled: !d.canRedo, onSelect: d.redo },
             { label: modeLabel, icon: d.readOnly ? 'eye' : 'edit', onSelect: toggleMode },
           ] : []),
-          { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: '?', onSelect: () => setHelping(true) },
+          { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: editingLabel('help', zoomShortcuts.edits.help), onSelect: () => setHelping(true) },
           { label: tourText('title'), icon: 'help', onSelect: () => setTour(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}

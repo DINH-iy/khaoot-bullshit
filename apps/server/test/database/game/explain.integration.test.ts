@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { parseDefinition } from '../../../src/game/definition.js';
 import { readSessionView } from '../../../src/game/views.js';
-import { readMinigameRun } from '../../../src/minigames/rules.js';
+import { readMinigameRun } from '../../../src/minigames/shared/rules.js';
 import { answer, db, fixture, hostCommand, prisma, service } from '../game-fixture.js';
 
 afterAll(async () => { await db.close(); });

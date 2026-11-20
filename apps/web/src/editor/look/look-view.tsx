@@ -8,6 +8,7 @@ import { layerOf, withLayer, type Scope } from './layer.js';
 import { ThemePanel } from './theme-panel.js';
 import { TranslatedTextsPanel } from './texts-panel.js';
 import { AnimationPanel } from './animation-panel.js';
+import { PhoneMenuPanel } from './phone-menu-panel.js';
 import { LookPreview } from './look-preview.js';
 import '../../room/room.css';
 import './look.css';
@@ -17,8 +18,8 @@ import { LOOK_TEXTS } from './look.text.js';
 const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
 import { readMemory, rememberPlace } from '../shell/editor-memory.js';
 
-type Section = 'theme' | 'texts' | 'animations';
-const SECTIONS = { theme: 'tabTheme', texts: 'tabTexts', animations: 'tabAnimations' } as const satisfies Record<Section, keyof typeof LOOK_TEXTS.en>;
+type Section = 'theme' | 'texts' | 'animations' | 'phoneMenu';
+const SECTIONS = { theme: 'tabTheme', texts: 'tabTexts', animations: 'tabAnimations', phoneMenu: 'tabPhoneMenu' } as const satisfies Record<Section, keyof typeof LOOK_TEXTS.en>;
 const short = (text: string) => text.length > 48 ? `${text.slice(0, 46)}…` : text;
 const scopeValue = (scope: Scope) => scope.kind === 'game' ? 'game' : `${scope.nodeKey}|${scope.stageIndex}`;
 
@@ -31,7 +32,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
   // The part of Look & feel last open for this game (K2).
   const [section, setSectionState] = useState<Section>(() => { const saved = readMemory(gameId).lookSection; return saved && saved in SECTIONS ? saved as Section : 'theme'; });
   const setSection = (next: Section) => { setSectionState(next); rememberPlace(gameId, { lookSection: next }); };
-  const live = scope.kind === 'scene' && !definition.nodes.some(node => node.key === scope.nodeKey) ? { kind: 'game' } as Scope : scope;
+  const live: Scope = section === 'phoneMenu' || (scope.kind === 'scene' && !definition.nodes.some(node => node.key === scope.nodeKey)) ? { kind: 'game' } : scope;
   const game = layerOf(definition, { kind: 'game' }); const layer = layerOf(definition, live);
   const below: Presentation = live.kind === 'game' ? {} : game;
   const update = (patch: Partial<Presentation>, group: string) => d.change(withLayer(definition, live, { ...layer, ...patch }) as Definition, undefined, `look:${scopeValue(live)}:${group}`);
@@ -41,7 +42,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
   return <div className="look-editor">
     <aside className="look-controls" aria-labelledby="look-heading">
       <h2 id="look-heading">{t('look')}</h2>
-      <label>{t('lookOf')}<Dropdown value={scopeValue(live)} onChange={value => { if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}
+      <label>{t('lookOf')}<Dropdown disabled={section === 'phoneMenu'} value={scopeValue(live)} onChange={value => { if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}
         options={[{ value: 'game', label: t('wholeGame') }, ...definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ value: `${node.key}|${index}`, group: t('onlyScene'),
           label: `${short(cardText(definition, node).title || node.key)}${node.stages.length > 1 ? t('partN', { number: index + 1 }) : ''}${stage['presentation'] ? ' ✎' : ''}` })))]} /></label>
       <p className="hint">{t(live.kind === 'game' ? 'gameHint' : 'sceneHint')}</p>
@@ -51,6 +52,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
       {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} title={definition.title} onChange={theme => update({ theme }, 'theme')} />}
       {section === 'texts' && <TranslatedTextsPanel layer={layer} below={below} language={textLanguage} onLanguageChange={setTextLanguage} onChange={update} />}
       {section === 'animations' && <AnimationPanel animations={layer.animations} below={below.animations ?? {}} onChange={animations => update({ animations }, 'animations')} />}
+      {section === 'phoneMenu' && <PhoneMenuPanel icons={game.phoneMenuIcons} onChange={phoneMenuIcons => update({ phoneMenuIcons }, 'phoneMenuIcons')} />}
       </fieldset>
     </aside>
     <section className="look-preview-area" aria-label={t('previewLabel')}>

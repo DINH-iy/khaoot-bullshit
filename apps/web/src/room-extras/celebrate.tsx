@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { rumble, screenEffect, soundEffect, type SoundEffect } from './phone-feedback.js';
+
 const SOUND_KEY = 'party_sound';
 export const soundOn = () => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch { return true; } };
 export const setSound = (on: boolean) => { try { localStorage.setItem(SOUND_KEY, on ? 'on' : 'off'); } catch { /* only a convenience */ } };
@@ -8,12 +10,13 @@ let audio: AudioContext | null = null;
 /** Phones only allow sound after a tap: the first tap anywhere prepares it. */
 export function unlockSound() { try { audio ??= new AudioContext(); if (audio.state === 'suspended') void audio.resume(); } catch { audio = null; } }
 /** A short rising chime, made on the phone (no sound files): bigger wins ring a little longer. */
-export function playChime(strength: number) {
+export function playChime(strength: number, effect: SoundEffect = 'chime') {
   if (!soundOn() || !audio || audio.state !== 'running') return;
-  const notes = [523.25, 659.25, 783.99, 1046.5].slice(0, strength > 1 ? 4 : 3); const start = audio.currentTime;
+  const melody = { chime: [523.25, 659.25, 783.99, 1046.5], arcade: [330, 440, 660, 880], bell: [880, 1174.66, 880, 1318.51] }[effect];
+  const notes = melody.slice(0, strength > 1 ? 4 : 3); const start = audio.currentTime;
   notes.forEach((frequency, index) => {
     const oscillator = audio!.createOscillator(); const gain = audio!.createGain(); const at = start + index * 0.08;
-    oscillator.type = 'triangle'; oscillator.frequency.value = frequency;
+    oscillator.type = effect === 'bell' ? 'sine' : 'triangle'; oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(0.0001, at); gain.gain.exponentialRampToValueAtTime(0.22, at + 0.02); gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
     oscillator.connect(gain).connect(audio!.destination); oscillator.start(at); oscillator.stop(at + 0.5);
   });
@@ -24,17 +27,18 @@ export function playChime(strength: number) {
  * shown. Once per round. Players who ask for less motion get the number
  * without confetti; the sound follows the phone's sound setting in the dock.
  */
-export function PointsCelebration({ roundId, points, label }: { roundId: string | null; points: number | null; label: string }) {
+export function PointsCelebration({ roundId, points, label, customizable }: { roundId: string | null; points: number | null; label: string; customizable: boolean }) {
   const [shown, setShown] = useState<{ round: string; points: number } | null>(null); const done = useRef(new Set<string>());
+  const effect = customizable ? screenEffect() : 'confetti';
   useEffect(() => {
     if (!roundId || !points || points <= 0 || done.current.has(roundId)) return;
-    done.current.add(roundId); setShown({ round: roundId, points }); playChime(points >= 10 ? 2 : 1);
-    if ('vibrate' in navigator) navigator.vibrate?.([30, 40, 60]);
+    done.current.add(roundId); setShown({ round: roundId, points }); playChime(points >= 10 ? 2 : 1, customizable ? soundEffect() : 'chime');
+    rumble([30, 40, 60]);
     const timer = setTimeout(() => setShown(null), 2600); return () => clearTimeout(timer);
-  }, [roundId, points]);
+  }, [roundId, points, customizable]);
   if (!shown) return null;
-  return <div className="celebration" aria-hidden="true">
-    <div className="confetti">{Array.from({ length: 28 }, (_, index) => <i key={index} style={{ '--x': `${(index * 37) % 100}%`, '--delay': `${(index % 7) * 60}ms`, '--hue': `${(index * 47) % 360}` } as React.CSSProperties} />)}</div>
+  return <div className={`celebration celebration-${effect}`} aria-hidden="true">
+    {effect === 'confetti' && <div className="confetti">{Array.from({ length: 28 }, (_, index) => <i key={index} style={{ '--x': `${(index * 37) % 100}%`, '--delay': `${(index % 7) * 60}ms`, '--hue': `${(index * 47) % 360}` } as React.CSSProperties} />)}</div>}
     <p className="celebration-points">+{label}</p>
   </div>;
 }

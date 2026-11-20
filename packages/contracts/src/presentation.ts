@@ -1,5 +1,6 @@
+import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
-import { MINIGAME_KEYS, MINIGAMES, type MinigameKey } from './minigames.js';
+import { MINIGAME_KEYS, MINIGAMES, type MinigameKey } from './minigames/shared/catalog.js';
 
 // How a game looks, sounds (later) and moves. Everything players, the shared
 // screen and the host see can be changed per game, and again per scene. These
@@ -41,7 +42,7 @@ export const TEXT_DEFAULTS = {
   'stat.mostVotes': 'Crowd favourite', 'stat.minigameChamp': 'Minigame champion', 'stat.luckiest': 'Luckiest', 'stat.mostReactions': 'Most reactions', 'stat.scene': 'Best in one scene', 'stat.fewest': 'Wooden spoon',
   'scores.open': 'Show the scoreboard', 'scores.close': 'Close', 'react.open': 'Send a reaction', 'react.title': 'React on the big screen',
   'minigame.getReady': 'Get ready…', 'minigame.wait': 'Wait for it…', 'minigame.go': 'GO!', 'minigame.tooSoon': 'Too soon!', 'minigame.tap': 'TAP!',
-  'minigame.stop': 'Stop', 'minigame.pickDoor': 'Pick a door', 'minigame.door': 'Door {number}', 'minigame.result': 'Your result: {result}', 'minigame.played': 'Done! Waiting for the others…', 'minigame.paused': 'Paused. When the host continues, you get a new countdown.',
+  'minigame.stop': 'Stop', 'minigame.pickDoor': 'Pick a door', 'minigame.door': 'Door {number}', 'minigame.result': 'Your result: {result}', 'minigame.played': 'Done! Waiting for the others…', 'minigame.paused': 'Paused. Waiting for the host to continue…',
   'minigame.places': 'Places', 'minigame.behindDoors': 'Behind the doors',
   'minigame.drawCircle': 'Draw one circle, in one go', 'minigame.yourTurn': 'Your turn! Add to the drawing', 'minigame.theirTurn': '{name} is drawing…', 'minigame.voteBest': 'Vote for the best drawing',
   'drawing.submit': 'Send my drawing', 'drawing.undo': 'Undo', 'drawing.clear': 'Start over', 'drawing.blind': 'Drawing blind: you see it when it is sent', 'drawing.blindTitle': 'BLIND ROUND', 'drawing.blindHint': 'Your lines stay hidden until you send it', 'drawing.colour': 'Colour', 'drawing.size': 'Pen size',
@@ -96,6 +97,9 @@ export type Theme = z.infer<typeof ThemeSchema>;
 export type FullTheme = { [K in Exclude<keyof Theme, 'preset' | 'colors'>]-?: NonNullable<Theme[K]> } & { colors: z.infer<typeof FullColorsSchema> };
 // Every style starts with the classic marks: A B C in a circle before the answer, arrows on party choices.
 const MARKS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const, backgroundMotion: 'none' as const };
+const SPACE: FullTheme = { ...MARKS, font: 'system', headingFont: 'condensed', radius: 14, textScale: 1, background: 'glow', backgroundMotion: 'starlight', tiles: 'glass', uppercaseHeadings: true, gradients: false,
+    colors: { background: '#0a1024', background2: '#21113e', surface: '#18213c', text: '#f5f4ff', muted: '#bec9e8', accent: '#a3e6ff', accentText: '#081827', success: '#97f0ba', danger: '#ffa8bd',
+      answers: ['#8c275c', '#23508e', '#795324', '#206754', '#584097', '#8c422e'], answerText: '#ffffff' } };
 /** Starting points. Every value can be changed afterwards. */
 export const THEME_PRESETS: Record<string, { name: string; theme: FullTheme }> = {
   party: { name: 'Party', theme: { ...MARKS, font: 'system', headingFont: 'system', radius: 24, textScale: 1, background: 'glow', tiles: 'filled', uppercaseHeadings: false, gradients: false,
@@ -123,9 +127,10 @@ export const THEME_PRESETS: Record<string, { name: string; theme: FullTheme }> =
   elegant: { name: 'Gala', theme: { ...MARKS, font: 'serif', headingFont: 'elegant', radius: 4, textScale: 1, background: 'gradient', tiles: 'glass', uppercaseHeadings: true, gradients: false,
     colors: { background: '#11131a', background2: '#05060a', surface: '#1b1e28', text: '#f4efe4', muted: '#b9b1a0', accent: '#d4b26a', accentText: '#15120a', success: '#8fcfa4', danger: '#e39a9a',
       answers: ['#8c2f39', '#2c4f7c', '#7d6a2b', '#2f6b52', '#5a3f7a', '#8a5a2b'], answerText: '#f4efe4' } } },
-  space: { name: 'Space', theme: { ...MARKS, font: 'system', headingFont: 'condensed', radius: 14, textScale: 1, background: 'glow', backgroundMotion: 'starlight', tiles: 'glass', uppercaseHeadings: true, gradients: false,
-    colors: { background: '#0a1024', background2: '#21113e', surface: '#18213c', text: '#f5f4ff', muted: '#bec9e8', accent: '#a3e6ff', accentText: '#081827', success: '#97f0ba', danger: '#ffa8bd',
-      answers: ['#8c275c', '#23508e', '#795324', '#206754', '#584097', '#8c422e'], answerText: '#ffffff' } } },
+  space: { name: 'Space', theme: SPACE },
+  mars: { name: 'Mars', theme: { ...SPACE, colors: { ...SPACE.colors, background: '#250f16', background2: '#471c1a', surface: '#391e25', text: '#fff4eb', muted: '#e2bdb7', accent: '#ffae85', accentText: '#32150f' } } },
+  saturn: { name: 'Saturn', theme: { ...SPACE, colors: { ...SPACE.colors, background: '#211927', background2: '#43281e', surface: '#352934', text: '#fff7e8', muted: '#dfc8b6', accent: '#ffd697', accentText: '#301c12' } } },
+  neptune: { name: 'Neptune', theme: { ...SPACE, colors: { ...SPACE.colors, background: '#071830', background2: '#153760', surface: '#102948', text: '#eff9ff', muted: '#b4cbe3', accent: '#91d8ff', accentText: '#0a2339' } } },
   ocean: { name: 'Ocean', theme: { ...MARKS, font: 'rounded', headingFont: 'rounded', radius: 20, textScale: 1, background: 'gradient', tiles: 'glass', uppercaseHeadings: false, gradients: false,
     colors: { background: '#023e5a', background2: '#011627', surface: '#0b3a52', text: '#eefaff', muted: '#a9d3e3', accent: '#5ce1e6', accentText: '#012030', success: '#7ef0b0', danger: '#ff9b9b',
       answers: ['#b0306a', '#1565c0', '#8a6d00', '#00796b', '#5e35b1', '#ad4a00'], answerText: '#ffffff' } } },
@@ -183,6 +188,9 @@ export function contrast(a: string, b: string): number {
 // ---------- motion ----------
 export const MOMENTS = {
   sceneEnter: 'A new scene or question appears', answersEnter: 'The answers appear', answerSaved: 'A player’s answer is saved',
+  mediaEnter: 'Scene media appears', teamsEnter: 'Teams appear', explanationEnter: 'An explanation appears',
+  voteEnter: 'A ballot appears', routeEnter: 'A route choice appears', duelEnter: 'The duel begins',
+  minigameEnter: 'Minigame controls appear', finaleEnter: 'Final awards appear',
   timerEnding: 'The last seconds of the timer', reveal: 'Results are revealed', scoreboard: 'The scoreboard appears', cutscene: 'A cutscene appears', lobbyJoin: 'Someone joins the lobby',
 } as const;
 export type Moment = keyof typeof MOMENTS;
@@ -220,6 +228,7 @@ export const ANIMATION_PRESETS: Record<string, { name: string; animation: Custom
 };
 /** What each moment does unless the game says otherwise. */
 export const DEFAULT_ANIMATIONS: Record<Moment, string> = {
+  mediaEnter: 'fade', teamsEnter: 'fade', explanationEnter: 'fade', voteEnter: 'fade', routeEnter: 'fade', duelEnter: 'fade', minigameEnter: 'fade', finaleEnter: 'rise',
   sceneEnter: 'rise', answersEnter: 'cascade', answerSaved: 'pop', timerEnding: 'pulse', reveal: 'zoom', scoreboard: 'cascade', cutscene: 'zoom', lobbyJoin: 'pop',
 };
 export function resolveAnimation(choice: AnimationChoice | undefined, moment: Moment): CustomAnimation | null {
@@ -234,7 +243,7 @@ export const GAME_LANGUAGES = ['en', 'nl', 'de', 'ro'] as const;
 export const TranslatedTextsSchema = z.partialRecord(z.enum(GAME_LANGUAGES), TextsSchema);
 export type TranslatedTexts = z.infer<typeof TranslatedTextsSchema>;
 const AnimationsSchema = z.record(z.string(), AnimationChoiceSchema).refine(animations => Object.keys(animations).every(key => key in MOMENTS), 'Unknown moment');
-export const PresentationSchema = z.object({ texts: TextsSchema.optional(), translations: TranslatedTextsSchema.optional(), theme: ThemeSchema.optional(), animations: AnimationsSchema.optional() }).strict();
+export const PresentationSchema = z.object({ texts: TextsSchema.optional(), translations: TranslatedTextsSchema.optional(), theme: ThemeSchema.optional(), animations: AnimationsSchema.optional(), phoneMenuIcons: PhoneMenuIconsSchema.optional() }).strict();
 export type Presentation = z.infer<typeof PresentationSchema>;
 
 export function mergePresentationTexts(game?: Presentation, scene?: Presentation) {

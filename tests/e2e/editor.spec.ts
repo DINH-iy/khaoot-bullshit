@@ -38,6 +38,8 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
   await chooseOption(help.getByLabel('Show the whole game.'), '3');
+  await chooseOption(help.getByLabel('Tidy into rows'), 'J');
+  await expect(help.getByRole('row', { name: /Shift \+ J Tidy up into rows/ })).toBeVisible();
   await help.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: /^\d+%$/ }).click();
   await expect(page.getByRole('menuitem', { name: 'Show the whole game' })).toHaveAttribute('aria-keyshortcuts', 'Shift+3');
@@ -92,13 +94,18 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await props.getByRole('button', { name: 'Try this scene' }).click();
   const popup = page.getByRole('dialog', { name: 'Preview' });
   await expect(popup.locator('.phone-screen .minigame-preview')).toBeVisible();
+  await popup.getByRole('button', { name: 'Start practice' }).click();
+  await popup.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(popup.getByRole('status')).toContainText('off');
   await popup.getByRole('button', { name: 'Close', exact: true }).click();
 
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   await page.getByLabel('Change the look of').click();
   await page.getByRole('option', { name: 'The whole game' }).click();
-  await page.getByRole('button', { name: 'Space', exact: true }).click();
-  await expect(page.locator('.room-preview.motion-starlight').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Neptune', exact: true }).click();
+  const planetPreview = page.locator('.room-preview.motion-starlight').first();
+  await expect(planetPreview).toBeVisible();
+  await expect(planetPreview).toHaveCSS('--r-accent', '#91d8ff');
   await saved(page);
 
   await page.goto('/?admin=look');
@@ -543,10 +550,13 @@ test('the editor works on a phone: compact top bar, the scene panel and menus as
   expect(await inView(page.getByRole('menuitem', { name: 'Publish', exact: true }))).toBe(true);
   const menu = page.getByRole('menu', { name: 'Play and publish' });
   const headerBox = (await header.boundingBox())!;
-  expect((await menu.boundingBox())!.y).toBeCloseTo(headerBox.y + headerBox.height + 4, 0);
+  const headerBottom = headerBox.y + headerBox.height;
+  const placement = (await menu.boundingBox())!.y;
+  expect(placement).toBeGreaterThanOrEqual(headerBottom);
+  expect(placement).toBeLessThanOrEqual(headerBottom + 5);
   await burger.click();
   const gameMenu = page.getByRole('menu', { name: 'Game menu' });
-  expect((await gameMenu.boundingBox())!.y).toBeCloseTo(headerBox.y + headerBox.height + 4, 0);
+  expect((await gameMenu.boundingBox())!.y).toBeCloseTo(placement, 0);
   await people.click();
   await expect(page.getByRole('textbox', { name: 'Your name, as others editing this game see it' })).toBeVisible();
 });

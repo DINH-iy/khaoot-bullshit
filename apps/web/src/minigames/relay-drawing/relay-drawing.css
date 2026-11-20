@@ -1,0 +1,6 @@
+.mg-relay, .mg-turn, .mg-relay-screen { display: grid; gap: 12px; width: 100%; justify-items: center; }
+.mg-relay .drawing-view, .mg-turn .drawing-pad { width: min(100%, 30rem); }
+.mg-relay-screen .drawing-gallery { width: 100%; }
+
+.drawing-animation .actions { justify-content: center; gap: 0.35rem; }
+.animation-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 0.4rem; }

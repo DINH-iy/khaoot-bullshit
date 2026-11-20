@@ -3,7 +3,7 @@ import { CommandReceiptSchema, GameCommandSchema, OPEN_INVITES_DEFAULT, HOST_PHO
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { applyCommand } from './commands.js';
 import { closeSoonWhenAllIn } from './auto-close.js';
-import type { LiveSignals } from '../minigames/live.js';
+import type { LiveSignals } from '../minigames/tap-race/live.js';
 import { assertExecutable, contentHash, parseDefinition } from './definition.js';
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
@@ -12,7 +12,7 @@ import { payGameChips } from '../side-games/earnings.js';
 
 export interface CommandObservation { type: string; outcome: 'COMMITTED' | 'REPLAYED' | GameErrorCode; durationMs: number }
 
-/** `live`: optional signals from connected phones that help judge minigame results (see minigames/live.ts). */
+/** `live`: optional signals from connected phones that help judge minigame results (see minigames/tap-race/live.ts). */
 export function createGameService(client: PrismaClient, observe?: (event: CommandObservation) => void, clock: Clock = () => new Date(), live?: LiveSignals) {
   return {
     async execute(trustedActor: TrustedActor, input: unknown): Promise<CommandReceipt> {

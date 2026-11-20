@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { GameIdSchema } from '@party/contracts';
 import { GameError, requireGame } from '../errors.js';
 import { teamCount, type Formation, type Play } from '../definition.js';
+import { skillTeams, teamRatings } from './skill.js';
 import type { Transaction } from '../model.js';
 
 // Teams. A lineup is an immutable record of who was in which team; a team is
@@ -14,7 +15,7 @@ export type TeamPlay = Extract<Play, { kind: 'teams' }>;
 export type Carryover = 'keep' | 'fresh' | 'members';
 
 const FormingSchema = z.object({
-  scope: z.enum(['game', 'round']), carryover: z.enum(['keep', 'fresh', 'members']), formation: z.enum(['random', 'host', 'players']),
+  scope: z.enum(['game', 'round']), carryover: z.enum(['keep', 'fresh', 'members']), formation: z.enum(['random', 'skill', 'host', 'players']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
   teams: z.array(z.object({ name: z.string().min(1).max(30), targetSize: z.number().int().min(1).nullable() }).strict()).min(1).max(12),
   // Player ID -> team index, or null for sitting out. Players not listed are unassigned.
@@ -52,11 +53,17 @@ export function randomAssignment(teams: Forming['teams'], playerIds: string[], b
   return assignment;
 }
 
-export function startForming(form: Formation, play: TeamPlay, scope: 'game' | 'round', carryover: Carryover, playerIds: string[]): Forming {
+async function bySkill(tx: Transaction, sessionId: string, teams: Forming['teams'], playerIds: string[]) {
+  const proposal = randomAssignment(teams, playerIds, teams.every(team => team.targetSize === null));
+  const sizes = teams.map((_, index) => Object.values(proposal).filter(team => team === index).length);
+  return skillTeams(shuffle(playerIds), sizes, await teamRatings(tx, sessionId, playerIds));
+}
+
+export async function startForming(tx: Transaction, sessionId: string, form: Formation, play: TeamPlay, scope: 'game' | 'round', carryover: Carryover, playerIds: string[]): Promise<Forming> {
   const names = form.names ?? DEFAULT_TEAM_NAMES;
   const teams = targets(form).slice(0, teamCount(form)).map((targetSize, index) => ({ name: names[index]!, targetSize }));
   return { scope, carryover, formation: form.formation, answers: play.answers, points: play.points, teams,
-    assignment: form.formation === 'random' ? randomAssignment(teams, playerIds, form.split.kind === 'count') : {}, captains: {} };
+    assignment: form.formation === 'skill' ? await bySkill(tx, sessionId, teams, playerIds) : form.formation === 'random' ? randomAssignment(teams, playerIds, form.split.kind === 'count') : {}, captains: {} };
 }
 
 /** The current game lineup (latest lineup made for the whole game), if any. */
@@ -94,7 +101,7 @@ export async function gameLineupForRound(tx: Transaction, sessionId: string, pre
 }
 
 /** Applies a team-forming command to the proposal; returns the updated proposal, or the confirmed lineup. */
-export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null }, actorPlayerId: string | null, presentIds: string[]) {
+export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill' }, actorPlayerId: string | null, presentIds: string[]) {
   const present = new Set(presentIds);
   const size = (index: number) => Object.entries(forming.assignment).filter(([id, team]) => team === index && present.has(id)).length;
   // More or fewer teams than the game proposed: a new team gets the next free colour name; at least one team stays.
@@ -113,7 +120,13 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     const captains = Object.fromEntries(Object.entries(forming.captains).flatMap(([team, id]) => { const next = shift(Number(team)); return next === null ? [] : [[String(next), id]]; }));
     return { forming: { ...forming, teams: forming.teams.filter((_, position) => position !== index), assignment, captains } };
   }
-  if (command.type === 'teams.shuffle') return { forming: { ...forming, assignment: randomAssignment(forming.teams, presentIds, forming.teams.every(team => team.targetSize === null)), captains: {} } };
+  if (command.type === 'teams.shuffle') {
+    const skilled = command.method === 'skill';
+    const formation = forming.formation === 'players' ? 'players' : skilled ? 'skill' : forming.formation === 'skill' ? 'random' : forming.formation;
+    const assignment = skilled ? await bySkill(tx, sessionId, forming.teams, presentIds)
+      : randomAssignment(forming.teams, presentIds, forming.teams.every(team => team.targetSize === null));
+    return { forming: { ...forming, formation, assignment, captains: {} } };
+  }
   if (command.type === 'teams.assign' || command.type === 'teams.choose') {
     const playerId = command.type === 'teams.choose' ? actorPlayerId : command.playerId;
     requireGame(playerId && present.has(playerId), 'INELIGIBLE');

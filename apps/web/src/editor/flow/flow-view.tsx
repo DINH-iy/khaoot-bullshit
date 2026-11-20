@@ -1,4 +1,4 @@
-import type { ZoomShortcuts } from './zoom-shortcuts.js';
+import { editingAction, type ZoomShortcuts } from './zoom-shortcuts.js';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from '../controls/icons.js';
@@ -339,20 +339,23 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       }
       if (readOnly) return;
       // Tidying: Ctrl/⌘ + Shift + L tidies into rows; Alt + Shift + H / V lines up the selected scenes (by key position, so any layout and a Mac's Option work).
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.code === 'KeyL') { event.preventDefault(); tidy.rows(); return; }
-      if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && (event.code === 'KeyH' || event.code === 'KeyV')) {
-        event.preventDefault(); if (selected.length > 1) tidy.lineUp(event.code === 'KeyH' ? 'row' : 'column'); else setNotice(t('selectTwo')); return;
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.code === `Key${zoomShortcuts.tidy}`) { event.preventDefault(); tidy.rows(); return; }
+      const row = event.code === `Key${zoomShortcuts.row}`;
+      const column = event.code === `Key${zoomShortcuts.column}`;
+      if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && (row || column)) {
+        event.preventDefault(); if (selected.length > 1) tidy.lineUp(row ? 'row' : 'column'); else setNotice(t('selectTwo')); return;
       }
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
-      else if ((event.key === 'Delete' || event.key === 'Backspace') && selected.length) { event.preventDefault(); setAskDelete(true); }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && selected.length) { event.preventDefault(); duplicate(selected); }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c' && selected.length) {
+      const action = editingAction(event, zoomShortcuts);
+      if (action === 'remove' && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
+      else if (action === 'remove' && selected.length) { event.preventDefault(); setAskDelete(true); }
+      if (action === 'selectAll') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
+      if (action === 'duplicate' && selected.length) { event.preventDefault(); duplicate(selected); }
+      if (action === 'copy' && selected.length) {
         const keys = new Set(selected);
         const from = { ...definition, nodes: definition.nodes.filter(node => keys.has(node.key)), edges: definition.edges.filter(edge => keys.has(edge.from) && keys.has(edge.to)) };
         if (!writeClip({ keys: [...selected], from, positions: Object.fromEntries(selected.map(key => [key, positions[key]!])), game: d.draft?.gameId ?? null })) { setNotice(t('noCopy')); return; }
         setNotice(t(selected.length === 1 ? 'copiedOne' : 'copiedMany', { count: selected.length, key: navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl' })); }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') { const clip = readClip(); if (clip) { event.preventDefault(); paste(clip); } }
+      if (action === 'paste') { const clip = readClip(); if (clip) { event.preventDefault(); paste(clip); } }
       if (event.key === 'Escape') { setConnecting(null); setSelectedEdge(null); setPending(null); setAdding(null); setNotice(''); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
@@ -375,11 +378,11 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       <button className="with-icon" aria-label={t('addScene')} disabled={readOnly} onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" /><span className="tool-label">{t('addScene')}</span></button>
       {/* Everything that tidies the map, in one menu; each item says its shortcut (also in Help & shortcuts). */}
       <ActionMenu label={t('tidyUp')} text={t('tidyUp')} icon="tidy" align="start" actions={[
-        { label: t('tidyRows'), icon: 'rows', shortcut: `${MOD} + Shift + L`, disabled: readOnly, onSelect: () => tidy.rows() },
+        { label: t('tidyRows'), icon: 'rows', shortcut: `${MOD} + Shift + ${zoomShortcuts.tidy}`, disabled: readOnly, onSelect: () => tidy.rows() },
         { label: t('tidyLine'), icon: 'line', disabled: readOnly, onSelect: () => tidy.line() },
         // Shown greyed out until two or more scenes are selected (the intro says how).
-        { label: t('lineRow'), icon: 'align-row', shortcut: 'Alt + Shift + H', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('row') },
-        { label: t('lineColumn'), icon: 'align-column', shortcut: 'Alt + Shift + V', disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('column') },
+        { label: t('lineRow'), icon: 'align-row', shortcut: `Alt + Shift + ${zoomShortcuts.row}`, disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('row') },
+        { label: t('lineColumn'), icon: 'align-column', shortcut: `Alt + Shift + ${zoomShortcuts.column}`, disabled: readOnly || selected.length < 2, onSelect: () => tidy.lineUp('column') },
         { label: t('straightenAll'), icon: 'straighten', disabled: readOnly || !Object.keys(positions).some(isBendKey), onSelect: () => tidy.straighten() },
       ]} intro={selected.length > 1 ? undefined : t('lineUpIntro')} />
       {/* Zooming, as in design tools: the zoom level opens the menu. */}

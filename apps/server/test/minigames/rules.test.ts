@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MINIGAMES } from '@party/contracts';
-import { FASTEST_REACTION_MS, judgeResult, networkAllowance, places, startMinigame, TAP_TAIL, teamValue } from '../../src/minigames/rules.js';
-import { createLiveSignals } from '../../src/minigames/live.js';
-import { minigameOutcome, type MinigameRules } from '../../src/minigames/outcome.js';
+import { ANGLE_TARGETS, MINIGAMES, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteColor, rouletteReturn } from '@party/contracts';
+import { judgeResult, places, startMinigame, teamValue } from '../../src/minigames/shared/rules.js';
+import { FASTEST_REACTION_MS } from '../../src/minigames/reaction/judge.js';
+import { TAP_TAIL } from '../../src/minigames/tap-race/judge.js';
+import { networkAllowance } from '../../src/minigames/shared/fairness.js';
+import { createLiveSignals } from '../../src/minigames/tap-race/live.js';
+import { minigameOutcome, type MinigameRules } from '../../src/minigames/shared/outcome.js';
 import { GameError } from '../../src/game/errors.js';
 import type { TeamContext } from '../../src/game/teams/teams.js';
 
@@ -14,6 +17,44 @@ const rules = (game: MinigameRules['game'], extra: Partial<MinigameRules> = {}):
 const rejected = (run: () => void) => { try { run(); } catch (error) { return error instanceof GameError && error.code === 'INVALID_SUBMISSION'; } return false; };
 
 describe('minigame rules', () => {
+  it('uses the numbered European wheel and pays exact picks including green zero', () => {
+    expect(new Set(ROULETTE_ORDER).size).toBe(37);
+    expect(rouletteColor(32)).toBe('red');
+    expect(rouletteColor(11)).toBe('black');
+    expect(rouletteReturn(0, 0, 10)).toBe(360);
+    expect(rouletteReturn(0, 'red', 10)).toBe(0);
+    expect(rouletteReturn(32, 32, 25)).toBe(900);
+    expect(rouletteReturn(32, 'red', 25)).toBe(50);
+  });
+
+  it('awards every correct roulette pick and pays neither color on green zero', () => {
+    const game = 'red-or-black-roulette';
+    const rule = rules(game, { placementMilli: ['4000'] });
+    const guesses = [row(ids[0], 0), row(ids[1], 0), row(ids[2], 1)];
+    const counts = Array.from({ length: ROULETTE_POCKETS }, (_, pocket) => rouletteColor(pocket));
+    expect(counts.filter(color => color === 'red')).toHaveLength(18);
+    expect(counts.filter(color => color === 'black')).toHaveLength(18);
+    expect(counts.filter(color => color === 'green')).toHaveLength(1);
+    for (const [pocket, winners] of [[0, []], [1, [ids[0], ids[1]]], [2, [ids[2]]]] as const) {
+      const run = startMinigame(game, {}, now, () => pocket);
+      const result = minigameOutcome(rule, guesses, null, 'stage', run);
+      expect(result.awards.map(award => [award.playerId, award.amountMilli])).toEqual(winners.map(id => [id, 4000n]));
+    }
+  });
+
+  it('skips easy targets all the way around the circle and accepts 360° as 0°', () => {
+    expect(ANGLE_TARGETS).toContain(17);
+    expect(ANGLE_TARGETS).not.toContain(355);
+    for (const target of ANGLE_TARGETS) {
+      for (const step of [30, 45]) {
+        const nearest = Math.round(target / step) * step;
+        expect(Math.abs(nearest - target)).toBeGreaterThan(5);
+      }
+    }
+    const run = startMinigame('match-the-angle', {}, now, () => 0);
+    expect(judgeResult('match-the-angle', {}, run, { value: 360 }, at(3000))).toEqual({ angle: 0, value: 6 });
+  });
+
   it('starts after a countdown, hides GO between the set waits and shuffles every door', () => {
     const reaction = startMinigame('reaction', { minWaitMs: 2000, maxWaitMs: 6000 }, now, max => max - 1);
     expect(reaction.startsAt).toBe(at(3000).toISOString());
@@ -104,5 +145,16 @@ describe('minigame rules', () => {
     expect(result.awards.filter(award => award.playerId).length).toBe(4);
     expect(teamValue('tap-race', 'total', [-10, -20])).toBe(-30);
     expect(teamValue('reaction', 'total', [200, 300])).toBe(250); // a total of reaction times would punish bigger teams
+  });
+
+  it('uses the first matching best guess or the last included average guess for team angle ties', () => {
+    const left = 'left';
+    const right = 'right';
+    const context: TeamContext = { lineupId: 'lineup', answers: 'everyone', points: 'team',
+      teamOf: new Map([[ids[0], left], [ids[1], left], [ids[2], right], [ids[3], right]]),
+      members: new Map([[left, [ids[0], ids[1]]], [right, [ids[2], ids[3]]]]), captainOf: new Map() };
+    const rows = ids.map((id, index) => ({ ...row(id, 2), receivedAt: at([3000, 6000, 4000, 5000][index]!) }));
+    expect(minigameOutcome(rules('match-the-angle', { teamResult: 'best' }), rows, context, 'stage').entries[0]?.teamId).toBe(left);
+    expect(minigameOutcome(rules('match-the-angle'), rows, context, 'stage').entries[0]?.teamId).toBe(right);
   });
 });

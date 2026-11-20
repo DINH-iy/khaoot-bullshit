@@ -1,3 +1,4 @@
+import { SettingToggle } from '../room-extras/setting-toggle.js';
 import { useEffect, useRef, useState } from 'react';
 import { RoomCodeSchema, SeatListSchema, type RoomSnapshot } from '@party/contracts';
 import { useTexts } from '../i18n/texts.js';
@@ -71,8 +72,8 @@ function useSeatAction(onError: (message: string) => void) {
 /** The room setting (in the host's settings sheet): approve every seat takeover first. */
 export function SeatApprovalSetting({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
   const { busy, act, h } = useSeatAction(onError);
-  return <label className="choice seat-approval"><input type="checkbox" checked={state.settings.reclaimApproval} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { reclaimApproval: event.target.checked })} />
-    {h('seatApproval')}</label>;
+  return <SettingToggle label={h('seatApproval')} checked={state.settings.reclaimApproval} disabled={busy}
+    onChange={value => act(`/api/rooms/${sessionId}/settings`, { reclaimApproval: value })} />;
 }
 
 /** Waiting seat requests, right in the host panel (nothing when there are none). */

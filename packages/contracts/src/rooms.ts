@@ -38,7 +38,7 @@ export const RoomSnapshotSchema = z.object({
   birthdayVote: z.object({ voted: z.boolean(), ready: z.boolean() }).strict().optional(),
   hostPhone: z.boolean().optional(), hostPhonePlayerId: GameIdSchema.nullable().optional(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema, canBan: z.boolean().optional() }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(), idleCloseMinutes: IdleCloseMinutesSchema.optional(), keepOpen: z.boolean().optional() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(), idleCloseMinutes: IdleCloseMinutesSchema.optional(), keepOpen: z.boolean().optional() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.
@@ -65,7 +65,7 @@ export const OPEN_INVITES_DEFAULT = 3; export const MAX_OPEN_INVITES = 10;
 // `showScores`: players and the shared screen see the scoreboard during the game (else only at scoreboard scenes and the end).
 // `reactions`: players may send emoji and stickers to the shared screen. `autoClose`: a round closes 3 seconds after everyone answered.
 // `reactionLimit`: reactions each player may send per 10 seconds. `reactionChoices`: which of REACTIONS are allowed (positions in the list).
-export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), autoClose: z.boolean(), autoCloseSeconds: z.number().int().min(1).max(30),
+export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int().min(1).max(30),
   // `breakVotes`: players may vote for a break; it starts when `breakPercent` of the players agree. The host can always call one.
   breakVotes: z.boolean(), breakPercent: z.number().int().min(10).max(100),
   // `sideGames`: games on the phones while waiting (challenges between players). `chips`: the games played with chips

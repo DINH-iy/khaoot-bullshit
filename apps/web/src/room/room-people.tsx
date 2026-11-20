@@ -1,3 +1,4 @@
+import { SettingToggle } from '../room-extras/setting-toggle.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PeopleListSchema, PersonGroupListSchema, PersonKeyViewSchema, type PersonGroup, type PersonRow, type RoomSnapshot } from '@party/contracts';
 import { newId, roomApi } from './api.js';
@@ -72,15 +73,15 @@ function useHostAction(onError: (message: string) => void) {
 /** Room settings: guests may make their own account while joining. */
 export function SignupSetting({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
   const { busy, act } = useHostAction(onError); const h = useTexts(HOST_TEXTS);
-  return <label className="choice"><input type="checkbox" checked={state.settings.signup} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { signup: event.target.checked })} />
-    {h('signupSetting')}</label>;
+  return <SettingToggle label={h('signupSetting')} checked={state.settings.signup} disabled={busy}
+    onChange={value => act(`/api/rooms/${sessionId}/settings`, { signup: value })} />;
 }
 
 /** Room settings: phones on the test bench (several players in one browser) may join; the test bench switches it on. */
 export function TestBenchSetting({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
   const { busy, act } = useHostAction(onError); const h = useTexts(HOST_TEXTS);
-  return <label className="choice"><input type="checkbox" checked={state.settings.testBench} disabled={busy} onChange={event => act(`/api/rooms/${sessionId}/settings`, { testBench: event.target.checked })} />
-    {h('testBenchSetting')}</label>;
+  return <SettingToggle label={h('testBenchSetting')} checked={state.settings.testBench} disabled={busy}
+    onChange={value => act(`/api/rooms/${sessionId}/settings`, { testBench: value })} />;
 }
 
 /** Phones asking to sign in as one of the added people, in the host panel (nothing when there are none). */

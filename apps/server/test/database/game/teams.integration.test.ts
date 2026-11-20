@@ -258,3 +258,26 @@ describe('team rounds', () => {
     await close(f, quizRun);
   });
 });
+
+it('balances teams by revealed individual performance, including submitted answers worth zero', async () => {
+  const pick = { key: 'pick', stages: [{
+    key: 'main', kind: 'teams', prompt: 'Make teams', durationMs: null,
+    form: { split: { kind: 'count', teams: 2 }, formation: 'skill' },
+  }] };
+  const f = await fixture(4, game([quiz('warmup'), pick]));
+  const warmup = (await hostCommand(f, 'session.start')).stageRunId!;
+  for (let index = 0; index < 4; index++) await answer(f, index, warmup, index < 2 ? 'canberra' : 'sydney');
+  await close(f, warmup);
+  const stageRunId = (await hostCommand(f, 'stage.advance', { stageRunId: warmup })).stageRunId!;
+  const winners = new Set(f.players.slice(0, 2).map(entry => entry.id));
+  const check = async () => {
+    const proposed = (await hostView(f)).stage!.teams!;
+    expect(proposed.formation).toBe('skill');
+    expect(proposed.teams.map(team => team.memberIds.length)).toEqual([2, 2]);
+    expect(proposed.teams.map(team => team.memberIds.filter(id => winners.has(id)).length)).toEqual([1, 1]);
+  };
+  await check();
+  await expect(act(f, 0, 'teams.shuffle', { stageRunId, method: 'skill' })).rejects.toBeDefined();
+  await hostCommand(f, 'teams.shuffle', { stageRunId, method: 'skill' });
+  await check();
+});

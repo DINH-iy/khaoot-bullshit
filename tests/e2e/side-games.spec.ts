@@ -44,15 +44,35 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await expect(page).not.toHaveURL(/person=/);
     await page.getByLabel('Room code').fill(roomCode);
     await expect(page.getByText(`Playing as ${name}`)).toBeVisible();
+    let releaseChallenges!: () => void;
+    const challengeGate = new Promise<void>(resolve => { releaseChallenges = resolve; });
+    await page.route('**/api/rooms/*/side/challenges', async route => {
+      await challengeGate;
+      await route.continue();
+    }, { times: 1 });
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect(host.getByText(`${name} · connected`, { exact: false })).toBeVisible();
 
+    await (await openPhoneMenu(page)).getByRole('button', { name: 'Challenge', exact: true }).click();
+    const challenges = page.getByRole('dialog', { name: 'Challenges' });
+    await expect(challenges.getByRole('button', { name: 'Challenge someone' })).toBeVisible();
+    await expect(challenges.getByRole('region', { name: 'Your challenges' })).toHaveAttribute('aria-busy', 'true');
+    releaseChallenges();
+    await expect(challenges.getByText(/^None yet/)).toBeVisible();
+    await challenges.getByRole('button', { name: 'Close' }).click();
     const dock = await openPhoneMenu(page);
     await dock.getByRole('button', { name: 'Games' }).click();
     const sheet = page.getByRole('dialog', { name: 'Side games' });
+    await expect(sheet.getByRole('button', { name: /Spin/ })).toHaveCount(0);
+    await sheet.getByRole('button', { name: 'Slot machine', exact: true }).click();
     // Everyone starts with 200 chips (more are earned by playing).
     await expect(sheet.getByTitle('200 chips')).toBeVisible();
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await sheet.getByRole('button', { name: 'Spin for 10 chips' }).click();
+    const reels = sheet.locator('.reel-strip.landing');
+    await expect(reels).toHaveCount(3);
+    expect(await reels.evaluateAll(elements => elements.map(element => getComputedStyle(element).animationDuration)))
+      .toEqual(['0.95s', '1.45s', '1.96s']);
     await expect(sheet.getByRole('status').filter({ hasText: /You win|No luck/ })).toBeVisible();
     expect((await new AxeBuilder({ page }).include('.bottom-sheet').analyze()).violations).toEqual([]);
     // One button names the game being played and opens all games.

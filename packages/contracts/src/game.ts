@@ -1,7 +1,8 @@
+import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
 import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from './head-to-head.js';
 import { GAME_LANGUAGES, PresentationSchema, ThemeSchema, AnimationChoiceSchema, TranslatedTextsSchema } from './presentation.js';
-import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames.js';
+import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames/shared/catalog.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
@@ -109,7 +110,7 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('score.adjust'), playerId: GameIdSchema, amountMilli: AdjustmentMilliSchema, reason: z.string().trim().min(1).max(120) }).strict(),
   // Team forming before a team round starts. The host can always change the
   // proposal; players may pick a team only when the round lets them choose.
-  z.object({ ...hostEnvelope, type: z.literal('teams.shuffle'), stageRunId: GameIdSchema }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('teams.shuffle'), stageRunId: GameIdSchema, method: z.literal('skill').optional() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.assign'), stageRunId: GameIdSchema, playerId: GameIdSchema, teamIndex: z.number().int().min(0).max(11).nullable() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.captain'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.confirm'), stageRunId: GameIdSchema }).strict(),
@@ -201,7 +202,7 @@ export const BallotEntrySchema = z.object({
 // The teams of a team round. While `forming`, teams are a proposal (no team IDs
 // yet) that the host confirms; afterwards they are the round's fixed lineup.
 export const StageTeamsSchema = z.object({
-  forming: z.boolean(), formation: z.enum(['random', 'host', 'players']), scope: z.enum(['game', 'round']),
+  forming: z.boolean(), formation: z.enum(['random', 'skill', 'host', 'players']), scope: z.enum(['game', 'round']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
   teams: z.array(z.object({ index: z.number().int().min(0), name: z.string().min(1).max(30), teamId: GameIdSchema.nullable(), targetSize: z.number().int().min(1).nullable(),
     memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable() }).strict()),
@@ -295,10 +296,11 @@ export const SessionViewSchema = z.object({
   // Only revealed-stage scores and host corrections are visible; awards on an open or unrevealed stage are private.
   standings: z.array(z.object({ playerId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
   // The look and texts for this moment: the game's, with the current scene's changes on top.
-  presentation: z.object({ texts: z.record(z.string(), z.string()), translations: TranslatedTextsSchema.optional(), animations: z.record(z.string(), AnimationChoiceSchema), themes: z.array(ThemeSchema).max(2) }).strict(),
+  presentation: z.object({ texts: z.record(z.string(), z.string()), translations: TranslatedTextsSchema.optional(), animations: z.record(z.string(), AnimationChoiceSchema), phoneMenuIcons: PhoneMenuIconsSchema.optional(), themes: z.array(ThemeSchema).max(2) }).strict(),
   wheel: WheelViewSchema,
   // The room's music (absent in older views; null: the game has none).
   music: PublicMusicSchema.nullable().optional(),
+  phoneEffects: z.boolean().optional(),
   // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
   awards: z.array(FinaleSlideSchema).nullable(),
   // Totals of the game's current teams, following that lineup's carryover rule.

@@ -3,12 +3,13 @@ import { HeadToHeadKeySchema, parseHeadToHeadSettings, type HeadToHeadKey, type 
 import { illegal, type HeadToHeadRules, type Seat } from './engine.js';
 import { rps } from './rps.js';
 import { tictactoe } from './tictactoe.js';
+import { creatureDuel } from './creature-duel.js';
 import { chess } from './chess.js';
 
 // The registry of head-to-head games. To add a game: its entry in the contracts
 // (head-to-head.ts), a rules module like ./rps.ts, one line here, and its board
 // on the phone. Duels and challenges pick it up from here.
-const RULES: { [K in HeadToHeadKey]: HeadToHeadRules<K, never> } = { rps, tictactoe, chess } as never;
+const RULES: { [K in HeadToHeadKey]: HeadToHeadRules<K, never> } = { rps, tictactoe, chess, 'creature-duel': creatureDuel } as never;
 const rulesFor = <K extends HeadToHeadKey>(game: K) => RULES[game] as unknown as HeadToHeadRules<K, unknown>;
 
 /** A match as stored: the game, its settings, the game's own state, and who resigned (if anyone). */

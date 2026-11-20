@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { GameIdSchema } from './game.js';
-import { MINIGAME_KEYS, type MinigameKey } from './minigames.js';
+import { MINIGAME_KEYS, type MinigameKey } from './minigames/shared/catalog.js';
 import { PlayerLookSchema } from './players.js';
 
 /**

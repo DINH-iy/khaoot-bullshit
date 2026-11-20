@@ -46,13 +46,26 @@ test('the test bench caps at four phones in two columns and keeps reactions insi
   expect(await page.locator('.bench-phones').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 
   const first = page.frameLocator('iframe[title="Phone of Player 1"]');
-  await first.getByRole('button', { name: 'Menu', exact: true }).click();
-  await first.getByRole('button', { name: 'React', exact: true }).click();
+  await first.getByRole('button', { name: 'Send a reaction', exact: true }).click();
   const tray = first.getByRole('dialog', { name: 'Send a reaction' });
   await expect(tray).toBeVisible();
   expect(await tray.locator('.reaction-grid').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await tray.getByRole('button', { name: /TY FOR TUTORIAL/ }).click();
   const host = page.frameLocator('iframe[title="Host screen"]');
+  await page.setViewportSize({ width: 1050, height: 900 });
+  const manage = host.getByRole('button', { name: 'Manage Player 1', exact: true });
+  await manage.click();
+  const row = host.locator('.host-player-list > li').filter({ has: manage });
+  await expect(row.getByLabel('Display name')).toHaveValue('Player 1');
+  expect(await row.evaluate(item => {
+    const header = item.querySelector('.host-player-row')!.getBoundingClientRect();
+    const form = item.querySelector('form')!.getBoundingClientRect();
+    const name = item.querySelector('.host-player-name')!;
+    const text = document.createRange();
+    text.selectNodeContents(name);
+    return form.top >= header.bottom && form.right <= item.getBoundingClientRect().right
+      && item.scrollWidth === item.clientWidth && text.getClientRects().length === 1;
+  })).toBe(true);
   const reaction = host.locator('.reactions-overlay .reaction').filter({ hasText: 'TY FOR TUTORIAL' });
   await expect(reaction).toContainText('Player 1');
   expect(await reaction.evaluate(element => {
@@ -332,7 +345,7 @@ test('players can save the active look, leave the room, and see host moderation 
     await host.getByRole('button', { name: 'Open room', exact: true }).click();
     const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await openHostFold(host, 'Room settings');
-    await host.getByRole('checkbox', { name: /Players confirm their look/ }).check();
+    await host.getByRole('switch', { name: /Players confirm their look/ }).check();
     await host.getByRole('dialog', { name: 'Room settings' }).getByRole('button', { name: 'Close', exact: true }).click();
     await page.goto(`/?code=${code}`);
     await page.getByLabel('Your name').fill('Draw and leave');
@@ -348,7 +361,7 @@ test('players can save the active look, leave the room, and see host moderation 
     await pad.press('ArrowRight');
     await pad.press('ArrowDown');
     await pad.press('Space');
-    await settings().getByRole('button', { name: 'Save my look' }).click();
+    await settings().getByRole('button', { name: 'Save drawing' }).click();
     await expect(settings()).toHaveCount(0);
     await expect(host.locator('.lobby-seats .avatar-picture path')).not.toHaveCount(0);
 
@@ -378,7 +391,17 @@ test('players can save the active look, leave the room, and see host moderation 
     await expect(host.locator('.lobby-seats .avatar-picture img')).not.toHaveAttribute('src', oldPhoto!);
 
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
-    await page.getByRole('link', { name: 'Leave room', exact: true }).click();
+    const footer = page.locator('.phone-menu-footer');
+    await expect(footer.getByRole('button')).toHaveText(['Settings', 'English', 'Leave room']);
+    const leave = footer.getByRole('button', { name: 'Leave room', exact: true });
+    await expect(leave).toHaveCSS('background-color', 'rgb(168, 32, 55)');
+    await leave.click();
+    const confirmation = page.getByRole('alertdialog', { name: 'Leave the room?' });
+    await expect(confirmation.getByRole('button', { name: 'Stay' })).toBeFocused();
+    await confirmation.getByRole('button', { name: 'Stay' }).click();
+    await expect(page).toHaveURL(room);
+    await leave.click();
+    await confirmation.getByRole('link', { name: 'OK, leave' }).click();
     await expect(page).toHaveURL(new URL('/', baseURL).href);
     await page.goto(room);
     await expect(page.getByRole('heading', { name: `Room ${code}` })).toBeVisible();

@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { HOST_PHONE_COMMANDS, ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
+import { ChatModerationSchema, ChatSendSchema, HOST_PHONE_COMMANDS, ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenVerifier } from '../auth/auth.js';
@@ -20,14 +20,15 @@ import { connectionCookies, SEAT_HEADER, seatOf } from './test-seats.js';
 import { closeRoom } from './close.js';
 import { reconcileEmptyRooms } from './idle-close.js';
 import { followRoom } from './restart.js';
-import { createLiveSignals } from '../minigames/live.js';
+import { createLiveSignals } from '../minigames/tap-race/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
+import { createRoomChat } from './chat.js';
 import { registerReactions } from './reactions.js';
 import { breakVotesNeeded, createBreaks } from './breaks.js';
 import { personCookie, personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
 import { clientAddress } from '../http/client-address.js';
-import { decideDueVotes } from '../minigames/steps/engine.js';
+import { decideDueVotes } from '../minigames/shared/steps/engine.js';
 import { arcadeLink } from '../arcade/link.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
@@ -39,7 +40,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const live = createLiveSignals();
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'), undefined, live.signals);
   const minigames = registerMinigameEvents(io, client, live, app.log);
-  const reactions = registerReactions(io, client); const breaks = createBreaks(client, service);
+  const reactions = registerReactions(io, client); const chat = createRoomChat(client); const breaks = createBreaks(client, service);
   const failure = (error: unknown): RoomReply<never> => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
     app.log.warn({ event: 'room_request_rejected', code }, 'Room request rejected');
@@ -96,7 +97,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         ? { birthdayVote: { voted: state.birthdayVoters.includes(selfId), ready: state.birthdayReady } } : {}),
       hostPhone, ...(principal.role === 'host' ? { hostPhonePlayerId: state.hostPhonePlayerId } : {}), selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, chat: state.chat, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
         ...(principal.role === 'host' || hostPhone ? { autoRevealSeconds: state.autoRevealSeconds } : {}) },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], ...roomPeople, nextRoom: state.nextRoom, roomClosed: state.roomClosed, arcade });
@@ -184,7 +185,43 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
       const body = RoomSettingsSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
-      reactions.settingsChanged(id); await seats.setSettings(id, principal, Object.fromEntries(Object.entries(body.data).filter(([, value]) => value !== undefined))); return { ok: true, data: {} };
+      reactions.settingsChanged(id); await seats.setSettings(id, principal, Object.fromEntries(Object.entries(body.data).filter(([, value]) => value !== undefined)));
+      if (body.data.chat === false) chat.clear(id);
+      return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  const chatPrincipal = async (request: FastifyRequest) => {
+    roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
+    const principal = await gateway.authenticate(sessionId(request), cookie(request));
+    roomAssert(limiter.allow(`chat:${principal.id}`, 100), 'RATE_LIMITED');
+    return principal;
+  };
+  app.get('/api/rooms/:sessionId/chat', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    try { return { ok: true, data: await chat.read(await chatPrincipal(request)) }; }
+    catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  app.post('/api/rooms/:sessionId/chat', async (request, reply) => {
+    try {
+      const principal = await chatPrincipal(request);
+      const input = ChatSendSchema.safeParse(request.body);
+      roomAssert(input.success, 'INVALID_COMMAND');
+      await chat.send(principal, input.data);
+      return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error)); }
+  });
+  app.post('/api/rooms/:sessionId/chat/moderation', async (request, reply) => {
+    try {
+      const principal = await chatPrincipal(request);
+      const input = ChatModerationSchema.safeParse(request.body);
+      roomAssert(input.success, 'INVALID_COMMAND');
+      const action = input.data;
+      if (action.action === 'report') await chat.report(principal, action.messageId);
+      else if (action.action === 'show') {
+        const message = await chat.quote(principal, action.messageId);
+        roomAssert(await reactions.showText(principal.sessionId, message.from, message.text), 'FORBIDDEN');
+      } else await chat.mute(principal, action.playerId, action.muted);
+      return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error)); }
   });
   // A break: a player votes for (or withdraws from) one, the host calls one. The host ends it by continuing the game.
@@ -308,6 +345,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         await authorize(tx, room, principal.actor);
         await closeRoom(tx, id);
       });
+      chat.clear(id);
       return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error)); }
   });

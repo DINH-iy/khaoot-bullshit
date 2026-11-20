@@ -1,0 +1,21 @@
+.speed-run-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  width: min(100%, 21rem);
+  margin-inline: auto;
+}
+.speed-run-board .race-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--r-muted, #a9acbc) 15%, transparent);
+}
+.speed-run-board .race-cell.wall { background: color-mix(in srgb, var(--r-muted, #a9acbc) 58%, var(--r-surface, #22252b)); }
+.speed-run-board .race-cell.finish { color: var(--r-accent, #baa4ff); outline: 1px solid currentColor; outline-offset: -1px; }
+.speed-run-board .race-cell.runner { background: var(--r-accent, #baa4ff); color: var(--r-accent-ink, #111); }
+.mg-speed-run .step-sides { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+.mg-speed-run .step-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.speed-run-edit .race-cell { min-width: 0; min-height: 0; padding: 0; }

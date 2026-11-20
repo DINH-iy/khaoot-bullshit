@@ -15,12 +15,12 @@ function Card({ card }: { card: number | null }) {
 }
 
 /** Blackjack against the dealer. A hand left open (a round started) is picked up again later. Without chips it is played for fun. */
-export function Blackjack({ sessionId, balance, onBalance, open, chips: forChips }: { sessionId: string; balance: number; onBalance: (balance: number) => void; open: BlackjackView | null; chips: boolean }) {
+export function Blackjack({ sessionId, balance, onBalance, onHand, open, chips: forChips }: { sessionId: string; balance: number; onBalance: (balance: number) => void; onHand: (hand: BlackjackView) => void; open: BlackjackView | null; chips: boolean }) {
   const [bet, setBet] = useState<typeof BETS[number]>(10);
   const [hand, setHand] = useState<BlackjackView | null>(open); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const send = async (path: string, body: unknown) => {
     setBusy(true); setError('');
-    try { const result = BlackjackResultSchema.parse(await sideApi(sessionId, path, body)); setHand(result.hand); onBalance(result.balance); }
+    try { const result = BlackjackResultSchema.parse(await sideApi(sessionId, path, body)); setHand(result.hand); onHand(result.hand); onBalance(result.balance); }
     catch (cause) { setError(sideProblem(cause)); } finally { setBusy(false); }
   };
   const playing = hand && hand.outcome === null;

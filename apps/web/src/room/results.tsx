@@ -1,3 +1,4 @@
+import { useReactions, type ReactionStore } from '../room-extras/reactions.js';
 import { Dropdown } from '../ui/dropdown.js';
 import { useText } from '../presentation/look.js';
 import { cloneElement, isValidElement, useEffect, useState, type ReactNode } from 'react';
@@ -5,7 +6,7 @@ import type { RoomSnapshot } from '@party/contracts';
 import { MediaView } from './media-upload.js';
 import { BallotContent, SavedVoteBadge, savedVote } from './vote.js';
 import { TeamStandings, teamName } from './teams.js';
-import { MinigameResults } from '../minigames/minigame-stage.js';
+import { MinigameResults } from '../minigames/shared/minigame-stage.js';
 import { StoredDrawing } from '../drawing/drawing-view.js';
 import { FaIcon } from '../presentation/icons.js';
 import { Avatar } from '../players/avatar.js';
@@ -164,8 +165,10 @@ export function leaderLine(state: RoomSnapshot): string {
 }
 
 /** The standings. `compact`: the small floating card (no heading or note, small faces). */
-export function Scoreboard({ state, disabled, send, compact = false }: { state: RoomSnapshot; disabled: boolean; send: Send; compact?: boolean }) {
+export function Scoreboard({ state, disabled, send, compact = false, reactions }: { state: RoomSnapshot; disabled: boolean; send: Send; compact?: boolean; reactions?: ReactionStore | undefined }) {
   const t = useText();
+  const recent = useReactions(reactions);
+  const bubbles = new Map(recent.map(reaction => [reaction.playerId, reaction]));
   const [edit, setEdit] = useState(''); const [correcting, setCorrecting] = useState(false);
   const [playerId, setPlayerId] = useState('');
   const totals = new Map(state.view.standings.map(row => [row.playerId, row.amountMilli]));
@@ -181,7 +184,8 @@ export function Scoreboard({ state, disabled, send, compact = false }: { state: 
   return <section aria-labelledby="scores-heading" className={scene ? 'scoreboard-scene' : compact ? 'scoreboard-compact' : undefined}><h2 id="scores-heading" className={compact ? 'visually-hidden' : undefined}>{scene ? state.view.stage!.prompt : finished ? t('scores.final') : t('scores.title')}</h2>
     {scene && teams && !state.view.teamStandings.length && scene.show === 'teams' && <p>{p('noTeams')}</p>}
     {players && <ol className="scoreboard">{rows.map(row =>
-      <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={compact ? 22 : 32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? p('you') : ''}</span><span className="score-points">{formatPoints(row.milli)}</span></li>
+      <li key={row.id}><Avatar look={state.players.find(player => player.id === row.id)?.look ?? defaultLook(row.id)} size={compact ? 22 : 32} /><span className="score-name">{row.name}{row.id === state.selfPlayerId ? p('you') : ''}{bubbles.get(row.id) && <span key={bubbles.get(row.id)!.id}
+        className={`score-reaction ${bubbles.get(row.id)!.kind}`} aria-hidden="true">{bubbles.get(row.id)!.value}</span>}</span><span className="score-points">{formatPoints(row.milli)}</span></li>
     )}</ol>}
     {teams && <TeamStandings state={state} />}
     {state.role === 'host' && players && rows.length > 0 && <>

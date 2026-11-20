@@ -15,7 +15,6 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     close: "Close",
     devices: "Preview device",
     editMedia: "Media settings", addMedia: "Add media",
-    rehearseOnly: "Rehearse only this scene",
 }, {
   nl: {
     position: "Positie van media",
@@ -32,7 +31,6 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     close: "Sluiten",
     devices: "Voorbeeldapparaat",
     editMedia: "Media-instellingen", addMedia: "Media toevoegen",
-    rehearseOnly: "Alleen deze scène oefenen",
   },
   de: {
     position: "Medienposition",
@@ -49,7 +47,6 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     close: "Schließen",
     devices: "Vorschaugerät",
     editMedia: "Medieneinstellungen", addMedia: "Medien hinzufügen",
-    rehearseOnly: "Nur diese Szene proben",
   },
   ro: {
     position: "Poziția conținutului media",
@@ -66,6 +63,5 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     close: "Închide",
     devices: "Dispozitiv de previzualizare",
     editMedia: "Setări media", addMedia: "Adaugă conținut media",
-    rehearseOnly: "Repetă doar această scenă",
   },
 });

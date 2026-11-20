@@ -1,34 +1,42 @@
+import { useTexts } from '../i18n/texts.js';
+import { CREATURE_TEXTS } from '../head-to-head/creature-board.js';
 import { Dropdown } from '../ui/dropdown.js';
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { ChallengeListSchema, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, type Challenge, type HeadToHeadKey, type HeadToHeadMove } from '@party/contracts';
+import { lazy, Suspense, useState } from 'react';
+import { ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, type Challenge, type HeadToHeadKey, type HeadToHeadMove } from '@party/contracts';
 import { newId } from '../room/api.js';
-import { chips, sideApi, sideProblem, isMyTurn, st } from './side-api.js';
+import { chips, sideApi, isMyTurn, st } from './side-api.js';
 import { rich } from '../i18n/rich.js';
 import { gameHowToPlay, gameName } from '../presentation/catalog.text.js';
-import './side-games.css';
+import { challengeProblem, type useChallenges } from './use-challenges.js';
 import { FaIcon } from '../presentation/icons.js';
 
 // The boards (and chess) load only when a game is opened.
 const HeadToHead = lazy(() => import('../head-to-head/boards.js').then(module => ({ default: module.HeadToHead })));
-const problems = { ALREADY_SUBMITTED: 'cAlready', INVALID_STATE: 'cChanged', INVALID_SUBMISSION: 'cNotAllowed', NOT_FOUND: 'cGone' } as const;
-const explain = (cause: unknown) => { const key = problems[(cause instanceof Error ? cause.message : '') as keyof typeof problems]; return key ? st(key) : sideProblem(cause); };
 const STATUS = { INVITED: 'stInvited', PLAYING: 'stPlaying', FINISHED: 'stFinished', DECLINED: 'stDeclined', CANCELLED: 'stCancelled' } as const satisfies Record<Challenge['status'], string>;
 const title = (game: HeadToHeadKey) => gameName(game) || HEAD_TO_HEAD_GAMES[game].name;
 
 /**
  * Challenges on a player's phone: challenge another player to a head-to-head
  * game (rock paper scissors, tic-tac-toe, chess…), optionally for chips; answer
- * invitations; play; and watch or save the replay. Updates arrive over the room
- * connection (`tick`), so nothing polls.
+ * invitations; play; and watch or save the replay. The challenge list updates over the room connection.
  */
-export default function Challenges({ sessionId, selfId, players, tick }: { sessionId: string; selfId: string | null; players: { id: string; displayName: string }[]; tick: number }) {
-  const [list, setList] = useState<Challenge[]>(); const [balance, setBalance] = useState(0); const [withChips, setWithChips] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+export function Challenges({ sessionId, selfId, players, state, withChips }: {
+  sessionId: string; selfId: string | null; players: { id: string; displayName: string }[];
+  state: ReturnType<typeof useChallenges>; withChips: boolean;
+}) {
+  const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null); const [creating, setCreating] = useState(false);
-  const load = useCallback(() => sideApi(sessionId, '/challenges').then(data => { const parsed = ChallengeListSchema.parse(data); setList(parsed.challenges); setBalance(parsed.balance); setWithChips(parsed.chips); }).catch(cause => setError(explain(cause))), [sessionId]);
-  useEffect(() => { void load(); }, [load, tick]);
+  const list = state.data?.challenges ?? [];
+  const balance = state.data?.balance ?? 0;
   const name = (id: string) => players.find(player => player.id === id)?.displayName ?? st('someone');
-  const act = (path: string, body: unknown = {}) => { setBusy(true); setError(''); void sideApi(sessionId, path, body).then(data => { const updated = ChallengeSchema.parse(data); setList(current => [updated, ...(current ?? []).filter(entry => entry.id !== updated.id)]); return load(); }).catch(cause => setError(explain(cause))).finally(() => setBusy(false)); };
-  if (!list) return error ? <p role="alert" className="error">{error}</p> : <p role="status">{st('loading')}</p>;
+  const act = (path: string, body: unknown = {}) => {
+    setBusy(true);
+    setError('');
+    void sideApi(sessionId, path, body).then(data => {
+      state.update(ChallengeSchema.parse(data));
+      return state.refresh();
+    }).catch(cause => setError(challengeProblem(cause))).finally(() => setBusy(false));
+  };
   const current = list.find(entry => entry.id === open);
   if (current) {
     const names: [string, string] = [name(current.challengerId), name(current.opponentId)];
@@ -55,8 +63,9 @@ export default function Challenges({ sessionId, selfId, players, tick }: { sessi
     {creating ? <NewChallenge players={players.filter(player => player.id !== selfId)} balance={balance} busy={busy} withChips={withChips} onCancel={() => setCreating(false)}
       onSend={body => { act('/challenges', body); setCreating(false); }} />
       : <button type="button" className="primary" onClick={() => setCreating(true)}>{st('challengeSomeone')}</button>}
-    <section aria-labelledby="mine-heading" className="challenge-group"><h3 id="mine-heading">{st('yours')}</h3>
-      {rest.length === 0 ? <p className="hint">{st('none')}</p>
+    <section aria-labelledby="mine-heading" className="challenge-group" aria-busy={!state.data && !state.error}><h3 id="mine-heading">{st('yours')}</h3>
+      {!state.data ? (state.error ? <><p role="alert" className="error">{state.error}</p><button type="button" className="small-button" onClick={() => void state.refresh()}>{st('retry')}</button></> : null)
+        : rest.length === 0 ? <p className="hint">{st('none')}</p>
         : <ul className="plain-list">{rest.map(entry => { const other = entry.mine === 'challenger' ? entry.opponentId : entry.challengerId;
           const myTurn = isMyTurn(entry);
           return <li key={entry.id} className="challenge-card">
@@ -71,16 +80,20 @@ export default function Challenges({ sessionId, selfId, players, tick }: { sessi
 }
 
 function NewChallenge({ players, balance, busy, onSend, onCancel, withChips }: { players: { id: string; displayName: string }[]; balance: number; busy: boolean; onSend: (body: unknown) => void; onCancel: () => void; withChips: boolean }) {
+  const c = useTexts(CREATURE_TEXTS);
+  const [size, setSize] = useState('1');
   const [opponentId, setOpponent] = useState(players[0]?.id ?? ''); const [game, setGame] = useState<HeadToHeadKey>('rps');
   const [stake, setStake] = useState('0'); const [firstTo, setFirstTo] = useState(String(HEAD_TO_HEAD_DEFAULTS.rps.firstTo));
   // Without chips in the room a challenge is always for fun.
   const amount = withChips ? Math.max(0, Math.round(Number(stake) || 0)) : 0;
   if (!players.length) return <p className="hint">{st('nobodyElse')} <button type="button" className="small-button" onClick={onCancel}><FaIcon name="arrow-rotate-left" /> {st('back')}</button></p>;
-  return <form className="challenge-form" onSubmit={event => { event.preventDefault(); onSend({ challengeId: newId(), opponentId, game, stake: amount, ...(game === 'rps' ? { settings: { firstTo: Number(firstTo) } } : {}) }); }}>
+  return <form className="challenge-form" onSubmit={event => { event.preventDefault(); onSend({ challengeId: newId(), opponentId, game, stake: amount, ...(game === 'rps' ? { settings: { firstTo: Number(firstTo) } } : game === 'creature-duel' ? { settings: { size: Number(size) } } : {}) }); }}>
     <label>{st('who')}<Dropdown value={opponentId} onChange={setOpponent} options={players.map(player => ({ value: player.id, label: player.displayName }))} /></label>
     <label>{st('game')}<Dropdown value={game} onChange={value => setGame(value as HeadToHeadKey)} options={HEAD_TO_HEAD_KEYS.map(value => ({ value, label: title(value) }))} /></label>
     <p className="hint">{gameHowToPlay(game) || HEAD_TO_HEAD_GAMES[game].howToPlay}</p>
     {game === 'rps' && <label>{st('firstTo')}<Dropdown value={firstTo} onChange={setFirstTo} options={[1, 2, 3, 4, 5].map(count => ({ value: String(count), label: st(count === 1 ? 'win' : 'wins', { count }) }))} /></label>}
+    {game === 'creature-duel' && <label>{c('teamSize')}<Dropdown value={size} onChange={setSize}
+      options={[{ value: '1', label: c('solo') }, { value: '3', label: c('team') }]} /></label>}
     {withChips && <label>{st('stake')}<input type="number" inputMode="numeric" min={0} max={balance} value={stake} onChange={event => setStake(event.target.value)} /></label>}
     {amount > 0 && <p className="hint">{st('eachPut', { amount: chips(amount), total: chips(amount * 2) })}</p>}
     <div className="actions"><button type="submit" className="primary" disabled={busy || !opponentId || amount > balance}>{st('send')}</button><button type="button" className="ghost" onClick={onCancel}>{st('cancel')}</button></div>

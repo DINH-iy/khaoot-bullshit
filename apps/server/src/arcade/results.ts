@@ -1,7 +1,7 @@
 import { MINIGAMES, MINIGAME_KEYS, isMinigameKey, type MinigameKey, type SessionView } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
-import { rankValue } from '../minigames/rules.js';
+import { rankValue } from '../minigames/shared/rules.js';
 import { lookOf } from './lobbies.js';
 import { payArcadeWins } from '../side-games/earnings.js';
 

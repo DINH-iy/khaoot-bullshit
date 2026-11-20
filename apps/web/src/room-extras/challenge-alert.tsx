@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { ChallengeListSchema, HEAD_TO_HEAD_GAMES, type Challenge, type RoomSnapshot } from '@party/contracts';
+import { useState } from 'react';
+import { HEAD_TO_HEAD_GAMES, type Challenge, type RoomSnapshot } from '@party/contracts';
 import { translate } from '../i18n/texts.js';
 import { EXTRAS_TEXTS } from '../room/extras.text.js';
 import { rich } from '../i18n/rich.js';
 import { gameName } from '../presentation/catalog.text.js';
 const x = (key: keyof typeof EXTRAS_TEXTS.en, values?: Record<string, string | number>) => translate(EXTRAS_TEXTS, key, values);
-import { chips, isMyTurn, sideApi } from '../side-games/side-api.js';
+import { chips, isMyTurn } from '../side-games/side-api.js';
 
 /** What the alert is about: someone challenged you, or it is your move. */
 interface Alert { key: string; challenge: Challenge; kind: 'invite' | 'turn' }
@@ -15,23 +15,12 @@ interface Alert { key: string; challenge: Challenge; kind: 'invite' | 'turn' }
  * their move), visible without opening the menu. It stays until they open the
  * challenges or tap Later. Read when the phone opens and on every challenge update.
  */
-export function ChallengeAlert({ state, tick, needed, onOpen }: { state: RoomSnapshot; tick: number; needed: boolean; onOpen: () => void }) {
-  const [alert, setAlert] = useState<Alert | null>(null);
+export function ChallengeAlert({ state, challenges, needed, onOpen }: { state: RoomSnapshot; challenges: Challenge[]; needed: boolean; onOpen: () => void }) {
   const [dismissed, setDismissed] = useState<string[]>([]);
-  const sessionId = state.view.sessionId; const on = state.settings.sideGames;
-  useEffect(() => {
-    if (!on) { setAlert(null); return; }
-    let mounted = true;
-    void sideApi(sessionId, '/challenges').then(data => {
-      if (!mounted) return;
-      const list = ChallengeListSchema.parse(data).challenges;
-      // An invitation comes first; otherwise a game waiting for your move. The key changes with each new move, so Later only hides this one.
-      const invite = list.find(entry => entry.status === 'INVITED' && entry.mine === 'opponent');
-      const turn = list.find(isMyTurn);
-      setAlert(invite ? { key: `invite:${invite.id}`, challenge: invite, kind: 'invite' } : turn ? { key: `turn:${turn.id}:${turn.updatedAt}`, challenge: turn, kind: 'turn' } : null);
-    }).catch(() => undefined);
-    return () => { mounted = false; };
-  }, [sessionId, tick, on]);
+  const invite = challenges.find(entry => entry.status === 'INVITED' && entry.mine === 'opponent');
+  const turn = challenges.find(isMyTurn);
+  const alert: Alert | null = invite ? { key: `invite:${invite.id}`, challenge: invite, kind: 'invite' }
+    : turn ? { key: `turn:${turn.id}:${turn.updatedAt}`, challenge: turn, kind: 'turn' } : null;
   if (!alert || dismissed.includes(alert.key)) return null;
   const { challenge } = alert; const other = alert.kind === 'invite' || challenge.mine === 'opponent' ? challenge.challengerId : challenge.opponentId;
   const name = state.players.find(player => player.id === other)?.displayName ?? x('someone');

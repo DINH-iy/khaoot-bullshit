@@ -1,9 +1,10 @@
-import { voteChoices } from '@party/contracts';
+import { isSharedPrediction, voteChoices } from '@party/contracts';
 import { FINALE_STATS, SubmissionValueSchema, type AwardRule, type FinaleStat } from '@party/contracts';
 import { minigameRules, type GameDefinition } from '../definition.js';
 import { locateStage } from '../graph.js';
 import type { Transaction } from '../model.js';
-import { minigameOutcome } from '../../minigames/outcome.js';
+import { minigameOutcome } from '../../minigames/shared/outcome.js';
+import { readMinigameRun } from '../../minigames/shared/rules.js';
 
 export interface FinaleSlide { stat: AwardRule; title?: string; playerIds: string[]; value: string }
 /** The statistics shown unless the author chooses: everything that has something to show. */
@@ -55,7 +56,8 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
   }
   for (const { run, stage } of stageOf.values()) {
     if (stage?.kind !== 'minigame' || run.lineupId) continue;
-    try { for (const entry of minigameOutcome(minigameRules(stage), submissions.filter(row => row.stageRunId === run.id), null, run.id).entries) if (entry.place === 1 && entry.playerId) bump(firsts, entry.playerId); }
+    const prediction = isSharedPrediction(stage.game) ? readMinigameRun(run.presentation) : undefined;
+    try { for (const entry of minigameOutcome(minigameRules(stage), submissions.filter(row => row.stageRunId === run.id), null, run.id, prediction).entries) if (entry.place === 1 && entry.playerId) bump(firsts, entry.playerId); }
     catch { /* a minigame no longer in the catalog has no champion */ }
   }
   const average = new Map([...times.entries()].filter(([, list]) => list.length >= 2).map(([id, list]) => [id, list.reduce((sum, ms) => sum + ms, 0) / list.length]));

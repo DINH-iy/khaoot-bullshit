@@ -26,20 +26,25 @@ export function BallotContent({ sessionId, entry, label }: { sessionId: string; 
 
 /** Players can choose or rank eligible entries. The host and display view the ballot. */
 export function VoteBallot({ state, stage, canVote, disabled, onVote }: { state: RoomSnapshot; stage: Stage; canVote: boolean; disabled: boolean; onVote: (value: SubmissionValue) => void }) {
+  return <Ballot sessionId={state.view.sessionId} ballot={stage.ballot ?? []} mode={stage.voteMode ?? 'single'} limit={stage.voteLimit ?? 1}
+    saved={voteChoices(savedVote(state))} canVote={canVote} disabled={disabled} onVote={onVote} />;
+}
+
+export function Ballot({ sessionId, ballot, mode, limit, saved, canVote, disabled, onVote }: {
+  sessionId: string; ballot: Entry[]; mode: NonNullable<Stage['voteMode']>; limit: number; saved: readonly string[];
+  canVote: boolean; disabled: boolean; onVote: (value: SubmissionValue) => void;
+}) {
   const t = useText();
   const controls = useTexts(ROUND_CONTROL_TEXTS);
-  const [choices, setChoices] = useState<string[]>([]); const ballot = stage.ballot ?? [];
-  const mode = stage.voteMode ?? 'single';
-  const limit = stage.voteLimit ?? 1;
+  const [choices, setChoices] = useState<string[]>([]);
   const toggle = (id: string) => setChoices(previous => mode === 'single' ? [id] : previous.includes(id) ? previous.filter(choice => choice !== id) : [...previous, id].slice(0, limit));
   if (!ballot.length) return <p>{p('nothingBallot')}</p>;
   const entries = ballot.map((entry, index) => ({ entry, name: p('entryN', { number: index + 1 }) }));
-  const saved = voteChoices(savedVote(state));
   if (!canVote) return <ul className="ballot">{entries.map(({ entry, name }) => {
     const selected = saved.includes(entry.submissionId);
     return <li key={entry.submissionId} className={`ballot-entry${selected ? ' saved-vote' : ''}`}>
       <span>{name}{entry.own ? ' (yours)' : ''}</span>
-      <BallotContent sessionId={state.view.sessionId} entry={entry} label={name} />
+      <BallotContent sessionId={sessionId} entry={entry} label={name} />
       {selected && <SavedVoteBadge />}
     </li>;
   })}</ul>;
@@ -47,7 +52,7 @@ export function VoteBallot({ state, stage, canVote, disabled, onVote }: { state:
     <fieldset><legend>{t('vote.legend')}</legend>{mode === 'ranked' && <p>{controls('ranking')}</p>}<div className="ballot">{entries.map(({ entry, name }) => <div key={entry.submissionId} className="ballot-entry">
       <label className="choice"><input type={mode === 'single' ? 'radio' : 'checkbox'} name="vote" value={entry.submissionId} disabled={disabled || entry.own || (mode !== 'single' && choices.length >= limit && !choices.includes(entry.submissionId))} checked={choices.includes(entry.submissionId)} onChange={() => toggle(entry.submissionId)} />
         <span>{mode === 'ranked' && choices.includes(entry.submissionId) && <strong>{choices.indexOf(entry.submissionId) + 1}. </strong>}{name}{entry.own ? ' (yours, you cannot vote for it)' : ''}{entry.content.kind === 'text' ? <>: <span className="ballot-text">{entry.content.text}</span></> : null}</span></label>
-      {entry.content.kind !== 'text' && <BallotContent sessionId={state.view.sessionId} entry={entry} label={name} />}
+      {entry.content.kind !== 'text' && <BallotContent sessionId={sessionId} entry={entry} label={name} />}
     </div>)}</div></fieldset>
     <button disabled={disabled || !choices.length}>{t('vote.submit')}</button>
   </form>;

@@ -421,16 +421,19 @@ test('authors can import audio, trim it, and add the clip to the playlist from t
   expect(draft.definition.music.tracks).toEqual([{ kind: 'audio', id: clipId }]);
 });
 
-test('background music plays from the lobby on, follows the scene and the hostâ€™s volume, and stops when switched off', async ({ page, baseURL }) => {
+test('background playlist advances in order, repeats, and follows the scene and host volume', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Set up from the desktop.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
-  const song = (await (await page.request.post(`${baseURL}/api/host/media?name=Lobby%20loop.wav`, { headers: { ...headers, 'content-type': 'application/octet-stream' }, data: silentWav() })).json()).data;
+  const upload = async (name: string, duration: number) => (await (await page.request.post(`${baseURL}/api/host/media?name=${encodeURIComponent(name)}`,
+    { headers: { ...headers, 'content-type': 'application/octet-stream' }, data: silentWav(duration) })).json()).data;
+  const song = await upload('Lobby loop.wav', 1.8);
+  const next = await upload('Second song.wav', 1.8);
   const gameId = randomUUID();
   const draft = (await (await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: `Music quiz ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' } })).json()).data;
   // The playlist, and the first question plays it quieter.
-  const definition = { ...draft.definition, music: { tracks: [{ id: song.id, kind: 'audio' }] }, nodes: draft.definition.nodes.map((node: { key: string; stages: object[] }) => node.key === draft.definition.startNodeKey ? { ...node, stages: [{ ...node.stages[0], music: { mode: 'quiet' } }, ...node.stages.slice(1)] } : node) };
+  const definition = { ...draft.definition, music: { tracks: [{ id: song.id, kind: 'audio' }, { id: next.id, kind: 'audio' }] }, nodes: draft.definition.nodes.map((node: { key: string; stages: object[] }) => node.key === draft.definition.startNodeKey ? { ...node, stages: [{ ...node.stages[0], music: { mode: 'quiet' } }, ...node.stages.slice(1)] } : node) };
   const saved = (await (await page.request.put(`${baseURL}/api/host/games/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).json()).data;
   expect((await page.request.post(`${baseURL}/api/host/games/${gameId}/publish`, { headers, data: { expectedRevision: saved.revision } })).ok()).toBe(true);
   const sessionId = randomUUID();
@@ -441,11 +444,16 @@ test('background music plays from the lobby on, follows the scene and the hostâ€
   const music = page.locator('audio[aria-hidden=true]');
   await expect(music).toHaveAttribute('src', `/api/media/${song.id}`);
   const start = page.getByRole('button', { name: 'Start the music' });
+  await expect.poll(async () => await start.isVisible() || await music.evaluate(element => !(element as HTMLAudioElement).paused)).toBe(true);
   if (await start.isVisible()) await start.click();
   const volume = () => music.evaluate(element => Math.round((element as HTMLAudioElement).volume * 100));
   await expect.poll(volume).toBe(60);
   // The song is named as it starts (its file name without the extension; no credit set).
   await expect(page.locator('.music-caption')).toContainText('Lobby loop');
+  await expect(music).toHaveJSProperty('loop', false);
+  await expect(music).toHaveAttribute('src', `/api/media/${next.id}`);
+  await expect(page.locator('.music-caption')).toContainText('Second song');
+  await expect(music).toHaveAttribute('src', `/api/media/${song.id}`);
   await page.getByRole('button', { name: 'Start the game' }).click();
   await expect.poll(volume).toBe(18);
   // The host turns it up for the room, then switches it off.

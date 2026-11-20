@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { HEAD_TO_HEAD_GAMES, type HeadToHeadKey, type HeadToHeadMove, type HeadToHeadView } from '@party/contracts';
+import { CreatureBoard } from './creature-board.js';
 import { Replay } from './replay.js';
 import { PIECES, RPS_ICONS, squaresOf } from './pieces.js';
 import { h, listItem } from './h2h.text.js';
@@ -72,7 +73,7 @@ function ChessBoard({ view, board, canMove, onMove }: BoardProps<'chess'>) {
 }
 
 /** The registry of boards: one per head-to-head game, chosen by the game's key. */
-const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { rps: RpsBoard, tictactoe: TicTacToeBoard, chess: ChessBoard };
+const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { rps: RpsBoard, tictactoe: TicTacToeBoard, chess: ChessBoard, 'creature-duel': CreatureBoard };
 
 /**
  * A head-to-head game as one phone (or screen) sees it: whose turn, the board,

@@ -4,7 +4,7 @@ import { busGuessRight, type BusGuess, type PlayingCard } from '@party/contracts
 import { parseDefinition } from '../../../src/game/definition.js';
 import { createGameService } from '../../../src/game/service.js';
 import { readSessionView } from '../../../src/game/views.js';
-import { readMinigameRun } from '../../../src/minigames/rules.js';
+import { readMinigameRun } from '../../../src/minigames/shared/rules.js';
 import { db, fixture, prisma } from '../game-fixture.js';
 
 afterAll(async () => { await db.close(); });
@@ -120,5 +120,34 @@ describe('step games: one engine for games played move by move', () => {
     await move(w2, tie, 0, tieRun, 0, 'left'); await move(w2, tie, 1, tieRun, 0, 'right');
     await host(w2, tie, 'stage.close', { stageRunId: tieRun }); await host(w2, tie, 'stage.reveal', { stageRunId: tieRun });
     expect(await prisma.scoreEntry.count({ where: { sessionId: tie.sessionId } })).toBe(0);
+  });
+});
+
+describe('Speed run', () => {
+  it('protects the countdown and course, retains progress through a pause, and ranks finish times', async () => {
+    const w = world(); const f = await fixture(2, game({ game: 'speed-run', settings: {}, placementMilli: ['10000', '6000'] }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+    await expect(move(w, f, 0, stageRunId, 0, 'down')).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    w.advance(3500);
+    await expect(move(w, f, 0, stageRunId, 0, 'left')).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await move(w, f, 0, stageRunId, 0, 'down');
+    await expect(move(w, f, 0, stageRunId, 0, 'down')).rejects.toMatchObject({ code: 'ALREADY_SUBMITTED' });
+    await host(w, f, 'session.pause');
+    w.advance(30_000);
+    await host(w, f, 'session.resume');
+    w.advance(3500);
+    const route = ['down', 'down', 'right', 'right', 'down', 'down', 'right', 'right', 'right', 'right'];
+    for (const [step, option] of route.entries()) {
+      if (step > 0) await move(w, f, 0, stageRunId, step, option);
+      w.advance(150);
+    }
+    for (const [step, option] of route.entries()) await move(w, f, 1, stageRunId, step, option);
+    await host(w, f, 'stage.close', { stageRunId });
+    await host(w, f, 'stage.reveal', { stageRunId });
+    const answer = (await readSessionView(prisma, f.host, f.sessionId)).stage!.reveal!.answer!;
+    expect(answer).toMatchObject({ kind: 'minigame', game: 'speed-run', entries: [
+      { playerId: f.players[0]!.id, place: 1, value: 2350 },
+      { playerId: f.players[1]!.id, place: 2, value: 2500 },
+    ] });
   });
 });

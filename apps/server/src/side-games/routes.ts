@@ -1,7 +1,9 @@
+import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  BLACKJACK_OUTCOMES, BlackjackMoveSchema, packPrice, BlackjackResultSchema, BlackjackStartSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
+  BLACKJACK_OUTCOMES, BlackjackMoveSchema, packPrice, BlackjackResultSchema, BlackjackStartSchema, CoinFlipSchema, CoinResultSchema, CoinSideSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
+  ROULETTE_POCKETS, RoulettePickSchema, RoulettePocketSchema, RouletteResultSchema, RouletteSpinSchema, RouletteTableBetsSchema, RouletteTableSpinSchema, RouletteTableResultSchema, rouletteColor, rouletteReturn,
   REFILL_BELOW, REFILL_CHIPS, SlotResultSchema, SlotSpinSchema, slotMultiplier, WalletSchema, type GamblerRow, type RoomReply, type SlotSymbol,
 } from '@party/contracts';
 import type { Config } from '../config.js';
@@ -9,6 +11,7 @@ import type { PrismaClient, SideRound } from '../generated/prisma/client.js';
 import { GameError } from '../game/errors.js';
 import type { Transaction } from '../game/model.js';
 import { readSessionView } from '../game/views.js';
+import { flipCoin } from '../minigames/heads-or-tails/coin.js';
 import type { createRoomGateway } from '../rooms/gateway.js';
 import { readRoomState } from '../rooms/reclaim.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
@@ -22,13 +25,16 @@ import type { Server } from 'socket.io';
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, NOT_FOUND: 404, NOT_ENOUGH_CHIPS: 409, CHIPS_OFF: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, ALREADY_SUBMITTED: 409, INVALID_STATE: 409 };
 // A stored hand: the cards (the dealer's hidden one included) and, once over, its result.
 const StoredHandSchema = HandStateSchema.extend({ outcome: z.enum(BLACKJACK_OUTCOMES).nullable() });
+const StoredCoinSchema = z.object({ guess: CoinSideSchema, coin: CoinSideSchema }).strict();
+const StoredRouletteSchema = z.object({ guess: RoulettePickSchema, roulette: RoulettePocketSchema }).strict();
+const StoredTableSchema = z.object({ bets: RouletteTableBetsSchema, roulette: RoulettePocketSchema }).strict();
 const readHand = (round: SideRound): { hand: HandState; outcome: Outcome | null } => {
   const parsed = StoredHandSchema.safeParse(round.state); roomAssert(parsed.success, 'INVALID_STATE');
   const { outcome, ...hand } = parsed.data; return { hand, outcome };
 };
 
 /**
- * Side games on the phones: slot machine, blackjack and packs, for play chips.
+ * Side games on the phones, with optional use of play chips.
  * Only a player of the room can play, only while the host allows side games,
  * and never while the game needs them (an open round they still have to answer).
  */
@@ -124,22 +130,90 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
     } catch (error) { return fail(reply, error); }
   });
 
+  for (const game of ['heads-or-tails', 'red-or-black-roulette'] as const) {
+    const coinGame = game === 'heads-or-tails';
+    const ledgerGame = coinGame ? game : 'roulette';
+    const requestSchema = coinGame ? CoinFlipSchema : RouletteSpinSchema;
+    const stateSchema = coinGame ? StoredCoinSchema : StoredRouletteSchema;
+    const resultSchema = coinGame ? CoinResultSchema : RouletteResultSchema;
+    app.post(`/api/rooms/:sessionId/side/${game}`, async (request, reply) => {
+      try {
+        const parsed = requestSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+        const { roundId, guess, bet } = parsed.data;
+        return { ok: true, data: await play(request, async (tx, seat, chips) => {
+          const before = await earlier(tx, seat, roundId, ledgerGame);
+          if (before) {
+            const stored = stateSchema.safeParse(before.state);
+            roomAssert(stored.success && stored.data.guess === guess && before.bet === bet, 'INVALID_COMMAND');
+            return resultSchema.parse({ roundId, ...stored.data, bet, payout: before.payout, balance: await balance(tx, seat) });
+          }
+          roomAssert(bet === 0 || chips, 'CHIPS_OFF');
+          roomAssert(bet === 0 || await balance(tx, seat) >= bet, 'NOT_ENOUGH_CHIPS');
+          const outcome = coinGame ? { coin: flipCoin() } : { roulette: randomInt(ROULETTE_POCKETS) };
+          const winningPick = outcome.roulette === undefined ? outcome.coin : rouletteColor(outcome.roulette);
+          const payout = winningPick === guess ? 2 * bet : 0;
+          const state = { guess, ...outcome };
+          await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: ledgerGame, finished: true, bet, payout, state } });
+          if (bet) await tx.chipEntry.createMany({ data: [
+            { ...entryFor(seat), roundId, game: ledgerGame, reason: 'BET', amount: -bet },
+            ...(payout ? [{ ...entryFor(seat), roundId, game: ledgerGame, reason: 'PAYOUT' as const, amount: payout }] : []),
+          ] });
+          return resultSchema.parse({ roundId, ...state, bet, payout, balance: await balance(tx, seat) });
+        }) };
+      } catch (error) { return fail(reply, error); }
+    });
+  }
+
+  app.post('/api/rooms/:sessionId/side/roulette', async (request, reply) => {
+    try {
+      const parsed = RouletteTableSpinSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+      const { roundId } = parsed.data;
+      const bets = [...parsed.data.bets].sort((a, b) => String(a.guess).localeCompare(String(b.guess)));
+      const bet = bets.reduce((total, entry) => total + entry.bet, 0);
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
+        const before = await earlier(tx, seat, roundId, 'roulette');
+        if (before) {
+          const stored = StoredTableSchema.safeParse(before.state);
+          roomAssert(stored.success && stored.data.bets.length === bets.length && stored.data.bets.every((entry, index) =>
+            entry.guess === bets[index]!.guess && entry.bet === bets[index]!.bet), 'INVALID_COMMAND');
+          return RouletteTableResultSchema.parse({ roundId, ...stored.data, payout: before.payout, balance: await balance(tx, seat) });
+        }
+        roomAssert(bet === 0 || chips, 'CHIPS_OFF');
+        roomAssert(bet === 0 || await balance(tx, seat) >= bet, 'NOT_ENOUGH_CHIPS');
+        const roulette = randomInt(ROULETTE_POCKETS);
+        const payout = bets.reduce((total, entry) => total + rouletteReturn(roulette, entry.guess, entry.bet), 0);
+        const state = { bets, roulette };
+        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'roulette', finished: true, bet, payout, state } });
+        if (bet) await tx.chipEntry.createMany({ data: [
+          { ...entryFor(seat), roundId, game: 'roulette', reason: 'BET', amount: -bet },
+          ...(payout ? [{ ...entryFor(seat), roundId, game: 'roulette', reason: 'PAYOUT' as const, amount: payout }] : []),
+        ] });
+        return RouletteTableResultSchema.parse({ roundId, ...state, payout, balance: await balance(tx, seat) });
+      }) };
+    } catch (error) { return fail(reply, error); }
+  });
+
   app.post('/api/rooms/:sessionId/side/packs', async (request, reply) => {
     try {
-      const parsed = PackOpenSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId, setId } = parsed.data;
+      const parsed = PackOpenSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const { roundId, setId, preview } = parsed.data;
       return { ok: true, data: await play(request, async (tx, seat, chips) => {
         const before = await earlier(tx, seat, roundId, 'packs');
-        if (before) { const state = before.state as { items: string[]; god?: boolean }; return PackResultSchema.parse({ roundId, items: state.items, balance: await balance(tx, seat), god: state.god === true }); }
-        // Packs are bought with chips: without chips in the room there is nothing to collect.
-        roomAssert(chips, 'CHIPS_OFF');
-        // The set the player chose, at its price now (the owner may change it, or take it off sale).
+        if (before) {
+          const state = before.state as { items: string[]; god?: boolean; collected?: boolean; setId?: string };
+          roomAssert(state.setId === undefined || state.setId === setId, 'INVALID_COMMAND');
+          return PackResultSchema.parse({ roundId, items: state.items, balance: await balance(tx, seat), god: state.god === true, collected: state.collected ?? true });
+        }
         const set = await saleSet(tx, setId); roomAssert(set !== null && set.items.length > 0, 'NOT_FOUND');
-        const price = packPrice(set); roomAssert(await balance(tx, seat) >= price, 'NOT_ENOUGH_CHIPS');
+        const price = chips && !preview ? packPrice(set) : 0;
+        const collected = price > 0;
+        roomAssert(!collected || await balance(tx, seat) >= price, 'NOT_ENOUGH_CHIPS');
         const { items, god } = drawPack(set);
-        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: price, state: { items, god, setId } } });
-        if (price > 0) await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -price } });
-        await tx.collectedItem.createMany({ data: items.map(itemKey => ({ ...entryFor(seat), roundId, itemKey })) });
-        return PackResultSchema.parse({ roundId, items, balance: await balance(tx, seat), god });
+        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'packs', finished: true, bet: price, payout: 0, state: { items, god, setId, collected } } });
+        if (collected) {
+          await tx.chipEntry.create({ data: { ...entryFor(seat), roundId, game: 'packs', reason: 'BET', amount: -price } });
+          await tx.collectedItem.createMany({ data: items.map(itemKey => ({ ...entryFor(seat), roundId, itemKey })) });
+        }
+        return PackResultSchema.parse({ roundId, items, balance: await balance(tx, seat), god, collected });
       }) };
     } catch (error) { return fail(reply, error); }
   });

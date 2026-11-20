@@ -3,7 +3,8 @@ import { PlacesFields } from './places-fields.js';
 import { useState } from 'react';
 import { ChoiceDialog, type CardChoice } from '../../controls/choice-dialog.js';
 import { withDuelContest, type Stage } from '../../model.js';
-import { translate } from '../../../i18n/texts.js';
+import { CREATURE_TEXTS } from '../../../head-to-head/creature-board.js';
+import { translate, useTexts } from '../../../i18n/texts.js';
 import { FIELDS_TEXTS } from '../fields.text.js';
 import { gameDescription, gameHowToPlay, gameName } from '../../../presentation/catalog.text.js';
 const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
@@ -22,6 +23,7 @@ const duelChoices = (): CardChoice[] => [{ value: 'host', label: t('anyContest')
  * its settings), the points for the winner and runner-up, and for each right bet.
  */
 export function DuelFields({ part, stage, onChange }: { part: 'settings' | 'points'; stage: Stage; onChange: (next: Stage, field: string) => void }) {
+  const c = useTexts(CREATURE_TEXTS);
   const contest = (stage['contest'] as { kind: 'host' } | { kind: 'game'; game: string; settings?: Record<string, unknown> } | undefined) ?? { kind: 'host' };
   const game = contest.kind === 'game' && isHeadToHeadKey(contest.game) ? contest.game : null;
   const set = (change: Partial<Stage>, field: string) => onChange({ ...stage, ...change }, field);
@@ -39,6 +41,10 @@ export function DuelFields({ part, stage, onChange }: { part: 'settings' | 'poin
     {picking && <ChoiceDialog title={t('howWon')} value={game ?? 'host'} choices={duelChoices()}
       onPick={next => { setPicking(false); if (next !== (game ?? 'host')) onChange(withDuelContest(stage, next), 'contest'); }} onClose={() => setPicking(false)} />}
     <Segmented label={t('whoDuels')} value={String(stage['pick'] ?? 'random')} choices={[{ value: 'random', label: t('twoRandom') }, { value: 'host', label: t('hostPicks') }]} onChange={pick => set({ pick }, 'pick')} />
+    {game === 'creature-duel' && <Segmented label={c('teamSize')} inline
+      value={String((contest as { settings?: { size?: number } }).settings?.size ?? 1)}
+      choices={[{ value: '1', label: c('solo') }, { value: '3', label: c('team') }]}
+      onChange={size => set({ contest: { kind: 'game', game: 'creature-duel', settings: { size: Number(size) } } }, 'team-size')} />}
     {game === 'rps' && <Segmented label={t('winsNeeded')} inline value={String((contest as { settings?: { firstTo?: number } }).settings?.firstTo ?? HEAD_TO_HEAD_DEFAULTS.rps.firstTo)}
       choices={['1', '2', '3', '4', '5'].map(count => ({ value: count, label: count }))} onChange={count => set({ contest: { kind: 'game', game: 'rps', settings: { firstTo: Number(count) } } }, 'first-to')} />}
   </div>;

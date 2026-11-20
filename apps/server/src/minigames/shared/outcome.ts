@@ -1,0 +1,108 @@
+import { AwardMilliSchema, COIN_SIDES, isSharedPrediction, MinigameValueSchema, ROULETTE_PICKS, rouletteColor, SubmissionValueSchema, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { route, type Award, type TeamContext } from '../../game/teams/teams.js';
+import { places, rankValue, teamValue, usesSubmissionTime, type MinigameRun } from './rules.js';
+
+export const DEFAULT_PLACEMENT_MILLI = ['10000', '6000', '3000'];
+export interface MinigameRules { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total' }
+interface Row { playerId: string | null; teamId: string | null; value: unknown; receivedAt?: Date }
+export interface Outcome {
+  /** Team rows first (in a team round), each with the team's result; then every player's own result. */
+  entries: { playerId: string | null; teamId: string | null; value: number | null; place: number | null; stroke?: number[]; cut?: number; angle?: number; dotGuess?: number; graphLine?: number[] }[];
+  awards: Award[];
+}
+
+/**
+ * Everyone's place and the placement points. Equal results share a place and
+ * its points after any tiebreak. In a team round the teams are ranked by their combined result
+ * and the points follow the round's team points rule.
+ */
+export function minigameOutcome(rules: MinigameRules, rows: Row[], context: TeamContext | null, stageRunId: string, run?: MinigameRun | null): Outcome {
+  const results = rows.map(row => { const value = SubmissionValueSchema.safeParse(row.value); const parsed = value.success ? MinigameValueSchema.safeParse(value.data) : null;
+    return parsed?.success ? { ...row, result: parsed.data } : null; }).filter(row => row !== null);
+  const raw = (result: { value: number; early?: true | undefined }) => result.early ? null : result.value;
+  const details = ({ stroke, cut, angle, dotGuess, graphLine }: ReturnType<typeof MinigameValueSchema.parse>) => ({
+    ...(stroke ? { stroke } : {}), ...(cut === undefined ? {} : { cut }), ...(angle === undefined ? {} : { angle }),
+    ...(dotGuess === undefined ? {} : { dotGuess }), ...(graphLine ? { graphLine } : {}),
+  });
+  const ranked = rules.game !== 'lucky-doors';
+  const timedTiebreak = usesSubmissionTime(rules.game);
+  const submittedAt = (row: Row) => row.receivedAt?.getTime() ?? 0;
+  if (rules.game === 'relay-drawing') {
+    // Pass the pencil: teams are ranked by the votes their picture received.
+    if (!context) return { entries: [], awards: [] };
+    const animation = (rules.settings as MinigameSettings<'relay-drawing'>).animation;
+    const tallies = [...context.members.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([teamId, members]) => ({
+      teamId,
+      votes: animation
+        ? Math.round(100 * results.filter(row => (row.teamId ?? (row.playerId ? context.teamOf.get(row.playerId) : null)) === teamId && row.result.value === 1).length / Math.max(1, context.answers === 'captain' ? 1 : members.length))
+        : results.filter(row => row.result.teamId === teamId).length,
+    }));
+    const placed = places(tallies, tally => animation && tally.votes === 0 ? null : -tally.votes);
+    const pointsOf = (place: number | undefined) => place === undefined ? 0n : BigInt(AwardMilliSchema.parse(rules.placementMilli[place - 1] ?? '0'));
+    return { entries: tallies.map(tally => ({ playerId: null, teamId: tally.teamId, value: tally.votes, place: placed.get(tally) ?? null })).sort((a, b) => (a.place ?? 999) - (b.place ?? 999)),
+      awards: tallies.flatMap(tally => route({ amountMilli: pointsOf(placed.get(tally)), stageRunId, awardKey: `minigame:${stageRunId}:team:${tally.teamId}`, reason: 'Minigame place' }, { teamId: tally.teamId }, context)) };
+  }
+  const pointsFor = (place: number | undefined) => place === undefined ? 0n : BigInt(AwardMilliSchema.parse(rules.placementMilli[place - 1] ?? '0'));
+  if (isSharedPrediction(rules.game)) {
+    const winningPick = rules.game === 'heads-or-tails' ? COIN_SIDES.findIndex(side => side === run?.coin)
+      : run?.roulette === undefined ? -1 : ROULETTE_PICKS.findIndex(color => color === rouletteColor(run.roulette!));
+    const entries = results.filter(row => row.playerId && (row.result.value === 0 || row.result.value === 1)).map(row => ({
+      playerId: row.playerId!, teamId: null, value: row.result.value, place: row.result.value === winningPick ? 1 : null,
+    })).sort((a, b) => (a.place ?? 2) - (b.place ?? 2));
+    const awards = entries.filter(entry => entry.place === 1).flatMap(entry => route({ amountMilli: pointsFor(1), stageRunId,
+      awardKey: `minigame:${stageRunId}:${entry.playerId}`, reason: rules.game === 'heads-or-tails' ? 'Correct coin guess' : 'Correct roulette guess' }, { playerId: entry.playerId }, null));
+    return { entries, awards };
+  }
+  if (rules.game === 'bus' && context) {
+    // Drive the bus: each team's sips plus the last round's sips for every other team's rainbow; fewest sips win.
+    const lastSips = (rules.settings as { sips: number[]; rainbow?: boolean }).sips[3] ?? 0;
+    const teams = [...context.members.keys()].map(teamId => ({ teamId, row: results.find(row => row.teamId === teamId) }));
+    const rainbows = teams.filter(team => team.row?.result.rainbow).length;
+    const totals = teams.map(team => ({ ...team, total: team.row ? team.row.result.value + (rainbows - (team.row.result.rainbow ? 1 : 0)) * lastSips : null }));
+    const placed = places(totals, team => team.total);
+    const entries = totals.map(team => ({ playerId: null, teamId: team.teamId, value: team.total, place: placed.get(team) ?? null })).sort((a, b) => (a.place ?? 999) - (b.place ?? 999));
+    return { entries, awards: totals.flatMap(team => route({ amountMilli: pointsFor(placed.get(team)), stageRunId, awardKey: `minigame:${stageRunId}:team:${team.teamId}`, reason: 'Minigame place' }, { teamId: team.teamId }, context)) };
+  }
+  if (rules.game === 'majority') {
+    // Left or right: everyone (or every team) on the side most chose shares 1st place and its points; a tie: nobody wins.
+    const sides = context ? [...context.members.keys()].map(teamId => ({ playerId: null, teamId, row: results.find(row => row.teamId === teamId) }))
+      : results.map(row => ({ playerId: row.playerId, teamId: null, row }));
+    const left = sides.filter(side => side.row?.result.value === 0).length; const right = sides.filter(side => side.row?.result.value === 1).length;
+    const winner = left === right ? null : left > right ? 0 : 1;
+    const entries = sides.map(side => ({ playerId: side.playerId, teamId: side.teamId, value: side.row ? side.row.result.value : null, place: side.row && side.row.result.value === winner ? 1 : null }))
+      .sort((a, b) => (a.place ?? 999) - (b.place ?? 999));
+    const awards = entries.filter(entry => entry.place === 1).flatMap(entry => route({ amountMilli: pointsFor(1), stageRunId, awardKey: `minigame:${stageRunId}:${entry.teamId ? `team:${entry.teamId}` : entry.playerId}`, reason: 'Minigame place' },
+      entry.teamId ? { teamId: entry.teamId } : { playerId: entry.playerId! }, context));
+    return { entries, awards };
+  }
+  if (!context) {
+    const placed = ranked ? places(results, row => rankValue(rules.game, rules.settings, row.result), timedTiebreak ? submittedAt : undefined) : new Map();
+    const entries = results.map(row => ({ playerId: row.playerId, teamId: null, value: raw(row.result), place: placed.get(row) ?? null, ...details(row.result) }))
+      .sort((a, b) => (a.place ?? 999) - (b.place ?? 999));
+    const awards = results.flatMap(row => row.playerId ? route({ amountMilli: pointsFor(placed.get(row)), stageRunId, awardKey: `minigame:${stageRunId}:${row.playerId}`, reason: 'Minigame place' }, { playerId: row.playerId }, null) : []);
+    return { entries, awards };
+  }
+  // Team rows: a captain's result is the team's; otherwise the members' results combine.
+  const teamIds = [...context.members.keys()];
+  const teams = teamIds.map(teamId => {
+    const own = results.filter(row => row.teamId === teamId || (row.playerId && context.teamOf.get(row.playerId) === teamId));
+    const scored = own.map(row => ({ row, value: rankValue(rules.game, rules.settings, row.result) })).filter(entry => entry.value !== null);
+    const score = ranked ? teamValue(rules.game, rules.teamResult, scored.map(entry => entry.value!)) : null;
+    let time = 0;
+    if (timedTiebreak && score !== null) {
+      // Best uses the first guess that achieved the score. Average uses the last guess it includes.
+      time = rules.teamResult === 'best'
+        ? Math.min(...scored.filter(entry => entry.value === score).map(entry => submittedAt(entry.row)))
+        : Math.max(...scored.map(entry => submittedAt(entry.row)));
+    }
+    return { teamId, score, time };
+  });
+  const placed = places(teams, team => team.score, timedTiebreak ? team => team.time : undefined);
+  const magnitude = (score: number | null) => score === null ? null : Math.abs(score);
+  const entries = [
+    ...teams.map(team => ({ playerId: null, teamId: team.teamId, value: magnitude(team.score), place: placed.get(team) ?? null })).sort((a, b) => (a.place ?? 999) - (b.place ?? 999)),
+    ...results.map(row => ({ playerId: row.playerId, teamId: row.teamId ?? (row.playerId ? context.teamOf.get(row.playerId) ?? null : null), value: raw(row.result), place: null, ...details(row.result) })),
+  ];
+  const awards = teams.flatMap(team => route({ amountMilli: pointsFor(placed.get(team)), stageRunId, awardKey: `minigame:${stageRunId}:team:${team.teamId}`, reason: 'Minigame place' }, { teamId: team.teamId }, context));
+  return { entries, awards };
+}
