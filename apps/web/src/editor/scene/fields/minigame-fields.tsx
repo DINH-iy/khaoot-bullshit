@@ -12,7 +12,7 @@ import { Segmented } from '../../controls/segmented.js';
 import { ANIMATION_TEXTS } from '../../../minigames/relay-drawing/animation-relay.js';
 import { translate, useTexts } from '../../../i18n/texts.js';
 import { FIELDS_TEXTS } from '../fields.text.js';
-import { gameDescription, gameHowToPlay, gameName } from '../../../presentation/catalog.text.js';
+import { gameDescription, gameName } from '../../../presentation/catalog.text.js';
 const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
 import { InfoTip } from '../../controls/info-tip.js';
 
@@ -56,7 +56,7 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
       choices={[{ value: 'average', label: t('average') }, { value: 'best', label: t('best') }, ...(MINIGAMES[game].better === 'higher' ? [{ value: 'total', label: t('added') }] : [])]} />}
   </> : null;
   return <div className="minigame-fields">
-    {known ? <div className="ed-chosen"><strong>{gameName(game)}</strong><span>{gameHowToPlay(game)}</span>
+    {known ? <div className="configuration-game"><strong>{gameName(game)}</strong>
       <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('changeMinigame')}</button></div>
     : <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('chooseMinigame')}</button>}
     {/* A new minigame starts from its own defaults and a fitting timer; a team minigame gets round-only teams of two, which the host can change. */}

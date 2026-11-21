@@ -1,12 +1,13 @@
 import { Dropdown } from '../ui/dropdown.js';
 import { useEffect, useRef, useState } from 'react';
-import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, MINIGAMES, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, type ArcadeLobbyView, type ArcadeTeams, type MinigameKey } from '@party/contracts';
+import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeLobbyView, type ArcadeTeams } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { navigate } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
 import { Avatar } from '../players/avatar.js';
 import { savedLook } from '../players/look-builder.js';
 import { useMe } from '../people/use-me.js';
+import { gameName, gameDescription } from '../presentation/catalog.text.js';
 import { FaIcon } from '../presentation/icons.js';
 import { useSiteLookFrame } from '../presentation/site-look.js';
 import { rememberName } from './arcade-home.js';
@@ -49,20 +50,20 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
     <div className="arcade-title"><h1>{lobby.title}</h1>
       {lobby.me.leader ? <button type="button" className={lobby.locked ? 'primary' : 'ghost'} aria-pressed={lobby.locked} onClick={() => act('lock', { locked: !lobby.locked })}>{lobby.locked ? 'Locked: unlock' : 'Open: lock'}</button>
         : <p className="arcade-meta">{lobby.locked ? 'Locked: nobody new can join' : lobby.protected ? 'Password required to join' : 'Open: anyone with the link can join'}</p>}</div>
-    {lobby.round ? <section className="arcade-card" aria-live="polite"><h2>Round {lobby.round.number}: {MINIGAMES[lobby.round.game].name}</h2>
+    {lobby.round ? <section className="arcade-card" aria-live="polite"><h2>Round {lobby.round.number}: {gameName(lobby.round.game)}</h2>
       {lobby.round.seated ? <p role="status">Going to the round…</p> : <p>This round started before you came in. You play in the next one.</p>}
       {lobby.me.leader && !lobby.round.seated && <button type="button" className="ghost" onClick={() => act('round/end')}>End this round</button>}</section>
       : lobby.me.leader ? <PickRound players={lobby.members.length} onStart={(game, teams) => act('rounds', { roundId: newId(), game, teams })} />
-      : <section className="arcade-card"><h2>Next round</h2><p>Waiting for {leader?.displayName ?? 'the leader'} to pick a minigame…</p></section>}
+      : <section className="arcade-card"><h2>Next round</h2><p>Waiting for {leader?.displayName ?? 'the leader'} to pick a game…</p></section>}
     <section className="arcade-card" aria-labelledby="members-heading">
       <h2 id="members-heading">Players ({lobby.members.length})</h2>
       <ul className="arcade-members">{lobby.members.map(member => <li key={member.id} className={member.connected ? 'online' : 'offline'}>
         <Avatar look={member.look} size={48} /><span>{member.displayName}{member.id === lobby.me?.memberId ? ' (you)' : ''}</span>
         {member.leader && <span className="arcade-badge"><FaIcon name="star" /> Leader</span>}{member.playing && <span className="arcade-badge">Playing</span>}</li>)}</ul>
     </section>
-    {lobby.lastRound && <section className="arcade-card" aria-labelledby="last-heading"><h2 id="last-heading">Round {lobby.lastRound.number}: {MINIGAMES[lobby.lastRound.game].name}</h2>
+    {lobby.lastRound && <section className="arcade-card" aria-labelledby="last-heading"><h2 id="last-heading">Round {lobby.lastRound.number}: {gameName(lobby.lastRound.game)}</h2>
       <ol className="arcade-board">{lobby.lastRound.results.map(row => <li key={row.memberId}><span><Avatar look={row.look} size={28} /> {row.place ? `${row.place}. ` : ''}{row.displayName}</span>
-        <span>{lobby.lastRound!.teams ? '' : `${arcadeResult(lobby.lastRound!.game, row.value)} · `}{points(row.pointsMilli)}</span></li>)}</ol></section>}
+        <span>{lobby.lastRound!.teams || !isMinigameKey(lobby.lastRound!.game) ? '' : `${arcadeResult(lobby.lastRound!.game, row.value)} · `}{points(row.pointsMilli)}</span></li>)}</ol></section>}
     {lobby.totals.length > 0 && <section className="arcade-card" aria-labelledby="totals-heading"><h2 id="totals-heading">Total in this lobby</h2>
       <ol className="arcade-board">{lobby.totals.map(row => <li key={row.memberId}><span><Avatar look={row.look} size={28} /> {row.displayName}</span><span>{points(row.pointsMilli)} · {row.wins} {row.wins === 1 ? 'win' : 'wins'} · {row.rounds} played</span></li>)}</ol></section>}
     <InviteCard url={url} locked={lobby.locked} protected={lobby.protected} />
@@ -135,27 +136,31 @@ function LobbyPassword({ lobby, onChanged }: { lobby: ArcadeLobbyView; onChanged
 }
 
 /** The leader's choice for the next round: a minigame, and alone or in a number of teams (made at random or by the players). */
-function PickRound({ players, onStart }: { players: number; onStart: (game: MinigameKey, teams: ArcadeTeams | null) => void }) {
-  const [game, setGame] = useState<MinigameKey>('reaction'); const [teamCount, setTeamCount] = useState(0); const [formation, setFormation] = useState<ArcadeTeams['formation']>('random');
-  const teamOnly = TEAM_MINIGAMES.includes(game);
+function PickRound({ players, onStart }: { players: number; onStart: (game: ArcadeGame, teams: ArcadeTeams | null) => void }) {
+  const [game, setGame] = useState<ArcadeGame>('reaction'); const [teamCount, setTeamCount] = useState(0); const [formation, setFormation] = useState<ArcadeTeams['formation']>('random');
+  const duel = isHeadToHeadKey(game);
+  const teamOnly = !duel && TEAM_MINIGAMES.includes(game);
   // Never more teams than players; a team-only minigame needs at least two.
   const most = Math.min(ARCADE_MAX_TEAMS, Math.max(2, players));
-  const count = teamOnly && teamCount < 2 ? 2 : Math.min(teamCount, most);
-  const enough = players >= Math.max(1, count);
+  const count = duel ? 0 : teamOnly && teamCount < 2 ? 2 : Math.min(teamCount, most);
+  const enough = players >= Math.max(duel ? 2 : 1, count);
   return <section className="arcade-card" aria-labelledby="pick-heading">
     <h2 id="pick-heading">Next round</h2>
     <div className="arcade-pick">
-      <label>Minigame<Dropdown value={game} onChange={value => setGame(value as MinigameKey)}
-        options={MINIGAME_KEYS.filter(value => !SHARED_SCREEN_MINIGAMES.includes(value))
-          .map(value => ({ value, label: MINIGAMES[value].name + (TEAM_MINIGAMES.includes(value) ? ' (teams)' : '') }))} /></label>
-      <label>Play<Dropdown value={String(count)} onChange={value => setTeamCount(Number(value))}
+      <label>Game<Dropdown value={game} onChange={value => setGame(value as ArcadeGame)}
+        options={[
+          ...MINIGAME_KEYS.map(value => ({ value, group: 'Minigames', label: gameName(value) + (TEAM_MINIGAMES.includes(value) ? ' (teams)' : '') })),
+          ...HEAD_TO_HEAD_KEYS.map(value => ({ value, group: 'Head-to-head', label: gameName(value) })),
+        ]} /></label>
+      {!duel && <label>Play<Dropdown value={String(count)} onChange={value => setTeamCount(Number(value))}
         options={[...(teamOnly ? [] : [{ value: '0', label: 'Everyone alone' }]),
-          ...Array.from({ length: most - 1 }, (_, index) => ({ value: String(index + 2), label: `In ${index + 2} teams` }))]} /></label>
+          ...Array.from({ length: most - 1 }, (_, index) => ({ value: String(index + 2), label: `In ${index + 2} teams` }))]} /></label>}
       {count > 0 && <label>Teams made<Dropdown value={formation} onChange={value => setFormation(value as ArcadeTeams['formation'])}
         options={[{ value: 'random', label: 'At random' }, { value: 'players', label: 'By the players' }]} /></label>}
     </div>
-    <p className="arcade-meta">{MINIGAMES[game].description}</p>
-    {!enough && <p className="arcade-meta">{count} teams need at least {count} players.</p>}
-    <button type="button" className="primary big" disabled={!enough} onClick={() => onStart(game, count ? { count, formation } : null)}>Play {MINIGAMES[game].name}</button>
+    <p className="arcade-meta">{gameDescription(game)}</p>
+    {isMinigameKey(game) && SHARED_SCREEN_MINIGAMES.includes(game) && <p className="arcade-meta">Open the shared screen from the round to watch together.</p>}
+    {!enough && <p className="arcade-meta">{duel ? 'A duel needs two players.' : `${count} teams need at least ${count} players.`}</p>}
+    <button type="button" className="primary big" disabled={!enough} onClick={() => onStart(game, count ? { count, formation } : null)}>Play {gameName(game)}</button>
   </section>;
 }

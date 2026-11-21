@@ -408,16 +408,45 @@
 .editor .action-menu-list button:hover:not(:disabled), .editor .action-menu-list button:focus-visible { background: var(--e-accent-soft); }
 .editor .action-menu-list .danger-item { color: var(--e-danger); }
 /* A popup with cards, for choices that need a description (minigame, duel, award). */
-.ed-dialog.choice-dialog { width: min(720px, 100%); max-height: calc(100dvh - 32px); grid-template-rows: auto auto minmax(0, 1fr) auto; }
-.choice-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; overflow: auto; padding: 2px; }
-.editor .choice-dialog .choice-card, .choice-dialog .choice-card { display: flex; gap: 10px; align-items: start; text-align: left; justify-content: start; min-height: 72px; padding: 12px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); position: relative; }
-.choice-dialog .choice-card:hover, .choice-dialog .choice-card:focus-visible { background: var(--e-accent-soft); }
-.choice-dialog .choice-card[aria-pressed=true] { border-color: var(--e-accent); box-shadow: inset 0 0 0 1px var(--e-accent); }
+.ed-dialog.choice-dialog {
+  width: min(720px, calc(100% - 24px)); height: min(610px, calc(100dvh - 24px));
+  max-width: none; max-height: none; padding: clamp(12px, 2vw, 20px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.ed-dialog.choice-dialog:not([open]) { display: none; }
+.choice-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.choice-header { display: grid; gap: 8px; }
+.choice-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.editor .choice-dialog .choice-tabs button { min-height: 44px; padding: 4px 10px; border-radius: 999px; }
+.editor .choice-dialog :is(.choice-tabs button, .choice-card)[aria-pressed=true] {
+  background: var(--e-accent-soft); color: var(--e-text); border-color: var(--e-accent);
+}
+.choice-dialog .choice-cards {
+  --choice-columns: 3;
+  display: grid; grid-template-columns: repeat(var(--choice-columns), minmax(0, 1fr)); align-content: start;
+  min-height: 0; gap: 8px; padding: 4px; overflow: auto; overscroll-behavior: contain;
+}
+@media (max-width: 720px) { .choice-dialog .choice-cards { --choice-columns: 2; } }
+@media (max-width: 520px) { .choice-dialog .choice-cards { --choice-columns: 1; } }
+.editor .choice-dialog .choice-card {
+  display: flex; gap: 10px; align-items: start; text-align: left; justify-content: start;
+  min-height: 44px; padding: 10px; border-radius: 12px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text);
+}
+.editor .choice-dialog .choice-card:hover { border-color: var(--e-accent); }
+.editor .choice-dialog button:focus-visible { outline: 2px solid var(--e-accent); outline-offset: 2px; }
 .choice-dialog .choice-card svg { flex: none; color: var(--e-accent); margin-top: 2px; }
-.choice-dialog .choice-card span { display: grid; gap: 4px; } .choice-dialog .choice-card small { color: var(--e-muted); font-size: .82rem; line-height: 1.35; font-weight: 400; }
-.choice-dialog .choice-current { width: fit-content; flex: none; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--e-accent); }
+.editor .choice-dialog .choice-copy { display: grid; gap: 4px; flex: 1; min-width: 0; color: inherit; font-size: inherit; }
+.editor .choice-dialog .choice-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; color: inherit; font-size: inherit; }
+.editor .choice-dialog .choice-title strong { min-width: 0; overflow-wrap: anywhere; color: inherit; }
+.editor .choice-dialog .choice-card small { color: var(--e-muted); font-size: .875rem; line-height: 1.35; font-weight: 400; overflow-wrap: anywhere; }
+.editor .choice-dialog .choice-card[aria-pressed=true] small { color: inherit; }
+.editor .choice-dialog .choice-current { padding: 2px 6px; border: 1px solid var(--e-accent); border-radius: 6px; color: inherit; font-size: .75rem; font-weight: 700; }
+.choice-footer, .choice-pager { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.choice-footer { justify-content: space-between; }
+.editor .choice-footer button { min-height: 44px; padding-inline: 8px; }
+.choice-pager button[aria-disabled=true] { color: var(--e-muted); cursor: default; }
+.choice-pager span { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ed-chosen .small-button { justify-self: start; margin-top: 4px; }
-@media (max-width: 520px) { .choice-cards { grid-template-columns: 1fr; } }
 /* The editor's own dropdown: a button showing the choice, and a list drawn over the page. */
 
 /* The Flow editor's panel shows what a scene is, not its settings: a summary and a way into the Scene editor. */
@@ -583,7 +612,6 @@
 /* R8: How a team decides and its Seconds per vote, spaced like the other fields. */
 .step-decide-fields { display: grid; gap: 12px; }
 /* R9: popup cards are one even grid: equal widths, and equal heights per row. */
-.choice-cards { grid-auto-rows: 1fr; }
 /* S: colour chips. The chip is the colour (click it to change); hovering or focusing shows a pencil and a bin on it
    (always on touch screens); a dashed + chip adds one. All chips one size, in one wrapping row. */
 .swatch-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -658,19 +686,6 @@
 .scene-props .inspector-head .try-scene { min-width: 0; }
 .scene-props .inspector-head .try-scene svg { flex: none; }
 .scene-props .inspector-head .try-scene span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-/* S7: the minigame popup: tabs by sort; cards in equal columns. */
-.choice-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-.editor .choice-tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-muted); font-weight: 600; }
-.editor .choice-tabs button[aria-selected=true] { background: var(--e-accent-soft); color: var(--e-text); border-color: var(--e-accent); }
-.choice-tabs small { font-weight: 500; opacity: .75; }
-.choice-dialog .choice-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; min-height: 0; }
-@media (max-width: 720px) { .choice-dialog .choice-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .choice-dialog .choice-cards { grid-template-columns: minmax(0, 1fr); } }
-/* The chosen card is filled: the accent with light text, like a pressed button. */
-.editor .choice-dialog .choice-card[aria-pressed=true] { background: light-dark(#2a1d5c, var(--e-accent)); border-color: light-dark(#2a1d5c, var(--e-accent)); color: light-dark(#fff, #1d1730); box-shadow: none; }
-.editor .choice-dialog .choice-card[aria-pressed=true] :is(svg, small, .choice-current) { color: inherit; }
-.editor .choice-dialog .choice-card[aria-pressed=true] small { opacity: .85; }
-.editor .choice-dialog .choice-card[aria-pressed=true] .choice-current { padding: 2px 6px; border-radius: 6px; background: light-dark(rgb(255 255 255 / .18), rgb(0 0 0 / .15)); }
 /* Help & shortcuts: its sections as plain blocks with a line between them, not cards far apart. */
 .ed-dialog.help-panel { gap: 0; }
 .help-panel > section { margin: 0; padding: 16px 0 0; border: 0; border-radius: 0; background: none; }
@@ -825,29 +840,6 @@
 .scene-preview-window .phone-screen:has(.scene-practice) { width: 100%; aspect-ratio: auto; }
 .scene-preview-window .tv-screen:has(.scene-practice) { min-height: min(32rem, 55dvh); }
 .scene-preview-window .practice-note { color: var(--e-muted); margin: 0; font-size: .85rem; }
-.minigame-configuration { overflow: hidden; }
-.minigame-configuration > .scene-preview-window {
-  box-sizing: border-box; max-height: calc(100dvh - 26px);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-.configuration-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; min-height: 0; }
-.configuration-fields, .configuration-preview {
-  display: grid; align-content: start; gap: 12px; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
-  padding: 4px 6px;
-}
-.configuration-fields label:not(.choice, .check) { display: grid; gap: 6px; min-width: 0; }
-.configuration-timing { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 12px; }
-.configuration-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid var(--e-border); }
-.configuration-actions button, .configuration-nav button, .configuration-preview > .segmented button { min-height: 44px; }
-.minigame-configuration .configuration-nav { display: none; }
-.configuration-preview .tv-screen:has(.scene-practice) { min-height: 0; aspect-ratio: auto; }
-@media (max-width: 760px) {
-  .minigame-configuration > .scene-preview-window { grid-template-rows: auto auto minmax(0, 1fr) auto; }
-  .minigame-configuration .configuration-nav { display: flex; }
-  .configuration-columns { grid-template-columns: minmax(0, 1fr); }
-  .configuration-columns[data-panel="settings"] .configuration-preview,
-  .configuration-columns[data-panel="preview"] .configuration-fields { display: none; }
-}
 .practice-parts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .9rem; }
 .scene-practice { display: grid; min-width: 0; gap: 12px; }
 .scene-practice > button { justify-self: start; }
@@ -958,10 +950,6 @@
 .editor:has(> .editor-tour) { grid-template-rows: auto auto minmax(0, 1fr); }
 
 
-.choice-dialog .choice-copy { flex: 1; min-width: 0; }
-.choice-dialog .choice-card .choice-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
-.choice-title strong { min-width: 0; overflow-wrap: anywhere; }
-.choice-dialog .choice-card .choice-current { align-self: start; }
 .scene-editor > .scene-stage { display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0; min-height: 0; padding: clamp(8px, 1.3vw, 20px); gap: 10px; }
 @media (min-width: 1001px) {
   .editor-main[data-view="scene"] { padding-bottom: 0; }
@@ -1002,6 +990,7 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+.practice-draw-the-graph > .practice-result { font-size: clamp(.875rem, 5cqw, 1.125rem); white-space: nowrap; }
 .compact-game-preview .scene-practice > button { justify-self: center; }
 .compact-game-preview .mg-countdown strong { font-size: 2rem; }
 

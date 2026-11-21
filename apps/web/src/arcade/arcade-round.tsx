@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { ArcadeAction, RoomSnapshot } from '@party/contracts';
+import { SHARED_SCREEN_MINIGAMES, type ArcadeAction, type RoomSnapshot } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { navigate } from '../navigation.js';
+import { CopyButton } from '../room/join-qr.js';
 import { Popover } from '../room/room-chrome.js';
 import { FaIcon, type IconName } from '../presentation/icons.js';
 import { arcadeProblem } from './arcade-text.js';
@@ -15,7 +16,7 @@ const NEXT_ICON: Partial<Record<ArcadeAction, IconName>> = { begin: 'play', resu
 
 /** Keeps this phone's member present in the lobby, and brings everyone back to the lobby when the round ends. */
 export function useArcadeRound(state: RoomSnapshot | undefined) {
-  const lobbyId = state?.arcade?.lobbyId; const finished = state?.view.status === 'FINISHED';
+  const lobbyId = state?.role === 'player' ? state.arcade?.lobbyId : undefined; const finished = state?.view.status === 'FINISHED';
   useEffect(() => {
     if (!lobbyId) return;
     const here = () => { void roomApi(`/api/arcade/lobbies/${lobbyId}/here`, {}).catch(() => {}); };
@@ -43,6 +44,7 @@ function waitingStep(state: RoomSnapshot): { action: ArcadeAction; label: string
   if (!stage || state.view.status !== 'RUNNING') return null;
   if (stage.teams?.forming) return { action: 'confirm-teams', label: 'Start round', blocked: stage.teams.teams.every(team => team.memberIds.length === 0) };
   if (stage.status === 'ACTIVE' && stage.explain) return { action: 'start', label: `Start (${stage.explain.readyIds.length} of ${state.players.length} ready)` };
+  if (stage.duel && !stage.revealed) return stage.status === 'ACTIVE' ? { action: 'close', label: 'Start duel' } : null;
   if (stage.status === 'CLOSED' && !stage.revealed) return { action: 'reveal', label: 'Show the results' };
   if (stage.revealed) return { action: 'end', label: 'Back to the lobby' };
   return null;
@@ -55,11 +57,33 @@ export function ArcadeLeaderNext({ state, disabled }: { state: RoomSnapshot; dis
   if (state.view.status === 'FINISHED') return <p role="status" className="arcade-round">Back to the lobby…</p>;
   if (!arcade.leader) return stage?.revealed ? <p className="arcade-round wait-note">Waiting for the leader to go back to the lobby… <button type="button" className="ghost" onClick={() => navigate(`/?arcade=${arcade.lobbyId}`, { replace: true })}>Go now</button></p> : null;
   const next = waitingStep(state);
-  if (!next && !error) return null;
+  const needsDisplay = stage?.minigame && SHARED_SCREEN_MINIGAMES.includes(stage.minigame.game);
+  if (!next && !error && !needsDisplay) return null;
   return <div className="arcade-round" role="group" aria-label="Leader">
     {error && <p role="alert" className="error">{error}</p>}
+    {needsDisplay && <ArcadeDisplayLink sessionId={state.view.sessionId} />}
     {next && <button type="button" className="primary arcade-next" disabled={disabled || busy || next.blocked} onClick={() => act(next.action)}>
       {NEXT_ICON[next.action] && <FaIcon name={NEXT_ICON[next.action]!} />}{next.label}</button>}
+  </div>;
+}
+
+function ArcadeDisplayLink({ sessionId }: { sessionId: string }) {
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const create = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const { token } = await roomApi<{ token: string }>(`/api/arcade/rounds/${sessionId}/display`, {});
+      setUrl(`${location.origin}/?room=${sessionId}&display=1#access=${token}`);
+    } catch (cause) { setError(arcadeProblem(cause)); }
+    finally { setBusy(false); }
+  };
+  return <div className="actions">
+    {url ? <><a className="link-button" href={url} target="_blank" rel="noreferrer">Open shared screen</a><CopyButton text={url} label="Copy screen link" /></>
+      : <button type="button" className="ghost" data-keep-open disabled={busy} onClick={() => void create()}><FaIcon name="tv" /> Set up shared screen</button>}
+    {error && <p role="alert" className="error">{error}</p>}
   </div>;
 }
 
@@ -72,7 +96,8 @@ export function ArcadeLeaderMenu({ state, disabled }: { state: RoomSnapshot; dis
     <p className="arcade-round-label"><FaIcon name="star" /> You lead this round</p>
     {error && <p role="alert" className="error">{error}</p>}
     {stage?.teams?.forming && stage.teams.formation === 'random' && <button type="button" disabled={off} onClick={() => act('shuffle-teams')}><FaIcon name="rotate" /> Shuffle the teams</button>}
-    {playing && <button type="button" disabled={off} onClick={() => act('close')}><FaIcon name="stopwatch" /> End now and count the results</button>}
+    {stage?.duel && <ArcadeDisplayLink sessionId={state.view.sessionId} />}
+    {playing && !stage?.duel && <button type="button" disabled={off} onClick={() => act('close')}><FaIcon name="stopwatch" /> End now and count the results</button>}
     {!stopping ? <button type="button" className="ghost" data-keep-open disabled={off} onClick={() => setStopping(true)}><FaIcon name="xmark" /> Stop the round</button>
       // Stopping asks first: one tap too many must not end everyone's round.
       : <div className="arcade-round-confirm" role="group" aria-label="Stop the round"><p>Stop this round for everyone and go back to the lobby?</p>

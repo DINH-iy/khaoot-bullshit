@@ -45,7 +45,8 @@ export async function closeExpiredStages(client: PrismaClient, service: TimeoutE
   for (const [id, until] of backoff) if (until <= at) backoff.delete(id);
   // Rounds with a longer grace (drawings) are found here too early; their close refuses until it is due, and a later pass closes them.
   const cutoff = new Date(at - ACCEPTANCE_GRACE_MS - SETTLE_MS);
-  const due = await client.stageRun.findMany({ where: { status: 'ACTIVE', deadlineAt: { lte: cutoff }, session: { status: 'RUNNING' }, ...(backoff.size ? { id: { notIn: [...backoff.keys()] } } : {}) },
+  const due = await client.stageRun.findMany({ where: { OR: [{ status: 'ACTIVE', deadlineAt: { lte: cutoff } }, { status: 'CLOSED', deadlineAt: { lte: new Date(at - SETTLE_MS) }, revealedAt: null }],
+    session: { status: 'RUNNING' }, ...(backoff.size ? { id: { notIn: [...backoff.keys()] } } : {}) },
     select: { id: true, sessionId: true, session: { select: { hostId: true } } }, orderBy: { deadlineAt: 'asc' }, take: 50 });
   let closed = 0; let failed = 0;
   for (const stage of due) {

@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { canPlacePoolCue, POOL_HEIGHT, POOL_WIDTH, type HeadToHeadMove, type HeadToHeadView, type PoolFrame } from '@party/contracts';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, poolLegalTarget, POOL_AIM_STEP, POOL_HEIGHT, POOL_POCKETS, POOL_WIDTH, type HeadToHeadMove, type HeadToHeadView, type PoolFrame, type PoolSpin } from '@party/contracts';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { usePoolLandscape } from './landscape.js';
-import { paintPool } from './table.js';
+import { paintPool, type BallRotation } from './table.js';
+import { PotTrays } from './pot-trays.js';
+import { FaIcon } from '../../presentation/icons.js';
+import { PoolSpinButton, PoolSpinPicker } from './spin-picker.js';
+import '../../ui/game-slider.css';
 import './pool.css';
 
 const TEXTS = defineTexts('eight-ball', {
@@ -19,51 +23,96 @@ const TEXTS = defineTexts('eight-ball', {
   ro: { early: 'Bila 8 a intrat prea devreme', scratch: 'Bila albă a intrat cu bila 8', 'wrong-pocket': 'Bila 8 a intrat în buzunarul greșit', foulEight: 'Fault la bila 8', rotate: 'Mod peisaj', exitLandscape: 'Ieși din modul peisaj', guide: 'Trage pentru a ținti. Trage înapoi de la bila albă pentru a lovi.', requiredPocket: 'Bila 8 · {pocket}', topLeft: 'Sus stânga', topMiddle: 'Sus mijloc', topRight: 'Sus dreapta', bottomLeft: 'Jos stânga', bottomMiddle: 'Jos mijloc', bottomRight: 'Jos dreapta', table: 'Masă de biliard', aim: 'Unghi', power: 'Putere', shoot: 'Lovește', placeCue: 'Așază bila albă', aimCue: 'Țintește', solids: 'Pline', stripes: 'Dungate', open: 'Masă deschisă', foul: 'Fault · Bilă în mână', remaining: '{group} · {count} rămase', ballInHand: 'Bilă în mână', lower: 'Țintește la stânga', higher: 'Țintește la dreapta' },
 });
 
+const TARGET_TEXTS = defineTexts('pool-target', {
+  break: 'Break shot', open: 'Open table', solid: 'Play solids', stripe: 'Play stripes', eight: 'Play the 8', assist: 'Aim assist', shortAssist: 'Assist', landscape: 'Landscape',
+}, {
+  nl: { break: 'Breakstoot', open: 'Open tafel', solid: 'Speel hele', stripe: 'Speel halve', eight: 'Speel de 8', assist: 'Richthulp', shortAssist: 'Hulp', landscape: 'Liggend' },
+  de: { break: 'Anstoß', open: 'Offener Tisch', solid: 'Volle spielen', stripe: 'Halbe spielen', eight: 'Auf die Acht', assist: 'Zielhilfe', shortAssist: 'Zielhilfe', landscape: 'Querformat' },
+  ro: { break: 'Spargere', open: 'Masă deschisă', solid: 'Joacă plinele', stripe: 'Joacă dungatele', eight: 'Joacă bila 8', assist: 'Asistență la țintire', shortAssist: 'Asistare', landscape: 'Peisaj' },
+});
+
 type PoolView = Extract<HeadToHeadView['board'], { game: 'eight-ball' }>;
 type Shot = Extract<HeadToHeadMove, { game: 'eight-ball' }>;
 const FRAME_MS = 1000 / 15;
 const POCKET_NAMES = ['topLeft', 'topMiddle', 'topRight', 'bottomLeft', 'bottomMiddle', 'bottomRight'] as const;
-const angleOf = (angle: number) => (angle + 360) % 360;
+const angleOf = (angle: number) => (Math.round(angle / POOL_AIM_STEP) * POOL_AIM_STEP + 360) % 360;
+const powerFromPull = (distance: number) => Math.max(1, Math.min(100, Math.round(distance / 1.45)));
+const AIM_ASSIST_KEY = 'party_pool_aim_assist';
 
-export function PoolBoard({ view, board, names, canMove, onMove }: {
-  view: HeadToHeadView; board: PoolView; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void;
+export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: {
+  view: HeadToHeadView; board: PoolView; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void; statusLabel?: string | undefined;
 }) {
   const t = useTexts(TEXTS);
+  const targetText = useTexts(TARGET_TEXTS);
   const orientation = usePoolLandscape();
   const canvas = useRef<HTMLCanvasElement>(null);
+  const rotations = useRef(new Map<number, BallRotation>());
   const lastShot = useRef(board.shot);
   const pulling = useRef(false);
-  const [angle, setAngle] = useState(0);
+  const startArea = board.start ?? DEFAULT_POOL_START;
+  const [angle, setAngle] = useState(startArea.side === 'right' ? 180 : 0);
   const [power, setPower] = useState(75);
+  const [objectGuide, setObjectGuide] = useState(() => {
+    try { return localStorage.getItem(AIM_ASSIST_KEY) !== 'off'; } catch { return true; }
+  });
   const [placing, setPlacing] = useState(false);
+  const [spin, setSpin] = useState<PoolSpin>([0, 0]);
+  const [editingSpin, setEditingSpin] = useState(false);
   const [cue, setCue] = useState<Shot['cue']>();
-  const [roll, setRoll] = useState<{ shot: number; balls: PoolFrame }>();
+  const [roll, setRoll] = useState<{ shot: number; balls: PoolFrame; sinking?: Map<number, number> }>();
+  const [shownPots, setShownPots] = useState<PoolView['potsBySeat']>(board.potsBySeat);
   const rolling = roll?.shot === board.shot;
   const ready = canMove && view.turn === view.seat && !rolling;
   const balls = roll?.shot === board.shot ? roll.balls : board.balls;
   const placement = ready && board.ballInHand ? cue : undefined;
   const table = placement ? balls.map((ball): PoolFrame[number] => ball[0] === 0 ? [0, ...placement] : ball) : balls;
+  const target = !rolling && (view.turn === 0 || view.turn === 1) ? poolLegalTarget(board.balls,
+    board.solids === null ? null : board.solids === view.turn ? 'solid' : 'stripe', board.shot === 0) : null;
 
   useEffect(() => {
     if (lastShot.current === board.shot) return;
     lastShot.current = board.shot;
     setCue(undefined);
     setPlacing(false);
+    setSpin([0, 0]);
+    setEditingSpin(false);
     setRoll(undefined);
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches || board.motion.length < 2) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || board.motion.length < 2) { setShownPots(board.potsBySeat); return; }
     const start = performance.now();
+    const frameMs = Math.min(FRAME_MS, 4600 / (board.motion.length - 1));
+    let previous = new Map(board.motion[0]!.map(ball => [ball[0], ball]));
+    const rotateBalls = (next: PoolFrame) => {
+      for (const ball of next) {
+        const [id, x, y] = ball;
+        const before = previous.get(id);
+        if (!before) continue;
+        const dx = x - before[1], dy = y - before[2];
+        const distance = Math.hypot(dx, dy);
+        if (distance < .04) continue;
+        const old = rotations.current.get(id);
+        rotations.current.set(id, { phase: ((old?.phase ?? 0) + distance / BALL_RADIUS) % (Math.PI * 2), direction: Math.atan2(dy, dx) });
+      }
+      previous = new Map(next.map(ball => [ball[0], ball]));
+    };
     let frame = 0;
     const advance = (time: number) => {
-      const position = Math.max(0, time - start) / FRAME_MS;
+      const position = Math.max(0, time - start) / frameMs;
       const index = Math.floor(position);
       const next = board.motion[index + 1];
-      if (!next) { setRoll(undefined); return; }
+      if (!next) { rotateBalls(board.motion.at(-1)!); setShownPots(board.potsBySeat); setRoll(undefined); return; }
       const fraction = position - index;
       const to = new Map(next.map(ball => [ball[0], ball]));
-      setRoll({ shot: board.shot, balls: board.motion[index]!.map(([id, x, y]) => {
+      const sinking = new Map<number, number>();
+      const picture: PoolFrame = board.motion[index]!.map(([id, x, y]) => {
         const ball = to.get(id);
-        return ball ? [id, x + (ball[1] - x) * fraction, y + (ball[2] - y) * fraction] : [id, x, y];
-      }) });
+        if (ball) return [id, x + (ball[1] - x) * fraction, y + (ball[2] - y) * fraction];
+        const [px, py] = POOL_POCKETS.reduce((nearest, pocket) =>
+          Math.hypot(pocket[0] - x, pocket[1] - y) < Math.hypot(nearest[0] - x, nearest[1] - y) ? pocket : nearest);
+        sinking.set(id, 1 - fraction);
+        return [id, x + (px - x) * fraction, y + (py - y) * fraction];
+      });
+      rotateBalls(picture);
+      setRoll({ shot: board.shot, balls: picture, sinking });
       frame = requestAnimationFrame(advance);
     };
     setRoll({ shot: board.shot, balls: board.motion[0]! });
@@ -76,9 +125,9 @@ export function PoolBoard({ view, board, names, canMove, onMove }: {
     const ctx = canvas.current?.getContext('2d');
     if (ctx) paintPool(ctx, table, {
       aim: ready && !placing ? { angle, power } : undefined,
-      placing: ready && placing, eightPocket: rolling ? null : board.eightPocket,
+      placing: ready && placing, eightPocket: rolling ? null : board.eightPocket, rotations: rotations.current, target, objectGuide, start: startArea, sinking: roll?.sinking,
     });
-  }, [table, ready, placing, angle, power, rolling, board.eightPocket, orientation.landscape]);
+  }, [table, ready, placing, angle, power, rolling, board.eightPocket, orientation.landscape, target, objectGuide, startArea, roll]);
 
   const coordinates = (event: PointerEvent<HTMLCanvasElement>) => {
     const element = event.currentTarget;
@@ -90,65 +139,91 @@ export function PoolBoard({ view, board, names, canMove, onMove }: {
       Math.round((localY - element.clientTop) * POOL_HEIGHT / element.clientHeight)] as const;
   };
   const white = table.find(([id]) => id === 0);
-  const aimFrom = (x: number, y: number, pull = false) => {
+  const aimFrom = (x: number, y: number) => {
     if (!white) return;
     const dx = x - white[1], dy = y - white[2];
-    const distance = Math.hypot(dx, dy);
-    if (distance <= 10) return;
-    return { angle: angleOf(Math.round(Math.atan2(dy, dx) * 180 / Math.PI) + (pull ? 180 : 0)),
-      power: pull ? Math.max(1, Math.min(100, Math.round(distance / 1.45))) : power, distance };
+    if (Math.hypot(dx, dy) <= BALL_RADIUS) return;
+    return angleOf(Math.atan2(dy, dx) * 180 / Math.PI);
+  };
+  const pullDistance = (x: number, y: number) => {
+    if (!white) return 0;
+    const radians = angle * Math.PI / 180;
+    return (white[1] - x) * Math.cos(radians) + (white[2] - y) * Math.sin(radians);
   };
   const sendShot = (shotAngle: number, shotPower: number) => onMove({
     game: 'eight-ball', angle: shotAngle, power: shotPower, shot: board.shot, ...(placement ? { cue: placement } : {}),
+    ...(spin[0] || spin[1] ? { spin } : {}),
   });
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (!ready || event.button !== 0 || !event.isPrimary) return;
+    if (!ready || editingSpin || event.button !== 0 || !event.isPrimary) return;
     const [x, y] = coordinates(event);
     if (placing && board.ballInHand) {
-      if (canPlacePoolCue(x, y, balls)) { setCue([x, y]); setPlacing(false); }
+      if (canPlacePoolCue(x, y, balls, startArea)) { setCue([x, y]); setPlacing(false); }
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
     pulling.current = Boolean(white && Math.hypot(x - white[1], y - white[2]) <= 29);
     const next = pulling.current ? undefined : aimFrom(x, y);
-    if (next) setAngle(next.angle);
+    if (next !== undefined) setAngle(next);
   };
   const surface = <div className="pool">
+    {!view.outcome && <div className="pool-toolbar">
+      <p className="pool-current" role="status"><strong>{statusLabel}</strong>{target && <span>{targetText(target)}</span>}</p>
+      {view.seat !== null && <button type="button" className="pool-aim-assist" aria-label={targetText('assist')} aria-pressed={objectGuide} onClick={() => {
+        setObjectGuide(!objectGuide);
+        try { localStorage.setItem(AIM_ASSIST_KEY, objectGuide ? 'off' : 'on'); } catch { /* optional preference */ }
+      }}><span aria-hidden="true" />{targetText('shortAssist')}</button>}
+      {view.seat !== null && !orientation.landscape && <button type="button" className="pool-landscape-button" aria-label={t('rotate')}
+        onClick={() => void orientation.open()}><FaIcon name="rotate" />{targetText('landscape')}</button>}
+      {orientation.landscape && <button type="button" className="ghost pool-landscape-exit" autoFocus onClick={orientation.close}>{t('exitLandscape')}</button>}
+    </div>}
+    {orientation.landscape && view.outcome && <div className="pool-toolbar">
+      <p className="pool-current" role="status"><strong>{statusLabel}</strong></p>
+      <button type="button" className="ghost pool-landscape-exit" onClick={orientation.close}>{t('exitLandscape')}</button>
+    </div>}
     <canvas className="pool-table" ref={canvas} width={POOL_WIDTH} height={POOL_HEIGHT} role="img" aria-label={t('table')}
       data-shot={board.shot} data-rolling={rolling} data-aiming={ready} onPointerDown={down}
       onPointerMove={event => {
         if (!ready || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-        const next = aimFrom(...coordinates(event), pulling.current);
-        if (next) { setAngle(next.angle); if (pulling.current) setPower(next.power); }
+        if (pulling.current) {
+          setPower(powerFromPull(pullDistance(...coordinates(event))));
+        } else {
+          const next = aimFrom(...coordinates(event));
+          if (next !== undefined) setAngle(next);
+        }
       }}
       onPointerUp={event => {
-        const next = pulling.current && ready ? aimFrom(...coordinates(event), true) : undefined;
+        const distance = pulling.current && ready ? pullDistance(...coordinates(event)) : 0;
         pulling.current = false;
-        if (next && next.distance >= 36) sendShot(next.angle, next.power);
+        if (distance >= 24) sendShot(angle, powerFromPull(distance));
       }} onLostPointerCapture={() => { pulling.current = false; }} />
-    {board.solids === null ? <p className="pool-open">{t('open')}</p> : <ul className="pool-groups">
-      {([0, 1] as const).map(seat => {
-        const solid = board.solids === seat;
-        const count = balls.filter(([id]) => solid ? id > 0 && id < 8 : id > 8).length;
-        return <li key={seat}><strong>{names[seat]}</strong><span>{t('remaining', { group: t(solid ? 'solids' : 'stripes'), count })}</span></li>;
-      })}
-    </ul>}
+    <PotTrays names={names} pots={shownPots ?? [[], []]} turn={view.turn === 'both' ? null : view.turn} />
+    {board.ballInHand && ready && !editingSpin && <button className="ghost pool-place" type="button"
+      onClick={() => setPlacing(!placing)}>{t(placing ? 'aimCue' : 'placeCue')}</button>}
     {view.seat !== null && !view.outcome && <div className="pool-controls">
-      {board.ballInHand && ready && <button className="ghost" type="button" onClick={() => setPlacing(!placing)}>{t(placing ? 'aimCue' : 'placeCue')}</button>}
-      <div className="pool-adjust">
-        <button type="button" aria-label={t('lower')} disabled={!ready} onClick={() => setAngle(angleOf(angle - 1))}>−</button>
-        <label>{t('aim')} <input type="range" min={0} max={359} value={angle} disabled={!ready} aria-valuetext={`${angle}°`} onChange={event => setAngle(event.currentTarget.valueAsNumber)} /></label>
-        <button type="button" aria-label={t('higher')} disabled={!ready} onClick={() => setAngle(angleOf(angle + 1))}>+</button>
+      {editingSpin && ready ? <PoolSpinPicker value={spin} onChange={setSpin} onDone={() => setEditingSpin(false)}
+        sideways={orientation.landscape && matchMedia('(orientation: portrait)').matches} /> : <>
+      <div className="pool-adjust pool-aim">
+        <button type="button" aria-label={t('lower')} disabled={!ready || placing} onClick={() => setAngle(angleOf(angle - POOL_AIM_STEP))}>−</button>
+        <label><span>{t('aim')} <strong aria-hidden="true">{angle}°</strong></span>
+          <input className="game-slider slider-ring" type="range" min={0} max={360 - POOL_AIM_STEP} step={POOL_AIM_STEP} value={angle}
+            disabled={!ready || placing} aria-valuetext={`${angle}°`} onChange={event => setAngle(event.currentTarget.valueAsNumber)} />
+        </label>
+        <button type="button" aria-label={t('higher')} disabled={!ready || placing} onClick={() => setAngle(angleOf(angle + POOL_AIM_STEP))}>+</button>
       </div>
-      <div className="pool-adjust">
-        <label>{t('power')} <input type="range" min={1} max={100} value={power} disabled={!ready} onChange={event => setPower(event.currentTarget.valueAsNumber)} /></label>
+      <label className="pool-power"><span>{t('power')} <strong aria-hidden="true">{power}%</strong></span>
+        <input className="game-slider slider-notch" type="range" min={1} max={100} value={power}
+          disabled={!ready || placing} aria-valuetext={`${power}%`} style={{ '--pool-power': `${power}%` } as CSSProperties}
+          onChange={event => setPower(event.currentTarget.valueAsNumber)} />
+      </label>
+      <div className="pool-shot-actions">
+        <PoolSpinButton value={spin} disabled={!ready || placing} onClick={() => setEditingSpin(true)} />
         <button className="primary" type="button" disabled={!ready || placing} onClick={() => sendShot(angle, power)}>{t('shoot')}</button>
-      </div>
+      </div></>}
     </div>}
     {board.eightPocket !== null && !rolling && !view.outcome && <p className="pool-open pool-target">
       {t('requiredPocket', { pocket: t(POCKET_NAMES[board.eightPocket]!) })}
     </p>}
-    {ready && board.shot === 0 && <p className="pool-open pool-instructions">{t('guide')}</p>}
     {board.ending && board.ending !== 'clean' && !rolling && <p className="pool-open pool-target" role="status">
       {t(board.ending === 'foul' ? 'foulEight' : board.ending)}
     </p>}
@@ -157,13 +232,8 @@ export function PoolBoard({ view, board, names, canMove, onMove }: {
   if (orientation.landscape) return <dialog className="pool-landscape-dialog" ref={orientation.dialog} aria-label={t('table')}
     onCancel={event => { event.preventDefault(); orientation.close(); }}>
     <div className="pool-landscape-frame">
-      <button type="button" className="ghost pool-landscape-exit" autoFocus onClick={orientation.close}>{t('exitLandscape')}</button>
       {surface}
     </div>
   </dialog>;
-  return <>
-    {view.seat !== null && !view.outcome && <button type="button" className="ghost small-button pool-landscape-button"
-      onClick={() => void orientation.open()}>{t('rotate')}</button>}
-    {surface}
-  </>;
+  return surface;
 }

@@ -15,6 +15,7 @@ import { WheelOfScene } from '../shell/show-settings.js';
 import { PlacesFields } from './fields/places-fields.js';
 import { MinigameFields } from './fields/minigame-fields.js';
 import { MinigameConfiguration } from './minigame-configuration.js';
+import { PoolConfiguration } from './pool-configuration.js';
 import { DrawingFields } from './fields/drawing-fields.js';
 import { DuelFields } from './fields/duel-fields.js';
 import { translate, useTexts } from '../../i18n/texts.js';
@@ -59,7 +60,7 @@ const scoreboardShows = () => [{ value: 'players', label: t('showPlayers') }, { 
  * (open), the points, and who plays. The kind of scene (which minigame, how a
  * duel is won) is chosen when adding it, so it is shown here, not asked again.
  */
-export function StageFields({ definition, node, index, onChange, mediaOpen, openMedia, closeMedia }: { definition: Definition; node: Node; index: number; onChange: Change; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void }) {
+export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void }) {
   const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
@@ -69,13 +70,18 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
   const withPlaces = <T extends Record<string, unknown>>(base: T, places: Places | undefined): T => { const copy: Record<string, unknown> = { ...base }; if (places) copy['places'] = places; else delete copy['places']; return copy as T; };
   const fastest = (legendFor: string) => <PlacesFields legend={t('extraFastest', { what: legendFor })} hint={t('extraFastestHint')} value={scoring?.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring ?? {}, places) }), 'places')} />;
   const id = (field: string) => `${node.key}-${index}-${field}`;
-  const timed = !(stage.kind === 'duel' && stage['pick'] === 'teams') && !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
+  const poolStage = stage.kind === 'duel' && (stage['contest'] as { kind?: string; game?: string } | undefined)?.game === 'eight-ball';
+  const timed = !poolStage && !(stage.kind === 'duel' && stage['pick'] === 'teams') && !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
   const graphRound = stage.kind === 'minigame' && stage['game'] === 'draw-the-graph';
-  const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || stage.kind === 'duel' || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
+  const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || (stage.kind === 'duel' && !poolStage) || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
   const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
   const voting = stage['voteMode'] === 'multi' || stage['voteMode'] === 'ranked' ? stage['voteMode'] : 'single';
   const cards = stage['resultCards'];
   const cardMode = typeof cards === 'number' ? 'timed' : cards === 'manual' ? 'manual' : 'together';
+  const incoming = definition.edges.filter(edge => edge.to === node.key);
+  const hasTeamSetup = node.stages.slice(0, index).some(part => part.kind === 'teams') ||
+    (node.key !== definition.startNodeKey && incoming.length > 0 && incoming.every(edge =>
+      definition.nodes.find(candidate => candidate.key === edge.from)?.stages.some(part => part.kind === 'teams')));
   return <div className="stage-fields">
     <Section title={t('content')} memory="Content" open>
       {stage.kind === 'info' && <label>{t('title')}<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
@@ -139,7 +145,9 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
           onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= 15) edit(current => ({ ...current, countdownSeconds: value }), 'countdown'); }} /></label>}
       {stage.kind === 'scoreboard' && <Segmented label={t('show')} value={String(stage['show'] ?? 'players')} choices={scoreboardShows()} onChange={show => edit(current => ({ ...current, show }), 'show')} />}
       {stage.kind === 'minigame' && <MinigameConfiguration key={stage.key} definition={definition} node={node} index={index} onApply={next => edit(() => next, 'minigame-configuration')} />}
-      {stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
+      {poolStage ? <PoolConfiguration key={`${node.key}:${stage.key}`} stage={stage} onChange={(next, field) => edit(() => next, field)}
+        addTeams={hasTeamSetup ? undefined : addTeams} />
+        : stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
       {stage.kind === 'route' && <RouteFields definition={definition} node={node} stage={stage} onChange={onChange} />}
       {stage.kind === 'teams' && <PickTeamsFields definition={definition} node={node} stage={stage} onChange={(next, field) => edit(() => next, field)} />}
       {isWheelScene(stage) && <WheelOfScene definition={definition} stage={stage} onChange={onChange} />}

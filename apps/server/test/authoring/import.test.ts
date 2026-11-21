@@ -34,8 +34,8 @@ describe('importing a game from text', () => {
       settings: { revealEasing: 'ease-out', graph: { visible: [10, 20, 35, 50], hidden: [55, 65, 62, 80], yLabel: 'Visitors', scale: { min: 0, max: 1000 }, splitAt: 0.4, source: 'Example dataset', sourceUrl: 'https://example.org/museum-visits', sourceNote: 'Annual admissions.' } } });
     expect(stage('roulette')).toMatchObject({ kind: 'minigame', game: 'red-or-black-roulette', durationMs: 15_000, placementMilli: ['10000'] });
     expect(game).toMatchObject({ presentation: { phoneMenuIcons: { scores: 'star', games: 'wheel', packs: 'sparkles', blackjack: 'cards' } } });
-    expect(stage('pool')).toMatchObject({ kind: 'duel', pick: 'random', durationMs: 20_000, betMilli: '2000',
-      contest: { kind: 'game', game: 'eight-ball' }, places: { kind: 'list', pointsMilli: ['10000'] } });
+    expect(stage('pool')).toMatchObject({ kind: 'duel', pick: 'random', durationMs: 20_000, betMilli: '2000', matchSeconds: 120,
+      contest: { kind: 'game', game: 'eight-ball', settings: { ballBehavior: { preset: 'arcade' }, start: { side: 'random', percent: 30 } } }, places: { kind: 'list', pointsMilli: ['10000'] } });
     expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(16);
   });
 

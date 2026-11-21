@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import type { PoolBallBehavior, PoolStart } from '@party/contracts';
 import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
-import { checkBet, decideDuel, duelPlay, openDuel, openTeamPool, pickDuelists } from './duel.js';
+import { checkBet, decideDuel, duelists, duelPlay, endTimedPool, openDuel, openPoolTryout, openTeamPool, pickDuelists, pickTimedPoolWinner, readDuel } from './duel.js';
 import { matchOutcome } from '../head-to-head/match.js';
 import { judgeResult, readMinigameRun, startMinigame, usesSubmissionTime } from '../minigames/shared/rules.js';
 import { CLOCK_SLACK_MS, NO_FAIRNESS } from '../minigames/shared/fairness.js';
@@ -30,7 +31,8 @@ export interface Effect {
 }
 
 // `number` counts runs in this session (1, 2, 3…); on a branching game it is not a position in the definition.
-async function openStage(tx: Transaction, sessionId: string, number: number, entry: Located, definition: GameDefinition, now: Date): Promise<StageRun> {
+async function openStage(tx: Transaction, sessionId: string, number: number, entry: Located, definition: GameDefinition, now: Date,
+  poolTryout?: { players: [string] | [string, string] | undefined; seconds: number | undefined; ballBehavior: PoolBallBehavior | undefined; start: PoolStart | undefined }): Promise<StageRun> {
   const players = await tx.sessionPlayer.findMany({ where: { sessionId, leftAt: null }, select: { id: true }, orderBy: { id: 'asc' } });
   let presentation = {};
   if (entry.stage.kind === 'vote') {
@@ -39,7 +41,7 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   }
   const ids = players.map(player => player.id);
   let lineupId: string | null = null; let eligible = ids; let timed = true;
-  let teamDuelStarted = false;
+  let duelStartsImmediately = false;
   let teamDuelUnavailable = false;
   if (entry.stage.kind === 'route') {
     const opened = await openRoute(tx, sessionId, entry.stage, ids);
@@ -55,14 +57,23 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   }
   // A duel: everyone but the two duelists bets; when the host picks the pair, betting waits (untimed) until then.
   if (entry.stage.kind === 'duel') {
-    if (entry.stage.pick === 'teams') {
+    if (poolTryout) {
+      const poolStage = { ...entry.stage, contest: { kind: 'game' as const, game: 'eight-ball' as const,
+        settings: { ...(poolTryout.ballBehavior ? { ballBehavior: poolTryout.ballBehavior } : {}), ...(poolTryout.start ? { start: poolTryout.start } : {}) } } };
+      const duel = poolTryout.players ? openPoolTryout(poolStage, poolTryout.players) : openDuel(poolStage, ids).duel;
+      requireGame(duel.match?.game === 'eight-ball', 'INELIGIBLE');
+      presentation = { duel };
+      eligible = [];
+      timed = false;
+      duelStartsImmediately = true;
+    } else if (entry.stage.pick === 'teams') {
       const lineup = await gameLineupForRound(tx, sessionId, ids);
       const duel = openTeamPool(entry.stage, ids, lineup?.members ?? []);
       lineupId = lineup?.id ?? null;
       presentation = { duel };
       eligible = [];
       timed = false;
-      teamDuelStarted = true;
+      duelStartsImmediately = true;
       teamDuelUnavailable = !duel.match;
     } else {
       const opened = openDuel(entry.stage, ids);
@@ -88,9 +99,11 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   if (explainsFirst(entry.stage)) { presentation = { ...presentation, explain: { readyIds: [] } }; timed = false; }
   // A minigame starts (after its countdown) as soon as players can play it.
   if (timed) presentation = { ...presentation, ...countdownPresentation(entry.stage, now) };
+  const poolSeconds = duelStartsImmediately && !teamDuelUnavailable && entry.stage.kind === 'duel' ? poolTryout?.seconds ?? entry.stage.matchSeconds : undefined;
+  const duration = poolSeconds !== undefined ? poolSeconds * 1000 : timed ? await startedDuration(tx, entry.stage, lineupId, presentation, now) : null;
   const stage = await tx.stageRun.create({ data: { sessionId, number, nodeKey: entry.nodeKey, stageKey: entry.stage.key, openedAt: now, presentation, lineupId,
-    ...(teamDuelStarted ? { status: 'CLOSED', closedAt: now, ...(teamDuelUnavailable ? { revealedAt: now } : {}) } : {}),
-    ...timerColumns(timed ? await startedDuration(tx, entry.stage, lineupId, presentation, now) : null, false, now), eligibility: { formatVersion: 1, playerIds: eligible } } });
+    ...(duelStartsImmediately ? { status: 'CLOSED', closedAt: now, ...(teamDuelUnavailable ? { revealedAt: now } : {}) } : {}),
+    ...timerColumns(duration, false, now), eligibility: { formatVersion: 1, playerIds: eligible } } });
   await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'RUNNING', currentNodeKey: entry.nodeKey } });
   return stage;
 }
@@ -214,18 +227,31 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(session.mode === 'REHEARSAL' && roomState.tryout === true, 'FORBIDDEN');
     requireGame(session.status !== 'FINISHED' && !roomState.roomClosed && !roomState.nextRoom, 'INVALID_STATE');
     const chosen = locateStage(definition, command.game, 'play');
-    requireGame(chosen?.stage.kind === 'minigame' && chosen.stage.game === command.game, 'INVALID_COMMAND');
+    const pool = command.game === 'eight-ball' && chosen?.stage.kind === 'duel' &&
+      chosen.stage.contest?.kind === 'game' && chosen.stage.contest.game === 'eight-ball';
+    requireGame(chosen && (pool || (chosen.stage.kind === 'minigame' && chosen.stage.game === command.game)), 'INVALID_COMMAND');
+    const players = await present(tx, session.id);
     const minPlayers = TEAM_MINIGAMES.some(game => game === command.game) ? 2 : 1;
-    requireGame((await present(tx, session.id)).length >= minPlayers, 'INELIGIBLE');
+    requireGame(players.length >= minPlayers, 'INELIGIBLE');
+    const poolPlayers = command.poolPlayers ?? (pool && players.length === 1 ? [players[0]!] as [string] : undefined);
+    if (poolPlayers) {
+      requireGame(pool, 'INVALID_COMMAND');
+      requireGame(new Set(poolPlayers).size === poolPlayers.length && poolPlayers.every(id => players.includes(id)), 'INELIGIBLE');
+    }
+    if (command.poolSeconds !== undefined) requireGame(pool && (poolPlayers?.length ?? players.length) >= 2, 'INVALID_COMMAND');
+    if (command.poolBallBehavior !== undefined || command.poolStart !== undefined) requireGame(pool, 'INVALID_COMMAND');
     const previous = await tx.stageRun.findFirst({ where: { sessionId: session.id }, orderBy: { number: 'desc' } });
     if (previous?.status === 'ACTIVE') {
       // An abandoned attempt stays in history without a reveal or a score award.
       await tx.stageRun.update({ where: { id: previous.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
+    } else if (previous?.deadlineAt || previous?.pausedRemainingMs != null) {
+      await tx.stageRun.update({ where: { id: previous.id }, data: timerColumns(null, false, now) });
     }
     if (session.status === 'PAUSED') {
       await tx.gameSession.update({ where: { id: session.id }, data: { state: { ...roomState, breakStartedAt: null, breakVoters: [] } } });
     }
-    return { ...empty, stageRunId: (await openStage(tx, session.id, (previous?.number ?? 0) + 1, chosen, definition, now)).id };
+    return { ...empty, stageRunId: (await openStage(tx, session.id, (previous?.number ?? 0) + 1, chosen, definition, now,
+      pool ? { players: poolPlayers, seconds: command.poolSeconds, ballBehavior: command.poolBallBehavior, start: command.poolStart } : undefined)).id };
   }
   if (command.type === 'session.start') {
     requireGame(session.status === 'LOBBY' && !roomState.tryout, 'INVALID_STATE');
@@ -238,7 +264,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     const state = session.state && typeof session.state === 'object' && !Array.isArray(session.state) ? session.state as Record<string, unknown> : {};
     await tx.gameSession.update({ where: { id: session.id }, data: { status: pausing ? 'PAUSED' : 'RUNNING', ...(pausing ? {} : { state: { ...state, breakStartedAt: null, breakVoters: [] } as object }) } });
     // A pause freezes the clock; resuming restarts it with the same remainder.
-    const active = await tx.stageRun.findFirst({ where: { sessionId: session.id, status: 'ACTIVE' } });
+    const active = await tx.stageRun.findFirst({ where: { sessionId: session.id, OR: [{ status: 'ACTIVE' }, { deadlineAt: { not: null } }, { pausedRemainingMs: { not: null } }] }, orderBy: { number: 'desc' } });
     if (active) {
       // A pause stops a running minigame on every phone (they stop playing while the room is paused);
       // resuming gives everyone who has not finished a fresh countdown. Lucky doors keep their secret order.
@@ -320,24 +346,33 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type === 'duel.decide') {
     // Naming the winner closes the betting, pays out and shows the result, in one step.
     requireGame(entry.stage.kind === 'duel', 'INVALID_STATE');
-    requireGame(entry.stage.contest?.kind !== 'game' || entry.stage.contest.game !== 'eight-ball', 'INVALID_STATE');
-    const decided = await decideDuel(tx, stage, entry.stage, command.winnerId);
+    const duel = readDuel(stage.presentation);
+    const decided = await decideDuel(tx, stage, entry.stage, command.winnerId,
+      entry.stage.contest?.kind === 'game' && entry.stage.contest.game === 'eight-ball' ? pickTimedPoolWinner(duel, command.winnerId) : duel);
     await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: decided.duel as object },
       ...(stage.status === 'ACTIVE' ? { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } : {}) } });
     await reveal(tx, { ...stage, status: 'CLOSED' }, now);
     return { ...empty, stageRunId: stage.id, awards: decided.awards };
   }
   if (command.type === 'duel.move' || command.type === 'duel.resign') {
-    // A duelist plays the duel's game (after betting has closed). A win names the winner and pays out at once; a draw waits for the host.
+    // A duelist plays the duel's game (after betting has closed). A win names the winner and pays out at once; a draw in Arcade ends the round.
     requireGame(actor.role === 'player' && entry.stage.kind === 'duel', 'INVALID_STATE');
+    requireGame(stage.status !== 'CLOSED' || !stage.deadlineAt || now < stage.deadlineAt, 'TOO_LATE');
     const played = duelPlay(stage, actor.playerId, command.type === 'duel.move' ? { move: command.move } : { resign: true });
     if (!played.winnerId) {
       await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: played.duel as object } } });
-      if (played.duel.match?.game === 'eight-ball' && matchOutcome(played.duel.match)?.kind === 'draw') await reveal(tx, stage, now);
+      const match = played.duel.match;
+      const outcome = match ? matchOutcome(match) : null;
+      const pool = match?.game === 'eight-ball';
+      const drawEndsRound = outcome?.kind === 'draw' && (pool || await tx.arcadeRound.count({ where: { sessionId: session.id, endedAt: null } }) > 0);
+      if (outcome && ((pool && played.duel.practicePlayerId) || drawEndsRound)) {
+        await tx.stageRun.update({ where: { id: stage.id }, data: timerColumns(null, false, now) });
+        await reveal(tx, stage, now);
+      }
       return { ...empty, stageRunId: stage.id };
     }
     const decided = await decideDuel(tx, stage, entry.stage, played.winnerId, played.duel);
-    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: decided.duel as object } } });
+    await tx.stageRun.update({ where: { id: stage.id }, data: { ...timerColumns(null, false, now), presentation: { ...(stage.presentation as object), duel: decided.duel as object } } });
     await reveal(tx, stage, now);
     return { ...empty, stageRunId: stage.id, awards: decided.awards };
   }
@@ -364,6 +399,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     const next = nextStage(definition, { nodeKey: stage.nodeKey, stageKey: stage.stageKey }, decided ? { selectedEdgeKey: decided.selectedEdgeKey, destinationNodeKey: decided.destinationNodeKey } : null);
     requireGame(next !== 'DECISION_PENDING', 'DECISION_PENDING');
     if (stage.status === 'ACTIVE') await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
+    else if (stage.deadlineAt || stage.pausedRemainingMs !== null) await tx.stageRun.update({ where: { id: stage.id }, data: timerColumns(null, false, now) });
     let awards: Award[] = [];
     if (!stage.revealedAt && !isVoteSource(definition, entry.nodeKey, entry.stage.key)) { await reveal(tx, stage, now); awards = await revealAwards(tx, stage, entry.stage); }
     if (next === 'END') {
@@ -373,6 +409,16 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     return { ...empty, awards, stageRunId: (await openStage(tx, session.id, stage.number + 1, next, definition, now)).id };
   }
   if (command.type === 'stage.close' || command.type === 'stage.timeout') {
+    if (command.type === 'stage.timeout' && stage.status === 'CLOSED' && entry.stage.kind === 'duel') {
+      requireGame(!stage.revealedAt && stage.deadlineAt && now >= stage.deadlineAt, 'INVALID_STATE');
+      const timed = endTimedPool(stage);
+      requireGame(timed.match, 'INVALID_STATE');
+      const outcome = matchOutcome(timed.match);
+      const decided = outcome?.kind === 'win' ? await decideDuel(tx, stage, entry.stage, duelists(timed)![outcome.seat], timed) : null;
+      await tx.stageRun.update({ where: { id: stage.id }, data: { ...timerColumns(null, false, now), presentation: { ...(stage.presentation as object), duel: (decided?.duel ?? timed) as object } } });
+      if (decided) await reveal(tx, stage, now);
+      return { ...empty, stageRunId: stage.id, awards: decided?.awards ?? [] };
+    }
     requireGame(stage.status === 'ACTIVE', 'INVALID_STATE');
     // Teams must be confirmed before a team round can end: later rounds (and the
     // validator) rely on a lineup existing once a team round has run.
@@ -384,7 +430,8 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       const run = readMinigameRun(stage.presentation);
       requireGame(run?.coin !== undefined || run?.roulette !== undefined, 'INVALID_STATE');
     }
-    await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
+    const poolSeconds = entry.stage.kind === 'duel' && readDuel(stage.presentation)?.match?.game === 'eight-ball' ? entry.stage.matchSeconds : undefined;
+    await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, ...timerColumns(poolSeconds === undefined ? null : poolSeconds * 1000, false, now) } });
     if (flip) {
       await reveal(tx, stage, now);
       return { ...empty, stageRunId: stage.id, awards: await revealAwards(tx, stage, entry.stage) };
@@ -474,6 +521,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type === 'stage.reopen') {
     // Once the answer has been shown, or a judgment recorded, the stage stays closed.
     requireGame(stage.status === 'CLOSED' && !stage.revealedAt, 'INVALID_STATE');
+    requireGame(entry.stage.kind !== 'duel' || readDuel(stage.presentation)?.match?.game !== 'eight-ball', 'INVALID_STATE');
     // An undecided vote may be reopened (existing votes stay); a recorded route is final.
     requireGame(!decided, 'ALREADY_DECIDED');
     requireGame(await tx.stageJudgment.count({ where: { stageRunId: stage.id } }) === 0, 'ALREADY_JUDGED');

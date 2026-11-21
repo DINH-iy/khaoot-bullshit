@@ -9,7 +9,7 @@ import { gameName } from '../presentation/catalog.text.js';
 import './head-to-head.css';
 
 type Board<K extends HeadToHeadKey> = Extract<HeadToHeadView['board'], { game: K }>;
-interface BoardProps<K extends HeadToHeadKey> { view: HeadToHeadView; board: Board<K>; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void }
+interface BoardProps<K extends HeadToHeadKey> { view: HeadToHeadView; board: Board<K>; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void; statusLabel?: string | undefined }
 
 const RPS_ORDER = ['rock', 'paper', 'scissors'] as const;
 const pickName = (pick: typeof RPS_ORDER[number]) => listItem('picks', RPS_ORDER.indexOf(pick));
@@ -80,16 +80,17 @@ const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { 
  * A head-to-head game as one phone (or screen) sees it: whose turn, the board,
  * resigning, and once it is over the result and its replay.
  */
-export function HeadToHead({ view, names, busy, onMove, onResign }: { view: HeadToHeadView; names: [string, string]; busy: boolean; onMove: (move: HeadToHeadMove) => void; onResign?: () => void }) {
+export function HeadToHead({ view, names, busy, onMove, onResign, showTurnName = false }: { view: HeadToHeadView; names: [string, string]; busy: boolean; onMove: (move: HeadToHeadMove) => void; onResign?: () => void; showTurnName?: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const Board = BOARDS[view.game] as (props: BoardProps<HeadToHeadKey>) => ReactNode;
-  const turnText = view.outcome ? null : view.turn === 'both' ? h('bothPick') : view.turn === view.seat ? h('yourMove') : view.turn !== null ? h('theirMove', { name: names[view.turn] }) : null;
+  const turnText = view.outcome ? null : view.turn === 'both' ? h('bothPick') : view.turn === null ? null
+    : view.turn === view.seat && !showTurnName ? h('yourMove') : h('theirMove', { name: names[view.turn] });
   const result = !view.outcome ? null : view.outcome.kind === 'draw' ? h('draw') : view.outcome.reason === 'resigned' ? h('winsGaveUp', { name: names[view.outcome.seat], other: names[view.outcome.seat === 0 ? 1 : 0] }) : h('wins', { name: names[view.outcome.seat] });
   return <div className={`h2h h2h-${view.game}`}>
-    <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong><span className="h2h-title-dot" aria-hidden="true"> · </span>{h('versus', { first: names[0], second: names[1] })}</p>
-    {turnText && <p className="h2h-turn" role="status">{turnText}</p>}
+    {view.game !== 'eight-ball' && <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong><span className="h2h-title-dot" aria-hidden="true"> · </span>{h('versus', { first: names[0], second: names[1] })}</p>}
+    {view.game !== 'eight-ball' && turnText && <p className="h2h-turn" role="status">{turnText}</p>}
     {result && <p className="h2h-result" role="status">{result}</p>}
-    <Board view={view} board={view.board} names={names} canMove={!busy && view.seat !== null && !view.outcome} onMove={onMove} />
+    <Board view={view} board={view.board} names={names} canMove={!busy && view.seat !== null && !view.outcome} onMove={onMove} statusLabel={result ?? turnText ?? undefined} />
     {view.seat !== null && !view.outcome && onResign && (confirm
       ? <div className="actions"><button type="button" className="danger-outline" disabled={busy} onClick={() => { setConfirm(false); onResign(); }}>{h('yesGiveUp')}</button><button type="button" className="ghost" onClick={() => setConfirm(false)}>{h('keepPlaying')}</button></div>
       : <button type="button" className="ghost small-button" onClick={() => setConfirm(true)}>{h('giveUp')}</button>)}

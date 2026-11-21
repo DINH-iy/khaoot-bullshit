@@ -51,6 +51,8 @@ export const MinigameSettingsSchemas = {
 export type MinigameKey = keyof typeof MinigameSettingsSchemas;
 export type MinigameSettings<K extends MinigameKey = MinigameKey> = z.infer<typeof MinigameSettingsSchemas[K]>;
 export const MINIGAME_KEYS = Object.keys(MinigameSettingsSchemas) as MinigameKey[];
+export const TRYOUT_GAME_KEYS = [...MINIGAME_KEYS, 'eight-ball'] as const;
+export type TryoutGame = typeof TRYOUT_GAME_KEYS[number];
 export const isMinigameKey = (key: string): key is MinigameKey => key in MinigameSettingsSchemas;
 
 /** Countdown before every minigame starts, so all phones begin together. */

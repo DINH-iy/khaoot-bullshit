@@ -7,9 +7,13 @@ import { grapherSeries, type GrapherSeries } from './graph-grapher.js';
 import { GraphChart } from '../../../minigames/draw-the-graph/graph-chart.js';
 import { GRAPH_TEXTS } from '../../../minigames/draw-the-graph/graph.text.js';
 import { graphCutoffs, graphFromCsv, MAX_GRAPH_CSV_BYTES, readGraphCsv, type GraphTable } from './graph-csv.js';
+import { Icon } from '../../controls/icons.js';
+import './graph-data-import.css';
 
 export function GraphDataImport({ onImport }: { onImport: (data: GraphData, question?: string) => void }) {
   const t = useTexts(GRAPH_TEXTS);
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
   const [localTable, setLocalTable] = useState<GraphTable>();
   const [remoteSeries, setRemoteSeries] = useState<GrapherSeries[]>([]);
   const [selectedSeries, setSelectedSeries] = useState(0);
@@ -68,8 +72,13 @@ export function GraphDataImport({ onImport }: { onImport: (data: GraphData, ques
     } finally { setLoadingUrl(false); }
   };
 
-  return <details className="minigame-fields">
-    <summary>{t('importData')}</summary>
+  return <div className="graph-data-import">
+    <button type="button" className="graph-import-trigger" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(current => !current)}>
+      <Icon name="upload" size={18} />
+      <span>{t('importData')}</span>
+      <span className="graph-import-indicator" aria-hidden="true">{open ? '−' : '+'}</span>
+    </button>
+    <div id={panelId} className="minigame-fields graph-import-panel" hidden={!open}>
     <label>{t('chartUrl')}<input type="url" inputMode="url" spellCheck={false} maxLength={500} value={url}
       onChange={event => setUrl(event.currentTarget.value)} /></label>
     <button type="button" className="small-button" disabled={loadingUrl || !url.trim()} onClick={() => void loadUrl()}>
@@ -113,5 +122,6 @@ export function GraphDataImport({ onImport }: { onImport: (data: GraphData, ques
       }}>{t('useData')}</button>
       {done && <p role="status">{t('dataUsed')}</p>}
     </>}
-  </details>;
+    </div>
+  </div>;
 }

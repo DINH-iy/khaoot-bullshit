@@ -28,7 +28,10 @@ test('players finish the same graph in their own colors and the host reveals all
   await configuration.getByLabel('Reveal easing').selectOption('ease-out');
   await expect(host.getByRole('checkbox', { name: 'Use my own graph' })).toBeChecked();
   await expect(host.getByLabel('Hidden values')).toHaveValue('50, 50');
-  await host.getByText('Import graph data', { exact: true }).click();
+  const importData = configuration.getByRole('button', { name: 'Import graph data', exact: true });
+  await expect(importData).toHaveAttribute('aria-expanded', 'false');
+  await importData.press('Space');
+  await expect(importData).toHaveAttribute('aria-expanded', 'true');
   const sourceUrl = 'https://ourworldindata.org/grapher/life-expectancy';
   const csv = ['entity,code,year,life_expectancy',
     ...[2000, 2001, 2002, 2003, 2004].flatMap((year, index) => [`Netherlands,NLD,${year},${index + 70}`, `Belgium,BEL,${year},${index + 60}`]),
@@ -40,10 +43,12 @@ test('players finish the same graph in their own colors and the host reveals all
   await host.getByRole('button', { name: 'Preview chart from URL' }).click();
   await host.getByRole('combobox', { name: 'Value column' }).selectOption({ label: 'Belgium' });
   await host.getByRole('button', { name: 'Use this data' }).click();
+  await expect(host.getByRole('link', { name: 'Open original data source' })).toHaveAttribute('href', sourceUrl);
+  await configuration.getByRole('button', { name: 'Text & timing' }).click();
   const question = configuration.getByRole('textbox', { name: 'Question', exact: true });
   await expect(question).toHaveValue('Life expectancy — how did it change for Belgium?');
-  await expect(host.getByRole('link', { name: 'Open original data source' })).toHaveAttribute('href', sourceUrl);
   await question.fill('How many views did the video get each year?');
+  await configuration.getByRole('button', { name: 'Settings', exact: true }).click();
   await host.getByLabel('Upload CSV').setInputFiles({ name: 'views.csv', mimeType: 'text/csv',
     buffer: Buffer.from('Year,Views\n2010,100\n2011,250\n2012,750\n2013,750\n2014,750') });
   const cut = host.getByRole('slider', { name: 'Last visible period', exact: false });
@@ -58,7 +63,7 @@ test('players finish the same graph in their own colors and the host reveals all
   await expect.poll(async () => (await readDraft()).definition.nodes[0].stages[0].settings).toMatchObject({
     revealEasing: 'ease-out', graph: { scale: { min: 0, max: 800 }, splitLabel: '2012', source: 'Example views dataset' },
   });
-  await host.getByRole('button', { name: 'Try minigame' }).click();
+  await host.getByRole('button', { name: 'Try this scene' }).click();
   const practice = host.getByRole('dialog', { name: 'Preview' });
   const desktop = host.viewportSize()!;
   await host.setViewportSize({ width: 320, height: 568 });

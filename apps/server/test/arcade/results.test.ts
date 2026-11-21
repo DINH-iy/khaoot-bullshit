@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, type SessionView } from '@party/contracts';
+import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, TEAM_MINIGAMES, type SessionView } from '@party/contracts';
 import { arcadeDefinition, arcadeRoundFits } from '../../src/arcade/definition.js';
 import { roundResults } from '../../src/arcade/results.js';
 import { assertExecutable } from '../../src/game/definition.js';
@@ -9,17 +9,32 @@ const seats = [{ memberId: 'm-a', playerId: ids.a, personId: 'p-a' }, { memberId
 const viewWith = (stage: Record<string, unknown>) => ({ stage }) as unknown as SessionView;
 
 describe('arcade rounds', () => {
-  it('makes a playable one-scene game of every phone-only minigame, alone where possible and in teams', () => {
-    for (const game of MINIGAME_KEYS.filter(key => !SHARED_SCREEN_MINIGAMES.includes(key))) {
+  it('makes a playable one-scene game of every minigame, alone where possible and in teams', () => {
+    for (const game of MINIGAME_KEYS) {
       expect(arcadeRoundFits(game, null)).toBe(!TEAM_MINIGAMES.includes(game));
       if (arcadeRoundFits(game, null)) expect(() => assertExecutable(arcadeDefinition(game, null))).not.toThrow();
       for (const formation of ['random', 'players'] as const) expect(() => assertExecutable(arcadeDefinition(game, { count: 2, formation }))).not.toThrow();
     }
   });
 
-  it('keeps Count the Dots out of phone-only lobbies even if the leader asks for it directly', () => {
-    expect(arcadeRoundFits('count-the-dots', null)).toBe(false);
-    expect(arcadeRoundFits('count-the-dots', { count: 2, formation: 'random' })).toBe(false);
+  it('starts each head-to-head game with a random pair', () => {
+    for (const game of HEAD_TO_HEAD_KEYS) {
+      expect(arcadeRoundFits(game, null)).toBe(true);
+      expect(arcadeRoundFits(game, { count: 2, formation: 'random' })).toBe(false);
+      const definition = arcadeDefinition(game, null);
+      expect(() => assertExecutable(definition)).not.toThrow();
+      expect(definition.nodes[0]?.stages[0]).toMatchObject({ kind: 'duel', pick: 'random', contest: { kind: 'game', game } });
+    }
+  });
+
+  it('records the winner and the correct spectator votes, with no personal best for a duel', () => {
+    const view = viewWith({ duel: { duelistIds: [ids.a, ids.b], winnerId: ids.b },
+      reveal: { awards: [{ playerId: ids.b, amountMilli: '10000' }, { playerId: ids.c, amountMilli: '1000' }] } });
+    expect(roundResults(view, 'eight-ball', seats)).toEqual([
+      { memberId: 'm-a', personId: 'p-a', place: 2, pointsMilli: 0n, value: null, bestKey: null },
+      { memberId: 'm-b', personId: null, place: 1, pointsMilli: 10000n, value: null, bestKey: null },
+      { memberId: 'm-c', personId: null, place: null, pointsMilli: 1000n, value: null, bestKey: null },
+    ]);
   });
 
   it('records nothing for a round whose results were never shown', () => {

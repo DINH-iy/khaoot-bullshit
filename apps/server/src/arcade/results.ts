@@ -1,4 +1,4 @@
-import { MINIGAMES, MINIGAME_KEYS, isMinigameKey, type MinigameKey, type SessionView } from '@party/contracts';
+import { MINIGAMES, MINIGAME_KEYS, isArcadeGame, isMinigameKey, type ArcadeGame, type MinigameKey, type SessionView } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
 import { rankValue } from '../minigames/shared/rules.js';
@@ -13,17 +13,28 @@ export interface Seat { memberId: string; playerId: string; personId: string | n
 export interface ResultRow { memberId: string; personId: string | null; place: number | null; pointsMilli: bigint; value: number | null; bestKey: number | null }
 
 /**
- * Each seat's result in a revealed minigame round: the points it was awarded, its place (its team's in a team
+ * Each seat's result in a revealed round: the points it was awarded, its place (its team's in a team
  * round), its measured value and, played alone and ranked, the key the leaderboards compare (lower is better).
- * Empty when the round has no revealed minigame results (it ended before anyone played).
+ * Empty when the round has no revealed results (it ended before anyone played).
  */
-export function roundResults(view: SessionView, game: MinigameKey, seats: Seat[]): ResultRow[] {
+export function roundResults(view: SessionView, game: ArcadeGame, seats: Seat[]): ResultRow[] {
   const stage = view.stage; const answer = stage?.reveal?.answer;
-  if (!stage?.reveal || answer?.kind !== 'minigame') return [];
+  if (!stage?.reveal) return [];
+  const awards = stage.reveal.awards;
+  const awarded = (playerId: string) => awards.filter(award => award.playerId === playerId).reduce((sum, award) => sum + BigInt(award.amountMilli), 0n);
+  if (!isMinigameKey(game)) {
+    const duel = stage.duel;
+    if (!duel?.duelistIds) return [];
+    return seats.map(seat => ({
+      memberId: seat.memberId, personId: seat.personId, pointsMilli: awarded(seat.playerId), value: null, bestKey: null,
+      place: duel.winnerId === seat.playerId ? 1 : duel.winnerId && duel.duelistIds?.includes(seat.playerId) ? 2 : null,
+    }));
+  }
+  if (answer?.kind !== 'minigame') return [];
   const teams = stage.teams && !stage.teams.forming ? stage.teams.teams : null;
   const ranked = MINIGAMES[game].better !== 'none';
   return seats.map(seat => {
-    const points = stage.reveal!.awards.filter(award => award.playerId === seat.playerId).reduce((sum, award) => sum + BigInt(award.amountMilli), 0n);
+    const points = awarded(seat.playerId);
     const own = answer.entries.find(entry => entry.playerId === seat.playerId);
     const team = teams?.find(entry => entry.memberIds.includes(seat.playerId));
     const place = teams ? (team?.teamId ? answer.entries.find(entry => entry.playerId === null && entry.teamId === team.teamId)?.place ?? null : null) : own?.place ?? null;
@@ -34,7 +45,7 @@ export function roundResults(view: SessionView, game: MinigameKey, seats: Seat[]
 }
 
 /** Records a round's results once; a second call for the same round adds nothing. */
-export async function recordResults(tx: Transaction, roundId: string, game: MinigameKey, rows: ResultRow[]) {
+export async function recordResults(tx: Transaction, roundId: string, game: ArcadeGame, rows: ResultRow[]) {
   if (!rows.length) return;
   await tx.arcadeResult.createMany({ data: rows.map(row => ({ roundId, game, ...row })), skipDuplicates: true });
   // Winning a round earns chips (people with an account), once per seat.
@@ -56,7 +67,7 @@ export async function lobbyScores(client: PrismaClient, lobbyId: string) {
   const totals = sums.flatMap(sum => { const member = byId.get(sum.memberId); return member ? [{ memberId: member.id, displayName: member.displayName, look: lookOf(member),
     pointsMilli: (sum._sum.pointsMilli ?? 0n).toString(), wins: wins.find(row => row.memberId === sum.memberId)?._count._all ?? 0, rounds: sum._count._all }] : []; })
     .sort((a, b) => BigInt(b.pointsMilli) === BigInt(a.pointsMilli) ? b.wins - a.wins : BigInt(b.pointsMilli) > BigInt(a.pointsMilli) ? 1 : -1);
-  const lastRound = last && isMinigameKey(last.game) ? { number: last.number, game: last.game, teams: last.teams,
+  const lastRound = last && isArcadeGame(last.game) ? { number: last.number, game: last.game, teams: last.teams,
     results: last.results.flatMap(result => { const member = byId.get(result.memberId); return member ? [{ memberId: member.id, displayName: member.displayName, look: lookOf(member), place: result.place, pointsMilli: result.pointsMilli.toString(), value: result.value }] : []; })
       .sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (BigInt(b.pointsMilli) > BigInt(a.pointsMilli) ? 1 : BigInt(b.pointsMilli) < BigInt(a.pointsMilli) ? -1 : 0)) } : null;
   return { totals, lastRound };

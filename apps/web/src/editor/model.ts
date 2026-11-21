@@ -142,7 +142,7 @@ const wheelEntries = () => (['w1', 'w2', 'w3', 'w4', 'w5', 'w6'] as const).map(k
  */
 export interface SceneVariant { key: string; name: string; hint: string }
 export const SCENE_VARIANTS: Partial<Record<SceneType, SceneVariant[]>> = {
-  minigame: [...MINIGAME_KEYS, 'eight-ball'].map(key => ({ key, get name() { return gameName(key); }, get hint() { return gameDescription(key); } })),
+  minigame: MINIGAME_KEYS.map(key => ({ key, get name() { return gameName(key); }, get hint() { return gameDescription(key); } })),
   // How a duel is won: any contest in the room (the host names the winner), or a head-to-head game on the two phones.
   duel: [{ key: 'host', get name() { return t('vHost'); }, get hint() { return t('vHostHint'); } },
     ...HEAD_TO_HEAD_KEYS.map(key => ({ key, get name() { return gameName(key); }, get hint() { return t('vOnPhones', { description: gameDescription(key).toLowerCase() }); } }))],
@@ -183,11 +183,13 @@ const isStandardDuelPrompt = (prompt: string, contest: { kind?: string; game?: s
 export function withDuelContest(stage: Stage, choice: string): Stage {
   const old = stage['contest'] as { kind?: string; game?: string } | undefined;
   const contest = isHeadToHeadKey(choice) ? { kind: 'game', game: choice } : { kind: 'host' };
-  return { ...stage, contest, ...(stage['pick'] === 'teams' && choice !== 'eight-ball' ? { pick: 'random' } : {}), ...(!stage.prompt || isStandardDuelPrompt(stage.prompt, old) ? { prompt: duelPrompt(contest) } : {}) };
+  const next = { ...stage, contest, ...(stage['pick'] === 'teams' && choice !== 'eight-ball' ? { pick: 'random' } : {}),
+    ...(!stage.prompt || isStandardDuelPrompt(stage.prompt, old) ? { prompt: duelPrompt(contest) } : {}) } as Stage;
+  if (choice !== 'eight-ball') delete next['matchSeconds'];
+  return next;
 }
 /** A new scene's first part: the type's standard start, adjusted for the chosen kind (variant). */
 export function newStage(type: SceneType, definition: Definition, variant?: string): Stage {
-  if (type === 'minigame' && variant === 'eight-ball') return withDuelContest(baseStage('duel', definition), variant);
   const stage = baseStage(type, definition);
   if (type === 'minigame' && variant && isMinigameKey(variant)) return minigameStage(variant, definition);
   if (type === 'duel' && variant && isHeadToHeadKey(variant)) return withDuelContest(stage, variant);
@@ -439,6 +441,16 @@ export function freeSpot(definition: Definition, positions: Positions, key: stri
 export function addConnectedScene(definition: Definition, type: SceneType, from: string, option: string | undefined, variant?: string): { definition: Definition; key: string } {
   const added = addScene(definition, type, variant);
   return { key: added.key, definition: connect(added.definition, from, option, added.key) };
+}
+
+/** Insert a team setup on every edge entering the round, including when it is the first scene. */
+export function insertTeamsBefore(definition: Definition, nodeKey: string): { definition: Definition; key: string } {
+  const added = addScene(definition, 'teams');
+  return { key: added.key, definition: connect({
+    ...added.definition,
+    startNodeKey: definition.startNodeKey === nodeKey ? added.key : definition.startNodeKey,
+    edges: definition.edges.map(edge => edge.to === nodeKey ? { ...edge, to: added.key } : edge),
+  }, added.key, undefined, nodeKey) };
 }
 
 /**

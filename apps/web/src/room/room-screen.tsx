@@ -5,7 +5,7 @@ import { isSharedPrediction, answerMark, cleanRoomCode, formatRoomCode, GameComm
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
 import { BigCode, CopyIcon, JoinLink, JoinQr, publicJoinUrl } from './join-qr.js';
-import { useRemaining } from './stage-timer.js';
+import { StageTimer, useRemaining } from './stage-timer.js';
 import { ConnectionMenu, FloatingScores, HostDialog, Popover, RoundBar } from './room-chrome.js';
 import { FaIcon } from '../presentation/icons.js';
 import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
@@ -341,6 +341,14 @@ export function RoomScreen() {
   const ownPoints = role === 'player' && stage?.revealed && state ? stage.reveal?.awards.find(award => award.playerId === state.selfPlayerId)?.amountMilli ?? null : null;
   const nextAlso = !state?.tryout && running && stage && stage.status === 'CLOSED' && primary?.label !== t('host.next') && (!poolDuel || stage.revealed) && (stage.kind !== 'route' || stage.route?.decision);
 
+  if (role === 'display' && state && poolDuel && stage?.status === 'CLOSED' && stage.duel?.contest.kind === 'game' &&
+      stage.duel.contest.view && state.view.status !== 'FINISHED') {
+    return <LookContext.Provider value={look}><main ref={roomRoot} className={`room room-display pool-tv ${lookClass}`} style={lookStyle}>
+      <DuelPanel key={stage.id} state={state} stage={stage} disabled send={command} />
+      <div className="pool-tv-clock"><StageTimer stage={stage} remaining={remaining} /></div>
+    </main></LookContext.Provider>;
+  }
+
   return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''} ${lookClass}`} style={lookStyle}>
     <header className="room-bar session-bar">
       <h1 className="visually-hidden">{state ? r(role === 'host' ? 'hostScreen' : role === 'display' ? 'sharedScreen' : 'yourPhone', { title: state.view.title }) : r('partyRoom')}</h1>
@@ -435,7 +443,7 @@ export function RoomScreen() {
             live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })}
             onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} /></div>}
           {stage.kind === 'route' && <div ref={routeRef}><RouteChoice state={state} stage={stage} disabled={disabled} send={command} /></div>}
-          {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel state={state} stage={stage} disabled={disabled} send={command} /></div>}
+          {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel key={stage.id} state={state} stage={stage} disabled={disabled || (poolDuel && stage.status === 'CLOSED' && timeUp && Boolean(stage.deadlineAt))} send={command} /></div>}
           {stage.kind !== 'route' && stage.revealed && (!poolDuel || (role !== 'player' && stage.duel?.pick !== 'teams' && stage.reveal?.awards.length)) && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })}
             onGraphPlayback={action => command('stage.graphPlayback', { stageRunId: stage.id, action })} disabled={disabled} /></div>}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>{r('shownWithoutNames')}</p>}
@@ -449,7 +457,7 @@ export function RoomScreen() {
             }}>
               <AnswerInput sessionId={state.view.sessionId} input={stage.input} draft={draft} onChange={setDraft} legend={stage.kind === 'route' ? t('vote.legend') : t('answer.legend')} route={stage.kind === 'route'} />
               <button className="primary" disabled={disabled || !draftValue(stage.input, draft) || timeUp}>{timeUp ? t('timer.up') : stage.kind === 'route' ? t('vote.submit') : t('answer.submit')}</button></form>
-            : role === 'player' ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly ? '' : t('wait.screen')}</p> : null}</div></>}
+            : role === 'player' && !poolDuel ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly ? '' : t('wait.screen')}</p> : null}</div></>}
         </section>}
         {role !== 'display' && <WheelBadge wheel={state.view.wheel} />}
         {state.view.status === 'FINISHED' && <div ref={finaleRef}><FinaleShow state={state} /></div>}
@@ -480,7 +488,7 @@ export function RoomScreen() {
                 <label>{h('timeLeft')}<input type="number" inputMode="numeric" min={1} max={3600} step={1} value={timerSeconds} onChange={event => setTimerSeconds(event.target.value)} /></label>
                 <button className="ghost small-button" disabled={disabled || !validSeconds}>{h('setTime')}</button></form>
             </Popover></>}
-          {running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.route?.decision && stage.route?.method !== 'host' && <Popover label={h('reopenAnswers')} icon="arrow-rotate-left" className="icon-tool">
+          {running && stage?.status === 'CLOSED' && !stage.revealed && !poolDuel && !showOnly && !stage.route?.decision && stage.route?.method !== 'host' && <Popover label={h('reopenAnswers')} icon="arrow-rotate-left" className="icon-tool">
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: 30_000 })}>{h('reopen30')}</button>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>{h('reopenNoLimit')}</button></Popover>}
         </div>

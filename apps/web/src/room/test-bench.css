@@ -15,6 +15,10 @@
 .bench-phones[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
 .bench-phone { display: grid; gap: 6px; margin: 0; width: min(100%, calc(max(var(--phone-height), 220px) * 390 / 844)); min-width: 0; }
 .bench-phone figcaption { display: flex; justify-content: space-between; align-items: center; gap: 4px; font-size: .85rem; font-weight: 700; }
+.bench-phone-actions { display: flex; gap: 4px; }
+.bench .bench-orientation { width: auto; padding-inline: 5px; }
+.bench .bench-orientation[aria-pressed="true"] { border-color: #a990f0; background: #393055; }
+.bench-phone-landscape { grid-column: 1 / -1; width: min(100%, 680px); }
 .bench-screen { position: relative; width: 100%; aspect-ratio: 390 / 844; overflow: hidden; border-radius: 16px; box-shadow: 0 0 0 1px #3a3750; background: #000; }
 .bench-screen iframe { position: absolute; top: 0; left: 0; width: 390px; height: 844px; border: 0; transform-origin: top left; }
 @media (max-width: 900px) {
@@ -31,6 +35,7 @@
 .bench-tryout { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding: 9px 16px; background: #1d1b29; border-bottom: 1px solid #39354b; }
 .bench-tryout label { display: grid; gap: 3px; font-size: .8rem; font-weight: 700; }
 .bench-tryout select { min-height: 38px; max-width: 100%; padding: 4px 9px; border-radius: 8px; border: 1px solid #50496a; background: #151320; color: inherit; }
+.bench-tryout input { box-sizing: border-box; width: 100%; min-height: 38px; padding: 4px 9px; border-radius: 8px; border: 1px solid #50496a; background: #151320; color: inherit; }
 .bench-tryout .bench-play { background: #c8b8fa; border-color: #c8b8fa; color: #201637; }
 .bench-tryout :disabled { opacity: .5; }
 .bench-tryout-status { align-self: center; font-size: .85rem; color: #c0bad2; }

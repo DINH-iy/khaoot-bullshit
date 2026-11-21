@@ -159,7 +159,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt, translations: entry.stage.translations,
           input: entry.stage.kind === 'collect' ? publicInput(entry.stage.input, `${current.id}:${actorKey(actor.data)}`)
             : entry.stage.kind === 'route' && entry.stage.decide.method !== 'host' ? { kind: 'choice', layout: 'tiles', options: entry.stage.options } : null, status: current.status,
-          deadlineAt: current.status === 'ACTIVE' ? current.deadlineAt?.toISOString() ?? null : null, pausedRemainingMs: current.status === 'ACTIVE' ? current.pausedRemainingMs : null,
+          deadlineAt: !current.revealedAt ? current.deadlineAt?.toISOString() ?? null : null, pausedRemainingMs: !current.revealedAt ? current.pausedRemainingMs : null,
           submittedCount: submissions.length, eligibleCount: choice ? choice.voterCount : eligible?.success ? eligible.data.playerIds.length : 0,
           challenge: entry.stage.kind === 'challenge' ? { maxAwardMilli: entry.stage.maxAwardMilli, placesMilli: stagePlaces(entry.stage), judgedPlayerIds: judged.map(row => row.playerId), judgedTeamIds: [...new Set(judged.map(row => context?.teamOf.get(row.playerId)).filter(id => id !== undefined))] } : null,
           teams, route: choice?.view ?? null,

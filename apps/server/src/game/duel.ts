@@ -7,6 +7,7 @@ import { GameError, requireGame } from './errors.js';
 import type { Award } from './teams/teams.js';
 import type { Transaction } from './model.js';
 import { IllegalMove, type Seat } from '../head-to-head/engine.js';
+import { finishPoolOnTime, poolTimedOut, settlePoolTie } from '../head-to-head/eight-ball/rules.js';
 import { matchOutcome, MatchStateSchema, matchView, playMove, resignMatch, startMatch, type MatchState } from '../head-to-head/match.js';
 
 // A duel: two players face off while everyone else bets on the winner. How it is
@@ -19,7 +20,7 @@ import { matchOutcome, MatchStateSchema, matchView, playMove, resignMatch, start
 // presentation, so a restart changes nothing; bets are submissions, one per player.
 export type DuelStage = Extract<StageDefinition, { kind: 'duel' }>;
 const DuelStateSchema = z.object({ a: z.uuid().nullable(), b: z.uuid().nullable(), winnerId: z.uuid().nullable(), match: MatchStateSchema.nullable().optional(),
-  teamIds: z.tuple([z.uuid(), z.uuid()]).optional() }).strict();
+  teamIds: z.tuple([z.uuid(), z.uuid()]).optional(), practicePlayerId: z.uuid().optional() }).strict();
 export type DuelState = z.infer<typeof DuelStateSchema>;
 
 export const duelRules = (stage: DuelStage) => ({ placesMilli: stage.places ? placePoints(stage.places) : ['10000'], betMilli: stage.betMilli, pick: stage.pick, contest: stage.contest ?? { kind: 'host' as const } });
@@ -42,6 +43,36 @@ export function openDuel(stage: DuelStage, playerIds: string[]): { duel: DuelSta
   const first = playerIds[randomInt(playerIds.length)]!;
   const rest = playerIds.filter(id => id !== first); const second = rest[randomInt(rest.length)]!;
   return { duel: { a: first, b: second, winnerId: null, match: matchFor(stage) }, eligible: playerIds.filter(id => id !== first && id !== second), timed: true };
+}
+
+export function openPoolTryout(stage: DuelStage, players: readonly [string] | readonly [string, string]): DuelState {
+  const [a, b] = players;
+  const match = matchFor(stage);
+  requireGame(match?.game === 'eight-ball', 'INVALID_DEFINITION');
+  return b ? { a, b, winnerId: null, match } : { a: null, b: null, winnerId: null, match, practicePlayerId: a };
+}
+
+function practiceSeat(match: MatchState): Seat | null {
+  const turn = matchView(match, null).turn;
+  return turn === 0 || turn === 1 ? turn : null;
+}
+
+export function poolTie(duel: DuelState | null): boolean {
+  const match = duel?.match;
+  return match?.game === 'eight-ball' && poolTimedOut(match.data) && matchOutcome(match)?.kind === 'draw';
+}
+
+export function endTimedPool(stage: StageRun): DuelState {
+  const duel = readDuel(stage.presentation);
+  requireGame(duel?.match?.game === 'eight-ball' && duelists(duel) && !matchOutcome(duel.match), 'INVALID_STATE');
+  return { ...duel, match: { ...duel.match, data: finishPoolOnTime(duel.match.data) } };
+}
+
+export function pickTimedPoolWinner(duel: DuelState | null, winnerId: string): DuelState {
+  requireGame(duel?.match && poolTie(duel), 'INVALID_STATE');
+  const seat = duelists(duel)?.indexOf(winnerId);
+  requireGame(seat === 0 || seat === 1, 'INVALID_COMMAND');
+  return { ...duel, match: { ...duel.match, data: settlePoolTie(duel.match.data, seat) } };
 }
 
 export function openTeamPool(stage: DuelStage, present: string[], members: readonly { teamId: string; playerId: string }[]): DuelState {
@@ -107,13 +138,16 @@ export async function decideDuel(tx: Transaction, stage: StageRun, definition: D
  */
 export function duelPlay(stage: StageRun, playerId: string, action: { move: HeadToHeadMove } | { resign: true }): { duel: DuelState; winnerId: string | null } {
   const duel = readDuel(stage.presentation); const pair = duelists(duel);
-  requireGame(duel && pair && duel.match && !duel.winnerId && stage.status === 'CLOSED', 'INVALID_STATE');
-  const seat = pair.indexOf(playerId); requireGame(seat === 0 || seat === 1, 'INELIGIBLE');
+  requireGame(duel && duel.match && !duel.winnerId && stage.status === 'CLOSED', 'INVALID_STATE');
+  const practice = duel.practicePlayerId;
+  if (practice) requireGame(practice === playerId && 'move' in action, 'INELIGIBLE');
+  const seat = practice ? practiceSeat(duel.match) : pair?.indexOf(playerId);
+  requireGame(seat === 0 || seat === 1, 'INELIGIBLE');
   let match: MatchState;
-  try { match = 'resign' in action ? resignMatch(duel.match, seat as Seat) : playMove(duel.match, seat as Seat, action.move); }
+  try { match = 'resign' in action ? resignMatch(duel.match, seat) : playMove(duel.match, seat, action.move); }
   catch (error) { if (error instanceof IllegalMove) throw new GameError('INVALID_SUBMISSION'); throw error; }
   const outcome = matchOutcome(match);
-  return { duel: { ...duel, match }, winnerId: outcome?.kind === 'win' ? pair[outcome.seat] : null };
+  return { duel: { ...duel, match }, winnerId: outcome?.kind === 'win' ? pair?.[outcome.seat] ?? null : null };
 }
 
 /** What screens see: the pair, the bets on each (live), the points at stake, the contest (with the board as this viewer sees it) and the winner. */
@@ -121,11 +155,12 @@ export async function duelView(tx: Transaction, stage: StageRun, definition: Due
   const duel = readDuel(stage.presentation); const pair = duelists(duel); const rules = duelRules(definition);
   const bets = pair ? await tx.submission.findMany({ where: { stageRunId: stage.id, slotKey: 'answer' }, select: { value: true } }) : [];
   const count = (playerId: string) => bets.filter(bet => { const value = SubmissionValueSchema.safeParse(bet.value); return value.success && value.data.kind === 'bet' && value.data.playerId === playerId; }).length;
-  const seat = pair && viewer ? pair.indexOf(viewer) : -1;
+  const practice = duel?.practicePlayerId;
+  const seat = practice && practice === viewer && duel.match ? practiceSeat(duel.match) : pair && viewer ? pair.indexOf(viewer) : null;
   const contest = rules.contest.kind === 'game' ? { kind: 'game' as const, game: rules.contest.game, view: duel?.match ? matchView(duel.match, seat === 0 || seat === 1 ? seat : null) : null } : { kind: 'host' as const };
   const pool = rules.contest.kind === 'game' && rules.contest.game === 'eight-ball';
-  return { duelistIds: pair, pick: rules.pick, ...(duel?.teamIds ? { teamIds: duel.teamIds } : {}),
+  return { duelistIds: pair, pick: rules.pick, ...(practice ? { practicePlayerId: practice } : {}), ...(poolTie(duel) ? { poolTie: true as const } : {}), ...(duel?.teamIds ? { teamIds: duel.teamIds } : {}),
     bets: pair && rules.pick !== 'teams' ? pair.map(playerId => ({ playerId, count: count(playerId) })) : [],
-    placesMilli: pool ? rules.placesMilli.slice(0, 1) : rules.placesMilli, betMilli: rules.pick === 'teams' ? '0' : rules.betMilli,
+    placesMilli: practice ? [] : pool ? rules.placesMilli.slice(0, 1) : rules.placesMilli, betMilli: practice || rules.pick === 'teams' ? '0' : rules.betMilli,
     winnerId: duel?.winnerId ?? null, contest };
 }

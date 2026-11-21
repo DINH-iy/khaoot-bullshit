@@ -8,13 +8,14 @@ import { MinigameFields } from './fields/minigame-fields.js';
 import { FIELDS_TEXTS } from './fields.text.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { ScenePreview } from './scene-preview.js';
+import './minigame-configuration.css';
 
 const TEXTS = defineTexts('minigame-configuration', {
-  title: 'Configure minigame', settings: 'Settings', apply: 'Apply changes', cancel: 'Cancel',
+  title: 'Configure minigame', settings: 'Settings', timing: 'Text & timing', apply: 'Apply changes', cancel: 'Cancel',
 }, {
-  nl: { title: 'Minigame instellen', settings: 'Instellingen', apply: 'Wijzigingen toepassen', cancel: 'Annuleren' },
-  de: { title: 'Minispiel konfigurieren', settings: 'Einstellungen', apply: 'Änderungen übernehmen', cancel: 'Abbrechen' },
-  ro: { title: 'Configurează minijocul', settings: 'Setări', apply: 'Aplică modificările', cancel: 'Anulează' },
+  nl: { title: 'Minigame instellen', settings: 'Instellingen', timing: 'Tekst en tijd', apply: 'Wijzigingen toepassen', cancel: 'Annuleren' },
+  de: { title: 'Minispiel konfigurieren', settings: 'Einstellungen', timing: 'Text und Zeit', apply: 'Änderungen übernehmen', cancel: 'Abbrechen' },
+  ro: { title: 'Configurează minijocul', settings: 'Setări', timing: 'Text și timp', apply: 'Aplică modificările', cancel: 'Anulează' },
 });
 
 type Props = { definition: Definition; node: Node; index: number; onApply: (stage: Stage) => void };
@@ -40,7 +41,7 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, onClos
   const title = useId();
   const [draft, setDraft] = useState(initial);
   const [device, setDevice] = useState<'phone' | 'sharedScreen'>(initial['game'] === 'count-the-dots' ? 'sharedScreen' : 'phone');
-  const [panel, setPanel] = useState<'settings' | 'preview'>('settings');
+  const [panel, setPanel] = useState<'settings' | 'timing' | 'preview'>('settings');
   const game = String(draft['game'] ?? '');
   const known = isMinigameKey(game);
   const valid = known && parseMinigameSettings(game, draft['settings']) !== null;
@@ -56,22 +57,26 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, onClos
   return <dialog className="scene-preview-dialog minigame-configuration" ref={dialog} aria-labelledby={title}
     onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className="scene-preview-window">
+    <div className="configuration-window">
       <header><h2 id={title}>{t('title')}</h2></header>
       <div className="segmented configuration-nav" role="group" aria-label={t('title')}>
         <button type="button" aria-pressed={panel === 'settings'} onClick={() => setPanel('settings')}>{t('settings')}</button>
-        <button type="button" aria-pressed={panel === 'preview'} onClick={() => setPanel('preview')}>{fields('preview')}</button>
+        <button type="button" aria-pressed={panel === 'timing'} onClick={() => setPanel('timing')}>{t('timing')}</button>
+        <button className="configuration-preview-tab" type="button" aria-pressed={panel === 'preview'} onClick={() => setPanel('preview')}>{fields('preview')}</button>
       </div>
       <div className="configuration-columns" data-panel={panel}>
-        <section className="configuration-fields" aria-label={t('settings')}>
+        <div className="configuration-fields" role="region" aria-label={panel === 'timing' ? t('timing') : t('settings')}>
+          <div className="configuration-pane" hidden={panel === 'timing'}>
           <MinigameFields part="settings" definition={draftDefinition} node={draftNode} index={index}
             onChange={next => {
               const updated = next.nodes.find(candidate => candidate.key === node.key)!.stages[index]!;
               if (updated['game'] !== draft['game']) setDevice(updated['game'] === 'count-the-dots' ? 'sharedScreen' : 'phone');
               setDraft(updated);
             }} />
+          </div>
+          <div className="configuration-pane" hidden={panel !== 'timing'}>
           <label>{inspector(game === 'draw-the-graph' ? 'graphQuestion' : 'lMinigame')}
-            <textarea rows={2} value={draft.prompt ?? ''} maxLength={2000} onChange={event => {
+            <textarea rows={1} value={draft.prompt ?? ''} maxLength={2000} onChange={event => {
               const prompt = event.currentTarget.value;
               setDraft(previous => ({ ...previous, prompt }));
             }} />
@@ -95,19 +100,20 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, onClos
                 }} />
             </label>
           </div>
-        </section>
-        <section className="configuration-preview" aria-label={fields('preview')}>
+          </div>
+        </div>
+        <div className="configuration-preview" role="region" aria-label={fields('preview')}>
           <div className="segmented" role="group" aria-label={fields('preview')}>
             {(['phone', 'sharedScreen'] as const).map(choice => <button type="button" key={choice}
               aria-pressed={device === choice} onClick={() => setDevice(choice)}>{fields(choice)}</button>)}
           </div>
           <ScenePreview key={JSON.stringify([game, draft['settings'], draft.durationMs, draft['countdownSeconds'], device])}
-            definition={draftDefinition} node={draftNode} index={index} device={device} interactive />
-        </section>
+            definition={draftDefinition} node={draftNode} index={index} device={device} interactive compactIntro />
+        </div>
       </div>
       <footer className="configuration-actions">
         <button type="button" className="small-button" autoFocus onClick={onClose}>{t('cancel')}</button>
-        <button type="button" className="primary" disabled={!valid} onClick={() => { if (draft !== initial) onApply(draft); onClose(); }}>{t('apply')}</button>
+        <button type="button" className="configuration-apply" disabled={!valid} onClick={() => { if (draft !== initial) onApply(draft); onClose(); }}>{t('apply')}</button>
       </footer>
     </div>
   </dialog>;

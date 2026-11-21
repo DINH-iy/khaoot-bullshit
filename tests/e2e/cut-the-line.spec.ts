@@ -25,7 +25,7 @@ test('Cut the Line takes a whole-percent cut on a phone and reveals its error', 
   await targets.getByRole('button', { name: 'Exact' }).click();
   await host.getByRole('spinbutton', { name: 'Target percentage' }).fill('24');
   await host.getByRole('button', { name: 'Apply changes' }).click();
-  await host.getByRole('button', { name: 'Try minigame' }).click();
+  await host.getByRole('button', { name: 'Try this scene' }).click();
   const practice = host.getByRole('dialog', { name: 'Preview' });
   const desktop = host.viewportSize()!;
   await host.setViewportSize({ width: 320, height: 568 });

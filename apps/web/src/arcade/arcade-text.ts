@@ -9,7 +9,7 @@ export function arcadeProblem(error: unknown): string {
     LOBBY_FULL: 'This lobby is full.',
     ARCADE_FULL: 'There are too many open lobbies right now. Join one, or try again in a few minutes.',
     ROUND_ON: 'A round is already being played.',
-    NOT_ENOUGH_PLAYERS: 'Not enough players for that many teams.',
+    NOT_ENOUGH_PLAYERS: 'Not enough players to start this round.',
     ROOM_NOT_AVAILABLE: 'This lobby has closed.',
     FORBIDDEN: 'Only the leader can do that.',
     UNAUTHORIZED: 'You are not in this lobby (any more). Join it again.',

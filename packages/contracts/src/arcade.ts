@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import { GameIdSchema } from './game.js';
-import { MINIGAME_KEYS, type MinigameKey } from './minigames/shared/catalog.js';
+import { MINIGAME_KEYS, isMinigameKey, type MinigameKey } from './minigames/shared/catalog.js';
+import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, type HeadToHeadKey } from './head-to-head.js';
 import { PlayerLookSchema } from './players.js';
 
 /**
- * The arcade: lobbies anyone opens to play minigames together, outside a game.
+ * The arcade: lobbies anyone opens to play minigames and duels together, outside a game.
  * A lobby keeps its members, its leader and a running total across rounds; each
- * round is a room with one minigame that the lobby's members are seated in.
+ * round is a room with one scene that the lobby's members are seated in.
  */
 const MinigameKeySchema = z.enum(MINIGAME_KEYS as [MinigameKey, ...MinigameKey[]]);
+export type ArcadeGame = MinigameKey | HeadToHeadKey;
+export const ArcadeGameSchema = z.enum([...HEAD_TO_HEAD_KEYS, ...MINIGAME_KEYS] as const);
+export const isArcadeGame = (value: unknown): value is ArcadeGame => typeof value === 'string' && (isMinigameKey(value) || isHeadToHeadKey(value));
 export const ARCADE_PASSWORD_MIN = 4;
 export const ARCADE_PASSWORD_MAX = 64;
 const PasswordSchema = z.string().min(ARCADE_PASSWORD_MIN).max(ARCADE_PASSWORD_MAX).refine(password => password.trim().length > 0);
@@ -26,7 +30,7 @@ export const CreateArcadeSchema = z.object({ lobbyId: GameIdSchema, title: z.str
 export const JoinArcadeSchema = z.object({ displayName: NameSchema, look: PlayerLookSchema.optional(), password: z.string().max(ARCADE_PASSWORD_MAX).optional() }).strict();
 export const ArcadePasswordUpdateSchema = z.object({ password: PasswordSchema.nullable() }).strict();
 export const ArcadeLockSchema = z.object({ locked: z.boolean() }).strict();
-export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: MinigameKeySchema, teams: ArcadeTeamsSchema.nullable() }).strict();
+export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable() }).strict();
 /** What the leader does in a round's room. `stageRunId` binds the action to the round step the leader saw. */
 export const ARCADE_ACTIONS = ['begin', 'resume', 'confirm-teams', 'shuffle-teams', 'start', 'close', 'reveal', 'end'] as const;
 export type ArcadeAction = typeof ARCADE_ACTIONS[number];
@@ -35,7 +39,7 @@ export const ArcadeActSchema = z.object({ action: z.enum(ARCADE_ACTIONS), stageR
 // Views.
 export const ArcadeLobbyCardSchema = z.object({
   id: GameIdSchema, title: z.string(), locked: z.boolean(), protected: z.boolean().default(false), players: z.number().int().min(0),
-  leaderName: z.string().nullable(), playing: MinigameKeySchema.nullable(), member: z.boolean(),
+  leaderName: z.string().nullable(), playing: ArcadeGameSchema.nullable(), member: z.boolean(),
 }).strict();
 export const ArcadeListSchema = z.object({ lobbies: z.array(ArcadeLobbyCardSchema) }).strict();
 export type ArcadeList = z.infer<typeof ArcadeListSchema>;
@@ -47,10 +51,10 @@ export const ArcadeLobbyViewSchema = z.object({
   me: z.object({ memberId: GameIdSchema, leader: z.boolean() }).strict().nullable(),
   members: z.array(z.object({ id: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, connected: z.boolean(), leader: z.boolean(), playing: z.boolean() }).strict()),
   // The round being played, if any; `seated`: this browser plays in it (and can enter its room).
-  round: z.object({ number: z.number().int().min(1), game: MinigameKeySchema, teams: z.number().int().nullable(), seated: z.boolean() }).strict().nullable(),
+  round: z.object({ number: z.number().int().min(1), game: ArcadeGameSchema, teams: z.number().int().nullable(), seated: z.boolean() }).strict().nullable(),
   // The running total of this lobby: everyone who played a round here.
   totals: z.array(z.object({ memberId: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, pointsMilli: MilliSchema, wins: z.number().int().min(0), rounds: z.number().int().min(0) }).strict()),
-  lastRound: z.object({ number: z.number().int().min(1), game: MinigameKeySchema, teams: z.number().int().nullable(), results: z.array(ResultRowSchema) }).strict().nullable(),
+  lastRound: z.object({ number: z.number().int().min(1), game: ArcadeGameSchema, teams: z.number().int().nullable(), results: z.array(ResultRowSchema) }).strict().nullable(),
 }).strict();
 export type ArcadeLobbyView = z.infer<typeof ArcadeLobbyViewSchema>;
 

@@ -1,5 +1,6 @@
 import { chooseOption } from './helpers.js';
 import { randomUUID } from 'node:crypto';
+import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS } from '@party/contracts';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -65,7 +66,7 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     await bo.page.goto(link);
     await bo.page.getByLabel('Your name').fill('Bo');
     await bo.page.getByRole('button', { name: 'Join the lobby' }).click();
-    await expect(bo.page.getByText('Waiting for Ann to pick a minigame…')).toBeVisible();
+    await expect(bo.page.getByText('Waiting for Ann to pick a game…')).toBeVisible();
     await expect(ann.page.getByRole('region', { name: /Players \(2\)/ })).toContainText('Bo');
 
     // Locked: Cy cannot get in until Ann unlocks.
@@ -82,7 +83,7 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     expect((await new AxeBuilder({ page: ann.page }).analyze()).violations).toEqual([]);
 
     // Ann picks Left or right; every phone goes into the round by itself.
-    await chooseOption(ann.page.getByLabel('Minigame'), { label: 'Left or right' });
+    await chooseOption(ann.page.getByRole('combobox', { name: 'Game', exact: true }), { label: 'Left or right' });
     await ann.page.getByRole('button', { name: 'Play Left or right' }).click();
     const players: Page[] = [ann.page, bo.page, cy.page];
     for (const page of players) await expect(page.getByRole('button', { name: 'Got it!' })).toBeVisible({ timeout: 15_000 });
@@ -124,4 +125,56 @@ test('the arcade wears the join screen look the owner chose in admin', async ({ 
     await expect(main).toHaveAttribute('style', /--r-bg1:\s*#123456/);
     await expect(main).toHaveAttribute('style', /--r-accent:\s*#ff5500/);
   } finally { await guest.close(); await save({}); }
+});
+
+test('Arcade publishes the full game catalog and plays a pool duel and a TV-only dots round', async ({ page: leader, browser, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'Uses separate browser sessions for players and the TV.');
+  test.setTimeout(90_000);
+  const guest = await browser.newContext({ baseURL, reducedMotion: 'reduce' });
+  const tvContext = await browser.newContext({ baseURL, reducedMotion: 'reduce' });
+  try {
+    const friend = await guest.newPage();
+    await leader.goto('/?arcade');
+    await leader.getByLabel('Your name').fill('Alex');
+    await leader.getByRole('button', { name: 'Open a lobby' }).click();
+    const invite = leader.getByRole('region', { name: 'Invite players' });
+    await friend.goto((await invite.getByRole('link').textContent())!);
+    await friend.getByLabel('Your name').fill('Jo');
+    await friend.getByRole('button', { name: 'Join the lobby' }).click();
+    await expect(leader.getByRole('heading', { name: 'Players (2)' })).toBeVisible();
+    const picker = leader.getByRole('combobox', { name: 'Game', exact: true });
+    await picker.click();
+    await expect(leader.getByRole('group', { name: 'Minigames' }).getByRole('option')).toHaveCount(MINIGAME_KEYS.length);
+    await expect(leader.getByRole('group', { name: 'Head-to-head' }).getByRole('option')).toHaveCount(HEAD_TO_HEAD_KEYS.length);
+    await expect(leader.getByRole('option', { name: '8-ball pool', exact: true })).toHaveCount(1);
+    await leader.getByRole('option', { name: '8-ball pool', exact: true }).click();
+    await leader.getByRole('button', { name: 'Play 8-ball pool' }).click();
+    await leader.getByRole('button', { name: 'Start duel' }).click();
+    await expect(friend.getByRole('img', { name: 'Pool table' })).toBeVisible();
+    await friend.getByRole('button', { name: 'Give up', exact: true }).click();
+    await friend.getByRole('button', { name: 'Yes, give up' }).click();
+    await leader.getByRole('button', { name: 'Back to the lobby' }).click();
+    await expect(leader.getByRole('region', { name: 'Round 1: 8-ball pool' })).toContainText(/1\. Alex/);
+
+    await chooseOption(picker, 'count-the-dots');
+    await leader.getByRole('button', { name: 'Play Count the Dots' }).click();
+    await expect(friend.getByRole('button', { name: 'Got it!' })).toBeVisible();
+    const displayRoute = `${new URL(friend.url()).origin}/api/arcade/rounds/${new URL(friend.url()).searchParams.get('room')}/display`;
+    const denied = await friend.request.post(displayRoute, { headers: { 'x-party-request': '1', origin: baseURL! }, data: {} });
+    expect(denied.ok()).toBe(false);
+    await leader.getByRole('button', { name: 'Set up shared screen' }).click();
+    const screen = await tvContext.newPage();
+    await screen.goto((await leader.getByRole('link', { name: 'Open shared screen' }).getAttribute('href'))!);
+    await friend.getByRole('button', { name: 'Got it!' }).click();
+    await leader.getByRole('button', { name: 'Got it!' }).click();
+    await leader.getByRole('button', { name: 'Start (2 of 2 ready)' }).click();
+    const board = screen.getByRole('img', { name: 'Dot pattern' });
+    await expect(board).toBeVisible();
+    await expect(friend.getByRole('img', { name: 'Dot pattern' })).toHaveCount(0);
+    await expect(leader.getByRole('img', { name: 'Dot pattern' })).toHaveCount(0);
+    const guess = friend.getByRole('textbox', { name: 'How many dots?' });
+    await guess.fill(String(await board.locator('span').count()));
+    await guess.press('Enter');
+    await expect(friend.getByText(/Guess saved/)).toBeVisible();
+  } finally { await Promise.all([guest.close(), tvContext.close()]); }
 });

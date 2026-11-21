@@ -57,6 +57,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
   const [tour, setTour] = useState(needsEditorTour);
   const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
   const changeZoomShortcuts = (shortcuts: ZoomShortcuts) => { setZoomShortcuts(shortcuts); rememberZoomShortcuts(shortcuts); };
+  const [rehearsing, setRehearsing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [compactHeader, setCompactHeader] = useState(() => matchMedia(COMPACT_HEADER).matches);
   useEffect(() => {
@@ -133,8 +134,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
         {/* A game with problems cannot be rehearsed or published: the menu says so, and the problems are in the box at the bottom left. */}
         <ActionMenu label={t('playPublish')} text={t('playPublishText')} {...(d.issues.length || compactHeader ? { icon: compactHeader ? 'play' : 'warning' } : {})}
           intro={d.issues.length ? <span className="menu-warning" title={t('problemsTip')}><Icon name="warning" size={16} />{t('toFixFirst', { problems: problemCount })}</span> : t('rehearseIntro')} actions={[
-          { label: fromStart ? t('rehearseStartFix', { fix: fix(fromStart) }) : t('rehearseStart'), disabled: d.busy || d.save !== 'saved' || fromStart > 0, onSelect: () => d.rehearse(null) },
-          { label: selected.length !== 1 ? t('rehearseSelectOne') : fromScene ? t('rehearseSceneFix', { fix: fix(fromScene) }) : t('rehearseScene'), disabled: d.busy || d.save !== 'saved' || selected.length !== 1 || fromScene > 0, onSelect: () => d.rehearse(selected[0]!) },
+          { label: t('rehearse'), disabled: d.busy || d.save !== 'saved', onSelect: () => setRehearsing(true) },
           { label: draft.published?.matchesDraft ? t('publishNothing') : d.issues.length ? t('publishFix', { problems: problemCount }) : d.save !== 'saved' ? t('publishSaving') : t('publish'),
             disabled: d.busy || !ready || Boolean(draft.published?.matchesDraft), onSelect: d.publish },
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
@@ -154,6 +154,11 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
         <PeerBar live={live} />
       </div>
     </header>
+    {rehearsing && <RehearsalDialog title={t('rehearse')} close={t('close')} onClose={() => setRehearsing(false)} choices={[
+      { label: fromStart ? t('rehearseStartFix', { fix: fix(fromStart) }) : t('rehearseStart'), blocked: fromStart > 0, run: () => d.rehearse(null) },
+      { label: selected.length !== 1 ? t('rehearseSelectOne') : fromScene ? t('rehearseSceneFix', { fix: fix(fromScene) }) : t('rehearseScene'),
+        blocked: selected.length !== 1 || fromScene > 0, run: () => d.rehearse(selected[0]!) },
+    ]} />}
     {tour && <EditorTour onClose={() => { finishEditorTour(); setTour(false); }} />}
     {helping && <HelpPanel zoomShortcuts={zoomShortcuts} onZoomShortcuts={changeZoomShortcuts} onClose={() => setHelping(false)} />}
     {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly} onClose={() => setLibraryOpen(false)} />}
@@ -177,6 +182,21 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
       </div>
     </main>
   </div>;
+}
+
+function RehearsalDialog({ title, close, choices, onClose }: {
+  title: string; close: string; choices: { label: string; blocked: boolean; run: () => void }[]; onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+  return <dialog ref={dialog} className="scene-preview-dialog phone-preview-dialog" aria-labelledby="rehearsal-title"
+    onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="scene-preview-window">
+      <header><h2 id="rehearsal-title">{title}</h2><button type="button" className="small-button" onClick={onClose}>{close}</button></header>
+      {choices.map(choice => <button key={choice.label} type="button" className="small-button" disabled={choice.blocked}
+        onClick={() => { onClose(); choice.run(); }}>{choice.label}</button>)}
+    </div>
+  </dialog>;
 }
 
 /** The whole game as text: to keep a copy, or to give to an AI with a request and import its answer. */

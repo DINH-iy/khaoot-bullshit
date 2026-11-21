@@ -19,10 +19,27 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
   const draft = (await (await host.request.post(url, { headers, data: { gameId, title: 'Pool night', startFrom: 'timed-quiz' } })).json()).data;
   const definition = { formatVersion: 2, title: 'Pool night', startNodeKey: 'pool', edges: [],
     nodes: [{ key: 'pool', stages: [{ key: 'main', kind: 'duel', prompt: '8-ball pool', durationMs: 30_000,
-      pick: 'host', betMilli: '2000', contest: { kind: 'game', game: 'eight-ball' } }] }] };
+      pick: 'host', betMilli: '2000', matchSeconds: 60, contest: { kind: 'game', game: 'eight-ball' } }] }] };
   const saved = (await (await host.request.put(`${url}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).json()).data;
   await host.goto(`${baseURL}/?edit=${gameId}&view=scene`);
-  await expect(host.getByRole('button', { name: 'Team vs team' })).toBeVisible();
+  const configure = host.getByRole('button', { name: 'Configure pool', exact: true });
+  const changeContest = host.getByRole('button', { name: 'Change game', exact: true });
+  await expect(changeContest).toBeVisible();
+  const [poolButton, gameButton] = await Promise.all([configure.boundingBox(), changeContest.boundingBox()]);
+  expect(poolButton!.y).toBe(gameButton!.y);
+  expect(gameButton!.x - (poolButton!.x + poolButton!.width)).toBeCloseTo(8);
+  expect(gameButton!.height).toBeGreaterThanOrEqual(44);
+  await changeContest.click();
+  await expect(host.getByRole('dialog', { name: 'How is the duel won?' })).toBeVisible();
+  await host.keyboard.press('Escape');
+  const settings = host.getByRole('dialog', { name: 'Configure 8-ball pool' });
+  await configure.click();
+  await expect(settings.getByRole('button', { name: 'Team vs team' })).toBeVisible();
+  await expect(settings.getByRole('spinbutton', { name: 'Match time (seconds)' })).toHaveValue('60');
+  await settings.getByRole('button', { name: 'Table', exact: true }).click();
+  await expect(settings.getByRole('img', { name: 'Pool table preview' })).toBeVisible();
+  await settings.getByLabel('Starting side').selectOption('right');
+  await settings.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect((await host.request.post(`${url}/${gameId}/publish`, { headers, data: { expectedRevision: saved.revision } })).ok()).toBe(true);
   expect((await host.request.post(`${baseURL}/api/host/rooms`, { headers, data: { gameId, sessionId: roomId, commandId: randomUUID() } })).ok()).toBe(true);
   await host.goto(`${baseURL}/?room=${roomId}`);
@@ -91,6 +108,11 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await host.getByRole('button', { name: 'Close voting' }).click();
     const table = (page: typeof ada) => page.getByRole('img', { name: 'Pool table' });
     await expect(table(tv)).toBeInViewport({ ratio: 1 });
+    await expect(tv.getByRole('group', { name: 'Potted balls' })).toContainText('Ada');
+    await expect(ada.getByRole('group', { name: 'Potted balls' })).toContainText('Bo');
+    await expect(tv.locator('.session-bar')).toHaveCount(0);
+    expect((await table(tv).boundingBox())!.width).toBeGreaterThan(900);
+    await expect(tv.getByRole('timer')).toBeVisible();
     await expect(table(ada)).toBeInViewport({ ratio: 1 });
     await expect(ada.getByRole('button', { name: 'Shoot' })).toBeInViewport({ ratio: 1 });
     await expect(table(bo)).toBeVisible();
@@ -112,6 +134,26 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await bo.getByRole('button', { name: 'Yes, give up' }).click();
     await expect(tv.locator('.duel-result')).toContainText('Ada');
     await expect(cy.locator('.duel-result')).toContainText('2');
+
+    await host.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+    await configure.click();
+    await settings.getByRole('button', { name: 'Table', exact: true }).click();
+    await expect(settings.getByLabel('Starting side')).toHaveValue('left');
+    await settings.getByLabel('Starting side').selectOption('right');
+    await settings.getByRole('button', { name: 'Match', exact: true }).click();
+    await settings.getByRole('button', { name: 'Team vs team' }).click();
+    await settings.getByRole('button', { name: 'Add Pick teams scene' }).click();
+    await expect.poll(async () => {
+      const data = (await (await host.request.get(`${url}/${gameId}`, { headers })).json()).data;
+      const start = data.definition.startNodeKey;
+      return {
+        start: data.definition.nodes.find((node: { key: string }) => node.key === start)?.stages[0].kind,
+        next: data.definition.edges.find((edge: { from: string }) => edge.from === start)?.to,
+        position: data.definition.editor?.positions?.[start],
+        pool: data.definition.nodes.find((node: { key: string }) => node.key === 'pool')?.stages[0],
+      };
+    }).toMatchObject({ start: 'teams', next: 'pool', position: { x: expect.any(Number), y: expect.any(Number) },
+      pool: { pick: 'teams', contest: { settings: { start: { side: 'right', percent: 25 } } } } });
   } finally {
     await Promise.all([ada.close(), bo.close(), cy.close(), tv.close()]);
   }

@@ -16,7 +16,7 @@ export function formatRemaining(ms: number): string {
  * clock cannot shorten or lengthen what the player sees.
  */
 export function useRemaining(stage: Stage | null | undefined, clockOffset: number): number | null {
-  const deadline = stage?.status === 'ACTIVE' && stage.deadlineAt ? Date.parse(stage.deadlineAt) : null;
+  const deadline = stage?.deadlineAt ? Date.parse(stage.deadlineAt) : null;
   const read = () => deadline === null ? null : Math.max(0, deadline - (Date.now() + clockOffset));
   const [remaining, setRemaining] = useState(read);
   useEffect(() => {
@@ -26,12 +26,12 @@ export function useRemaining(stage: Stage | null | undefined, clockOffset: numbe
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deadline, clockOffset]);
-  if (stage?.status === 'ACTIVE' && stage.pausedRemainingMs !== null) return stage.pausedRemainingMs;
+  if (stage?.pausedRemainingMs != null) return stage.pausedRemainingMs;
   return remaining;
 }
 export function StageTimer({ stage, remaining }: { stage: Stage; remaining: number | null }) {
   const t = useText();
-  if (stage.status !== 'ACTIVE') return null;
+  if (stage.status !== 'ACTIVE' && !stage.deadlineAt && stage.pausedRemainingMs === null) return null;
   const paused = stage.pausedRemainingMs !== null;
   const text = remaining === null ? t('timer.none') : paused ? t('timer.paused', { time: formatRemaining(remaining) }) : remaining > 0 ? t('timer.left', { time: formatRemaining(remaining) }) : t('timer.up');
   // role=timer is not announced on every tick; the ending is announced separately.

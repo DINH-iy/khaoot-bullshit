@@ -20,7 +20,7 @@ test('Match the Angle works in editor practice and in a live room with a touch c
   };
   const saved = (await (await host.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).json()).data;
   await host.goto(`${baseURL}/?edit=${gameId}&view=scene`);
-  await host.getByRole('button', { name: 'Try minigame' }).click();
+  await host.getByRole('button', { name: 'Try this scene' }).click();
   const practice = host.getByRole('dialog', { name: 'Preview' });
   await practice.getByRole('button', { name: 'Start practice' }).click();
   const practiceDial = practice.getByRole('slider', { name: 'Ray angle' });

@@ -157,6 +157,33 @@ describe('arcade lobbies', () => {
     expect(board.wins.some((row: { name: string }) => row.name === 'Bob')).toBe(false);
   });
 
+  it('requires two duelists and records a drawn duel without a win or points', async () => {
+    const { lobbyId, leader } = await open();
+    const lobby = `/api/arcade/lobbies/${lobbyId}`;
+    const roundId = randomUUID();
+    const round = { roundId, game: 'tictactoe', teams: null };
+    expect(code(await call('POST', `${lobby}/rounds`, round, leader))).toBe('NOT_ENOUGH_PLAYERS');
+    await join(lobbyId, 'Bob');
+    expect((await call('POST', `${lobby}/rounds`, round, leader)).statusCode).toBe(200);
+    const room = cookieOf(await call('POST', `${lobby}/enter`, {}, leader));
+    const snapshot = async () => (await call('GET', `/api/rooms/${roundId}`, undefined, room)).json().data;
+    const stage = (await snapshot()).view.stage;
+    const pair: [string, string] = stage.duel.duelistIds;
+    const act = (action: 'close' | 'end') => call('POST', `/api/arcade/rounds/${roundId}/act`, { action, stageRunId: action === 'close' ? stage.id : null }, room);
+    expect((await act('close')).statusCode).toBe(200);
+
+    const service = createGameService(prisma);
+    for (const [turn, cell] of [0, 1, 2, 4, 3, 5, 7, 6, 8].entries()) {
+      await service.execute({ role: 'player', playerId: pair[turn % 2]! }, {
+        formatVersion: 1, type: 'duel.move', commandId: randomUUID(), sessionId: roundId, stageRunId: stage.id, move: { game: 'tictactoe', cell },
+      });
+    }
+    expect((await snapshot()).view.stage).toMatchObject({ revealed: true, duel: { winnerId: null, contest: { view: { outcome: { kind: 'draw' } } } } });
+    expect((await act('end')).statusCode).toBe(200);
+    const result = (await view(lobbyId, leader)).lastRound;
+    expect(result).toMatchObject({ game: 'tictactoe', results: [{ place: null, pointsMilli: '0' }, { place: null, pointsMilli: '0' }] });
+  });
+
   it('plays a team round: teams are made first and the leader confirms them before the minigame', async () => {
     const { lobbyId, leader } = await open();
     const bob = cookieOf(await join(lobbyId, 'Bob'));

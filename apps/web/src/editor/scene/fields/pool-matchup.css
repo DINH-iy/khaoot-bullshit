@@ -1,0 +1,50 @@
+.pool-matchup { display: grid; gap: 8px; min-width: 0; }
+.pool-matchup .segmented { padding: 4px; gap: 4px; border-radius: 12px; background: var(--e-bg); }
+.pool-matchup .segmented button {
+  flex: 1 1 min(6.75rem, 29%);
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  border-color: transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--e-muted);
+  font-size: .875rem;
+}
+.pool-matchup .segmented button:hover:not(:disabled) { color: var(--e-text); background: var(--e-panel); }
+.pool-matchup .segmented button[aria-pressed="true"],
+.pool-matchup .segmented button[aria-pressed="true"]:hover {
+  background: var(--e-accent-soft);
+  border-color: var(--e-accent);
+  color: var(--e-text);
+}
+.editor .pool-matchup .pool-team-setup {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px 6px 6px;
+  margin: 0;
+  border: 1px solid var(--e-border);
+  border-radius: 10px;
+  background: var(--e-card);
+  color: var(--e-text);
+  text-align: start;
+  font-size: .875rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.editor .pool-matchup button.pool-team-setup:hover:not(:disabled) { border-color: var(--e-accent); }
+.pool-team-setup-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: var(--e-accent-soft);
+  color: var(--e-accent);
+}
+.pool-team-setup > svg { color: var(--e-accent); }
+.pool-matchup button:focus-visible { outline: 2px solid var(--e-accent); outline-offset: 2px; }

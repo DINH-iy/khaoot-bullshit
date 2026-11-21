@@ -1,0 +1,70 @@
+.minigame-configuration {
+  width: min(960px, calc(100% - 24px));
+  overflow: hidden;
+}
+.configuration-window {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  max-height: calc(100dvh - 26px);
+}
+.configuration-window > header { padding: 16px 20px; border-bottom: 1px solid var(--e-border); }
+.configuration-window > header h2 { margin: 0; font-size: 1.2rem; }
+.configuration-columns {
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  min-height: 0; padding: 10px 16px 12px; gap: 16px;
+}
+.configuration-fields,
+.configuration-preview { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.configuration-fields { display: grid; align-content: start; gap: 12px; padding: 8px 4px; }
+.configuration-pane { display: grid; gap: 12px; min-width: 0; }
+.configuration-pane[hidden] { display: none; }
+.configuration-game { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.configuration-game .small-button { min-height: 44px; }
+.configuration-fields label:not(.choice, .check) { display: grid; gap: 5px; min-width: 0; font-size: .875rem; }
+.configuration-fields textarea { min-height: 44px; max-height: 8rem; resize: vertical; field-sizing: content; }
+.configuration-timing { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 10px; }
+.configuration-preview {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-radius: 12px; background: var(--e-bg);
+}
+.configuration-preview > .preview { width: 100%; justify-content: center; }
+.configuration-preview .preview > figure { min-width: 0; }
+.configuration-preview .preview > figure > figcaption { display: none; }
+.configuration-preview .phone { flex-basis: min(100%, 330px); }
+.configuration-preview .preview .phone-screen.compact-game-preview {
+  width: 100%;
+  min-height: min(19rem, max(12rem, calc(100dvh - 16rem)));
+  aspect-ratio: auto;
+}
+.configuration-preview .tv-screen:has(.scene-practice) { min-height: min(17rem, 40dvh); aspect-ratio: auto; }
+.configuration-preview .configuration-game-intro { background: transparent; border: 0; padding: 0 4px; }
+.configuration-preview .minigame-preview-copy p { margin: 0; }
+.configuration-window .configuration-nav { display: flex; gap: 6px; padding: 10px 16px 0; }
+.configuration-window .configuration-preview-tab { display: none; }
+.configuration-fields label:is(.choice, .check) { display: flex; align-items: center; min-height: 44px; gap: 8px; }
+.configuration-fields label:is(.choice, .check) input[type=checkbox] { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--e-accent); }
+.configuration-preview .configuration-game-intro:has(.graph-chart) .minigame-preview-copy { display: none; }
+.configuration-preview .configuration-game-intro .graph-chart { width: 100%; }
+.configuration-window .segmented button { min-height: 44px; }
+.configuration-window .segmented button[aria-pressed="true"] { background: var(--e-accent-soft); border-color: var(--e-accent); color: var(--e-text); }
+.configuration-actions {
+  display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px;
+  padding: 12px 20px; border-top: 1px solid var(--e-border);
+}
+.configuration-actions button { min-height: 44px; }
+.editor .configuration-actions .configuration-apply { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #20163d); font-weight: 750; }
+@media (max-width: 760px) {
+  .configuration-window { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .configuration-window > header { padding: 12px; }
+  .configuration-window .configuration-preview-tab { display: inline-flex; }
+  .configuration-window .configuration-nav { display: flex; justify-content: center; padding: 8px 12px; border-bottom: 1px solid var(--e-border); }
+  .configuration-columns { grid-template-columns: minmax(0, 1fr); padding-inline: 12px; }
+  .configuration-columns:not([data-panel="preview"]) .configuration-preview,
+  .configuration-columns[data-panel="preview"] .configuration-fields { display: none; }
+  .configuration-fields, .configuration-preview, .configuration-actions { padding-inline: 12px; }
+}

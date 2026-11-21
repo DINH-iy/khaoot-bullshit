@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, GameIdSchema, isMinigameKey, type RoomReply } from '@party/contracts';
+import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, GameIdSchema, isArcadeGame, type RoomReply } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { GameError } from '../game/errors.js';
@@ -67,7 +67,7 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
       me: member ? { memberId: member.id, leader: lobby.leaderId === member.id } : null,
       members: members.filter(entry => present(entry, now) || seated.has(entry.id)).map(entry => ({ id: entry.id, displayName: entry.displayName, look: lookOf(entry),
         connected: now.getTime() - entry.lastSeenAt.getTime() < CONNECTED_MS, leader: entry.id === lobby!.leaderId, playing: seated.has(entry.id) })),
-      round: round && isMinigameKey(round.game) ? { number: round.number, game: round.game, teams: round.teams, seated: Boolean(member && seated.has(member.id)) } : null,
+      round: round && isArcadeGame(round.game) ? { number: round.number, game: round.game, teams: round.teams, seated: Boolean(member && seated.has(member.id)) } : null,
       ...scores,
     });
   }
@@ -80,7 +80,7 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
       const mine = await Promise.all(found.map(lobby => lobbies.memberOf(lobby.id, request.headers.cookie)));
       return { ok: true, data: ArcadeListSchema.parse({ lobbies: found.map((lobby, index) => ({ id: lobby.id, title: lobby.title, locked: lobby.locked, protected: Boolean(lobby.passwordHash),
         players: lobby.members.filter(member => present(member, now)).length, leaderName: lobby.passwordHash && !mine[index] ? null : lobby.members.find(member => member.id === lobby.leaderId)?.displayName ?? null,
-        playing: lobby.rounds[0] && isMinigameKey(lobby.rounds[0].game) ? lobby.rounds[0].game : null, member: Boolean(mine[index]) })) }) };
+        playing: lobby.rounds[0] && isArcadeGame(lobby.rounds[0].game) ? lobby.rounds[0].game : null, member: Boolean(mine[index]) })) }) };
     } catch (error) { return fail(reply, error); }
   });
   app.get('/api/arcade/leaderboard', async (request, reply) => {
@@ -153,6 +153,13 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
     try {
       guard(request, 'act', 240); const sessionId = sessionParam(request);
       await rounds.act(await gateway.authenticate(sessionId, request.headers.cookie), request.body); return { ok: true, data: {} };
+    } catch (error) { return fail(reply, error); }
+  });
+
+  app.post('/api/arcade/rounds/:sessionId/display', async (request, reply) => {
+    try {
+      guard(request, 'act', 240); const sessionId = sessionParam(request);
+      return { ok: true, data: await rounds.display(await gateway.authenticate(sessionId, request.headers.cookie)) };
     } catch (error) { return fail(reply, error); }
   });
 

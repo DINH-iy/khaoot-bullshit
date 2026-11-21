@@ -1,7 +1,8 @@
-import { BALL_RADIUS, canPlacePoolCue, oppositePoolPocket, POOL_HEIGHT, POOL_MAX_SHOTS, POOL_START_LINE, POOL_WIDTH,
-  poolGroup, poolPositionClear, type HeadToHeadView, type PoolFrame } from '@party/contracts';
+import { randomInt } from 'node:crypto';
+import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, oppositePoolPocket, POOL_HEIGHT, POOL_MAX_SHOTS, POOL_WIDTH,
+  poolGroup, poolLegalTarget, isLegalPoolContact, poolPositionClear, poolStartX, rackPool, type HeadToHeadView, type PoolBallBehavior, type PoolFrame, type ResolvedPoolStart } from '@party/contracts';
 import { illegal, type HeadToHeadRules, type Seat } from '../engine.js';
-import { rackPool, shootPool } from './physics.js';
+import { shootPool } from './physics.js';
 
 interface Pool {
   frames: PoolFrame[];
@@ -13,19 +14,26 @@ interface Pool {
   winner: Seat | null;
   ending: Extract<HeadToHeadView['board'], { game: 'eight-ball' }>['ending'];
   lastPocket: { solid: number | null; stripe: number | null };
+  pots?: [number, number];
+  scratches?: [number, number];
+  timedOut?: true;
+  ballBehavior?: PoolBallBehavior;
+  start?: ResolvedPoolStart;
+  potsBySeat?: [number[], number[]];
 }
 
 const other = (seat: Seat): Seat => seat === 0 ? 1 : 0;
 const current = (data: Pool) => data.frames.at(-1)!;
 const atLimit = (data: Pool) => data.frames.length > POOL_MAX_SHOTS;
 
-function spot(balls: PoolFrame, id: 0 | 8): PoolFrame {
-  const preferred = id === 0 ? POOL_START_LINE : 550;
-  const limit = id === 0 ? POOL_START_LINE : POOL_WIDTH - BALL_RADIUS;
+function spot(balls: PoolFrame, id: 0 | 8, start: ResolvedPoolStart): PoolFrame {
+  const fromEdge = (x: number) => start.side === 'right' ? POOL_WIDTH - x : x;
+  const preferred = id === 0 ? poolStartX(start) : fromEdge(550);
+  const limit = id === 0 ? fromEdge(preferred) : POOL_WIDTH - BALL_RADIUS;
   if (poolPositionClear(preferred, 200, balls)) return [[id, preferred, 200], ...balls];
   for (let y = BALL_RADIUS * 3; y < POOL_HEIGHT - BALL_RADIUS; y += BALL_RADIUS * 2) {
     for (let x = BALL_RADIUS * 3; x <= limit; x += BALL_RADIUS * 2) {
-      if (poolPositionClear(x, y, balls)) return [[id, x, y], ...balls];
+      if (poolPositionClear(fromEdge(x), y, balls)) return [[id, fromEdge(x), y], ...balls];
     }
   }
   throw new Error('Pool table has no open placement');
@@ -39,25 +47,51 @@ function targetPocket(data: Pool, seat: Seat) {
   return last === null ? null : oppositePoolPocket(last);
 }
 
+export function poolTimedOut(data: unknown) {
+  return (data as Pool).timedOut === true;
+}
+
+export function finishPoolOnTime(data: unknown): Pool {
+  const match = data as Pool;
+  const [a, b] = match.pots ?? [0, 0];
+  const [aScratches, bScratches] = match.scratches ?? [0, 0];
+  const bothOnEight = !current(match).some(([id]) => poolGroup(id) !== null);
+  const difference = bothOnEight ? bScratches - aScratches : a - b;
+  return { ...match, timedOut: true, winner: difference > 0 ? 0 : difference < 0 ? 1 : null };
+}
+
+export function settlePoolTie(data: unknown, winner: Seat): Pool {
+  const match = data as Pool;
+  illegal(match.timedOut && match.winner === null, 'There is no pool tie to settle');
+  return { ...match, winner };
+}
+
 export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
-  start: () => ({ frames: [rackPool()], motion: [], turn: 0, solids: null, ballInHand: false, foul: false, winner: null,
-    ending: null, lastPocket: { solid: null, stripe: null } }),
-  turn: data => data.winner !== null || atLimit(data) ? null : data.turn,
+  start: settings => {
+    const side = settings.start?.side ?? DEFAULT_POOL_START.side;
+    const start: ResolvedPoolStart = { side: side === 'random' ? (randomInt(2) === 0 ? 'left' : 'right') : side,
+      percent: settings.start?.percent ?? DEFAULT_POOL_START.percent };
+    return { frames: [rackPool(start)], motion: [], turn: 0, solids: null, ballInHand: false, foul: false, winner: null, start,
+      ending: null, lastPocket: { solid: null, stripe: null }, ...(settings.ballBehavior ? { ballBehavior: settings.ballBehavior } : {}) };
+  },
+  turn: data => data.winner !== null || data.timedOut || atLimit(data) ? null : data.turn,
   apply(data, seat, move) {
     illegal(eightBall.turn(data) === seat, 'Not your turn');
     illegal(move.shot === data.frames.length - 1, 'That shot has already been played');
     const before = current(data);
+    const startArea = data.start ?? DEFAULT_POOL_START;
     const placement = move.cue;
-    illegal(!placement || (data.ballInHand && canPlacePoolCue(...placement, before)), 'The cue ball cannot be placed there');
+    illegal(!placement || (data.ballInHand && canPlacePoolCue(...placement, before, startArea)), 'The cue ball cannot be placed there');
     const start = placement ? before.map((ball): PoolFrame[number] => ball[0] === 0 ? [0, ...placement] : ball) : before;
-    const shot = shootPool(start, move.angle, move.power);
+    const shot = shootPool(start, move.angle, move.power, data.ballBehavior, move.spin);
     const opening = data.frames.length === 1;
     const own = groupFor(data, seat);
-    const onEight = !before.some(([id]) => own === null ? poolGroup(id) !== null : poolGroup(id) === own);
+    const legalTarget = poolLegalTarget(before, own, opening);
+    const onEight = legalTarget === 'eight';
     const target = targetPocket(data, seat);
     const hit = shot.firstHit;
     const scratch = shot.pocketed.some(({ id }) => id === 0);
-    const foul = scratch || hit === null || (!opening && (onEight ? hit !== 8 : hit === 8 || (own !== null && poolGroup(hit) !== own)));
+    const foul = scratch || hit === null || !isLegalPoolContact(legalTarget, hit);
     const eight = shot.pocketed.find(({ id }) => id === 8);
     const ending = eight && !opening ? (scratch ? 'scratch' : !onEight ? 'early' : foul ? 'foul'
       : target !== null && eight.pocket !== target ? 'wrong-pocket' : 'clean') : null;
@@ -71,14 +105,21 @@ export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
       if (sunk) lastPocket[sunk] = pocket;
     }
     let balls = shot.balls;
-    if (eight && opening) balls = spot(balls, 8);
-    if (foul && winner === null) balls = spot(balls.filter(([id]) => id !== 0), 0);
-    return { frames: [...data.frames, balls], motion: shot.motion, winner, ending, solids, foul, lastPocket,
+    if (eight && opening) balls = spot(balls, 8, startArea);
+    if (foul && winner === null) balls = spot(balls.filter(([id]) => id !== 0), 0, startArea);
+    const pots: [number, number] = [...(data.pots ?? [0, 0])];
+    const scratches: [number, number] = [...(data.scratches ?? [0, 0])];
+    if (!opening && !foul) pots[seat] += shot.pocketed.filter(({ id }) => poolGroup(id) !== null).length;
+    if (scratch) scratches[seat]++;
+    const potsBySeat: [number[], number[]] = [...(data.potsBySeat ?? [[], []])];
+    potsBySeat[seat] = [...new Set([...potsBySeat[seat], ...shot.pocketed.filter(({ id }) => id !== 0).map(({ id }) => id)])];
+    return { ...data, frames: [...data.frames, balls], motion: shot.motion, winner, ending, solids, foul, lastPocket, pots, scratches, potsBySeat,
       ballInHand: foul && winner === null, turn: keepTurn ? seat : other(seat) };
   },
-  outcome: data => data.winner === null ? (atLimit(data) ? { kind: 'draw' } : null) : { kind: 'win', seat: data.winner, reason: 'played' },
+  outcome: data => data.winner === null ? (data.timedOut || atLimit(data) ? { kind: 'draw' } : null) : { kind: 'win', seat: data.winner, reason: 'played' },
   board: data => ({ game: 'eight-ball', balls: current(data), motion: data.motion, solids: data.solids,
     ballInHand: data.ballInHand, foul: data.foul, shot: data.frames.length - 1,
+    start: data.start ?? DEFAULT_POOL_START, potsBySeat: data.potsBySeat ?? [[], []],
     eightPocket: eightBall.outcome(data) ? null : targetPocket(data, data.turn), ending: data.ending }),
   replay: data => ({ game: 'eight-ball', frames: data.frames }),
 };

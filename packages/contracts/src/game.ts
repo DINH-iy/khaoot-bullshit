@@ -4,6 +4,7 @@ import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from 
 import { GAME_LANGUAGES, PresentationSchema, ThemeSchema, AnimationChoiceSchema, TranslatedTextsSchema } from './presentation.js';
 import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames/shared/catalog.js';
 import { GraphPlaybackActionSchema, GraphPlaybackSchema } from './minigames/draw-the-graph/graph.js';
+import { PoolBallBehaviorSchema, PoolMatchSecondsSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
@@ -90,7 +91,9 @@ const hostEnvelope = { ...envelope, expectedRevision: RevisionSchema };
 export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('session.create'), expectedRevision: z.literal(0), gameVersionId: GameIdSchema, mode: z.enum(['LIVE', 'REHEARSAL']) }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('session.start') }).strict(),
-  z.object({ ...hostEnvelope, type: z.literal('minigame.tryout'), game: GameKeySchema }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('minigame.tryout'), game: GameKeySchema,
+    poolPlayers: z.union([z.tuple([GameIdSchema]), z.tuple([GameIdSchema, GameIdSchema])]).optional(),
+    poolSeconds: PoolMatchSecondsSchema.optional(), poolBallBehavior: PoolBallBehaviorSchema.optional(), poolStart: PoolStartSchema.optional() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('session.pause') }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('session.resume') }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('stage.close'), stageRunId: GameIdSchema }).strict(),
@@ -224,6 +227,8 @@ export const PublicRouteSchema = z.object({
 // (live, for everyone), the points at stake and, once decided, the winner.
 export const PublicDuelSchema = z.object({
   duelistIds: z.tuple([GameIdSchema, GameIdSchema]).nullable(), pick: z.enum(['random', 'host', 'teams']),
+  practicePlayerId: GameIdSchema.optional(),
+  poolTie: z.literal(true).optional(),
   teamIds: z.tuple([GameIdSchema, GameIdSchema]).optional(),
   bets: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(0) }).strict()),
   placesMilli: z.array(AwardMilliSchema), betMilli: AwardMilliSchema, winnerId: GameIdSchema.nullable(),

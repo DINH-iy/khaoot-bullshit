@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ArcadeActSchema, StartArcadeRoundSchema, isMinigameKey, type ArcadeAction } from '@party/contracts';
+import { ArcadeActSchema, StartArcadeRoundSchema, isArcadeGame, isHeadToHeadKey, isMinigameKey, type ArcadeAction } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient, ArcadeMember } from '../generated/prisma/client.js';
 import { contentHash, type GameDefinition } from '../game/definition.js';
@@ -8,12 +8,12 @@ import type { Transaction } from '../game/model.js';
 import type { createGameService } from '../game/service.js';
 import { readSessionView } from '../game/views.js';
 import { lockRoom, makeRoomCode, recordRoomChange, type Principal } from '../rooms/gateway.js';
-import { joinToken, roomAssert, tokenHash } from '../rooms/security.js';
+import { joinToken, newToken, roomAssert, tokenHash } from '../rooms/security.js';
 import { arcadeDefinition, arcadeRoundFits } from './definition.js';
 import { ensureLeader, lockLobby, present, QUIET_MS, type Lobbies } from './lobbies.js';
 import { recordResults, roundResults } from './results.js';
 
-// Rounds: each is an ordinary room with one minigame scene, hosted by the
+// Rounds: each is an ordinary room with one game scene, hosted by the
 // arcade's own creator. Every present member gets a seat (and a player key the
 // server keeps, handed out by `enter`) before the round starts, so nobody joins
 // late. The leader runs the round through `act`, which carries out the matching
@@ -65,26 +65,37 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
   async function end(roundId: string, now = new Date()) {
     const round = await client.arcadeRound.findUniqueOrThrow({ where: { id: roundId }, include: { session: { select: { hostId: true, status: true } }, seats: { include: { member: { select: { personId: true } } } } } });
     let rows: ReturnType<typeof roundResults> = [];
-    if (!round.endedAt && round.session.status !== 'FINISHED' && isMinigameKey(round.game)) {
+    if (!round.endedAt && round.session.status !== 'FINISHED' && isArcadeGame(round.game)) {
       const host = { role: 'host' as const, creatorId: round.session.hostId };
       try {
         let stage = (await readSessionView(client, host, round.sessionId)).stage;
-        if (stage?.status === 'ACTIVE' && !stage.teams?.forming && !stage.explain) { await hostStep(round.sessionId, round.session.hostId, 'stage.close', { stageRunId: stage.id }); stage = (await readSessionView(client, host, round.sessionId)).stage; }
-        if (stage?.status === 'CLOSED' && !stage.revealed) await hostStep(round.sessionId, round.session.hostId, 'stage.reveal', { stageRunId: stage.id });
+        if (isMinigameKey(round.game) && stage?.status === 'ACTIVE' && !stage.teams?.forming && !stage.explain) { await hostStep(round.sessionId, round.session.hostId, 'stage.close', { stageRunId: stage.id }); stage = (await readSessionView(client, host, round.sessionId)).stage; }
+        if (isMinigameKey(round.game) && stage?.status === 'CLOSED' && !stage.revealed) await hostStep(round.sessionId, round.session.hostId, 'stage.reveal', { stageRunId: stage.id });
         rows = roundResults(await readSessionView(client, host, round.sessionId), round.game, round.seats.map(seat => ({ memberId: seat.memberId, playerId: seat.playerId, personId: seat.member.personId })));
       } catch (error) { if (!(error instanceof GameError)) throw error; /* Ends without the results that could not be shown. */ }
     }
     await client.$transaction(async tx => {
       await lockLobby(tx, round.lobbyId);
       const ended = await tx.arcadeRound.updateMany({ where: { id: round.id, endedAt: null }, data: { endedAt: now } });
-      if (ended.count && isMinigameKey(round.game)) await recordResults(tx, round.id, round.game, rows);
+      if (ended.count && isArcadeGame(round.game)) await recordResults(tx, round.id, round.game, rows);
       await finishRoom(tx, round.sessionId, now);
     });
   }
 
+  async function leaderRound(principal: Principal, now: Date) {
+    roomAssert(principal.actor.role === 'player', 'FORBIDDEN');
+    const round = await client.arcadeRound.findUnique({ where: { sessionId: principal.sessionId }, include: { session: { select: { hostId: true } } } });
+    roomAssert(round && !round.endedAt, 'ROOM_NOT_AVAILABLE');
+    const seat = await client.arcadeSeat.findUnique({ where: { playerId: principal.actor.playerId }, include: { member: true } });
+    roomAssert(seat && seat.roundId === round.id && !seat.member.leftAt, 'FORBIDDEN');
+    await lobbies.touch(seat.member, now);
+    roomAssert(await client.$transaction(async tx => { await lockLobby(tx, round.lobbyId); return ensureLeader(tx, round.lobbyId, now); }) === seat.memberId, 'FORBIDDEN');
+    return round;
+  }
+
   return {
     end,
-    /** The leader starts a round of a minigame for everyone present. A retry with the same round id is the same round. */
+    /** The leader starts a round for everyone present. A retry with the same round id is the same round. */
     async start(member: ArcadeMember, input: unknown, now = new Date()) {
       const parsed = StartArcadeRoundSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE'); const secret = config.ROOM_TOKEN_SECRET;
@@ -98,7 +109,7 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
         roomAssert(await ensureLeader(tx, lobbyId, now) === member.id, 'FORBIDDEN');
         roomAssert(await tx.arcadeRound.count({ where: { lobbyId, endedAt: null } }) === 0, 'ROUND_ON');
         const players = (await tx.arcadeMember.findMany({ where: { lobbyId, leftAt: null }, orderBy: { joinedAt: 'asc' } })).filter(entry => present(entry, now) || entry.id === member.id);
-        roomAssert(players.length >= (teams?.count ?? 1), 'NOT_ENOUGH_PLAYERS');
+        roomAssert(players.length >= (teams?.count ?? (isHeadToHeadKey(game) ? 2 : 1)), 'NOT_ENOUGH_PLAYERS');
         return players;
       };
       await client.$transaction(async tx => { await lockLobby(tx, lobbyId); await check(tx); });
@@ -134,16 +145,22 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
       roomAssert(credential && !credential.revokedAt && credential.expiresAt.getTime() > Date.now(), 'ROOM_NOT_AVAILABLE');
       return { sessionId: round.sessionId, token, expiresAt: credential.expiresAt };
     },
+    /** A display-only credential for the leader to share with another screen. */
+    async display(principal: Principal, now = new Date()) {
+      const round = await leaderRound(principal, now);
+      const token = newToken();
+      await client.$transaction(async tx => {
+        await lockRoom(tx, round.sessionId);
+        const session = await tx.gameSession.findUniqueOrThrow({ where: { id: round.sessionId }, select: { status: true } });
+        roomAssert(session.status !== 'FINISHED', 'ROOM_NOT_AVAILABLE');
+        await tx.roomCredential.create({ data: { sessionId: round.sessionId, role: 'DISPLAY', source: 'LOCAL_REHEARSAL', tokenHash: tokenHash(token), expiresAt: principal.expiresAt } });
+      });
+      return { token };
+    },
     /** The leader's step in a round's room, taken as the room's host. */
     async act(principal: Principal, input: unknown, now = new Date()) {
       const parsed = ArcadeActSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
-      roomAssert(principal.actor.role === 'player', 'FORBIDDEN');
-      const round = await client.arcadeRound.findUnique({ where: { sessionId: principal.sessionId }, include: { session: { select: { hostId: true } } } });
-      roomAssert(round && !round.endedAt, 'ROOM_NOT_AVAILABLE');
-      const seat = await client.arcadeSeat.findUnique({ where: { playerId: principal.actor.playerId }, include: { member: true } });
-      roomAssert(seat && seat.roundId === round.id && !seat.member.leftAt, 'FORBIDDEN');
-      await lobbies.touch(seat.member, now);
-      roomAssert(await client.$transaction(async tx => { await lockLobby(tx, round.lobbyId); return ensureLeader(tx, round.lobbyId, now); }) === seat.memberId, 'FORBIDDEN');
+      const round = await leaderRound(principal, now);
       const { action, stageRunId } = parsed.data;
       if (action === 'end') { await end(round.id, now); return; }
       const view = await readSessionView(client, { role: 'host', creatorId: round.session.hostId }, round.sessionId);

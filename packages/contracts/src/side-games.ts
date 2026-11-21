@@ -113,7 +113,7 @@ export function playerNeeded(view: SessionView, selfId: string | null): boolean 
   const stage = view.stage;
   if (view.status !== 'RUNNING' || !stage || !selfId) return false;
   if (stage.kind === 'duel' && stage.duel?.contest.kind === 'game' && stage.duel.contest.game === 'eight-ball'
-    && stage.status === 'CLOSED' && !stage.revealed) return stage.duel.duelistIds?.includes(selfId) ?? false;
+    && stage.status === 'CLOSED' && !stage.revealed) return stage.duel.practicePlayerId === selfId || (stage.duel.duelistIds?.includes(selfId) ?? false);
   if (stage.status !== 'ACTIVE') return false;
   if (stage.kind === 'info' || stage.kind === 'scoreboard') return false;
   if (stage.teams?.forming) return stage.teams.formation === 'players';

@@ -4,6 +4,7 @@ import { defineTexts } from '../../i18n/texts.js';
 export const CONTROLS_TEXTS = defineTexts('editor-controls', {
   all: 'All', other: 'Other', sorts: 'Sorts', chosen: 'Chosen', cancel: 'Cancel', keep: 'Keep', choose: 'Choose…', addColour: 'Add a colour',
   prefabs: 'Prefabs', withPrefabs: '{label} · Prefabs', sceneSorts: 'Sorts of scenes', prefabsFailed: 'The prefabs could not be loaded. Try again.', prefabFailed: '“{name}” could not be loaded. Try again.',
+  previousPage: 'Previous', nextPage: 'Next', pageCount: '{page} / {total}',
   minigameSorts: 'Minigame categories', back: 'Back',
   deletePrefabAsk: 'Delete the prefab “{name}”? Games it was inserted into keep their scenes.', deleteFailed: 'Deleting did not work. Try again.', loadingPrefabs: 'Loading prefabs…',
   noPrefabs: 'No prefabs yet. Select one or more scenes and press **Save as prefab**; they appear here for every game.', sceneOne: '1 scene', sceneMany: '{count} scenes', deletePrefab: 'Delete prefab {name}',
@@ -14,6 +15,7 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
   nl: {
     all: 'Alles', other: 'Overig', sorts: 'Soorten', chosen: 'Gekozen', cancel: 'Annuleren', keep: 'Laten staan', choose: 'Kies…', addColour: 'Een kleur toevoegen',
     prefabs: 'Prefabs', withPrefabs: '{label} · Prefabs', sceneSorts: 'Soorten scènes', prefabsFailed: 'De prefabs konden niet geladen worden. Probeer het opnieuw.', prefabFailed: '“{name}” kon niet geladen worden. Probeer het opnieuw.',
+    previousPage: 'Vorige', nextPage: 'Volgende', pageCount: '{page} / {total}',
     minigameSorts: 'Minigamecategorieën', back: 'Terug',
     deletePrefabAsk: 'De prefab “{name}” verwijderen? Spellen waarin hij is ingevoegd houden hun scènes.', deleteFailed: 'Verwijderen lukte niet. Probeer het opnieuw.', loadingPrefabs: 'Prefabs laden…',
     noPrefabs: 'Nog geen prefabs. Kies een of meer scènes en druk op **Opslaan als prefab**; ze verschijnen hier voor elk spel.', sceneOne: '1 scène', sceneMany: '{count} scènes', deletePrefab: 'Prefab {name} verwijderen',
@@ -24,6 +26,7 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
   de: {
     all: 'Alle', other: 'Sonstige', sorts: 'Arten', chosen: 'Gewählt', cancel: 'Abbrechen', keep: 'Behalten', choose: 'Wählen…', addColour: 'Eine Farbe hinzufügen',
     prefabs: 'Vorlagen', withPrefabs: '{label} · Vorlagen', sceneSorts: 'Arten von Szenen', prefabsFailed: 'Die Vorlagen konnten nicht geladen werden. Versuche es erneut.', prefabFailed: '„{name}“ konnte nicht geladen werden. Versuche es erneut.',
+    previousPage: 'Zurück', nextPage: 'Weiter', pageCount: '{page} / {total}',
     minigameSorts: 'Minispiel-Kategorien', back: 'Zurück',
     deletePrefabAsk: 'Die Vorlage „{name}“ löschen? Spiele, in die sie eingefügt wurde, behalten ihre Szenen.', deleteFailed: 'Löschen hat nicht geklappt. Versuche es erneut.', loadingPrefabs: 'Vorlagen werden geladen…',
     noPrefabs: 'Noch keine Vorlagen. Wähle eine oder mehrere Szenen und drücke **Als Vorlage speichern**; sie erscheinen hier für jedes Spiel.', sceneOne: '1 Szene', sceneMany: '{count} Szenen', deletePrefab: 'Vorlage {name} löschen',
@@ -34,6 +37,7 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
   ro: {
     all: 'Toate', other: 'Altele', sorts: 'Tipuri', chosen: 'Ales', cancel: 'Anulează', keep: 'Păstrează', choose: 'Alege…', addColour: 'Adaugă o culoare',
     prefabs: 'Prefabricate', withPrefabs: '{label} · Prefabricate', sceneSorts: 'Tipuri de scene', prefabsFailed: 'Prefabricatele nu au putut fi încărcate. Încearcă din nou.', prefabFailed: '„{name}” nu a putut fi încărcat. Încearcă din nou.',
+    previousPage: 'Înapoi', nextPage: 'Înainte', pageCount: '{page} / {total}',
     minigameSorts: 'Categorii de minijocuri', back: 'Înapoi',
     deletePrefabAsk: 'Ștergi prefabricatul „{name}”? Jocurile în care a fost inserat își păstrează scenele.', deleteFailed: 'Ștergerea nu a mers. Încearcă din nou.', loadingPrefabs: 'Se încarcă prefabricatele…',
     noPrefabs: 'Încă niciun prefabricat. Alege una sau mai multe scene și apasă **Salvează ca prefabricat**; apar aici pentru fiecare joc.', sceneOne: '1 scenă', sceneMany: '{count} scene', deletePrefab: 'Șterge prefabricatul {name}',

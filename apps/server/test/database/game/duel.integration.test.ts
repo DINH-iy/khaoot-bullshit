@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { parseDefinition } from '../../../src/game/definition.js';
+import { createGameService } from '../../../src/game/service.js';
+import { closeExpiredStages } from '../../../src/game/timing.js';
 import { readSessionView } from '../../../src/game/views.js';
 import { db, fixture, hostCommand, prisma, service } from '../game-fixture.js';
 
@@ -52,6 +54,49 @@ describe('a duel the host decides', () => {
 describe('hosted 8-ball pool', () => {
   const contest = { kind: 'game', game: 'eight-ball' };
   const shoot = { game: 'eight-ball', angle: 0, power: 100, shot: 0 };
+
+  it('starts the match clock after betting, freezes it on pause and lets the host settle an expired tie once', async () => {
+    const f = await fixture(3, duelGame({ pick: 'host', contest, durationMs: 30_000, matchSeconds: 12 }));
+    await prisma.gameSession.update({ where: { id: f.sessionId }, data: { state: { autoClose: false } } });
+    const startTime = Date.now();
+    let clockMs = startTime;
+    const clock = () => new Date(clockMs);
+    const timed = createGameService(prisma, undefined, clock);
+    const command = async (who: typeof f.host | ReturnType<typeof actor>, type: string, extra: object = {}) => {
+      const revision = who.role === 'host' ? (await prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } })).revision : undefined;
+      return timed.execute(who, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type, ...extra,
+        ...(revision === undefined ? {} : { expectedRevision: revision }) });
+    };
+    const stageRunId = (await command(f.host, 'session.start')).stageRunId!;
+    const [a, b] = f.players.map(entry => entry.id);
+    await command(f.host, 'duel.pick', { stageRunId, playerIds: [a, b] });
+    await command(actor(f, 2), 'submission.submit', { stageRunId, value: { kind: 'bet', playerId: b } });
+    clockMs += 5000;
+    const view = async () => (await readSessionView(prisma, f.host, f.sessionId)).stage!;
+    expect((await view()).deadlineAt).toBe(new Date(startTime + 30_000).toISOString());
+    await command(f.host, 'stage.close', { stageRunId });
+    expect((await view()).deadlineAt).toBe(new Date(startTime + 17_000).toISOString());
+    await expect(command(f.host, 'duel.decide', { stageRunId, winnerId: b })).rejects.toThrow('INVALID_STATE');
+
+    clockMs += 2000;
+    await command(f.host, 'session.pause');
+    expect(await view()).toMatchObject({ pausedRemainingMs: 10_000, deadlineAt: null });
+    clockMs += 30_000;
+    await closeExpiredStages(prisma, timed, clock);
+    await command(f.host, 'session.resume');
+    const resumedDeadline = clockMs + 10_000;
+    expect((await view()).deadlineAt).toBe(new Date(resumedDeadline).toISOString());
+
+    clockMs = resumedDeadline;
+    await expect(command(actor(f, 0), 'duel.move', { stageRunId, move: shoot })).rejects.toThrow('TOO_LATE');
+    clockMs += 300;
+    await closeExpiredStages(prisma, timed, clock);
+    expect(await view()).toMatchObject({ deadlineAt: null, revealed: false, duel: { poolTie: true, winnerId: null } });
+    expect(await totals(f)).toEqual(['0', '0', '0']);
+    await command(f.host, 'duel.decide', { stageRunId, winnerId: b });
+    await expect(command(f.host, 'duel.decide', { stageRunId, winnerId: a })).rejects.toThrow('INVALID_STATE');
+    expect(await totals(f)).toEqual(['0', '10000', '1000']);
+  });
 
   it.each(['random', 'host'])('leaves the winner prediction to spectators, then pays the winner and correct picks (%s pair)', async pick => {
     const f = await fixture(4, duelGame({ pick, contest }));

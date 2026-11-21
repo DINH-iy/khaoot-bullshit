@@ -883,7 +883,7 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   expect(await surface.evaluate(element => (element as HTMLElement).style.transform)).not.toBe(before);
 
   // Rehearse from the start: a practice room opens in a new tab, and nothing is published.
-  const [practice] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the start' }).click(); })()]);
+  const [practice] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Rehearse', exact: true }).click(); await page.getByRole('dialog', { name: 'Rehearse' }).getByRole('button', { name: 'Rehearse from the start' }).click(); })()]);
   await expect(practice.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await expect(practice.getByText(/^Copy source \d+ · waiting to start$/)).toBeVisible();
   await practice.close();
@@ -892,7 +892,7 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   await card(page, /Shared finale/).locator('.card-title').click();
   await page.getByRole('button', { name: 'Close' }).click().catch(() => undefined);
   await card(page, /Shared finale/).locator('.card-title').click();
-  const [fromFinale] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Rehearse from the selected scene' }).click(); })()]);
+  const [fromFinale] = await Promise.all([context.waitForEvent('page'), (async () => { await page.getByRole('button', { name: 'Play & publish' }).click(); await page.getByRole('menuitem', { name: 'Rehearse', exact: true }).click(); await page.getByRole('dialog', { name: 'Rehearse' }).getByRole('button', { name: 'Rehearse from the selected scene' }).click(); })()]);
   await expect(fromFinale.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ })).toBeVisible();
   await fromFinale.getByRole('button', { name: 'Start the game' }).click();
   await expect(fromFinale.getByRole('heading', { name: /^Shared finale/ })).toBeVisible();

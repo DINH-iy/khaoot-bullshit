@@ -1,3 +1,4 @@
+import { gameName } from '../presentation/catalog.text.js';
 import { useEffect, useState } from 'react';
 import { navigate } from '../navigation.js';
 import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ArcadeLeaderboardSchema, ArcadeListSchema, MINIGAMES, type ArcadeLeaderboard, type ArcadeList } from '@party/contracts';
@@ -61,7 +62,7 @@ export function ArcadeHome() {
         {!list ? <p role="status">Loading…</p> : !list.lobbies.length ? <p>No open lobbies right now. Open one!</p>
           : <ul className="arcade-lobbies">{list.lobbies.map(lobby => <li key={lobby.id}>
             <div><strong>{lobby.title}</strong>
-              <p className="arcade-meta">{lobby.players} {lobby.players === 1 ? 'player' : 'players'}{lobby.leaderName ? ` · led by ${lobby.leaderName}` : ''}{lobby.playing ? ` · playing ${MINIGAMES[lobby.playing].name}` : ''}{lobby.locked ? ' · locked' : lobby.protected ? ' · password required' : ''}</p></div>
+              <p className="arcade-meta">{lobby.players} {lobby.players === 1 ? 'player' : 'players'}{lobby.leaderName ? ` · led by ${lobby.leaderName}` : ''}{lobby.playing ? ` · playing ${gameName(lobby.playing)}` : ''}{lobby.locked ? ' · locked' : lobby.protected ? ' · password required' : ''}</p></div>
             <button type="button" className={lobby.member ? 'primary' : undefined} disabled={lobby.locked && !lobby.member} onClick={() => openLobby(lobby.id)}>{lobby.member ? 'Back in' : lobby.locked ? 'Locked' : 'Join'}</button>
           </li>)}</ul>}
       </section>

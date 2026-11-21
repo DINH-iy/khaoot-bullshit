@@ -1,4 +1,4 @@
-import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
+import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, isSharedPrediction, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
@@ -90,7 +90,7 @@ const stageSchema = z.discriminatedUnion('kind', [
   // loser (left out: 10 points for the winner). `betMilli`: for every right bet. The timer is the
   // voting time. Pool can use representatives from two existing teams and skip voting.
   z.object({ ...look, key: GameKeySchema, kind: z.literal('duel'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
-    pick: z.enum(['random', 'host', 'teams']), places: PlacesSchema.optional(), betMilli: AwardMilliSchema,
+    pick: z.enum(['random', 'host', 'teams']), places: PlacesSchema.optional(), betMilli: AwardMilliSchema, matchSeconds: PoolMatchSecondsSchema.optional(),
     // How it is won (left out: the host names the winner). `game`: a head-to-head game on the two phones, with its settings.
     contest: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('host') }).strict(),
@@ -185,6 +185,7 @@ export const GameDefinitionSchema = z.object({
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'duel' && stage.contest?.kind === 'game' && !parseHeadToHeadSettings(stage.contest.game, stage.contest.settings)) ctx.addIssue({ code: 'custom', message: 'Duel game settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'duel' && stage.pick === 'teams' && (stage.contest?.kind !== 'game' || stage.contest.game !== 'eight-ball')) ctx.addIssue({ code: 'custom', message: 'Team representatives are available for 8-ball pool', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'duel' && stage.matchSeconds !== undefined && (stage.contest?.kind !== 'game' || stage.contest.game !== 'eight-ball')) ctx.addIssue({ code: 'custom', message: 'The match clock is available for 8-ball pool', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'matchSeconds'] });
       if (stage.kind === 'minigame' && stage.places && stage.placementMilli) ctx.addIssue({ code: 'custom', message: 'Give the minigame either points per place or places, not both', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && stage.game === 'clap-beat' && stage.durationMs !== null && stage.durationMs < CLAP_END_MS) {
         ctx.addIssue({ code: 'custom', message: 'Clap the beat needs at least 9 seconds', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'durationMs'] });

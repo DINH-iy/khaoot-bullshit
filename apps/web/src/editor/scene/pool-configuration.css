@@ -1,0 +1,20 @@
+.pool-configuration-launch { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.editor .pool-configuration-launch > button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 0; min-height: 44px; padding: 6px 8px; font-size: .875rem;
+}
+.editor .pool-configuration-launch > .pool-configure {
+  color: var(--e-text); background: var(--e-accent-soft); border-color: var(--e-accent);
+}
+.pool-configure svg { flex: none; }
+.pool-configuration-launch button:focus-visible { outline: 2px solid var(--e-accent); outline-offset: 2px; }
+.pool-configuration { width: min(560px, calc(100% - 24px)); }
+.pool-configuration > .configuration-window { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.pool-configuration-tabs { margin: 12px 20px 0; }
+.pool-configuration-tabs button { flex: 1; }
+.pool-config-table {
+  display: block; width: min(100%, 380px); height: auto; margin-inline: auto;
+  border: 5px solid #604638; border-radius: 12px; box-sizing: border-box;
+}
+.pool-configuration .ed-unit { max-width: 55%; }
+.pool-configuration .ed-unit input { min-width: 0; width: 6rem; }

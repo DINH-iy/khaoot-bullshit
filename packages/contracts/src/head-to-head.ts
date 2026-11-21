@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { POOL_MAX_SHOTS, PoolBoardSchema, PoolFrameSchema, PoolShotSchema } from './minigames/eight-ball/pool.js';
+import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolShotSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
 
 /**
  * Head-to-head games: two players, one board. Used by the duel scene (the two
@@ -27,7 +27,7 @@ const SETTINGS = {
   rps: z.object({ firstTo: z.number().int().min(1).max(5) }).strict(),
   tictactoe: z.object({}).strict(),
   chess: z.object({}).strict(),
-  'eight-ball': z.object({}).strict(),
+  'eight-ball': z.object({ ballBehavior: PoolBallBehaviorSchema.optional(), start: PoolStartSchema.optional() }).strict(),
   'creature-duel': z.object({ size: z.union([z.literal(1), z.literal(3)]) }).strict(),
 } satisfies Record<HeadToHeadKey, z.ZodType>;
 export type HeadToHeadSettings<K extends HeadToHeadKey = HeadToHeadKey> = z.infer<typeof SETTINGS[K]>;

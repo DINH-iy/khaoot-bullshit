@@ -179,7 +179,7 @@ test('editor practice plays a draft quiz and minigame without opening a room', a
   await practice.getByRole('button', { name: 'Close', exact: true }).click();
 
   await page.getByRole('button', { name: 'Minigame Pick a prize', exact: true }).click();
-  const tryMinigame = page.getByRole('button', { name: 'Try minigame', exact: true });
+  const tryMinigame = page.getByRole('button', { name: 'Try this scene', exact: true });
   await tryMinigame.click();
   await expect(practice.locator('.phone-screen')).toBeVisible();
   await practice.getByRole('button', { name: 'Start practice' }).click();

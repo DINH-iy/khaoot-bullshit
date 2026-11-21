@@ -10,7 +10,7 @@ import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
 import { Section } from '../controls/section.js';
-import { isWheelScene, addScene, cardText, connect, deleteScene, freeSpot, isRoute, newStage, optionsOf, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
+import { isWheelScene, addScene, COLUMN_STEP, cardText, connect, deleteScene, freeSpot, insertTeamsBefore, isRoute, newStage, optionsOf, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
 import { ScenePreview, ScenePreviewDialog } from './scene-preview.js';
@@ -95,6 +95,14 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
     const stage = { ...newStage(type, definition, variant), key: uniqueKey('part', current.stages.map(entry => entry.key)) };
     change({ ...definition, nodes: definition.nodes.map(node => node.key === current.key ? { ...node, stages: [...node.stages, stage] } : node) });
     setPart(current.stages.length); setAdding(null);
+  };
+  const addTeamSetup = (configured: Node['stages'][number]) => {
+    const added = insertTeamsBefore(updateStage(definition, current.key, index, () => configured), current.key);
+    const before = positions[current.key] ?? { x: 0, y: 0 };
+    const point = freeSpot(added.definition, positions, added.key, { x: before.x - COLUMN_STEP, y: before.y });
+    change(added.definition, { ...positions, [added.key]: point });
+    setSelected([added.key]);
+    setPart(0);
   };
   const movePart = (from: number, to: number) => {
     const stages = [...current.stages]; const [moved] = stages.splice(from, 1); stages.splice(to, 0, moved!);
@@ -185,7 +193,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
             onClick={() => setCanvasDevice(device)}>{t(device)}</button>)}
         </div>
       </div>
-      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice} onTry={tryScene}
+      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice}
         canvas={canvasDevice === 'sharedScreen' ? {
           readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
         } : undefined} />
@@ -212,7 +220,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
           <p className="hint">{t('partsHint')}</p>
         </Section>}
         {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
-        <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
+        <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange}
+          addTeams={addTeamSetup} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
       </div>
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
       {confirming && <ConfirmDialog title={t('deleteAsk', { title: cardText(definition, current).title })} text={t('deleteText')} confirm={t('deleteConfirm')}

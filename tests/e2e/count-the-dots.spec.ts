@@ -28,6 +28,35 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
   await expect(configuration.getByLabel('Reveal easing')).toHaveValue('ease-in');
   await configuration.getByRole('button', { name: 'Change minigame…' }).click();
   const picker = configuration.getByRole('dialog', { name: 'Choose the minigame' });
+  const pickerViewport = host.viewportSize()!;
+  await host.setViewportSize({ width: 1024, height: 600 });
+  await picker.getByRole('button', { name: 'Precision', exact: true }).click();
+  const selected = picker.getByRole('button', { name: /^Count the Dots Chosen/ });
+  await expect(selected).toHaveAttribute('aria-pressed', 'true');
+  expect(await selected.locator('small').evaluate(description => {
+    const foreground = getComputedStyle(description).color;
+    return foreground === getComputedStyle(description.closest('button')!).color;
+  })).toBe(true);
+
+  await picker.getByRole('button', { name: 'All', exact: true }).click();
+  for (const viewport of [{ width: 320, height: 568 }, { width: 667, height: 375 }]) {
+    await host.setViewportSize(viewport);
+    const header = picker.locator('.choice-header');
+    const firstCard = picker.locator('.choice-card').first();
+    const footer = picker.locator('.choice-footer');
+    await expect(firstCard).toBeInViewport({ ratio: 1 });
+    await expect(picker.getByRole('button', { name: 'Cancel' })).toBeInViewport({ ratio: 1 });
+    const [top, card, bottom] = await Promise.all([header.boundingBox(), firstCard.boundingBox(), footer.boundingBox()]);
+    expect(card!.y).toBeGreaterThanOrEqual(top!.y + top!.height);
+    expect(bottom!.y).toBeGreaterThanOrEqual(card!.y + card!.height);
+    const page = await footer.getByRole('status').textContent();
+    await footer.getByRole('button', { name: 'Next' }).click();
+    await expect(footer.getByRole('status')).not.toHaveText(page!);
+    await footer.getByRole('button', { name: 'Previous' }).click();
+    await expect(footer.getByRole('status')).toHaveText(page!);
+  }
+  await host.setViewportSize(pickerViewport);
+  await picker.getByRole('button', { name: 'Speed', exact: true }).click();
   await picker.getByRole('button', { name: /^Speed run/ }).click();
   await configuration.getByRole('button', { name: 'Customize course' }).click();
   const tile = configuration.locator('.phone-screen .speed-run-board > span').nth(4);
@@ -46,7 +75,9 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
   await configure.click();
   await configuration.getByLabel('Reveal easing').selectOption('ease-in-out');
   await expect(host.getByLabel('Dot viewing time')).toHaveValue('6');
+  await configuration.getByRole('button', { name: 'Text & timing' }).click();
   await expect(host.getByLabel('Guessing time')).toHaveValue('12');
+  await configuration.getByRole('button', { name: 'Settings', exact: true }).click();
   await host.getByRole('group', { name: 'Dot count' }).getByRole('button', { name: 'Exact' }).click();
   await host.getByRole('spinbutton', { name: 'Dot count' }).fill('14');
   await host.getByRole('checkbox', { name: 'Allow slight overlap' }).check();
@@ -56,7 +87,7 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
     viewSeconds: 6, count: { mode: 'exact', value: 14 }, allowOverlap: true, revealEasing: 'ease-in-out',
   });
   const saved = await readDraft();
-  await host.getByRole('button', { name: 'Try minigame' }).click();
+  await host.getByRole('button', { name: 'Try this scene' }).click();
   const practice = host.getByRole('dialog', { name: 'Preview' });
   await practice.getByRole('button', { name: 'Start practice' }).click();
   const practiceBoard = practice.locator('.tv-screen').getByRole('img', { name: 'Dot pattern' });

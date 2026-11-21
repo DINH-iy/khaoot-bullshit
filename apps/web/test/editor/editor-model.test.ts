@@ -1,13 +1,33 @@
 import { replaceScene } from '../../src/editor/scene/replace-scene.js';
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routeSegments, routedPath, withBends, duplicateScenes, pasteScenes, addScene, SCENE_TYPES, addConnectedScene, autoLayout, CARD_WIDTH, COLUMN_STEP, cardHeight, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
+import { lineUp, straightenAll, bendKey, bendsOf, isBendKey, pointOnRoute, routeSegments, routedPath, withBends, duplicateScenes, pasteScenes, addScene, SCENE_TYPES, SCENE_VARIANTS, addConnectedScene, autoLayout, CARD_WIDTH, COLUMN_STEP, cardHeight, connect, connectProblem, deleteScene, freeSpot, GRID, inputPort, outputPort, PORT_Y, quizKind, SCENE_GROUPS, setRouteOptions, snapCard, withDuelContest, withMinigame, withQuizKind, type Definition, type Stage } from '../../src/editor/model.js';
 import { toDoc } from '../../src/editor/live/document.js';
+import { insertTeamsBefore } from '../../src/editor/model.js';
 
 const scene = (key: string) => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] });
 const choice = (key: string) => ({ key, stages: [{ key: 'main', kind: 'route', prompt: 'Which way?', durationMs: null, options: [{ key: 'left', label: 'Left' }, { key: 'right', label: 'Right' }], decide: { method: 'host' } }] });
 const game = (): Definition => ({ formatVersion: 2, title: 'T', startNodeKey: 'a', nodes: [scene('a'), choice('b'), scene('c'), scene('d')],
   edges: [{ key: 'ab', from: 'a', to: 'b' }, { key: 'bc', from: 'b', to: 'c', option: 'left' }] });
+
+it('offers 8-ball only as a head-to-head scene and authors a pool duel', () => {
+  expect(SCENE_VARIANTS.minigame?.some(variant => variant.key === 'eight-ball')).toBe(false);
+  expect(SCENE_VARIANTS.duel?.filter(variant => variant.key === 'eight-ball')).toHaveLength(1);
+  expect(addScene(game(), 'duel', 'eight-ball').definition.nodes.at(-1)?.stages[0]).toMatchObject({
+    kind: 'duel', contest: { kind: 'game', game: 'eight-ball' },
+  });
+});
+
+it('inserts Pick teams before a route rejoin while keeping both choice options', () => {
+  const definition = game();
+  definition.edges.push({ key: 'b-right', from: 'b', to: 'c', option: 'right' });
+  const { key, definition: next } = insertTeamsBefore(definition, 'c');
+  expect(next.edges.filter(edge => edge.from === 'b')).toEqual([
+    { key: 'bc', from: 'b', to: key, option: 'left' }, { key: 'b-right', from: 'b', to: key, option: 'right' },
+  ]);
+  expect(next.edges.find(edge => edge.from === key)?.to).toBe('c');
+  expect(next.startNodeKey).toBe('a');
+});
 
 describe('replacing a scene type', () => {
   it('keeps the selected node, start, and edges and prevents accidental route loss', () => {
