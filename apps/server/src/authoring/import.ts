@@ -120,7 +120,8 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const wanted = text(raw['game']).toLowerCase().trim().replace(/\s+/g, '-');
       const game = HEAD_TO_HEAD_KEYS.find(entry => entry === wanted || HEAD_TO_HEAD_GAMES[entry].name.toLowerCase().replace(/\s+/g, '-') === wanted);
       const points = raw['places'] !== undefined ? placesFrom(raw) : raw['points'] !== undefined ? { places: { kind: 'list', pointsMilli: [milli(raw['points']) ?? '10000'] } } : {};
-      return { key, kind: 'duel', prompt, durationMs: durationMs ?? 30_000, pick: text(raw['pick']) === 'host' ? 'host' : 'random', betMilli: milli(raw['betPoints'] ?? 1) ?? '1000', ...points,
+      const pick = ['host', 'teams'].includes(text(raw['pick'])) ? text(raw['pick']) : 'random';
+      return { key, kind: 'duel', prompt, durationMs: durationMs ?? 30_000, pick, betMilli: milli(raw['betPoints'] ?? 1) ?? '1000', ...points,
         ...(game ? { contest: { kind: 'game', game, ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}) } } : {}) };
     }
     case 'challenge': return { key, kind: 'challenge', prompt, durationMs, maxAwardMilli: milli(raw['maxPoints'] ?? raw['points'] ?? 10) ?? '10000', ...placesFrom(raw), ...play };

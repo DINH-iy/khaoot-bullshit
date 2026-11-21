@@ -25,3 +25,20 @@
   .bench-phones:is([data-count="3"], [data-count="4"]) { --phone-height: 660px; }
 }
 .bench .fa-icon { width: 1em; height: 1em; display: block; }
+.bench .bench-mode, .bench-tryout button {
+  min-height: 38px; padding: 0 12px; border: 1px solid #50496a; border-radius: 8px; background: #29263b; color: inherit; font-weight: 700;
+}
+.bench-tryout { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding: 9px 16px; background: #1d1b29; border-bottom: 1px solid #39354b; }
+.bench-tryout label { display: grid; gap: 3px; font-size: .8rem; font-weight: 700; }
+.bench-tryout select { min-height: 38px; max-width: 100%; padding: 4px 9px; border-radius: 8px; border: 1px solid #50496a; background: #151320; color: inherit; }
+.bench-tryout .bench-play { background: #c8b8fa; border-color: #c8b8fa; color: #201637; }
+.bench-tryout :disabled { opacity: .5; }
+.bench-tryout-status { align-self: center; font-size: .85rem; color: #c0bad2; }
+.bench-tryout-status span { display: block; }
+.bench-tryout-error { color: #ffb5bb; margin: 0; align-self: center; }
+.bench-tryout-recovery { display: flex; flex-wrap: wrap; gap: 6px; }
+.bench .bench-back { color: #d4c7fc; }
+@media (max-width: 900px) {
+  .bench-tryout { position: sticky; top: 0; z-index: 2; }
+  .bench-tryout label { min-width: 0; }
+}

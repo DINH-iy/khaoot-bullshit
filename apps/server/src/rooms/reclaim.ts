@@ -48,6 +48,8 @@ export const RoomStateSchema = z.object({
   // Phones on the test bench (several in one browser, rooms/test-seats.ts) may join only when the host allows it;
   // opening the test bench switches it on.
   testBench: z.boolean().default(false),
+  // Set only by the authenticated local rehearsal launcher.
+  tryout: z.boolean().default(false),
   expected: z.array(GameIdSchema).max(100).default([]),
   nameRequests: z.array(z.object({ id: GameIdSchema, personId: GameIdSchema, status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'USED']), requestedAt: z.string().datetime() }).strict()).max(50).default([]),
 }).strict();

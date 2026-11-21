@@ -3,3 +3,5 @@
 .reaction-cue { display: grid; gap: 8px; text-align: center; line-height: 1.1; }
 .reaction-cue small { font-size: clamp(.95rem, 4vw, 1.2rem); font-weight: 650; }
 .mg-done.reaction-early .mg-big { color: var(--r-bad); font-size: clamp(2rem, 9vw, 4rem); }
+
+.room-player .mg-done.reaction-early .mg-big { font-size: clamp(1.125rem, 5vw, 1.5rem); }

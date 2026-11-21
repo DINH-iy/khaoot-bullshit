@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { COIN_SIDES, CoinSideSchema } from '../heads-or-tails/coin.js';
 import { ROULETTE_PICKS, RoulettePocketSchema } from '../red-or-black-roulette/roulette.js';
-import { DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, DotGuessSchema, DotPatternSchema } from '../count-the-dots/dot-pattern.js';
+import { DotGuessSchema, DotPatternSchema, DotSettingsSchema } from '../count-the-dots/dot-pattern.js';
 import { GraphHueSchema, GraphLineSchema, GraphRoundViewSchema, GraphSettingsSchema, GraphDataSchema } from '../draw-the-graph/graph.js';
+import { CutSettingsSchema, CutTargetSchema } from '../cut-the-line/target.js';
 import { COURSE_HEIGHT, COURSE_WIDTH, raceCourseHasRoute } from '../speed-run/course.js';
 
 const Milli = z.string().regex(/^(0|[1-9][0-9]{0,11})$/);
@@ -32,9 +33,9 @@ export const MinigameSettingsSchemas = {
   'lucky-doors': z.object({ doorsMilli: z.array(Milli).min(2).max(8), order: z.enum(['random', 'fixed']).optional() }).strict(),
   // Draw one circle in one stroke; the server scores how round it is.
   'perfect-circle': z.object({ seconds: z.number().int().min(3).max(30) }).strict(),
-  'cut-the-line': z.object({}).strict(),
+  'cut-the-line': CutSettingsSchema,
   'match-the-angle': z.object({}).strict(),
-  'count-the-dots': z.object({ viewSeconds: z.number().int().min(DOT_VIEW_MIN_SECONDS).max(DOT_VIEW_MAX_SECONDS) }).strict(),
+  'count-the-dots': DotSettingsSchema,
   'draw-the-graph': GraphSettingsSchema,
   'heads-or-tails': z.object({}).strict(),
   'red-or-black-roulette': z.object({}).strict(),
@@ -54,7 +55,6 @@ export const isMinigameKey = (key: string): key is MinigameKey => key in Minigam
 
 /** Countdown before every minigame starts, so all phones begin together. */
 export const MINIGAME_COUNTDOWN_MS = 3000;
-export const CUT_TARGETS = Array.from({ length: 79 }, (_, index) => 11 + index).filter(target => target % 5 !== 0);
 export const ANGLE_TARGETS = Array.from({ length: 360 }, (_, angle) => angle).filter(angle =>
   [30, 45].every(step => Math.abs(angle - Math.round(angle / step) * step) > 5));
 export const AngleSchema = z.number().int().min(0).max(359);
@@ -102,13 +102,13 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
     howToPlay: 'Drag the ray to the target angle and lock it in. Angles start pointing right and increase counterclockwise. Closest wins, with faster submissions breaking ties.',
     better: 'lower', defaults: {}, defaultSeconds: 20 },
   'count-the-dots': { name: 'Count the Dots', description: 'Remember how many dots flashed on the shared screen.',
-    howToPlay: 'Watch the host or shared screen and count the dots. When they disappear, enter your guess on your phone. Closest wins, with faster submissions breaking ties.',
+    howToPlay: 'Count the dots. Lock in your count on your phone.',
     better: 'lower', defaults: { viewSeconds: 5 }, defaultSeconds: 15 },
   'draw-the-graph': { name: 'Draw the Graph', description: 'Predict the missing half of a line graph.',
     howToPlay: 'Start at the last dot and draw the rest of the graph. Closest wins, with faster submissions breaking ties.',
     better: 'lower', defaults: {}, defaultSeconds: 30 },
   'heads-or-tails': { name: 'Heads or Tails', description: 'Make a private prediction for one shared coin flip.',
-    howToPlay: 'Pick heads or tails in secret. The coin flips when guesses close. Everyone who picked the right side gets points.',
+    howToPlay: 'Pick a side. Correct guesses earn points.',
     better: 'none', defaults: {}, defaultSeconds: 15 },
   'red-or-black-roulette': { name: 'Red or Black Roulette', description: 'Pick a colour for one shared roulette spin.',
     howToPlay: 'Pick red or black in secret. The wheel spins when guesses close. A correct guess earns points. Green zero pays neither colour.',
@@ -144,7 +144,7 @@ export function formatMinigameResult(game: MinigameKey, value: number | null, se
   if (game === 'tap-race') return `${value} ${value === 1 ? 'tap' : 'taps'}`;
   if (game === 'stop-clock') { const off = Math.abs(value - (settings as MinigameSettings<'stop-clock'>).targetMs) / 1000; return `${(value / 1000).toFixed(2)} s · ${off.toFixed(2)} s off`; }
   if (game === 'perfect-circle') return `${(value / 10).toFixed(1)}% round`;
-  if (game === 'cut-the-line') return `${value} pp off`;
+  if (game === 'cut-the-line') return `${value} percentage points off`;
   if (game === 'match-the-angle') return `${value}° off`;
   if (game === 'count-the-dots') return `${value} off`;
   if (game === 'draw-the-graph') return `${(value / 100).toFixed(1)}% off`;
@@ -232,7 +232,7 @@ export const PublicMinigameSchema = z.object({
   game: z.enum(MINIGAME_KEYS as [MinigameKey, ...MinigameKey[]]), settings: z.record(z.string(), z.unknown()),
   // Server time: when the countdown ends and play begins (null while teams are being made), and for a reaction duel, when GO shows.
   startsAt: z.string().datetime().nullable(), goAt: z.string().datetime().nullable(),
-  cutTarget: z.number().int().min(1).max(99).optional(),
+  cutTarget: CutTargetSchema.optional(),
   angleTarget: AngleSchema.optional(),
   graph: GraphRoundViewSchema.optional(),
   dots: z.object({ guessAt: z.string().datetime(), pattern: DotPatternSchema.optional() }).strict().optional(),
@@ -248,4 +248,5 @@ export const MinigameRevealSchema = z.object({
   entries: z.array(z.object({ playerId: z.string().uuid().nullable(), teamId: z.string().uuid().nullable(), value: z.number().int().nullable(), place: z.number().int().min(1).nullable(),
     stroke: z.array(z.number().int()).optional(), cut: z.number().int().min(0).max(100).optional(), angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(), graphHue: GraphHueSchema.optional() }).strict()),
   doorsMilli: z.array(Milli).nullable(), graph: GraphDataSchema.optional(), dotCount: z.number().int().positive().optional(), coin: CoinSideSchema.optional(), roulette: RoulettePocketSchema.optional(),
+  dotReveal: z.strictObject({ pattern: DotPatternSchema, startedAt: z.string().datetime() }).optional(),
 }).strict();

@@ -69,7 +69,8 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await expect(props.getByLabel('Text on every screen')).toHaveValue('Welcome! Get ready to play.');
   await saved(page);
 
-  await props.getByRole('button', { name: 'Change where it leads (Flow editor)' }).click();
+  await props.getByRole('button', { name: 'Scene actions' }).click();
+  await props.getByRole('menuitem', { name: 'Change where it leads (Flow editor)' }).click();
   await expect(page.locator('.edge-line')).toHaveCount(2);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.keyboard.press('Shift+Digit3');
@@ -231,12 +232,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await decides.getByRole('button', { name: 'The host' }).click();
   await expect(decides.getByRole('button', { name: 'The host' })).toHaveAttribute('aria-pressed', 'true');
   await expect(props.getByRole('group', { name: 'On a tie' })).toHaveCount(0);
-  // Where it leads: a button per route goes to that scene; changing it is in the ☰ menu, which opens the Flow editor on the same scene.
-  const leads = props.getByRole('group', { name: 'Next' });
-  await expect(leads.getByRole('button')).toHaveText([/Music.*Music Mayhem/, /Physical.*Living Sculpture/]);
-  await leads.getByRole('button', { name: /Music Mayhem/ }).click();
-  await expect(props.getByRole('heading', { name: 'Music route' })).toBeVisible();
-  await page.getByRole('navigation', { name: 'Scenes in play order' }).getByRole('button', { name: /Choose your challenge/ }).click();
+  await expect(props.getByRole('group', { name: 'Next', exact: true })).toHaveCount(0);
   await props.getByRole('button', { name: 'Scene actions' }).click();
   await page.getByRole('menuitem', { name: 'Change where it leads (Flow editor)' }).click();
   await expect(page.getByRole('tab', { name: 'Flow editor' })).toHaveAttribute('aria-selected', 'true');
@@ -286,6 +282,30 @@ async function openCopy(page: Page, baseURL: string, name: string, desktop = tru
   await page.getByRole('link', { name: `Edit ${name}` }).click();
   await expect(page.locator('.scene-card')).toHaveCount(5);
 }
+
+test('the categorized minigame picker stays above the editor dock on a short screen', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'Exercises a short desktop viewport.');
+  await page.setViewportSize({ width: 1100, height: 580 });
+  await openCopy(page, baseURL!, 'Short-screen palette', false);
+  await page.getByRole('button', { name: 'Add a scene', exact: true }).click();
+  await page.getByRole('tab', { name: 'Games', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Minigame/ }).click();
+  const categories = page.getByRole('tablist', { name: 'Minigame categories' });
+  await expect(categories.getByRole('tab')).toHaveText(['Speed', 'Precision', 'Drawing', 'Luck & choices', 'Drinking']);
+  await categories.getByRole('tab', { name: 'Speed', exact: true }).press('ArrowRight');
+  await expect(categories.getByRole('tab', { name: 'Precision', exact: true })).toBeFocused();
+  await expect(page.getByRole('menuitem', { name: /^Count the Dots/ })).toBeVisible();
+  const dock = page.getByRole('tablist', { name: 'Editor view' });
+  const palette = page.locator('.add-menu-anchor .add-menu');
+  await page.setViewportSize({ width: 580, height: 490 });
+  await expect.poll(async () => {
+    const bounds = (await palette.boundingBox())!;
+    return bounds.y + bounds.height <= (await dock.boundingBox())!.y;
+  }).toBe(true);
+  await categories.getByRole('tab', { name: 'Drinking', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Drive the bus/ }).click();
+  await expect(page.locator('.scene-card')).toHaveCount(6);
+});
 
 test('choices that need a description open a popup with cards: a duel’s game and an award', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
@@ -938,6 +958,12 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   expect(instructions).toContain('First, ask before you write.');
   expect(instructions).toContain('reply with ONLY one JSON object');
   expect(instructions).not.toContain('ai-instructions');
+  expect(instructions).toContain('Configure minigame');
+  const example = JSON.parse(/```json\s*([\s\S]*?)```/.exec(instructions)![1]!);
+  expect(example.scenes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ game: 'count-the-dots', settings: expect.objectContaining({ revealEasing: 'ease-in' }) }),
+    expect.objectContaining({ game: 'draw-the-graph', settings: expect.objectContaining({ revealEasing: 'ease-out' }) }),
+  ]));
   // What an AI might answer: chatter around a fenced JSON block.
   const answer = 'Here is your game!\n```json\n' + JSON.stringify({ title: `AI quiz ${Date.now()}`, scenes: [
     { id: 'welcome', type: 'cutscene', title: 'QUIZ TIME', text: 'Phones out!' },

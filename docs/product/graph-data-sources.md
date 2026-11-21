@@ -1,0 +1,35 @@
+# Data sources for Draw the Graph
+
+## What works today
+
+In the Scene editor, set the **Question**, then open **Import graph data**. Paste a supported chart URL, preview the chart, pick a series and the last visible period, and choose **Use this data**. The published scene stores the sampled values, scale, question, and attribution. A live round can run while the source is offline. The answer, source link, and source note first appear at reveal.
+
+Try [life expectancy in the Netherlands](https://ourworldindata.org/grapher/life-expectancy?country=~NLD&time=1950..2023). Remove the country filter in the original chart link to pick from its default series, or select multiple countries on the source chart and copy that link.
+
+## Provider comparison
+
+| Source | Page and programmatic route | Metadata, filtering, and reuse |
+| --- | --- | --- |
+| Our World in Data | Recognize [Grapher chart links](https://ourworldindata.org/grapher/life-expectancy). The documented [Chart Data API](https://docs.owid.io/projects/etl/api/chart-api/) appends `.csv` and `.metadata.json` to the chart path. It has no API key. | Filtered downloads follow the chart’s selected countries and dates. CSV columns and entities identify series. Metadata provides units, descriptions, and citations. Credit OWID and the original suppliers and check their licenses. This is the first integration. [OWID reuse policy](https://ourworldindata.org/faqs#can-i-reuse-or-republish-your-data) |
+| World Bank | Read the indicator from [the page path](https://data.worldbank.org/indicator/SP.POP.TOTL?locations=NL) and the country from `locations`. Use the [Indicators V2 API](https://api.worldbank.org/v2/country/NLD/indicator/SP.POP.TOTL?format=json&date=2000:2023). No key needed. | Country, indicator, date range, and pagination are explicit parameters. An indicator lookup adds name, source, and notes. The default for World Bank-produced open data is CC BY 4.0 and exceptions are dataset-specific. This is the next adapter for straightforward annual series. [API docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation) · [Licensing](https://datacatalog.worldbank.org/public-licenses) |
+| Google Books Ngram Viewer | [Viewer query for “artificial intelligence”](https://books.google.com/ngrams/graph?content=artificial+intelligence&year_start=1970&year_end=2022&smoothing=0) selects the phrase, corpus, years, and smoothing. Google documents downloadable corpus files. The viewer’s internal JSON response has no documented stability guarantee. | Phrase and corpus identify series. The viewer reports a fraction of ngram occurrences, which can be converted to mentions per million by multiplying by one million. The official corpus files are large. Google permits reuse and requests attribution. Use prepared tabular data for now. [Google Ngram documentation](https://books.google.com/ngrams/info) |
+| FRED | Read the series ID from a page such as [UNRATE](https://fred.stlouisfed.org/series/UNRATE). The official observations API takes the ID and date filters. The series endpoint adds units, frequency, and notes. Both require a registered key. | The series page offers a download for CSV fallback. API terms require notices and series owners can impose further reuse restrictions. Defer a direct adapter until key and reuse requirements are settled. [Observations API](https://fred.stlouisfed.org/docs/api/fred/series_observations.html) · [Series metadata](https://fred.stlouisfed.org/docs/api/fred/series.html) · [Terms](https://fred.stlouisfed.org/docs/api/terms_of_use.html) |
+| Eurostat | Read the data code from [a Data Browser URL](https://ec.europa.eu/eurostat/databrowser/view/demo_pjan/default/table?lang=en). The public Statistics API has a [JSON-stat endpoint](https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/demo_pjan?lang=en&geo=NL&sex=T&age=TOTAL&unit=NR). | Request dates, geography, units, and other dimensions explicitly. A single page can represent many different series. There is no API key. Cite the dataset or filtered data code and access date. Prefer CSV export until the game has a dimension picker. [API guide](https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-getting-started) · [Reuse](https://ec.europa.eu/eurostat/help/copyright-notice) |
+| Wikimedia pageviews | An article title and project map to [the Wikimedia Pageviews API](https://wikitech.wikimedia.org/wiki/Analytics/AQS/Pageviews), with daily or monthly counts. | A useful option for pop-culture rounds. Keep project, article, access channel, and time window with the output. Use the documented access policy and identify the client when automating. [Wikimedia API access policy](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_API_Usage_Guidelines) |
+
+Provider quotas can change. The game currently caps OWID imports at 12 requests per minute per client address, bounds downloads and lets the author retry in the editor, and never polls providers during play.
+
+## Import choices
+
+- **Supported chart URL** preserves filters, units and attribution in one step. The server only requests the documented endpoints on the provider’s fixed HTTPS origin.
+- **Direct CSV or JSON URL** can work for regular tables, but still needs a defined schema, safe fetching rules, and attribution. General URLs and generic JSON are candidates for a later importer.
+- **CSV or TSV upload** already works offline. Pick a value column, set the cutoff, and fill in units and attribution as needed.
+- **Pasted cells** already work for spreadsheet exports, including Google Trends CSV. Describe Trends numbers as relative search interest. The game reuses its existing CSV reader and chart component. The official [owid-catalog Python client](https://docs.owid.io/projects/etl/api/) wraps several OWID data APIs, but adds a separate runtime for a task that needs two HTTP requests here. A chart renderer would not replace the series selection and scoring logic.
+
+## Drawing reference
+
+[GuessDash Extraplot](https://guessdash.com/extraplot) gives the subject and units top billing, makes the cutoff obvious, and shows the overlay, miss, and source after submission. The party round uses a question, a tall phone chart, assigned player colors, and a shared reveal. A live period and value above the chart stays clear of a drawing finger. At reveal, the actual line and predictions draw together from the cutoff. Players see their own line and the actual line on their phones, with rankings on the host and shared screens. The game shows the author’s attribution or the imported credit at reveal.
+
+The line uses 24 stored prediction samples. Annual labels report the nearest year at each sample and dated series show the corresponding date. Arbitrary period labels fall back to progress from the cutoff. This keeps the same scoring rule for previously authored charts.
+
+Next playtest both a real search-interest export and a URL-imported series on a phone. Check unit formatting, the simultaneous reveal, and accessibility with touch and keyboard before tuning the next game.

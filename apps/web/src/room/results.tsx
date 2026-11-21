@@ -1,12 +1,15 @@
 import { useReactions, type ReactionStore } from '../room-extras/reactions.js';
+import { PagedResultList } from '../ui/paged-result-list.js';
 import { Dropdown } from '../ui/dropdown.js';
 import { useText } from '../presentation/look.js';
 import { cloneElement, isValidElement, useEffect, useState, type ReactNode } from 'react';
-import type { RoomSnapshot } from '@party/contracts';
+import type { GraphPlaybackAction, RoomSnapshot } from '@party/contracts';
 import { MediaView } from './media-upload.js';
 import { BallotContent, SavedVoteBadge, savedVote } from './vote.js';
 import { TeamStandings, teamName } from './teams.js';
-import { MinigameResults } from '../minigames/shared/minigame-stage.js';
+import { GraphReplayControls } from '../minigames/draw-the-graph/replay-controls.js';
+import { MinigamePhoneResult } from '../minigames/shared/phone-result.js';
+import { MinigameResults } from '../minigames/shared/shared-result.js';
 import { StoredDrawing } from '../drawing/drawing-view.js';
 import { FaIcon } from '../presentation/icons.js';
 import { Avatar } from '../players/avatar.js';
@@ -20,9 +23,9 @@ import { defaultLook, voteChoices } from '@party/contracts';
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
 
-export function RoundResultsCard({ title, label, children }: { title: string; label?: string; children: ReactNode }) {
+export function RoundResultsCard({ title, label, hideHeading = false, children }: { title: string; label?: string; hideHeading?: boolean; children: ReactNode }) {
   return <div className="results round-results" role={label ? 'region' : undefined} aria-label={label}>
-    <header className="results-head"><span aria-hidden="true"><FaIcon name="trophy" /></span><h3>{title}</h3></header>
+    {!hideHeading && <header className="results-head"><span aria-hidden="true"><FaIcon name="trophy" /></span><h3>{title}</h3></header>}
     {children}
   </div>;
 }
@@ -88,7 +91,7 @@ function ResultSequence({ mode, items, offset, canAdvance, onNext, disabled }: {
   </li></>;
 }
 
-export function StageResults({ state, stage, offset = 0, onNext, disabled = false }: { state: RoomSnapshot; stage: Stage; offset?: number; onNext?: (() => void) | undefined; disabled?: boolean }) {
+export function StageResults({ state, stage, offset = 0, onNext, onGraphPlayback, disabled = false }: { state: RoomSnapshot; stage: Stage; offset?: number; onNext?: (() => void) | undefined; onGraphPlayback?: (action: GraphPlaybackAction) => void; disabled?: boolean }) {
   const t = useText();
   const reveal = stage.reveal; if (!reveal) return null;
   const answer = reveal.answer; const input = stage.input;
@@ -96,6 +99,15 @@ export function StageResults({ state, stage, offset = 0, onNext, disabled = fals
   const cards = (items: ReactNode[]) => <ResultSequence mode={stage.resultCards} items={items} offset={offset} canAdvance={Boolean(onNext && state.view.status === 'RUNNING' && (state.role === 'host' || state.hostPhone))} {...(onNext ? { onNext } : {})} disabled={disabled} />;
   const label = (key: string) => input?.kind === 'choice' ? input.options.find(option => option.key === key)?.label ?? key : input?.kind === 'order' ? input.items.find(item => item.key === key)?.label ?? key : key;
   const own = state.selfPlayerId ? reveal.awards.find(award => award.playerId === state.selfPlayerId) : undefined;
+  if (answer?.kind === 'minigame') {
+    const label = p('roundResults');
+    if (state.role === 'player') return <MinigamePhoneResult stage={stage} state={state} answer={answer} reveal={reveal} label={label} />;
+    return <RoundResultsCard title={t('results.title')} label={label} hideHeading>
+      {state.role === 'host' && stage.graphPlayback && onGraphPlayback && <GraphReplayControls
+        playback={stage.graphPlayback} offset={offset} onAction={onGraphPlayback} disabled={disabled || state.view.status !== 'RUNNING'} />}
+      <MinigameResults state={state} stage={stage} reveal={reveal} answer={answer} offset={offset} />
+    </RoundResultsCard>;
+  }
   return <RoundResultsCard title={t('results.title')} label={p('roundResults')}>
     {/* On a phone your own result comes first, big: that is what you look for. */}
     {state.role === 'player' && stage.input?.kind !== 'media' && <OwnRoundPoints points={own ? formatPoints(own.amountMilli) : undefined}
@@ -106,7 +118,6 @@ export function StageResults({ state, stage, offset = 0, onNext, disabled = fals
         return <li key={row.choiceKey} className={row.choiceKey === answer.correctChoiceKey ? 'correct' : answer.correctChoiceKey ? 'wrong' : undefined} style={{ '--share': `${total ? Math.round(row.count / total * 100) : 0}%` } as React.CSSProperties}>
           <span className="bar" aria-hidden="true" /><span className="results-bar-label">{label(row.choiceKey)}{row.choiceKey === answer.correctChoiceKey ? ' ✓' : ''}</span><span className="results-bar-count">{p(row.count === 1 ? 'answerOne' : 'answerMany', { count: row.count })}</span></li>; })}</ul>
     </>}
-    {answer?.kind === 'minigame' && <MinigameResults state={state} answer={answer} />}
     {answer?.kind === 'drawing' && (answer.entries.length ? <ul className="drawing-gallery">{cards(answer.entries.map(entry => { const author = entry.teamId ? teamName(state, entry.teamId) : nameOf(state, entry.playerId ?? '');
       return <li key={entry.assetId}><StoredDrawing sessionId={state.view.sessionId} assetIds={[entry.assetId]} label={p('drawingBy', { name: author })} /><span>{author}</span></li>; }))}</ul> : <p>{p('nobodyDrew')}</p>)}
     {answer?.kind === 'order' && answer.correctOrder && <><p>{p('correctOrder')}</p><ol>{answer.correctOrder.map(key => <li key={key}>{label(key)}</li>)}</ol></>}
@@ -120,7 +131,11 @@ export function StageResults({ state, stage, offset = 0, onNext, disabled = fals
     <PointsFold folded={state.role === 'player'} label={t('results.points')}>
       {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
       {stage.input?.kind !== 'media' && <h4>{t('results.points')}</h4>}
-      {stage.input?.kind === 'media' ? null : reveal.awards.length ? <ul className="plain-list round-awards">{[...reveal.awards].sort((a, b) => { const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli); return difference > 0n ? 1 : difference < 0n ? -1 : 0; }).map(award => <li key={award.playerId}><span>{nameOf(state, award.playerId)}</span><strong>{formatPoints(award.amountMilli)}</strong></li>)}</ul> : <p>{t('results.nobody')}</p>}
+      {stage.input?.kind === 'media' ? null : reveal.awards.length ? <PagedResultList key={stage.id} pageSize={reveal.awards.length}
+        className="plain-list round-awards" rows={[...reveal.awards].sort((a, b) => {
+          const difference = BigInt(b.amountMilli) - BigInt(a.amountMilli);
+          return difference > 0n ? 1 : difference < 0n ? -1 : 0;
+        }).map(award => <li key={award.playerId}><span>{nameOf(state, award.playerId)}</span><strong>{formatPoints(award.amountMilli)}</strong></li>)} /> : <p>{t('results.nobody')}</p>}
     </PointsFold>
   </RoundResultsCard>;
 }

@@ -4,6 +4,7 @@ import { useLiveStrokes, type LiveStrokes } from '../../drawing/live-strokes.js'
 import type { MinigameLive } from '../shared/minigame-stage.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { CONTROL_TEXTS } from '../shared/controls.text.js';
+import { PagedResultList } from '../../ui/paged-result-list.js';
 import { useText } from '../../presentation/look.js';
 import { DrawingPad } from '../../drawing/drawing-pad.js';
 import { DrawingView, uploadDrawing, useDrawings } from '../../drawing/drawing-view.js';
@@ -95,7 +96,7 @@ function MyTurn({ sessionId, stageRunId, team, animation, turn, turnLeft, disabl
   useEffect(() => { if (turnLeft <= 300) send(); });
   return <div className="mg-turn">
     <p className="mg-sub"><strong>{t('minigame.yourTurn')}</strong> · {Math.ceil(turnLeft / 1000)} s</p>
-    <DrawingPad value={drawing} onChange={change} onStrokeProgress={progress} under={animation ? [] : parts} disabled={disabled || sent.current} label={c('teamDrawingTurn')} bringIntoView />
+    <DrawingPad value={drawing} onChange={change} onStrokeProgress={progress} under={animation ? [] : parts} disabled={disabled || sent.current} label={c('teamDrawingTurn')} compactTools />
     {error && <p role="alert" className="error">{error}</p>}
     <button type="button" className="primary" disabled={disabled || sent.current} onClick={send}>{t('drawing.submit')}</button>
   </div>;
@@ -107,9 +108,9 @@ function RelayVote({ state, relay, mine, disabled, onVote, live }: { state: Room
   if (own?.success) return <p role="status" className="answer-in">{t('vote.saved')}</p>;
   const others = relay.teams.filter(team => team.teamId !== mine.teamId);
   return <form className="mg-relay-vote" onSubmit={event => { event.preventDefault(); if (choice) onVote(choice); }}>
-    <fieldset><legend>{t('minigame.voteBest')}</legend><ul className="drawing-gallery">{others.map(team => <li key={team.teamId}>
+    <fieldset><legend>{t('minigame.voteBest')}</legend><PagedResultList className="drawing-gallery" pageSize={2} rows={others.map(team => <li key={team.teamId}>
       <label className="choice"><input type="radio" name="relay-vote" value={team.teamId} checked={choice === team.teamId} onChange={() => setChoice(team.teamId)} />{team.name}</label>
-      <TeamPicture sessionId={state.view.sessionId} stageRunId={relay ? state.view.stage!.id : ''} strokes={live.strokes} team={team} label={c('drawingOf', { name: team.name })} /></li>)}</ul></fieldset>
+      <TeamPicture sessionId={state.view.sessionId} stageRunId={relay ? state.view.stage!.id : ''} strokes={live.strokes} team={team} label={c('drawingOf', { name: team.name })} /></li>)} /></fieldset>
     <button className="primary" disabled={disabled || !choice}>{t('vote.submit')}</button>
   </form>;
 }
@@ -127,9 +128,8 @@ function AnimationGuess({ state, relay, disabled, onVote }: {
   if (!other.parts.length) return <p className="wait-note">{a('waiting')}</p>;
   return <form className="mg-relay-vote" onSubmit={event => { event.preventDefault(); if (choice !== undefined) onVote(other.teamId, choice); }}>
     <DrawingAnimation sessionId={state.view.sessionId} assetIds={other.parts.map(part => part.assetId)} label={other.name} />
-    <fieldset><legend>{a('guess')}</legend><div className="animation-choices">{ANIMATION_WORDS.map((word, index) =>
-      <label className="choice" key={word}><input type="radio" name="animation-guess" checked={choice === index} onChange={() => setChoice(index)} />{words[index]}</label>)}
-    </div></fieldset>
+    <fieldset><legend>{a('guess')}</legend><PagedResultList className="animation-choices" pageSize={4} rows={ANIMATION_WORDS.map((word, index) =>
+      <li key={word}><label className="choice"><input type="radio" name="animation-guess" checked={choice === index} onChange={() => setChoice(index)} />{words[index]}</label></li>)} /></fieldset>
     <button className="primary" disabled={disabled || choice === undefined}>{t('vote.submit')}</button>
   </form>;
 }

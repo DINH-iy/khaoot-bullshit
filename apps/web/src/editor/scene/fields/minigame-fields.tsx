@@ -1,8 +1,11 @@
-import { DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { isDefaultGraphQuestion } from '../../../minigames/draw-the-graph/graph-question.js';
+import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
 import { SpeedRunCourseFields } from './speed-run-course.js';
 import { PlacesFields } from './places-fields.js';
 import { useState } from 'react';
+import { MINIGAME_GROUPS } from '../../controls/minigame-groups.js';
 import { ChoiceDialog } from '../../controls/choice-dialog.js';
 import { updateStage, withMinigame, type Definition, type Node, type Stage } from '../../model.js';
 import { Segmented } from '../../controls/segmented.js';
@@ -14,15 +17,6 @@ const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | n
 import { InfoTip } from '../../controls/info-tip.js';
 
 const rainbow = () => t('rainbow');
-/** The minigame picker's tabs: what kind of game it is. */
-const MINIGAME_GROUPS: { key: string; name: string; games: MinigameKey[] }[] = [
-  { key: 'speed', get name() { return t('gSpeed'); }, games: ['reaction', 'tap-race', 'clap-beat', 'speed-run', 'stop-clock'] },
-  { key: 'precision', get name() { return t('gPrecision'); }, games: ['cut-the-line', 'match-the-angle', 'count-the-dots'] },
-  { key: 'skill', get name() { return t('gDrawing'); }, games: ['perfect-circle', 'draw-the-graph', 'relay-drawing'] },
-  { key: 'luck', get name() { return t('gLuck'); }, games: ['lucky-doors', 'majority', 'heads-or-tails', 'red-or-black-roulette'] },
-  { key: 'drinking', get name() { return t('gDrinking'); }, games: ['bus'] },
-];
-
 type Change = (next: Definition, group?: string) => void;
 const toPoints = (milli: string) => String(Number(milli) / 1000);
 const toMilli = (text: string) => { const value = Math.round(Number(text)); return Number.isFinite(value) && value >= 0 ? String(Math.min(value, 999_999_999) * 1000) : '0'; };
@@ -36,6 +30,7 @@ const ms = (text: string, min: number, max: number) => Math.round(Math.min(max, 
  */
 export function MinigameFields({ part, definition, node, index, onChange }: { part: 'settings' | 'points'; definition: Definition; node: Node; index: number; onChange: Change }) {
   const a = useTexts(ANIMATION_TEXTS);
+  const numberText = useTexts(NUMBER_CHOICE_TEXTS);
   const stage = node.stages[index]!; const game = String(stage['game'] ?? '');
   const edit = (change: (current: Stage) => Stage, field: string) => onChange(updateStage(definition, node.key, index, change), `${node.key}:${index}:${field}`);
   const known = isMinigameKey(game); const [picking, setPicking] = useState(false);
@@ -71,14 +66,34 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
       onPick={next => { setPicking(false); if (next !== game) edit(current => withMinigame(current, next as MinigameKey, definition), 'game'); }} onClose={() => setPicking(false)} />}
     {known && !settings && <p className="hint warn" role="alert">{t('misfit')} <button type="button" className="small-button" onClick={() => edit(current => { const copy = { ...current }; delete copy['settings']; return copy; }, 'reset')}>{t('standardSettings')}</button></p>}
     {game === 'draw-the-graph' && settings && <GraphFields key={`${node.key}:${index}`} graph={(stage['settings'] as MinigameSettings<'draw-the-graph'> | undefined)?.graph}
-      onChange={graph => setSettings(graph ? { graph } : {}, 'graph-data')} />}
-    {game === 'count-the-dots' && settings && <label className="ed-inline">{t('dotViewTime')}
-      <span className="ed-unit"><input type="number" min={DOT_VIEW_MIN_SECONDS} max={DOT_VIEW_MAX_SECONDS} step={1}
-        value={(settings as MinigameSettings<'count-the-dots'>).viewSeconds} onChange={event => {
-          const viewSeconds = event.currentTarget.valueAsNumber;
-          if (Number.isInteger(viewSeconds) && viewSeconds >= DOT_VIEW_MIN_SECONDS && viewSeconds <= DOT_VIEW_MAX_SECONDS) setSettings({ viewSeconds }, 'dot-view-time');
-        }} />{t('sec')}</span>
+      onChange={(graph, question) => edit(current => ({ ...current, settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph },
+        ...(question && isDefaultGraphQuestion(current.prompt) ? { prompt: question } : {}),
+      }), 'graph-data')} />}
+    {(game === 'count-the-dots' || game === 'draw-the-graph') && settings && <label>{t('revealEasing')}
+      <select value={(settings as MinigameSettings<'count-the-dots' | 'draw-the-graph'>).revealEasing ?? DEFAULT_REVEAL_EASING}
+        onChange={event => setSettings({ ...settings, revealEasing: RevealEasingSchema.parse(event.currentTarget.value) }, 'reveal-easing')}>
+        {RevealEasingSchema.options.map(value => <option key={value} value={value}>{t(value)}</option>)}
+      </select>
     </label>}
+    {game === 'cut-the-line' && settings && <NumberChoiceFields label={numberText('target')}
+      value={(settings as MinigameSettings<'cut-the-line'>).target} min={0} max={100} initial={37} range={[25, 75]}
+      onChange={target => setSettings(target ? { target } : {}, 'cut-target')} />}
+    {game === 'count-the-dots' && settings && (() => {
+      const dots = settings as MinigameSettings<'count-the-dots'>;
+      return <>
+        <NumberChoiceFields label={numberText('count')} value={dots.count} min={1} max={DOT_COUNT_MAX} initial={20} range={[12, 30]}
+          onChange={count => setSettings({ ...dots, count }, 'dot-count')} />
+        <label className="choice"><input type="checkbox" checked={dots.allowOverlap ?? false}
+          onChange={event => setSettings({ ...dots, allowOverlap: event.currentTarget.checked }, 'dot-overlap')} />{numberText('overlap')}</label>
+        <label className="ed-inline">{t('dotViewTime')}
+          <span className="ed-unit"><input type="number" min={DOT_VIEW_MIN_SECONDS} max={DOT_VIEW_MAX_SECONDS} step={1}
+            value={dots.viewSeconds} onChange={event => {
+              const viewSeconds = event.currentTarget.valueAsNumber;
+              if (Number.isInteger(viewSeconds) && viewSeconds >= DOT_VIEW_MIN_SECONDS && viewSeconds <= DOT_VIEW_MAX_SECONDS) setSettings({ ...dots, viewSeconds }, 'dot-view-time');
+            }} />{t('sec')}</span>
+        </label>
+      </>;
+    })()}
 
     {game === 'reaction' && settings && (() => { const value = settings as MinigameSettings<'reaction'>; return <div className="field-pair">
       <label>{t('earliest')}<input type="number" min={1} max={10} step={0.5} value={seconds(value.minWaitMs)} onChange={event => setSettings({ ...value, minWaitMs: ms(event.target.value, 1, 10) }, 'min')} /></label>

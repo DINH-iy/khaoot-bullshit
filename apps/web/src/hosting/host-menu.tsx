@@ -39,6 +39,7 @@ export function HostMenu() {
   const ownerText = useTexts(OWNER_TEXTS);
   // One request identity per page load: a repeated click or retry returns the same room.
   const [request] = useState(() => ({ sessionId: newId(), commandId: newId() }));
+  const [tryoutRequest] = useState(() => ({ sessionId: newId(), commandId: newId() }));
   useEffect(() => {
     let mounted = true;
     void (async () => {
@@ -68,9 +69,9 @@ export function HostMenu() {
   useEffect(() => { const changed = () => setHash(location.hash); window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed); }, []);
   useEffect(() => { if (menu && hash === '#my-games' && !scrolled.current) { scrolled.current = true; document.getElementById('my-games')?.scrollIntoView(); } }, [menu, hash]);
   const reload = () => { void roomApi('/api/host').then(data => setMenu(HostMenuSchema.parse(data))).catch(cause => setError(explain(cause))); };
-  const open = (work: Promise<{ sessionId: string }>) => {
+  const open = (work: Promise<{ sessionId: string }>, screen: 'room' | 'bench' = 'room') => {
     setBusy(true); setError('');
-    work.then(result => location.assign(`/?room=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
+    work.then(result => location.assign(`/?${screen}=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
   };
   // Closing a room asks first (the game ends for everyone in it); afterwards the list is loaded again.
   const [closing, setClosing] = useState<string | null>(null);
@@ -80,7 +81,9 @@ export function HostMenu() {
   };
   // Editors (people with editor rights) work on the games only: no hosting, no open rooms, no admin.
   const owner = menu?.role === 'owner';
-  return <><OwnerNav current={hash === '#my-games' || (menu && !owner) ? 'editor' : 'host'} role={menu?.role ?? null} /><main className="host-page">
+  return <><OwnerNav current={hash === '#my-games' || (menu && !owner) ? 'editor' : 'host'} role={menu?.role ?? null}
+    mainAction={<button type="button" disabled={busy}
+      onClick={() => open(roomApi('/api/host/minigame-tryout', tryoutRequest), 'bench')}>{t('minigameTryout')}</button>} /><main className="host-page">
     {!menu || owner
       ? <header className="host-hero"><p className="eyebrow">{t('eyebrowHost')}</p><h1>{t('heroHost')}</h1>
         <p>{t('heroHostText')}</p></header>

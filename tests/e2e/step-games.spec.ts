@@ -55,6 +55,12 @@ test('Bar games: teams drive the bus by voting on each guess, then everyone pick
   await host.getByRole('button', { name: 'Close answers' }).click();
   await host.getByRole('button', { name: 'Reveal results' }).click();
   await expect(host.getByRole('region', { name: 'Round results' })).toContainText(/sips?/);
+  const phoneResults = ada.getByRole('region', { name: 'Round results' });
+  await expect(phoneResults.getByRole('heading', { name: 'Results', exact: true })).toHaveCount(0);
+  await expect(phoneResults.locator('.bus-card')).toHaveCount(4);
+  await expect(phoneResults).toContainText('Team sips');
+  await expect(phoneResults.locator('.mg-podium')).toHaveCount(0);
+  await expect(host.getByRole('region', { name: 'Round results' }).locator('.bus-card')).toHaveCount(8);
 
   // Left or right: alone, in secret. Ada and Bo pick differently: a tie, nobody wins.
   await host.getByRole('button', { name: 'Next', exact: true }).click();
@@ -67,4 +73,5 @@ test('Bar games: teams drive the bus by voting on each guess, then everyone pick
   await host.getByRole('button', { name: 'Close answers' }).click();
   await host.getByRole('button', { name: 'Reveal results' }).click();
   await expect(host.getByRole('region', { name: 'Round results' })).toContainText(/Left/);
+  await expect(phoneResults).toContainText('Tie');
 });

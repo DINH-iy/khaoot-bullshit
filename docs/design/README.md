@@ -2,6 +2,8 @@
 
 Accepted on 11 November 2026. These files are design documentation, not the application editors.
 
+New screens, minigames, and UI changes follow [the product style reference](style.md).
+
 ## Interactive layout and behavior reference
 
 Open [editor-reference.html](editor-reference.html) in a browser to explore both Flow editor and Scene editor. The [editable source fragment](editor-reference.source.html) is preserved so the reference does not depend on the original chat location. The standalone export was generated from that source using the visualization renderer.

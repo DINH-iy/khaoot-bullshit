@@ -88,9 +88,9 @@ const stageSchema = z.discriminatedUnion('kind', [
   // A duel: two players (picked at random or by the host) face off in the room while everyone
   // else bets on the winner; the host taps the winner. `places`: 1st for the winner, 2nd for the
   // loser (left out: 10 points for the winner). `betMilli`: for every right bet. The timer is the
-  // betting time. No team play: it is always two players.
+  // voting time. Pool can use representatives from two existing teams and skip voting.
   z.object({ ...look, key: GameKeySchema, kind: z.literal('duel'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
-    pick: z.enum(['random', 'host']), places: PlacesSchema.optional(), betMilli: AwardMilliSchema,
+    pick: z.enum(['random', 'host', 'teams']), places: PlacesSchema.optional(), betMilli: AwardMilliSchema,
     // How it is won (left out: the host names the winner). `game`: a head-to-head game on the two phones, with its settings.
     contest: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('host') }).strict(),
@@ -184,6 +184,7 @@ export const GameDefinitionSchema = z.object({
       // Pass the pencil is drawn by teams: it needs team play, from the round or the game.
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'duel' && stage.contest?.kind === 'game' && !parseHeadToHeadSettings(stage.contest.game, stage.contest.settings)) ctx.addIssue({ code: 'custom', message: 'Duel game settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'duel' && stage.pick === 'teams' && (stage.contest?.kind !== 'game' || stage.contest.game !== 'eight-ball')) ctx.addIssue({ code: 'custom', message: 'Team representatives are available for 8-ball pool', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && stage.places && stage.placementMilli) ctx.addIssue({ code: 'custom', message: 'Give the minigame either points per place or places, not both', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && stage.game === 'clap-beat' && stage.durationMs !== null && stage.durationMs < CLAP_END_MS) {
         ctx.addIssue({ code: 'custom', message: 'Clap the beat needs at least 9 seconds', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'durationMs'] });

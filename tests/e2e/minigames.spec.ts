@@ -57,7 +57,7 @@ test('a player builds their own look and plays minigames on the phone; the scree
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
     await expect(host.getByRole('region', { name: 'Round results' })).toContainText(/Speedy.*\d+ ms/);
-    await expect(page.getByText('You earned 10 points this round.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Round results' }).getByText('+10 pts', { exact: true })).toBeVisible();
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
 
     // Tap race: hammer the button until the time is up; the count is sent by itself.
@@ -77,7 +77,9 @@ test('a player builds their own look and plays minigames on the phone; the scree
     await expect(page.getByRole('status').filter({ hasText: 'Door 2' })).toBeVisible();
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
-    await expect(page.getByRole('heading', { name: 'Behind the doors' })).toBeVisible();
-    await expect(page.locator('.mg-doors.revealed li')).toHaveCount(4);
+    await expect(host.getByRole('heading', { name: 'Behind the doors' })).toBeVisible();
+    await expect(host.locator('.mg-doors.revealed li')).toHaveCount(4);
+    await expect(page.getByRole('region', { name: 'Round results' })).toContainText('Door 2');
+    await expect(page.locator('.mg-doors.revealed')).toHaveCount(0);
   } finally { await Promise.all([hostContext.close(), earlyContext.close()]); }
 });

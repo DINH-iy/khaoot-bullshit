@@ -1,0 +1,59 @@
+.mg-personal-result {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  width: min(100%, 27rem);
+  margin-inline: auto;
+  text-align: center;
+}
+.mg-result-facts {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  padding: 12px 0;
+  border-block: 1px solid var(--r-line);
+  font-variant-numeric: tabular-nums;
+}
+.mg-result-facts > div { flex: 1; min-width: 0; padding-inline: 6px; }
+.mg-result-facts > div + div { border-inline-start: 1px solid var(--r-line); }
+.mg-result-facts dt { color: var(--r-muted); font-size: .875rem; line-height: 1.25; }
+.mg-result-facts dd { margin: 3px 0 0; font-size: clamp(1rem, 5vw, 1.75rem); font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.mg-personal-note { margin: 0; color: var(--r-muted); font-size: .9375rem; }
+.mg-personal-score {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 12px;
+  color: var(--r-muted);
+  font-size: .9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.mg-personal-score strong { color: var(--r-text); }
+.mg-personal-score strong.earned { color: var(--r-ok); }
+.mg-personal-circle { width: min(100%, 7rem, 28svh); }
+.mg-personal-graph { width: 100%; }
+.mg-personal-drawing { width: min(100%, 9rem, 26svh); }
+.mg-personal-result .bus-sips { display: none; }
+.mg-personal-result .bus-board-side { justify-content: center; }
+.mg-personal-result .coin-reveal { margin: 0; }
+.mg-personal-result .mg-pocket { display: inline-block; padding: .15em .45em; border-radius: .35em; color: #fff; font-size: .875em; }
+.mg-pocket.red { background: #a62437; }
+.mg-pocket.black { background: #191921; }
+.mg-pocket.green { background: #16704e; }
+
+@media (max-height: 600px) {
+  .mg-personal-graph { width: min(100%, 15rem, 42svh); }
+  .mg-personal-result[data-game="draw-the-graph"] { gap: 8px; }
+}
+
+@media (orientation: landscape) and (max-height: 450px) {
+  .mg-personal-result { gap: 6px; }
+  .mg-result-facts { padding-block: 7px; }
+}
+
+.mg-clock-result { display: grid; gap: 8px; width: 100%; text-align: center; }
+
+.mg-personal-result[data-game="match-the-angle"] .mg-result-facts > div:last-child dd { color: var(--r-accent); }

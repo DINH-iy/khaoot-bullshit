@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  ANGLE_TARGETS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, CUT_TARGETS, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_PICKS, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
-  SAMPLE_GRAPH, graphError, angleError, busGuessRight, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteColor, isSharedPrediction,
+  ANGLE_TARGETS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, chooseCutTarget, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_PICKS, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
+  DEFAULT_REVEAL_EASING, SAMPLE_GRAPH, graphError, angleError, busGuessRight, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteColor, isSharedPrediction,
   type BusGuess, type Drawing, type MinigameKey, type MinigameSettings, type StepSideView,
 } from '@party/contracts';
 import { DrawingPad } from '../../drawing/drawing-pad.js';
@@ -11,11 +11,13 @@ import { AnimationFrames, ANIMATION_TEXTS, useAnimationWords } from '../../minig
 import { Countdown, type Result } from '../../minigames/shared/countdown.js';
 import { useServerNow } from '../../minigames/shared/clock.js';
 import { GraphChart } from '../../minigames/draw-the-graph/graph-chart.js';
+import { ClockResult } from '../../minigames/stop-clock/clock-result.js';
+import { CutResult } from '../../minigames/cut-the-line/cut-result.js';
 import { DotBoard, DotGuessForm } from '../../minigames/count-the-dots/count-dots.js';
+import { DotReveal } from '../../minigames/count-the-dots/dot-reveal.js';
 import { RouletteReveal } from '../../minigames/red-or-black-roulette/roulette.js';
 import { CoinReveal } from '../../minigames/heads-or-tails/coin.js';
 import { COIN_TEXTS } from '../../minigames/heads-or-tails/coin.text.js';
-import { CONTROL_TEXTS } from '../../minigames/shared/controls.text.js';
 import { minigameResult } from '../../minigames/shared/result-label.js';
 import { STEP_RENDERERS } from '../../minigames/shared/steps/renderers.js';
 import { StepChoices } from '../../minigames/shared/steps/step-game.js';
@@ -33,16 +35,16 @@ const sample = <T,>(source: readonly T[], count = source.length) => {
   return Array.from({ length: count }, () => pool.splice(random(pool.length), 1)[0]!);
 };
 
-export function MinigamePractice({ game, stage, intro }: { game: MinigameKey; stage: Stage; intro: ReactNode }) {
+export function MinigamePractice({ game, stage, intro, shared = false }: { game: MinigameKey; stage: Stage; intro: ReactNode; shared?: boolean }) {
   const t = useTexts(PRACTICE_TEXTS);
   const settings = parseMinigameSettings(game, stage['settings']) ?? MINIGAMES[game].defaults;
   const [attempt, setAttempt] = useState<number>();
-  return <div className="scene-practice">
+  return <div className={`scene-practice practice-${game}`}>
     {attempt === undefined ? <>{intro}<button type="button" className="primary" onClick={() => setAttempt(Date.now())}>{t('start')}</button></>
       : <>
         {game === 'count-the-dots'
           ? <DotPractice key={attempt} stage={stage} attempt={attempt} settings={settings as MinigameSettings<'count-the-dots'>} />
-          : <PracticeAttempt key={attempt} game={game} settings={settings} stage={stage} attempt={attempt} />}
+          : <PracticeAttempt key={attempt} game={game} settings={settings} stage={stage} attempt={attempt} shared={shared} />}
         <button type="button" className="small-button" onClick={() => setAttempt(previous => Math.max(Date.now(), previous! + 1))}>{t('replay')}</button>
       </>}
   </div>;
@@ -50,28 +52,26 @@ export function MinigamePractice({ game, stage, intro }: { game: MinigameKey; st
 
 function DotPractice({ stage, attempt, settings }: { stage: Stage; attempt: number; settings: MinigameSettings<'count-the-dots'> }) {
   const text = useText();
-  const t = useTexts(CONTROL_TEXTS);
-  const [pattern] = useState(() => createDotPattern(random));
-  const [guess, setGuess] = useState<number>();
+  const [pattern] = useState(() => createDotPattern(random, settings));
+  const [guess, setGuess] = useState<{ count: number; at: string }>();
   const now = useServerNow(0, guess === undefined);
   const countdown = typeof stage['countdownSeconds'] === 'number' ? stage['countdownSeconds'] * 1000 : MINIGAME_COUNTDOWN_MS;
   const startsAt = attempt + countdown;
   const guessAt = startsAt + settings.viewSeconds * 1000;
   const deadline = guessAt + (stage.durationMs ?? MINIGAMES['count-the-dots'].defaultSeconds * 1000);
-  if (guess !== undefined) return <p role="status">{t('dotTotal', { count: pattern.length })} · {
-    minigameResult('count-the-dots', Math.abs(guess - pattern.length), settings, false, { dotGuess: guess })
-  }</p>;
+  if (guess) return <DotReveal pattern={pattern} startedAt={guess.at} offset={0} easing={settings.revealEasing ?? DEFAULT_REVEAL_EASING}>
+    <p className="practice-result">{minigameResult('count-the-dots', Math.abs(guess.count - pattern.length), settings, false, { dotGuess: guess.count })}</p>
+  </DotReveal>;
   if (now >= deadline) return <p role="status">{text('timer.up')}</p>;
   return <Countdown startsAt={new Date(startsAt).toISOString()} offset={0}>
-    {now < guessAt ? <DotBoard pattern={pattern} /> : <>
-      <p className="timer" role="timer">{text('timer.left', { time: formatRemaining(deadline - now) })}</p>
-      <DotGuessForm disabled={false} onResult={result => setGuess(result.value)} />
-    </>}
+    {now < guessAt && <DotBoard pattern={pattern} />}
+    <p className="timer" role="timer">{text('timer.left', { time: formatRemaining(deadline - now) })}</p>
+    <DotGuessForm disabled={false} onResult={result => setGuess({ count: result.value, at: new Date().toISOString() })} />
   </Countdown>;
 }
 
-function PracticeAttempt({ game, settings, stage, attempt }: {
-  game: MinigameKey; settings: MinigameSettings; stage: Stage; attempt: number;
+function PracticeAttempt({ game, settings, stage, attempt, shared }: {
+  game: MinigameKey; settings: MinigameSettings; stage: Stage; attempt: number; shared: boolean;
 }) {
   const t = useText();
   const coinText = useTexts(COIN_TEXTS);
@@ -79,7 +79,7 @@ function PracticeAttempt({ game, settings, stage, attempt }: {
   const starts = attempt + countdown;
   const startsAt = new Date(starts).toISOString();
   const [goAt, setGoAt] = useState<string | null>(null);
-  const [cutTarget] = useState(() => game === 'cut-the-line' ? CUT_TARGETS[random(CUT_TARGETS.length)] : undefined);
+  const [cutTarget] = useState(() => game === 'cut-the-line' ? chooseCutTarget(settings as MinigameSettings<'cut-the-line'>, random) : undefined);
   const [angleTarget] = useState(() => game === 'match-the-angle' ? ANGLE_TARGETS[random(ANGLE_TARGETS.length)] : undefined);
   const [graph] = useState(() => {
     if (game !== 'draw-the-graph') return undefined;
@@ -114,19 +114,25 @@ function PracticeAttempt({ game, settings, stage, attempt }: {
   }, [duration, game, starts]);
 
   if (result) {
-    if (graph && result.graphLine) return <>
-      <GraphChart chart={graph.chart} answer={graph.data.hidden} traces={[{ id: 'own', hue: graph.hue, line: result.graphLine }]} />
-      <p className="mg-big" role="status">{minigameResult(game, graphError(graph.data, result.graphLine), settings)}</p>
-    </>;
+    if (graph && result.graphLine) {
+      const easing = (settings as MinigameSettings<'draw-the-graph'>).revealEasing ?? DEFAULT_REVEAL_EASING;
+      const animate = shared && easing !== 'instant';
+      const chart = <GraphChart chart={graph.chart} answer={graph.data.hidden} animateReveal={animate} traces={[{ id: 'own', hue: graph.hue, line: result.graphLine }]} />;
+      return <>
+        {animate ? <div className="graph-results" style={{ '--graph-reveal-easing': easing } as CSSProperties}>{chart}</div> : chart}
+        <p className="practice-result" role="status">{minigameResult(game, graphError(graph.data, result.graphLine), settings)}</p>
+      </>;
+    }
     if (pocket !== undefined) return <><RouletteReveal pocket={pocket} animate /><p>{coinText(ROULETTE_PICKS[result.value] === rouletteColor(pocket) ? 'right' : 'wrong')}</p></>;
     if (coin) return <><CoinReveal coin={coin} animate /><p>{coinText(COIN_SIDES[result.value] === coin ? 'right' : 'wrong')}</p></>;
     const { value, stroke } = result;
-    const label = cutTarget !== undefined ? minigameResult(game, Math.abs(value - cutTarget), settings, false, { cut: value })
-      : angleTarget !== undefined ? minigameResult(game, angleError(value, angleTarget), settings, false, { angle: value })
+    if (game === 'stop-clock') return <ClockResult target={(settings as MinigameSettings<'stop-clock'>).targetMs} elapsed={value} />;
+    if (cutTarget !== undefined) return <CutResult target={cutTarget} cut={value} />;
+    const label = angleTarget !== undefined ? minigameResult(game, angleError(value, angleTarget), settings, false, { angle: value })
       : minigameResult(game, stroke ? circleScore(stroke) : value, settings);
-    return <p className="mg-big" role="status">{result.early ? t('minigame.tooSoon') : label}</p>;
+    return <p className="practice-result" role="status">{result.early ? t('minigame.tooSoon') : label}</p>;
   }
-  if (expired && !STEP_RENDERERS[game]) return <p role="status">{t('timer.up')}</p>;
+  if (expired && !STEP_RENDERERS[game]) return <p className="mg-paused" role="status">{t('timer.up')}</p>;
   if (game === 'relay-drawing') return <Countdown startsAt={startsAt} offset={0}><RelayPractice settings={settings as MinigameSettings<'relay-drawing'>} /></Countdown>;
   if (STEP_RENDERERS[game]) return <Countdown startsAt={startsAt} offset={0}>
     <StepPractice game={game} settings={settings} starts={starts} expired={expired} />
@@ -176,7 +182,7 @@ function StepPractice({ game, settings, starts, expired }: { game: MinigameKey; 
       <p className="step-ask">{renderer.question(view, step, settings)}</p>
       {renderer.stake && <p className="step-stake">{renderer.stake(step, settings)}</p>}
       <StepChoices renderer={renderer} options={options} view={view} settings={settings} disabled={false} onChoose={choose} />
-    </div> : <p role="status" className="mg-big">{options ? text('timer.up') : game === 'lucky-doors'
+    </div> : <p role="status" className="practice-result">{options ? text('timer.up') : game === 'lucky-doors'
       ? t('points', { points: formatPoints(doors[Number(played[0])]!) }) : minigameResult(game, value, settings)}</p>}
   </div>;
 }
@@ -208,7 +214,7 @@ function RelayPractice({ settings }: { settings: MinigameSettings<'relay-drawing
   return <>
     {settings.animation && <p>{a('draw', { word })}</p>}
     <p>{t('turn', { turn: frames.length + 1, total })} · {text('timer.left', { time: formatRemaining(Math.max(0, deadline - now)) })}</p>
-    <DrawingPad key={frames.length} value={drawing} onChange={setDrawing} under={settings.animation ? [] : frames} label={t('draw')} />
+    <DrawingPad key={frames.length} value={drawing} onChange={setDrawing} under={settings.animation ? [] : frames} label={t('draw')} compactTools />
     <button type="button" onClick={finish}>{t('nextTurn')}</button>
   </>;
 }

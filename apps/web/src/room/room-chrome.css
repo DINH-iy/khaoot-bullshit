@@ -72,3 +72,4 @@
 .floating-scores h3 { font-size: .75rem; margin: 8px 0 4px; color: var(--r-muted); text-transform: uppercase; letter-spacing: .06em; }
 .room .floating-scores.docked { position: static; width: auto; box-shadow: none; background: var(--r-card-strong); }
 .room-display .floating-scores { width: 340px; font-size: 1.1rem; }
+.host-leave { display: flex; justify-content: flex-end; }

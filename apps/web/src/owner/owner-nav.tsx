@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { HostMenuSchema } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { rememberOwner } from './owner-session.js';
@@ -70,14 +70,15 @@ const menuLink = (link: Link, current: OwnerSection, t: Translate<keyof typeof O
  * Editor) on the left for everyone allowed; Feedback and, for the owner, a menu with the owner's own pages on the
  * right. Nothing for anyone else. The editor has its own header with the same links behind its logo (AppMenu).
  */
-export function OwnerNav({ current, role }: { current: OwnerSection; role: HostRole | null }) {
+export function OwnerNav({ current, role, mainAction }: { current: OwnerSection; role: HostRole | null; mainAction?: ReactNode }) {
   const menu = useMenu(); const t = useTexts(OWNER_TEXTS);
   if (!role) return null;
   const ownerPage = OWNER.find(link => link.key === current);
   return <header className="app-header">
     <a className="app-brand" href="/" aria-label={t('brand')}>party<span>.</span></a>
     <nav className="app-main" aria-label={t('main')}><ul>{MAIN.filter(link => role === 'owner' || link.editor).map(link =>
-      <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{t(link.label)}</a></li>)}</ul></nav>
+      <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{t(link.label)}</a></li>)}
+      {mainAction && <li>{mainAction}</li>}</ul></nav>
     <div className="app-end">
       <LanguagePicker label={t('language')} />
       <button type="button" className="app-feedback" {...{ [FEEDBACK_UI]: '' }} onClick={openFeedback}><FaIcon name="flag" /><span>{t('feedback')}</span></button>

@@ -9,6 +9,7 @@ import { AuthenticationUnavailable, createTokenVerifier, type TokenVerifier } fr
 import { RequestMetrics, now } from './diagnostics/observability.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 import { registerRoomNetworking } from './rooms/network.js';
+import { registerGrapherImport } from './authoring/grapher-import.js';
 import { registerLocalHosting } from './hosting/local-owner.js';
 import { createOwnerAccess } from './hosting/owner-access.js';
 import { registerFeedbackRoutes } from './feedback/routes.js';
@@ -136,6 +137,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   if (options.database?.client) {
     const owner = createOwnerAccess(app, config, options.database.client);
     registerLocalHosting(app, options.database.client, config, owner, live);
+    registerGrapherImport(app, owner);
     registerFeedbackRoutes(app, options.database.client, config, owner);
     registerPeopleRoutes(app, options.database.client, config, owner, live);
     registerGroupRoutes(app, options.database.client, owner);

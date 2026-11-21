@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ANIMATION_PRESETS, AWARD_RULES, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MOMENTS, THEME_PRESETS, ThemeSchema } from '@party/contracts';
+import { ANIMATION_PRESETS, AWARD_RULES, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MinigameSettingsSchemas, MOMENTS, PHONE_MENU_ACTIONS, PHONE_MENU_GLYPHS, RevealEasingSchema, THEME_PRESETS, ThemeSchema } from '@party/contracts';
 
 // The instructions the app copies for an AI ("Copy instructions for an AI") must know every
 // feature an author can use, or AI-made games silently miss them. When a feature is added,
@@ -23,6 +23,15 @@ describe('the instructions for an AI know every feature', () => {
   });
   it('every minigame and every head-to-head game', () => {
     expect(missing(quoted([...MINIGAME_KEYS, ...HEAD_TO_HEAD_KEYS]))).toEqual([]);
+  });
+  it('every minigame settings field and reveal easing option', () => {
+    for (const game of MINIGAME_KEYS) {
+      expect(missing(Object.keys(MinigameSettingsSchemas[game].shape)), game).toEqual([]);
+    }
+    expect(missing(RevealEasingSchema.options)).toEqual([]);
+  });
+  it('the phone menu icon setting, actions and icon choices', () => {
+    expect(missing(['phoneMenuIcons', ...PHONE_MENU_ACTIONS, ...PHONE_MENU_GLYPHS])).toEqual([]);
   });
   it('the game-wide extras: wheels, awards (every rule), side games, places and teams', () => {
     expect(missing(quoted(['wheels', 'spin', 'wheelClear', 'awards', 'sideGames', 'chips', 'openInvites', 'quickTime', 'idleCloseMinutes', 'autoRevealSeconds', 'birthdayVote', 'voteMode', 'voteLimit', 'resultCards', 'countdownSeconds', 'explain', 'places', 'inTeams', 'look', 'media', 'music']))).toEqual([]);

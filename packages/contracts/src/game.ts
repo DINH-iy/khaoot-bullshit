@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from './head-to-head.js';
 import { GAME_LANGUAGES, PresentationSchema, ThemeSchema, AnimationChoiceSchema, TranslatedTextsSchema } from './presentation.js';
 import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames/shared/catalog.js';
+import { GraphPlaybackActionSchema, GraphPlaybackSchema } from './minigames/draw-the-graph/graph.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
@@ -89,6 +90,7 @@ const hostEnvelope = { ...envelope, expectedRevision: RevisionSchema };
 export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('session.create'), expectedRevision: z.literal(0), gameVersionId: GameIdSchema, mode: z.enum(['LIVE', 'REHEARSAL']) }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('session.start') }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('minigame.tryout'), game: GameKeySchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('session.pause') }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('session.resume') }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('stage.close'), stageRunId: GameIdSchema }).strict(),
@@ -105,6 +107,7 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   // Shows the closed stage's answer, awards and updated scores to everyone.
   z.object({ ...hostEnvelope, type: z.literal('stage.reveal'), stageRunId: GameIdSchema }).strict(),
   z.object({ ...envelope, type: z.literal('stage.autoReveal'), stageRunId: GameIdSchema }).strict(),
+  z.object({ ...hostEnvelope, type: z.literal('stage.graphPlayback'), stageRunId: GameIdSchema, action: GraphPlaybackActionSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('stage.nextResult'), stageRunId: GameIdSchema }).strict(),
   // A correction is a new ledger entry; earlier awards and judgments are never edited.
   z.object({ ...hostEnvelope, type: z.literal('score.adjust'), playerId: GameIdSchema, amountMilli: AdjustmentMilliSchema, reason: z.string().trim().min(1).max(120) }).strict(),
@@ -220,7 +223,8 @@ export const PublicRouteSchema = z.object({
 // A duel as screens see it: the two duelists (null until picked), the bets on each
 // (live, for everyone), the points at stake and, once decided, the winner.
 export const PublicDuelSchema = z.object({
-  duelistIds: z.tuple([GameIdSchema, GameIdSchema]).nullable(), pick: z.enum(['random', 'host']),
+  duelistIds: z.tuple([GameIdSchema, GameIdSchema]).nullable(), pick: z.enum(['random', 'host', 'teams']),
+  teamIds: z.tuple([GameIdSchema, GameIdSchema]).optional(),
   bets: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(0) }).strict()),
   placesMilli: z.array(AwardMilliSchema), betMilli: AwardMilliSchema, winnerId: GameIdSchema.nullable(),
   // How the duel is won: the host names the winner, or a head-to-head game on the duelists' phones (its board as this viewer sees it).
@@ -263,6 +267,7 @@ export const PublicStageSchema = z.object({
   ballot: z.array(BallotEntrySchema).nullable(),
   countdownUntil: z.string().datetime().optional(),
   voteMode: VotingModeSchema.optional(), voteLimit: z.number().int().min(1).max(MAX_BALLOT_SELECTIONS).optional(),
+  graphPlayback: GraphPlaybackSchema.optional(),
   resultCards: z.object({ mode: ResultCardsSchema, revealedAt: z.string().datetime(), index: z.number().int().min(0) }).strict().optional(),
   minigame: PublicMinigameSchema.nullable(),
   duel: PublicDuelSchema.nullable(),

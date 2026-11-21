@@ -158,3 +158,22 @@ describe('minigame rules', () => {
     expect(minigameOutcome(rules('match-the-angle'), rows, context, 'stage').entries[0]?.teamId).toBe(right);
   });
 });
+
+describe('authored precision targets', () => {
+  it('uses exact cuts including the endpoints and draws from an inclusive range', () => {
+    expect(startMinigame('cut-the-line', { target: { mode: 'exact', value: 0 } }, now).cutTarget).toBe(0);
+    expect(startMinigame('cut-the-line', { target: { mode: 'exact', value: 100 } }, now).cutTarget).toBe(100);
+    expect(startMinigame('cut-the-line', { target: { mode: 'range', min: 27, max: 32 } }, now, () => 0).cutTarget).toBe(27);
+    expect(startMinigame('cut-the-line', { target: { mode: 'range', min: 27, max: 32 } }, now, max => max - 1).cutTarget).toBe(32);
+  });
+
+  it('uses the authored dot range and limits overlap to two units', () => {
+    const first = startMinigame('count-the-dots', { viewSeconds: 5, count: { mode: 'range', min: 14, max: 18 }, allowOverlap: true }, now, () => 0);
+    const pattern = first.dots!.pattern;
+    expect(pattern).toHaveLength(14);
+    const distances = pattern.flatMap(([x, y], index) => pattern.slice(index + 1).map(([otherX, otherY]) => Math.hypot(x - otherX, y - otherY)));
+    expect(Math.min(...distances)).toBe(20);
+    const last = startMinigame('count-the-dots', { viewSeconds: 5, count: { mode: 'range', min: 14, max: 18 } }, now, max => max - 1);
+    expect(last.dots!.pattern).toHaveLength(18);
+  });
+});

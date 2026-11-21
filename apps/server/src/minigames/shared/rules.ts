@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { CoinSideSchema, createDotPattern, isSharedPrediction, ROULETTE_POCKETS, RoulettePocketSchema } from '@party/contracts';
-import { ANGLE_TARGETS, AngleSchema, ANIMATION_WORDS, CUT_TARGETS, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { ANGLE_TARGETS, AngleSchema, ANIMATION_WORDS, chooseCutTarget, CutTargetSchema, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { GameError, requireGame } from '../../game/errors.js';
 import { DotRunSchema } from '../count-the-dots/dots.js';
 import { GraphRunSchema, judgeGraph, startGraph } from '../draw-the-graph/graph.js';
@@ -25,7 +25,7 @@ import type { ClaimedResult, JudgedResult, ResultJudge } from './judging.js';
 export const StepSideSchema = z.object({ state: z.unknown(), step: z.number().int().min(0), stepAt: z.string().datetime(), captainId: z.string().uuid().nullable(), voteEndsAt: z.string().datetime().nullable() }).strict();
 export type StepSide = z.infer<typeof StepSideSchema>;
 export const MinigameRunSchema = z.object({ startsAt: z.string().datetime(), goAt: z.string().datetime().nullable(), doorsMilli: z.array(z.string()).nullable(),
-  cutTarget: z.number().int().min(1).max(99).optional(),
+  cutTarget: CutTargetSchema.optional(),
   angleTarget: AngleSchema.optional(),
   dots: DotRunSchema.optional(),
   graph: GraphRunSchema.optional(),
@@ -52,14 +52,14 @@ export function startMinigame(game: MinigameKey, settings: MinigameSettings, now
     return { startsAt: new Date(startsAt).toISOString(), goAt: null, doorsMilli: doors };
   }
   const run: MinigameRun = { startsAt: new Date(startsAt).toISOString(), goAt: null, doorsMilli: null };
-  if (game === 'cut-the-line') run.cutTarget = CUT_TARGETS[random(CUT_TARGETS.length)]!;
+  if (game === 'cut-the-line') run.cutTarget = chooseCutTarget(settings as MinigameSettings<'cut-the-line'>, random);
   if (game === 'match-the-angle') run.angleTarget = ANGLE_TARGETS[random(ANGLE_TARGETS.length)]!;
   if (game === 'draw-the-graph') run.graph = startGraph(settings as MinigameSettings<'draw-the-graph'>, random);
   if (game === 'heads-or-tails') run.coin = flipCoin(random);
   if (game === 'red-or-black-roulette') run.roulette = random(ROULETTE_POCKETS);
   if (game === 'count-the-dots') {
-    const { viewSeconds } = settings as MinigameSettings<'count-the-dots'>;
-    run.dots = { pattern: createDotPattern(random), guessAt: new Date(startsAt + viewSeconds * 1000).toISOString() };
+    const dots = settings as MinigameSettings<'count-the-dots'>;
+    run.dots = { pattern: createDotPattern(random, dots), guessAt: new Date(startsAt + dots.viewSeconds * 1000).toISOString() };
   }
   if (game === 'relay-drawing' && (settings as MinigameSettings<'relay-drawing'>).animation) {
     const prompts = ANIMATION_WORDS.map((_, index) => index);

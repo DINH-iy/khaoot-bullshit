@@ -582,3 +582,7 @@
   .room :is(.bottom-sheet, .host-dialog) { animation: room-panel-enter 150ms ease-out both; }
   .room button { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
 }
+
+.result-page-actions { display: flex; justify-content: center; align-items: center; gap: 10px; margin-block-start: 8px; }
+.room .result-page-actions button { min-height: 44px; min-width: 44px; padding: 0 6px; }
+.result-page-actions span { color: var(--r-muted); font-size: .875rem; font-variant-numeric: tabular-nums; }

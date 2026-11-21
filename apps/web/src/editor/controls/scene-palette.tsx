@@ -4,13 +4,14 @@ import { roomApi } from '../../room/api.js';
 import { Icon } from './icons.js';
 import { translate } from '../../i18n/texts.js';
 import { marked } from '../../i18n/rich.js';
+import { MINIGAME_GROUPS } from './minigame-groups.js';
 import { CONTROLS_TEXTS } from './controls.text.js';
 const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROLS_TEXTS, key, values);
 import { SCENE_GROUPS, SCENE_TYPES, SCENE_VARIANTS, type SceneType } from '../model.js';
 
 export interface SceneChoice { type: SceneType; variant?: string }
 type Tab = string; // a scene group's key, or 'prefabs'
-type View = { kind: 'list' | 'variants'; tab: Tab; type?: SceneType };
+type View = { kind: 'list' | 'variants'; tab: Tab; type?: SceneType; category?: string };
 // Whether the last thing the person did was a key press: only then does a menu move
 // focus to its first item (a mouse user would just see a stray focus ring).
 let usingKeyboard = false;
@@ -39,35 +40,43 @@ export function ScenePalette({ label, onPick, onCancel, onPrefab, only, inline }
   const level = view.kind === 'variants' ? view.type! : 'list';
   useEffect(() => { if (usingKeyboard) menu.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus(); }, [level]);
   const choose = (tab: Tab) => { lastTab = tab; setView({ kind: 'list', tab }); };
+  const current = view.kind === 'variants' ? SCENE_TYPES.find(type => type.type === view.type)! : null;
+  const variants = view.kind === 'variants' ? SCENE_VARIANTS[view.type!] ?? [] : [];
+  const categories = view.type === 'minigame' ? [
+    ...MINIGAME_GROUPS.map(group => ({ key: group.key, name: group.name, variants: variants.filter(variant => group.games.some(game => game === variant.key)) })),
+    { key: 'other', name: t('other'), variants: variants.filter(variant => !MINIGAME_GROUPS.some(group => group.games.some(game => game === variant.key))) },
+  ].filter(category => category.variants.length) : [];
+  const category = categories.find(group => group.key === view.category) ?? categories[0];
+  const activeTabs = view.kind === 'list' ? tabs : categories;
+  const activeTab = category?.key ?? view.tab;
+  const chooseTab = (key: string) => view.kind === 'list' ? choose(key) : setView({ ...view, category: key });
   // Arrow keys move between tabs, as in any tab list.
   const onTabKey = (event: KeyboardEvent<HTMLDivElement>) => {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (!step || view.kind !== 'list') return;
+    if (!step) return;
     event.preventDefault();
-    const next = tabs[(tabs.findIndex(tab => tab.key === view.tab) + step + tabs.length) % tabs.length]!.key;
-    choose(next); requestAnimationFrame(() => tabList.current?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus());
+    const next = activeTabs[(activeTabs.findIndex(tab => tab.key === activeTab) + step + activeTabs.length) % activeTabs.length]!.key;
+    chooseTab(next); requestAnimationFrame(() => tabList.current?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus());
   };
-  const current = view.kind === 'variants' ? SCENE_TYPES.find(type => type.type === view.type)! : null;
-  const variants = view.kind === 'variants' ? SCENE_VARIANTS[view.type!] ?? [] : [];
   const heading = current ? `${label} · ${current.name}` : view.tab === 'prefabs' ? t('withPrefabs', { label }) : label;
   const shown = view.kind === 'list' ? groups.find(group => group.key === view.tab)?.types ?? [] : [];
   return <div className={`add-menu${inline ? ' inline' : ''}`} onPointerDown={event => event.stopPropagation()}>
     <p id={`${id}-heading`}>{heading}</p>
-    {view.kind === 'list' && tabs.length > 1 && <div ref={tabList} className="add-tabs" role="tablist" aria-label={t('sceneSorts')} onKeyDown={onTabKey}>
-      {tabs.map(tab => <button key={tab.key} type="button" role="tab" data-tab={tab.key} id={`${id}-tab-${tab.key}`} aria-selected={view.tab === tab.key} aria-controls={`${id}-list`} tabIndex={view.tab === tab.key ? 0 : -1} onClick={() => choose(tab.key)}>{tab.name}</button>)}
+    {activeTabs.length > 1 && <div ref={tabList} className={category ? 'add-tabs add-game-tabs' : 'add-tabs'} role="tablist" aria-label={t(category ? 'minigameSorts' : 'sceneSorts')} onKeyDown={onTabKey}>
+      {activeTabs.map(tab => <button key={tab.key} type="button" role="tab" data-tab={tab.key} id={`${id}-tab-${tab.key}`} aria-selected={activeTab === tab.key} aria-controls={`${id}-list`} tabIndex={activeTab === tab.key ? 0 : -1} onClick={() => chooseTab(tab.key)}>{tab.name}</button>)}
     </div>}
-    <div ref={menu} id={`${id}-list`} className="add-list" role="menu" aria-label={heading}>
+    <div key={category?.key} ref={menu} id={`${id}-list`} className="add-list" role="menu" aria-label={heading}>
       {shown.map(type => {
         const info = SCENE_TYPES.find(entry => entry.type === type)!; const variants = SCENE_VARIANTS[type];
         return <button key={type} role="menuitem" aria-haspopup={variants ? 'menu' : undefined} onClick={() => variants ? setView({ kind: 'variants', tab: view.tab, type }) : onPick({ type })}>
           <Icon name={info.icon} /><span><strong>{info.name}</strong><small>{info.hint}</small></span>{variants && <span className="add-more" aria-hidden="true">›</span>}</button>;
       })}
-      {variants.map(variant => <button key={variant.key} role="menuitem" onClick={() => onPick({ type: current!.type, variant: variant.key })}>
+      {(category?.variants ?? variants).map(variant => <button key={variant.key} role="menuitem" onClick={() => onPick({ type: current!.type, variant: variant.key })}>
         <Icon name={current!.icon} /><span><strong>{variant.name}</strong><small>{variant.hint}</small></span></button>)}
       {view.kind === 'list' && view.tab === 'prefabs' && onPrefab && <PrefabMenu onInsert={onPrefab} />}
     </div>
     <div className="add-menu-foot">
-      {view.kind === 'variants' ? <button type="button" onClick={() => setView({ kind: 'list', tab: view.tab })}>‹ Back</button> : <span />}
+      {view.kind === 'variants' ? <button type="button" onClick={() => setView({ kind: 'list', tab: view.tab })}>‹ {t('back')}</button> : <span />}
       <button type="button" className="add-cancel" onClick={onCancel}>{t('cancel')}</button>
     </div>
   </div>;

@@ -1,3 +1,6 @@
 .clap-beat { display: grid; gap: .75rem; width: min(100%, 25rem); }
 .clap-cue { margin: 0; padding: .6em 1em; text-align: center; font-weight: 800; border-radius: var(--r-radius); background: var(--r-surface); }
 .clap-cue.go { background: var(--r-accent); color: var(--r-accent-ink); }
+
+.room .clap-pad { display: grid; align-content: center; justify-items: center; gap: 4px; }
+.clap-pad small { font-size: .875rem; font-weight: 600; }

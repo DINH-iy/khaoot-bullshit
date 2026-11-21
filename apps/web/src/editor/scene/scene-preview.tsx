@@ -1,4 +1,7 @@
 import { GraphChart } from '../../minigames/draw-the-graph/graph-chart.js';
+import { isDefaultGraphQuestion } from '../../minigames/draw-the-graph/graph-question.js';
+import { GRAPH_TEXTS } from '../../minigames/draw-the-graph/graph.text.js';
+import { DotGuessForm } from '../../minigames/count-the-dots/count-dots.js';
 import { SpeedRunBoard } from '../../minigames/speed-run/speed-run.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
@@ -36,6 +39,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const fields = useTexts(INSPECTOR_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
   const practiceText = useTexts(PRACTICE_TEXTS);
+  const graphText = useTexts(GRAPH_TEXTS);
   const radioGroup = useId();
   const language = useLanguage();
   const stage = node.stages[index]!;
@@ -48,7 +52,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const title = translations?.title ?? String(stage.title ?? '');
   const label = stage.kind === 'info' ? title : prompt;
   const promptLabel = fields(stage.kind === 'info' ? 'lInfo' : 'lQuestion');
-  const timer = typeof stage.durationMs === 'number' ? look.text('timer.left', { time: formatRemaining(stage.durationMs) }) : null;
+  const timer = typeof stage.durationMs === 'number' && !(stage.kind === 'minigame' && stage['game'] === 'stop-clock') ? look.text('timer.left', { time: formatRemaining(stage.durationMs) }) : null;
   const input = stage['input'] as { kind?: string; options?: { key: string; label: string }[]; items?: { key: string; label: string }[]; layout?: string } | undefined;
   const options = (stage.kind === 'route' ? optionsOf(node) : input?.options ?? input?.items ?? []).map(option => ({
     ...option, label: Object.hasOwn(translations?.labels ?? {}, option.key) ? translations!.labels![option.key]! : option.label,
@@ -72,10 +76,14 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const sharedMedia = contentMedia('display');
   const game = stage['game'];
   const minigame = stage.kind === 'minigame' && typeof game === 'string' && isMinigameKey(game) ? game : undefined;
+  const compactPhone = interactive && device === 'phone' && Boolean(minigame);
+  const phoneLabel = compactPhone && minigame === 'draw-the-graph' && isDefaultGraphQuestion(label)
+    ? graphText(GraphSettingsSchema.safeParse(stage['settings']).data?.graph ? 'trendQuestion' : 'sampleQuestion')
+    : compactPhone && !label && minigame ? gameName(minigame) : label;
   const minigameIntro = minigame ? <MinigamePreview stage={stage} game={minigame} text={look.text} /> : null;
   const practice = interactive ? <LookContext.Provider value={look}>
-    {minigame === 'count-the-dots' && device === 'phone' ? minigameIntro
-      : minigame ? <MinigamePractice stage={stage} game={minigame} intro={minigameIntro} /> : <ScenePractice definition={definition} stage={stage} options={options} />}
+    {minigame === 'count-the-dots' && device === 'phone' ? <DotGuessForm disabled onResult={() => {}} />
+      : minigame ? <MinigamePractice stage={stage} game={minigame} shared={device === 'sharedScreen'} intro={compactPhone && (minigame === 'draw-the-graph' || minigame === 'cut-the-line') ? null : minigameIntro} /> : <ScenePractice definition={definition} stage={stage} options={options} />}
   </LookContext.Provider> : null;
   const minigameCard = minigame && !interactive ? <>
     {minigameIntro}
@@ -114,9 +122,9 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
         {stage.kind === 'scoreboard' && <ol className="tv-scores"><li>{t('playerOne')} <b>30</b></li><li>{t('playerTwo')} <b>20</b></li><li>{t('playerThree')} <b>10</b></li></ol>}
       </div></figure>}
     {device !== 'sharedScreen' && <figure className="phone"><figcaption>{t('phone')}</figcaption>
-      <div className={`phone-screen room room-player ${classes}`} style={style}>
+      <div className={`phone-screen room room-player ${classes}${compactPhone ? ' compact-game-preview' : ''}`} style={style}>
         <SceneComposition layout={layout} media={contentMedia('player')}>
-          <p className="phone-prompt">{label}</p>
+          <p className="phone-prompt">{phoneLabel}</p>
           {stage.kind === 'info' && <p className="phone-hint">{prompt}</p>}
         </SceneComposition>
         {!interactive && timer && <p className="timer">{timer}</p>}
@@ -146,8 +154,8 @@ function MinigamePreview({ stage, game, text }: { stage: Stage; game: keyof type
       : game === 'draw-the-graph' ? <GraphChart chart={GraphSettingsSchema.safeParse(settings).data?.graph ?? SAMPLE_GRAPH} />
       : <div className={`minigame-preview-symbol game-${game}`} aria-hidden="true">
       {game === 'stop-clock' ? <FaIcon name="stopwatch" /> : game === 'perfect-circle' ? '◯'
-        : game === 'relay-drawing' ? '✎' : game === 'lucky-doors' ? '▮ ▮ ▮' : game === 'majority' ? '← →'
-        : game === 'cut-the-line' ? '━╋━━' : game === 'match-the-angle' ? '∠' : game === 'count-the-dots' ? '•••' : game === 'red-or-black-roulette' ? '◉' : game === 'bus' ? '♠ ♥' : <FaIcon name="bolt" />}
+        : game === 'relay-drawing' ? '✎' : game === 'lucky-doors' ? '▮▮▮' : game === 'majority' ? '↔'
+        : game === 'cut-the-line' ? '┿' : game === 'match-the-angle' ? '∠' : game === 'count-the-dots' ? '•••' : game === 'red-or-black-roulette' ? '◉' : game === 'bus' ? <FaIcon name="heart" /> : <FaIcon name="bolt" />}
     </div>}
     <div className="minigame-preview-copy">
       <h3>{gameName(game)}</h3>

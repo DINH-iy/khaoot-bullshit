@@ -97,3 +97,7 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 @keyframes loader-pulse { 50% { transform: scale(1.04); opacity: .85; } }
 @keyframes loader-dot { 40% { opacity: 1; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .page-loader-mark, .page-loader-dots i { animation: none; } }
+
+/* Links keep their focus indicator and use weight or button styling for recognition. */
+a, a:hover, a:focus-visible { text-decoration: none; }
+a:not([class]) { font-weight: 650; }

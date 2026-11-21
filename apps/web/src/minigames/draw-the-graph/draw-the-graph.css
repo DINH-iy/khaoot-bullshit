@@ -14,11 +14,39 @@
 .graph-label text { font-size: 10px; font-weight: 700; }
 .graph-controller { touch-action: none; }
 .graph-draw-area { cursor: crosshair; }
-.graph-key-cursor { display: none; stroke: #fff; stroke-width: 1; }
-.graph-controller:focus-visible .graph-key-cursor { display: block; }
-.graph-phone { display: grid; gap: .75rem; width: 100%; }
-.graph-phone > p { margin: 0; }
-.graph-phone .actions { justify-content: end; }
+.graph-phone { display: grid; gap: .5rem; width: 100%; }
+.graph-phone > p { margin: 0; font-size: .9375em; }
+.graph-phone .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.graph-phone .actions > button { padding-inline: .5rem; overflow-wrap: anywhere; }
+.room .round-graph .graph-chart { width: 100%; }
+.room-player .room-grid:has(.round-graph) { padding-inline: clamp(4px, 1.25vw, 12px); }
+.room-player .stage-card.round-graph {
+  width: 100%; max-width: max(32rem, calc(125svh - 14rem)); margin-inline: auto;
+  padding: 12px clamp(4px, 1vw, 12px) !important; gap: 8px;
+}
+.room-player .round-graph :is(.scene-composition, .progress-line) { padding-inline: .375rem; }
+.room-player .round-graph .progress-line { margin-bottom: .375rem; font-size: .875em; }
 .graph-swatch { display: inline-block; margin-inline-end: .35em; width: .8em; height: .8em; vertical-align: baseline; border: 1px solid currentColor; border-radius: 50%; }
 .graph-reveal-key { margin: 0; text-align: center; }
 .graph-reveal-key::before { content: ''; display: inline-block; width: 1.25em; margin-inline-end: .4em; vertical-align: middle; border-top: 2px dashed currentColor; }
+.graph-source { margin: 0; text-align: center; overflow-wrap: anywhere; }
+.graph-reading { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; column-gap: .6rem; min-block-size: 3em; }
+.graph-difference { opacity: .15; }
+.graph-cursor circle { stroke: #fff; stroke-width: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .graph-results { --graph-reveal-duration: 2s; }
+  .graph-reveal-sweep {
+    animation: graph-draw-on var(--graph-reveal-duration) var(--graph-reveal-easing, ease-in) both;
+    animation-delay: calc(-1 * var(--graph-reveal-elapsed, 0ms)); animation-play-state: var(--graph-reveal-state, running);
+  }
+  .graph-chart-revealing .graph-label, .graph-results .graph-places {
+    animation: graph-show-results 0s both;
+    animation-delay: calc(var(--graph-reveal-duration) - var(--graph-reveal-elapsed, 0ms));
+    animation-play-state: var(--graph-reveal-state, running);
+  }
+}
+@keyframes graph-draw-on { from { width: 0; } }
+@keyframes graph-show-results { from { visibility: hidden; } to { visibility: visible; } }
+
+.graph-replay-controls { display: flex; flex-wrap: wrap; gap: .4rem; }
+.room .graph-replay-controls button { min-height: 40px; padding: .35rem .7rem; font-size: .85em; }

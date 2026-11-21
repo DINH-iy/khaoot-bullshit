@@ -20,3 +20,15 @@
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 8px; height: 8px; border-radius: 50%; background: var(--r-text); pointer-events: none;
 }
+
+.mg-angle-comparison { width: min(100%, 11rem, 27svh); cursor: default; }
+.mg-angle-comparison .mg-angle-ray:not(.target-ray) { width: 35%; }
+.mg-angle-comparison .mg-angle-ray::after { right: -5px; width: 10px; height: 10px; }
+.mg-angle-comparison .target-ray {
+  width: 46%;
+  height: 0;
+  margin-top: -1px;
+  border-top: 2px dashed var(--r-text);
+  background: none;
+}
+.mg-angle-comparison .target-ray::after { content: none; }

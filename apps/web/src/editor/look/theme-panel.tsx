@@ -1,8 +1,11 @@
-import { contrast, FONTS, resolveTheme, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
+import { contrast, FONTS, resolveTheme, SLIDER_STYLES, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
+import { themeStyle } from '../../presentation/look.js';
+import { DialSlider } from '../../ui/dial-slider.js';
+import '../../ui/game-slider.css';
 import { Dropdown } from '../../ui/dropdown.js';
 import { Section } from '../controls/section.js';
 import { Swatches } from '../controls/swatches.js';
-import { useState } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
 const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
@@ -19,6 +22,20 @@ const fontLabel = (font: FontName) => t(FONT_KEYS[font]);
 const fontOptions = () => (Object.keys(FONTS) as FontName[]).map(font => ({ value: font, label: fontLabel(font), style: { fontFamily: FONTS[font] } }));
 const BACKGROUND_KEYS = { glow: 'bGlow', gradient: 'bGradient', solid: 'bSolid', dots: 'bDots', stripes: 'bStripes', grid: 'bGrid' } as const;
 const TILE_KEYS = { filled: 'tFilled', flat: 'tFlat', outline: 'tOutline', glass: 'tGlass' } as const;
+const SLIDER_KEYS = { blade: 'sliderBlade', notch: 'sliderNotch', ring: 'sliderRing', dial: 'sliderDial' } as const;
+const DEMO_YEARS = Array.from({ length: 501 }, (_, index) => String(1500 + index));
+
+function DialPreview({ colors }: { colors: FullTheme['colors'] }) {
+  const id = useId();
+  const [value, setValue] = useState(223);
+  return <div className="dial-preview" style={{
+    '--dial-accent': colors.accent, '--dial-ink': colors.accentText, '--dial-surface': colors.surface,
+    '--dial-track': colors.muted, '--dial-label': colors.text, background: colors.surface, color: colors.text,
+  } as CSSProperties}>
+    <label htmlFor={id} className="visually-hidden">{t('sliderDemo')}</label>
+    <DialSlider id={id} labels={DEMO_YEARS} value={value} onChange={setValue} />
+  </div>;
+}
 
 
 // The marks before each answer: what they are, their shape and place, and what party choices use.
@@ -108,6 +125,17 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       <div className="segmented" role="group" aria-label={t('answerTiles')}>{(Object.keys(TILE_KEYS) as (keyof typeof TILE_KEYS)[]).map(key => <button key={key} aria-pressed={full.tiles === key} onClick={() => set({ tiles: key })}>{t(TILE_KEYS[key])}</button>)}</div></>}
       <label className="choice"><input type="checkbox" checked={full.gradients} onChange={event => set({ gradients: event.target.checked })} />{t(noAnswers ? 'gradientButton' : 'gradientAll')}</label>
     </Section>
+
+    {!noAnswers && <Section title={t('sliders')} memory="look:sliders" summary={t(SLIDER_KEYS[full.sliderStyle])}>
+      <div className="preset-grid" role="group" aria-label={t('sliders')} style={themeStyle(full)}>
+        {SLIDER_STYLES.map(style => <button key={style} type="button" className="slider-option"
+          aria-pressed={full.sliderStyle === style} onClick={() => set({ sliderStyle: style })}>
+          <span className={`game-slider slider-${style} slider-sample`} aria-hidden="true" />
+          {t(SLIDER_KEYS[style])}
+        </button>)}
+      </div>
+      {full.sliderStyle === 'dial' && <DialPreview colors={full.colors} />}
+    </Section>}
 
     {!noAnswers && <Section title={t('answerMarks')} memory="look:marks" summary={markName}>
       {markChoices().map(({ key, label, options }) => <div key={key}>

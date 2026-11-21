@@ -1,0 +1,68 @@
+.dial-slider {
+  --r-accent: var(--dial-accent, var(--e-accent));
+  --r-accent-ink: var(--dial-ink, var(--e-bg));
+  --r-surface: var(--dial-surface, var(--e-panel));
+  --r-muted: var(--dial-track, var(--e-border));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: ". value ." "less rail more" ". ticks .";
+  align-items: center;
+  column-gap: 6px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.dial-slider .game-slider {
+  grid-area: rail;
+  --slider-track-fill: linear-gradient(to right, var(--r-accent) var(--dial-position), var(--r-muted) var(--dial-position));
+}
+.dial-value {
+  grid-area: value;
+  justify-self: center;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--r-accent);
+  color: var(--r-accent-ink);
+  font-size: 1rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.dial-slider button.dial-step {
+  grid-area: less;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.dial-slider button.dial-step:last-of-type { grid-area: more; }
+.dial-ticks {
+  grid-area: ticks;
+  display: grid;
+  gap: 3px;
+  margin-block-start: -5px;
+  color: var(--dial-label, var(--e-muted));
+  font-size: .75rem;
+  text-align: center;
+}
+.dial-ticks > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dial-ticks > span::before {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 4px;
+  margin: 0 auto 2px;
+  background: currentColor;
+}
+.dial-ticks > span:first-child { text-align: left; }
+.dial-ticks > span:last-child:not(:first-child) { text-align: right; }
+.dial-ticks > span:first-child::before { margin-left: 0; }
+.dial-ticks > span:last-child:not(:first-child)::before { margin-right: 0; }
+
+@media (forced-colors: active) {
+  .dial-slider .game-slider { --slider-track-fill: ButtonText; }
+}

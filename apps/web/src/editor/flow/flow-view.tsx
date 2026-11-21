@@ -1,5 +1,5 @@
 import { editingAction, type ZoomShortcuts } from './zoom-shortcuts.js';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { Inspector } from '../scene/inspector.js';
@@ -303,18 +303,37 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const at = fromKeyboard || !rect ? { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } : toCanvas(event.clientX, event.clientY);
     select([]); setAdding({ from: null, option: undefined, at, place: { x: at.x - CARD_WIDTH / 2, y: at.y - 24 } });
   };
-  // The add menu stays inside the map: its real size is measured once shown, and it moves left or up to fit.
-  const menuRef = useRef<HTMLDivElement>(null); const [menuSize, setMenuSize] = useState({ width: 300, height: 560 });
+  // The palette lives outside the zoomed surface. Its list can change size when a category opens.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuSize, setMenuSize] = useState({ width: 0, height: 0 });
+  const menuOpen = adding !== null;
   useLayoutEffect(() => {
-    const menu = menuRef.current?.firstElementChild as HTMLElement | null; if (!menu) return;
-    const size = { width: menu.offsetWidth, height: menu.offsetHeight };
-    if (size.width !== menuSize.width || size.height !== menuSize.height) setMenuSize(size);
-  });
-  const menuSpot = (at: Point) => {
-    const rect = canvas.current?.getBoundingClientRect(); if (!rect) return { left: at.x, top: at.y };
-    const screenX = Math.max(8, Math.min(at.x * view.zoom + view.x, rect.width - menuSize.width - 8));
-    const screenY = Math.max(8, Math.min(at.y * view.zoom + view.y, rect.height - menuSize.height - 8));
-    return { left: (screenX - view.x) / view.zoom, top: (Math.max(8, screenY) - view.y) / view.zoom, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 0' };
+    if (!menuOpen || !menuRef.current) return;
+    const menu = menuRef.current;
+    const measure = () => {
+      const { offsetWidth: width, offsetHeight: height } = menu;
+      setMenuSize(previous => previous.width === width && previous.height === height ? previous : { width, height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(menu);
+    const resize = () => setMenuSize({ width: menu.offsetWidth, height: menu.offsetHeight });
+    window.addEventListener('resize', resize);
+    return () => { observer.disconnect(); window.removeEventListener('resize', resize); };
+  }, [menuOpen]);
+  const menuSpot = (at: Point): CSSProperties => {
+    const rect = canvas.current?.getBoundingClientRect();
+    if (!rect) return { left: 8, top: 8 };
+    const upper = Math.max(8, 8 - rect.top);
+    // Keep the palette above the floating editor tabs, even when the map has a larger minimum height.
+    const lower = Math.min(rect.height, window.innerHeight - rect.top) - 76;
+    const right = Math.min(rect.width, window.innerWidth - rect.left) - 8;
+    return {
+      left: Math.max(8, Math.min(at.x * view.zoom + view.x, right - menuSize.width)),
+      top: Math.max(upper, Math.min(at.y * view.zoom + view.y, lower - menuSize.height)),
+      '--flow-menu-width': `${Math.max(0, right - 8)}px`,
+      '--flow-menu-height': `${Math.max(0, lower - upper)}px`,
+    } as CSSProperties;
   };
 
   // ---------- keyboard ----------
@@ -464,8 +483,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           </div>;
         })}
         <PeerCursors live={live} zoom={view.zoom} />
-        {adding && <div className="add-menu-anchor" ref={menuRef} style={menuSpot(adding.at)}><ScenePalette label={t(adding.onEdge ? 'addOnArrow' : adding.from ? 'addConnected' : 'addScene')} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       </div>
+      {adding && <div className="add-menu-anchor" ref={menuRef} style={menuSpot(adding.at)}><ScenePalette label={t(adding.onEdge ? 'addOnArrow' : adding.from ? 'addConnected' : 'addScene')} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       {/* A selected arrow's actions float at the top of the map (never on the line, which keeps its bend handles free; never in the toolbar, which would jump). */}
       {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" role="toolbar" aria-label={t('selectedArrow')} onPointerDown={event => event.stopPropagation()}>
         <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>

@@ -141,7 +141,7 @@ test('Roulette works on the TV and in Games, with per-game icons and free pack p
     await expect(shared).toBeVisible();
     await expect(display.locator('.roulette-wheel')).toHaveCount(1);
     await expect(phone.locator('.roulette-wheel')).toHaveCount(0);
-    await expect(phone.locator('.roulette-result')).toHaveText((await shared.textContent())!);
+    await expect(phone.locator('.mg-personal-result .mg-pocket')).toHaveText((await shared.textContent())!);
     await expect(display.locator('.mg-podium li').filter({ hasText: 'Ada' })).toContainText((await shared.textContent()) === 'Black' ? 'Correct guess' : 'Wrong guess');
   } finally {
     await mobile.close();

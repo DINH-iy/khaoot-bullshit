@@ -11,6 +11,15 @@ export function AngleTarget({ target }: { target: number }) {
   return <p className="mg-big mg-angle-target">{t('angleTarget', { target })}</p>;
 }
 
+export function AngleComparison({ target, guess }: { target: number; guess?: number | undefined }) {
+  return <div className="mg-angle-dial mg-angle-comparison" aria-hidden="true">
+    <span className="mg-angle-baseline" />
+    <span className="mg-angle-ray target-ray" style={{ transform: `rotate(${-target}deg)` }} />
+    {guess !== undefined && <span className="mg-angle-ray" style={{ transform: `rotate(${-guess}deg)` }} />}
+    <span className="mg-angle-pivot" />
+  </div>;
+}
+
 export function MatchAngle({ target, disabled, onResult }: { target: number; disabled: boolean; onResult: (result: Result) => void }) {
   const t = useTexts(CONTROL_TEXTS);
   const [angle, setAngle] = useState(0);

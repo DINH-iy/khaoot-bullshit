@@ -44,7 +44,7 @@ export function SoloCoin({ sessionId, balance, onBalance, forChips }: {
   return <div className="side-game solo-coin">
     {result && <>
       <CoinReveal key={result.roundId} coin={result.coin} animate />
-      <p className="side-outcome" role="status">{won
+      <p key={result.roundId} className="side-outcome" role="status">{won
         ? result.bet ? st('youWin', { amount: chips(result.payout) }) : t('right')
         : t('wrong')}</p>
     </>}

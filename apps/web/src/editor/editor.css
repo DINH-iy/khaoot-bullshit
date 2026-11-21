@@ -197,6 +197,13 @@
 .add-list { display: grid; gap: 4px; grid-template-columns: 1fr 1fr; }
 .add-menu button { min-height: 56px; align-items: start; padding: 8px 10px; }
 .add-menu button svg { margin-top: 2px; }
+/* Keep the heading, category tabs and footer available while the choices scroll. */
+.add-menu-anchor > .add-menu {
+  display: flex; flex-direction: column; width: min(520px, var(--flow-menu-width)); min-width: 0;
+  max-height: var(--flow-menu-height); overflow: auto; cursor: auto;
+}
+.add-menu-anchor .add-list { min-height: min(48px, 15dvh); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.add-menu-anchor .add-tabs, .add-menu-anchor .add-menu-foot { flex: none; }
 .add-menu.inline { width: auto; } .add-menu.inline .add-list { grid-template-columns: 1fr; }
 .scene-props .add-menu.inline button, .part-palette .add-menu button { min-height: 44px; }
 /* The TV preview scales its text with its own width. */
@@ -419,7 +426,6 @@
 .flow-summary-title { font-weight: 700; overflow-wrap: anywhere; } .flow-summary-line { font-size: .85rem; color: var(--e-muted); }
 .flow-summary button { justify-self: start; margin-top: 6px; }
 /* The Scene editor shows where a scene leads; it is changed in the Flow editor. */
-.scene-next { display: grid; gap: 6px; margin: 4px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--e-border); font-size: .9rem; }
 .scene-props .inspector-head { display: flex; align-items: center; gap: 10px; } .scene-props .inspector-head h2 { margin: 0; }
 
 /* The title takes the space left by the header actions. */
@@ -487,7 +493,6 @@
   .flow-tools .tool-label { display: none; } .flow-tools button { flex: none; }
   .flow-canvas { height: calc(100dvh - 190px); min-height: 320px; }
   .inspector { position: fixed; z-index: 30; max-height: 65dvh; border-radius: 16px 16px 0 0; }
-  .add-menu-anchor { position: fixed; left: 8px !important; right: 8px; top: auto !important; bottom: 8px; z-index: 40; } .add-menu-anchor .add-menu { width: auto; max-height: 75dvh; overflow: auto; }
   /* The Scene editor: scenes (scrolling list), then the preview, then the scene's settings. */
   .scene-stage { padding: 12px; }
   /* The rough phone preview: as wide as half the screen and not taller than its content needs. */
@@ -571,6 +576,7 @@
 /* R5: the add menu's tabs: one height, text centred; in a narrow panel they share the row. */
 .editor .add-menu .add-tabs button { min-height: 36px !important; align-items: center; justify-content: center; text-align: center; }
 .add-menu.inline .add-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.add-menu.inline .add-game-tabs { display: flex; flex-wrap: wrap; }
 .editor .add-menu.inline .add-tabs button { padding: 4px 6px; line-height: 1.15; white-space: normal; }
 /* R7: a scrollbar appearing in a panel no longer narrows it (which made the content jump back and forth). */
 .scene-list, .scene-props, .game-settings-panel, .inspector { scrollbar-gutter: stable; }
@@ -645,12 +651,6 @@
 .floating-menu { position: fixed; z-index: 60; display: grid; overflow: auto; border-radius: 14px; }
 .floating-menu .add-menu { width: min(420px, calc(100vw - 24px)); }
 /* S6: where the scene leads: a button per way out, to go there. */
-.scene-next-title { font-size: .75rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--e-muted); }
-.scene-next-end { color: var(--e-muted); }
-.editor .scene-next .scene-next-go { display: flex; align-items: center; justify-content: space-between; gap: 10px; justify-self: stretch; min-height: 44px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 600; text-align: left; }
-.editor .scene-next .scene-next-go:hover, .editor .scene-next .scene-next-go:focus-visible { border-color: var(--e-accent); background: var(--e-accent-soft); }
-.scene-next-go > span { display: grid; min-width: 0; overflow-wrap: anywhere; } .scene-next-go small { font-size: .75rem; font-weight: 500; color: var(--e-muted); }
-.scene-next-go svg { flex: none; color: var(--e-accent); }
 .scene-props .inspector-head .try-scene { margin-left: auto; }
 .scene-props .inspector-head .action-menu { margin-left: 0; }
 .editor .scene-props .inspector-head :is(.try-scene, .action-menu > button),
@@ -825,6 +825,29 @@
 .scene-preview-window .phone-screen:has(.scene-practice) { width: 100%; aspect-ratio: auto; }
 .scene-preview-window .tv-screen:has(.scene-practice) { min-height: min(32rem, 55dvh); }
 .scene-preview-window .practice-note { color: var(--e-muted); margin: 0; font-size: .85rem; }
+.minigame-configuration { overflow: hidden; }
+.minigame-configuration > .scene-preview-window {
+  box-sizing: border-box; max-height: calc(100dvh - 26px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.configuration-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; min-height: 0; }
+.configuration-fields, .configuration-preview {
+  display: grid; align-content: start; gap: 12px; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
+  padding: 4px 6px;
+}
+.configuration-fields label:not(.choice, .check) { display: grid; gap: 6px; min-width: 0; }
+.configuration-timing { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 12px; }
+.configuration-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid var(--e-border); }
+.configuration-actions button, .configuration-nav button, .configuration-preview > .segmented button { min-height: 44px; }
+.minigame-configuration .configuration-nav { display: none; }
+.configuration-preview .tv-screen:has(.scene-practice) { min-height: 0; aspect-ratio: auto; }
+@media (max-width: 760px) {
+  .minigame-configuration > .scene-preview-window { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .minigame-configuration .configuration-nav { display: flex; }
+  .configuration-columns { grid-template-columns: minmax(0, 1fr); }
+  .configuration-columns[data-panel="settings"] .configuration-preview,
+  .configuration-columns[data-panel="preview"] .configuration-fields { display: none; }
+}
 .practice-parts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .9rem; }
 .scene-practice { display: grid; min-width: 0; gap: 12px; }
 .scene-practice > button { justify-self: start; }
@@ -933,9 +956,7 @@
 @keyframes editor-panel-enter { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
 .editor:has(> .editor-tour) { grid-template-rows: auto auto minmax(0, 1fr); }
-.scene-next-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 
-.scene-next-destinations { display: grid; gap: 6px; }
 
 .choice-dialog .choice-copy { flex: 1; min-width: 0; }
 .choice-dialog .choice-card .choice-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
@@ -971,4 +992,77 @@
   .editor :is(.ed-dialog, .game-settings-panel, .history-list, .problems-list),
   .editor-page :is(.ed-dialog, .game-settings-panel) { animation: editor-panel-enter 150ms ease-out both; }
   .editor :is(button, .scene-card, .scene-row) { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
+}
+
+.scene-practice .practice-result {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.compact-game-preview .scene-practice > button { justify-self: center; }
+.compact-game-preview .mg-countdown strong { font-size: 2rem; }
+
+.scene-preview-dialog:has(.compact-game-preview) .scene-preview-window { padding: 12px; gap: 8px; }
+.scene-preview-dialog:has(.compact-game-preview) .scene-preview-window header { padding-bottom: 0; border-bottom: 0; }
+.scene-preview-dialog:has(.compact-game-preview) .practice-note { display: none; }
+.scene-preview-dialog .phone:has(.compact-game-preview) { min-width: 0; flex-basis: min(100%, 350px); }
+.scene-preview-dialog .phone:has(.compact-game-preview) > figcaption { display: none; }
+.scene-preview-dialog .phone-screen.compact-game-preview {
+  min-height: min(29rem, calc(100dvh - 10rem));
+  border-width: 4px;
+  padding: 12px;
+  gap: 8px;
+  align-content: center;
+  container-type: inline-size;
+  text-align: center;
+}
+.compact-game-preview .scene-practice { gap: 8px; }
+.compact-game-preview .scene-practice > p { margin: 0; }
+.compact-game-preview .minigame-preview { grid-template-columns: minmax(0, 1fr); gap: 8px; justify-items: center; padding: 10px; }
+.compact-game-preview .minigame-preview-symbol { width: 44px; font-size: 1.35rem; border-radius: 10px; }
+.compact-game-preview .minigame-preview-copy p { font-size: .875rem; }
+.compact-game-preview .minigame-preview-cue { display: none; }
+.compact-game-preview .speed-run-board { width: min(100%, 13rem, 46svh); }
+.compact-game-preview .mg-angle-dial { width: min(100%, 12rem, 36svh); }
+.compact-game-preview .drawing-pad { width: min(100%, max(9rem, calc(100svh - 22rem))); }
+.compact-game-preview .drawing-pad.compact-tools { width: 100%; justify-items: center; }
+.compact-game-preview .drawing-pad.compact-tools .drawing-surface { width: min(100%, max(8rem, calc(100svh - 25rem))); }
+.compact-game-preview .scene-practice .mg-paused { margin-inline: auto; }
+.compact-game-preview .graph-reading { min-block-size: 2.25em; font-size: .875rem; }
+.compact-game-preview .graph-chart { max-width: min(100%, max(12rem, calc((100dvh - 25rem) * 1.25))); }
+.compact-game-preview .mg-cut-line { gap: 8px; }
+.scene-preview-dialog:has(.compact-game-preview) button { min-height: 44px; }
+
+@media (orientation: landscape) and (max-height: 480px) {
+  .scene-preview-dialog.phone-preview-dialog:has(.compact-game-preview) { width: min(560px, calc(100% - 24px)); }
+  .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window > :is(.preview, .practice-parts) { grid-column: 1 / -1; }
+  .scene-preview-dialog .phone:has(.compact-game-preview) { flex-basis: 100%; }
+  .scene-preview-dialog .phone-screen.compact-game-preview { min-height: min(16rem, calc(100dvh - 6rem)); }
+  .compact-game-preview .practice-draw-the-graph:has(.graph-phone) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .compact-game-preview .practice-draw-the-graph:has(> .graph-chart) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
+    align-items: center;
+  }
+  .compact-game-preview .graph-phone {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 8rem);
+    align-items: center;
+  }
+  .compact-game-preview .graph-reading { grid-area: 1 / 1 / 2 / -1; min-block-size: 0; }
+  .compact-game-preview .graph-controller { grid-area: 2 / 1; }
+  .compact-game-preview .graph-phone .actions { grid-area: 2 / 2; grid-template-columns: minmax(0, 1fr); }
+  .compact-game-preview .practice-draw-the-graph:has(.graph-phone) > button { grid-area: 1 / 2; }
+  .compact-game-preview .practice-draw-the-graph:has(> .graph-chart) > button { grid-area: 2 / 2; align-self: start; }
+  .compact-game-preview .practice-draw-the-graph .graph-chart { max-width: 13.5rem; }
+  .compact-game-preview .practice-draw-the-graph > .graph-chart { grid-column: 1; grid-row: 1 / span 2; }
+  .compact-game-preview .practice-draw-the-graph > .practice-result { grid-area: 1 / 2; align-self: end; }
 }

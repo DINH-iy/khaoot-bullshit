@@ -1,6 +1,9 @@
+import { HOSTED_POOL_TEXTS } from '../head-to-head/eight-ball/hosted.text.js';
 import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, type PrefabContent } from '@party/contracts';
 import { translate } from '../i18n/texts.js';
 import { LANGUAGES, type Language } from '../i18n/language.js';
+import { isDefaultGraphQuestion } from '../minigames/draw-the-graph/graph-question.js';
+import { GRAPH_TEXTS } from '../minigames/draw-the-graph/graph.text.js';
 import { MODEL_TEXTS } from './model.text.js';
 import { CATALOG_TEXTS } from '../presentation/catalog.text.js';
 import { gameDescription, gameName } from '../presentation/catalog.text.js';
@@ -139,7 +142,7 @@ const wheelEntries = () => (['w1', 'w2', 'w3', 'w4', 'w5', 'w6'] as const).map(k
  */
 export interface SceneVariant { key: string; name: string; hint: string }
 export const SCENE_VARIANTS: Partial<Record<SceneType, SceneVariant[]>> = {
-  minigame: MINIGAME_KEYS.map(key => ({ key, get name() { return gameName(key); }, get hint() { return gameDescription(key); } })),
+  minigame: [...MINIGAME_KEYS, 'eight-ball'].map(key => ({ key, get name() { return gameName(key); }, get hint() { return gameDescription(key); } })),
   // How a duel is won: any contest in the room (the host names the winner), or a head-to-head game on the two phones.
   duel: [{ key: 'host', get name() { return t('vHost'); }, get hint() { return t('vHostHint'); } },
     ...HEAD_TO_HEAD_KEYS.map(key => ({ key, get name() { return gameName(key); }, get hint() { return t('vOnPhones', { description: gameDescription(key).toLowerCase() }); } }))],
@@ -151,9 +154,10 @@ export const WRITING_STARTERS = [
   { key: 'caption', get name() { return t('vCaption'); }, get prompt() { return t('pCaption'); } },
   { key: 'excuse', get name() { return t('vExcuse'); }, get prompt() { return t('pExcuse'); } },
 ];
+const minigamePrompt = (game: MinigameKey) => game === 'draw-the-graph' ? translate(GRAPH_TEXTS, 'sampleQuestion') : `${gameName(game)}!`;
 /** A minigame scene for one game, with its own timer; a team game gets round-only teams unless the game already plays in teams. */
 export function minigameStage(game: MinigameKey, definition: Definition): Stage {
-  const stage: Stage = { key: 'main', kind: 'minigame', prompt: `${gameName(game)}!`, game, durationMs: MINIGAMES[game].defaultSeconds * 1000 };
+  const stage: Stage = { key: 'main', kind: 'minigame', prompt: minigamePrompt(game), game, durationMs: MINIGAMES[game].defaultSeconds * 1000 };
   if (TEAM_MINIGAMES.includes(game) && (definition['play'] as { kind?: string } | undefined)?.kind !== 'teams') stage['play'] = structuredClone(ROUND_TEAMS_PLAY);
   return stage;
 }
@@ -166,7 +170,8 @@ export function withMinigame(stage: Stage, game: MinigameKey, definition: Defini
   const old = String(stage['game'] ?? '');
   const copy: Stage = { ...stage, game, durationMs: MINIGAMES[game].defaultSeconds * 1000 }; delete copy['settings'];
   // The old game's standard title in any language counts as untouched.
-  if (!stage.prompt || (isMinigameKey(old) && LANGS.some(language => stage.prompt === `${translate(CATALOG_TEXTS, old, undefined, language)}!`))) copy.prompt = `${gameName(game)}!`;
+  if (!stage.prompt || (old === 'draw-the-graph' ? isDefaultGraphQuestion(stage.prompt)
+    : isMinigameKey(old) && LANGS.some(language => stage.prompt === `${translate(CATALOG_TEXTS, old, undefined, language)}!`))) copy.prompt = minigamePrompt(game);
   if (TEAM_MINIGAMES.includes(game) && (copy['play'] as { kind?: string } | undefined)?.kind !== 'teams' && (definition['play'] as { kind?: string } | undefined)?.kind !== 'teams') copy['play'] = structuredClone(ROUND_TEAMS_PLAY);
   return copy;
 }
@@ -178,10 +183,11 @@ const isStandardDuelPrompt = (prompt: string, contest: { kind?: string; game?: s
 export function withDuelContest(stage: Stage, choice: string): Stage {
   const old = stage['contest'] as { kind?: string; game?: string } | undefined;
   const contest = isHeadToHeadKey(choice) ? { kind: 'game', game: choice } : { kind: 'host' };
-  return { ...stage, contest, ...(!stage.prompt || isStandardDuelPrompt(stage.prompt, old) ? { prompt: duelPrompt(contest) } : {}) };
+  return { ...stage, contest, ...(stage['pick'] === 'teams' && choice !== 'eight-ball' ? { pick: 'random' } : {}), ...(!stage.prompt || isStandardDuelPrompt(stage.prompt, old) ? { prompt: duelPrompt(contest) } : {}) };
 }
 /** A new scene's first part: the type's standard start, adjusted for the chosen kind (variant). */
 export function newStage(type: SceneType, definition: Definition, variant?: string): Stage {
+  if (type === 'minigame' && variant === 'eight-ball') return withDuelContest(baseStage('duel', definition), variant);
   const stage = baseStage(type, definition);
   if (type === 'minigame' && variant && isMinigameKey(variant)) return minigameStage(variant, definition);
   if (type === 'duel' && variant && isHeadToHeadKey(variant)) return withDuelContest(stage, variant);
@@ -262,7 +268,7 @@ function stageLine(stage: Stage): string {
   if (stage.kind === 'scoreboard') return t('scoreboard');
   if (stage.kind === 'minigame') { const game = String(stage['game']); return [isMinigameKey(game) ? gameName(game) : t('chooseMinigame'), timer].filter(Boolean).join(' · '); }
   if (stage.kind === 'vote') return [t('voteOnAnswers'), timer].filter(Boolean).join(' · ');
-  if (stage.kind === 'duel') { const contest = stage['contest'] as { kind?: string; game?: string } | undefined; return [contest?.kind === 'game' && isHeadToHeadKey(contest.game) ? gameName(contest.game) : t('hostNamesWinner'), t(stage['pick'] === 'host' ? 'hostPicks' : 'randomPair'), timer ? t('toBet', { time: timer }) : null].filter(Boolean).join(' · '); }
+  if (stage.kind === 'duel') { const contest = stage['contest'] as { kind?: string; game?: string } | undefined; return [contest?.kind === 'game' && isHeadToHeadKey(contest.game) ? gameName(contest.game) : t('hostNamesWinner'), stage['pick'] === 'teams' ? translate(HOSTED_POOL_TEXTS, 'teams') : t(stage['pick'] === 'host' ? 'hostPicks' : 'randomPair'), timer && stage['pick'] !== 'teams' ? t('toBet', { time: timer }) : null].filter(Boolean).join(' · '); }
   const input = stage['input'] as { kind?: string; options?: unknown[] } | undefined;
   return [stageLabel(stage), input?.kind === 'choice' ? t('optionsN', { count: input.options?.length ?? 0 }) : null, timer].filter(Boolean).join(' · ');
 }

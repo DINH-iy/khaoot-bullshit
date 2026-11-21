@@ -1,4 +1,5 @@
 import { COIN_SIDES, type CoinSide } from '@party/contracts';
+import type { CSSProperties } from 'react';
 import { useTexts } from '../../i18n/texts.js';
 import { COIN_TEXTS } from './coin.text.js';
 import type { Result } from '../shared/countdown.js';
@@ -20,12 +21,15 @@ export function CoinPhone({ disabled, onResult }: { disabled: boolean; onResult:
 
 export function CoinReveal({ coin, animate }: { coin: CoinSide; animate: boolean }) {
   const t = useTexts(COIN_TEXTS);
-  const other = coin === 'heads' ? 'tails' : 'heads';
   return <div className={`coin-reveal${animate ? ' coin-reveal-animated' : ''}`}>
-    {animate && <span className="coin-scene" aria-hidden="true"><span className="coin-turn">
-      <span className={`coin-face ${coin}`}>{mark(coin)}</span>
-      <span className={`coin-face coin-back ${other}`}>{mark(other)}</span>
-    </span></span>}
+    {animate && <span className="coin-scene" data-landing={coin} aria-hidden="true">
+      <span className="coin-shadow" />
+      <span className="coin-lift"><span className="coin-turn">
+        {[-3, -2, -1, 0, 1, 2, 3].map(layer => <span key={layer} className="coin-rim" style={{ '--rim-depth': `${layer * 1.25}px` } as CSSProperties} />)}
+        <span className="coin-face heads">{mark('heads')}</span>
+        <span className="coin-face tails coin-back">{mark('tails')}</span>
+      </span></span>
+    </span>}
     <p role="status">{t('landed', { side: t(coin) })}</p>
   </div>;
 }

@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { isVoteSource, minigameRules, parseDefinition, stagePlaces, type StageDefinition } from './definition.js';
 import { duelView } from './duel.js';
 import { readMinigameRun } from '../minigames/shared/rules.js';
+import { readGraphPlayback } from '../minigames/draw-the-graph/playback.js';
 import { graphHue } from '../minigames/draw-the-graph/graph.js';
 import { relayPlan } from '../minigames/relay-drawing/relay.js';
 import { wheelView } from './show/wheel.js';
@@ -107,16 +108,22 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       const dotRun = run?.dots;
       const graph = run?.graph;
       const graphChart = graph ? { visible: graph.visible, startLabel: graph.startLabel, splitLabel: graph.splitLabel,
-        endLabel: graph.endLabel, yLabel: graph.yLabel } : null;
+        endLabel: graph.endLabel, yLabel: graph.yLabel, scale: graph.scale, splitAt: graph.splitAt } : null;
       const graphColors = graph && eligible?.success
         ? new Map(eligible.data.playerIds.map((id, index) => [id, graphHue(graph.seed, index)])) : null;
       const ownGraphHue = viewer ? graphColors?.get(viewer) : undefined;
-      const showPattern = actor.data.role !== 'player' && current?.status === 'ACTIVE' && session.status === 'RUNNING'
+      const sharedScreen = actor.data.role !== 'player';
+      const revealEasing = sharedScreen && (rules?.game === 'count-the-dots' || rules?.game === 'draw-the-graph')
+        ? (rules.settings as MinigameSettings<'count-the-dots' | 'draw-the-graph'>).revealEasing : undefined;
+      const showPattern = sharedScreen && current?.status === 'ACTIVE' && session.status === 'RUNNING'
         && dotRun && clock().getTime() < Date.parse(dotRun.guessAt);
       // A step game: every side's progress (secrets never; a team's vote counts only for its own members and the host).
       const steps = rules && isStepMinigame(rules.game) && current ? await stepView(tx, current, rules, context, eligible?.success ? eligible.data.playerIds : [], { playerId: viewer, host: actor.data.role === 'host' }) : null;
       const relay = rules?.game === 'relay-drawing' && run && context && current ? await relayView(tx, current.id, relayPlan(context, rules.settings as MinigameSettings<'relay-drawing'>, run), context.teamOf, viewer, revealed) : null;
-      const minigame = rules ? { game: rules.game, settings: rules.game === 'draw-the-graph' ? {} : rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
+      const revealSettings = revealEasing === undefined ? {} : { revealEasing };
+      const minigame = rules ? { game: rules.game, settings: rules.game === 'draw-the-graph' ? revealSettings
+        : rules.game === 'count-the-dots' ? { viewSeconds: (rules.settings as MinigameSettings<'count-the-dots'>).viewSeconds, ...revealSettings }
+        : rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
         ...(run?.cutTarget === undefined ? {} : { cutTarget: run.cutTarget }),
         ...(run?.angleTarget === undefined ? {} : { angleTarget: run.angleTarget }),
         ...(graphChart ? { graph: { chart: graphChart, ...(ownGraphHue === undefined ? {} : { hue: ownGraphHue }) } } : {}),
@@ -124,8 +131,11 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         // A paused room shows no GO: continuing restarts the duel with a fresh countdown and a new GO.
         goAt: current?.status === 'ACTIVE' && session.status === 'RUNNING' && run?.goAt &&Date.parse(run.goAt) <= clock().getTime() ? run.goAt : null } : null;
       const minigameAnswer = rules && revealed ? { kind: 'minigame', game: rules.game, doorsMilli: run?.doorsMilli ?? null,
-        ...(graph && graphChart ? { graph: { ...graphChart, hidden: graph.hidden } } : {}),
+        ...(graph && graphChart ? { graph: { ...graphChart, hidden: graph.hidden, source: graph.source, sourceNote: graph.sourceNote, sourceUrl: graph.sourceUrl } } : {}),
         ...(dotRun ? { dotCount: dotRun.pattern.length } : {}),
+        ...(dotRun && sharedScreen && current?.revealedAt ? { dotReveal: {
+          pattern: dotRun.pattern, startedAt: current.revealedAt.toISOString(),
+        } } : {}),
         ...(run?.coin ? { coin: run.coin } : {}),
         ...(run?.roulette === undefined ? {} : { roulette: run.roulette }),
         entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true, receivedAt: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id, run).entries.map(result => {
@@ -162,6 +172,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
             ? { countdownUntil: (current.presentation as { drawingStartsAt: string }).drawingStartsAt } : {}),
           ballot, ...(entry.stage.kind === 'vote' ? { voteMode: entry.stage.voteMode ?? 'single', voteLimit: entry.stage.voteMode && entry.stage.voteMode !== 'single' ? entry.stage.voteLimit ?? 3 : 1 } : {}),
           ...('resultCards' in entry.stage && entry.stage.resultCards !== undefined && current.revealedAt ? { resultCards: { mode: entry.stage.resultCards, revealedAt: current.revealedAt.toISOString(), index: (current.presentation as { resultCardIndex?: number }).resultCardIndex ?? 0 } } : {}), minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
+          ...(graph && current.revealedAt && sharedScreen && revealEasing !== 'instant' ? { graphPlayback: readGraphPlayback(current.presentation, current.revealedAt) } : {}),
           revealed, reveal: revealed ? { answer: voteAnswer ?? minigameAnswer ?? answer, awards: awards.map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
             teamAwards: teamAwards.map(row => ({ teamId: row.recipientTeamId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })) } : null } : null,
         serverTime: clock().toISOString(),

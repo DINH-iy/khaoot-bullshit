@@ -1,0 +1,90 @@
+.pool { display: grid; gap: 8px; min-width: 0; width: min(100%, 58rem, max(14rem, calc((100svh - 15rem) * 2))); justify-self: center; }
+.pool-table { display: block; width: 100%; height: auto; border: 6px solid #604638; box-shadow: 0 0 0 1px #9f784d, 0 7px 14px #0004; border-radius: 12px; box-sizing: border-box; }
+.pool-table[data-aiming="true"] { cursor: crosshair; touch-action: none; }
+.pool-open { margin: 0; text-align: center; font-size: .875rem; color: var(--r-muted); }
+.pool-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; padding: 0; margin: 0; gap: 8px; text-align: center; }
+.pool-groups li { display: grid; gap: 2px; min-width: 0; font-size: .875rem; }
+.pool-groups strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pool-groups span { color: var(--r-muted); }
+.pool-controls { display: grid; gap: 8px; }
+.pool-adjust { display: flex; gap: 8px; align-items: center; }
+.pool-adjust label { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; font-size: .875rem; }
+.room .pool-adjust input { flex: 1; width: 100%; min-width: 0; min-height: 44px; padding: 0; accent-color: var(--r-accent); }
+.room .pool-controls button { min-height: 44px; min-width: 44px; padding: 4px 10px; }
+.duel-pool-playing .duel-vs, .duel-pool-playing .duel-stakes { display: none; }
+.h2h-eight-ball .h2h-title { overflow-wrap: anywhere; }
+
+.pool-target { color: var(--r-accent); font-weight: 750; }
+.room .pool-adjust input[type="range"] { appearance: none; background: transparent; border: 0; }
+.pool-adjust input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 6px; background: var(--r-line); }
+.pool-adjust input[type="range"]::-moz-range-track { height: 6px; border-radius: 6px; background: var(--r-line); }
+.pool-adjust input[type="range"]::-webkit-slider-thumb { appearance: none; margin-top: -7px; height: 20px; width: 20px; border-radius: 50%; border: 2px solid var(--r-text); background: var(--r-accent); }
+.pool-adjust input[type="range"]::-moz-range-thumb { height: 18px; width: 18px; border-radius: 50%; border: 2px solid var(--r-text); background: var(--r-accent); }
+.room .pool-landscape-button { display: none; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .room-player .pool-landscape-button { display: inline-flex; justify-self: center; min-height: 44px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .room-player .pool { width: 100%; grid-template-columns: minmax(0, 1fr) minmax(150px, 31%); align-items: start; }
+  .room-player .pool-table { grid-column: 1; grid-row: 1; width: min(100%, max(12rem, calc((100svh - 12rem) * 2))); justify-self: center; }
+  .room-player .pool-controls { grid-column: 2; grid-row: 1 / span 2; align-self: start; }
+  .room-player .pool-groups, .room-player .pool-open { grid-column: 1; }
+  .room-player .pool-adjust { flex-wrap: wrap; }
+  .room-player .pool-adjust label { font-size: .8125rem; gap: 4px; }
+  .room-player .pool-adjust button { padding-inline: 6px; }
+  .room-player .pool-instructions { display: none; }
+  .room-player:has(.duel-pool-playing) .room-bar { padding-block: 5px; }
+  .room-player:has(.duel-pool-playing) .round-info { padding-block: 4px; }
+  .room-player .room-grid:has(.duel-pool-playing) { padding: 6px 12px; }
+  .room-player .stage-card:has(.duel-pool-playing) { padding: 8px 12px !important; gap: 6px; }
+  .room-player .stage-card:has(.duel-pool-playing) h2 { font-size: 1.125rem; }
+  .room-player .duel-pool-playing, .room-player .h2h-eight-ball { gap: 6px; }
+  .room-player .bottom-sheet:has(.h2h-eight-ball:not(:has(.h2h-result))) { width: min(100%, 850px); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  .room-player .bottom-sheet:has(.h2h-eight-ball) .sheet-body { padding-block: 8px; }
+}
+.room .pool-landscape-dialog {
+  position: fixed; inset: 0; width: 100dvw; height: 100dvh; max-width: none; max-height: none;
+  border: 0; padding: 0; margin: 0; overflow: hidden; background: var(--r-bg2); color: var(--r-text);
+}
+.pool-landscape-frame {
+  box-sizing: border-box; width: 100dvw; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  --pool-landscape-height: 100dvh;
+}
+.room .pool-landscape-exit { min-height: 44px; justify-self: end; }
+.room .pool-landscape-frame .pool { width: min(100%, 64rem); min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(140px, 28%); align-items: start; }
+.room .pool-landscape-frame .pool-table { grid-area: 1 / 1; width: min(100%, calc((var(--pool-landscape-height) - 8rem) * 2)); justify-self: center; }
+.room .pool-landscape-frame .pool-controls { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.pool-landscape-frame .pool-open, .pool-landscape-frame .pool-groups { grid-column: 1; }
+.pool-landscape-frame .pool-instructions { display: none; }
+@media (orientation: portrait) {
+  .pool-landscape-frame {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(90deg);
+    width: 100dvh; height: 100dvw; --pool-landscape-height: 100dvw;
+    padding: max(8px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-top));
+  }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .room-player .sheet-backdrop:has(.h2h-eight-ball) { padding-block: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-bottom)); }
+  .room-player .bottom-sheet:has(.h2h-eight-ball) .sheet-head { padding: 4px 12px; }
+  .room-player .bottom-sheet:has(.h2h-eight-ball) .sheet-head h2 { font-size: 1rem; }
+  .room-player .bottom-sheet:has(.h2h-eight-ball) .sheet-grip { min-height: 16px; }
+  .room-player .challenges:has(.h2h-eight-ball) { gap: 4px; }
+  .room-player .challenges:has(.h2h-eight-ball) > button:first-child { min-height: 44px; justify-self: start; }
+  .room-player .challenges .h2h-eight-ball { grid-template-columns: minmax(0, 1fr) auto; }
+  .room-player .challenges .h2h-eight-ball > :is(.pool, .pool-landscape-dialog, .h2h-result, .h2h-replay, .actions, button) { grid-column: 1 / -1; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .room-player .bottom-sheet:has(.h2h-eight-ball:not(:has(.h2h-result))) {
+    height: calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+.room .stage-card:has(.duel-pool-playing) { gap: 8px; padding: 12px !important; }
+.room .stage-card:has(.duel-pool-playing) h2 { text-align: center; font-size: clamp(1.125rem, 3vw, 1.65rem); }
+.duel-pool-playing .h2h-eight-ball { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.duel-pool-playing .h2h-eight-ball > :is(.pool, .h2h-result, .h2h-replay, .actions, button) { grid-column: 1 / -1; }
+.duel-pool-playing .h2h-title > :is(strong, .h2h-title-dot) { display: none; }
+.room-display .duel-pool-playing .pool { width: min(100%, 58rem, max(14rem, calc((100svh - 16rem) * 2))); }

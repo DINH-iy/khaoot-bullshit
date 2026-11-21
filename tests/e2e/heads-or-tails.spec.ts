@@ -61,9 +61,20 @@ test('Heads or Tails settles a solo stake and reveals one shared coin after priv
     await expect(phone.locator('.mg-done')).toContainText('Tails');
     await expect(display.locator('.coin-reveal')).toHaveCount(0);
     await expect(display.locator('.mg-podium')).toHaveCount(0);
+    await display.emulateMedia({ reducedMotion: 'no-preference' });
     await host.getByRole('button', { name: 'Close answers' }).click();
+    const coin = display.locator('.coin-turn');
+    await expect(coin).toBeAttached();
+    const landedFace = await coin.evaluate(async node => {
+      const animation = node.getAnimations()[0]!;
+      animation.pause();
+      await animation.ready;
+      animation.finish();
+      return new DOMMatrix(getComputedStyle(node).transform).m22 > 0 ? 'Heads' : 'Tails';
+    });
     const shared = display.getByText(/^It landed on (Heads|Tails)$/);
     await expect(shared).toBeVisible();
+    await expect(shared).toHaveText(`It landed on ${landedFace}`);
     await expect(display.locator('.coin-scene')).toHaveCount(1);
     await expect(phone.locator('.coin-scene')).toHaveCount(0);
     await expect(phone.getByText((await shared.textContent())!, { exact: true })).toBeVisible();

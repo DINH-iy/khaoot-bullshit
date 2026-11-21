@@ -18,8 +18,8 @@ export const countPoints = (drawing: Drawing) => drawing.strokes.reduce((sum, st
  * hides the player's own strokes until they are sent. `oneStroke` ends after
  * a single stroke (Perfect circle).
  */
-export function DrawingPad({ value, onChange, under = [], blind = false, maxStrokes = 400, tools = true, oneStroke = false, disabled = false, label, onStrokeEnd, onStrokeProgress, bringIntoView = false }: {
-  value: Drawing; onChange: (drawing: Drawing) => void; under?: readonly Drawing[]; blind?: boolean; maxStrokes?: number; tools?: boolean; oneStroke?: boolean; disabled?: boolean; label: string;
+export function DrawingPad({ value, onChange, under = [], blind = false, maxStrokes = 400, tools = true, compactTools = false, oneStroke = false, disabled = false, label, onStrokeEnd, onStrokeProgress, bringIntoView = false }: {
+  value: Drawing; onChange: (drawing: Drawing) => void; under?: readonly Drawing[]; blind?: boolean; maxStrokes?: number; tools?: boolean; compactTools?: boolean; oneStroke?: boolean; disabled?: boolean; label: string;
   onStrokeEnd?: (stroke: Stroke, drawing: Drawing) => void;
   /** The stroke being drawn, as it grows (number `strokeId` in the drawing): for showing it live elsewhere. */
   onStrokeProgress?: (stroke: Stroke, strokeId: number) => void;
@@ -76,7 +76,10 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
       else if (!full && pointer.current === null) grow({ c: oneStroke ? 0 : color, w: oneStroke ? 10 : DRAWING_WIDTHS[width]!, p: [pen.x, pen.y] });
     } else if ((event.key === 'Enter' || event.key === 'Escape') && current && pointer.current === null) { event.preventDefault(); finish(); }
   };
-  return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}`}>
+  const cannotEdit = disabled || !value.strokes.length;
+  const undo = () => onChange({ ...value, strokes: value.strokes.slice(0, -1) });
+  const clear = () => onChange({ ...value, strokes: [] });
+  return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}${compactTools ? ' compact-tools' : ''}`}>
     {/* Impossible to miss: in a blind round your own lines stay hidden until you send the drawing. */}
     {blind && <p className="blind-banner"><span aria-hidden="true">🙈</span><strong>{t('drawing.blindTitle')}</strong><small>{t('drawing.blindHint')}</small></p>}
     <svg ref={surface} className="drawing-surface" viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription={d('area')} aria-label={label}
@@ -90,13 +93,22 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
     </svg>
     <p id={hintId} className="drawing-keys">{d('keyboard')}</p>
     {blind && <p className="drawing-note">{t('drawing.blind')} · {value.strokes.length + (current ? 1 : 0)}</p>}
-    {tools && <div className="drawing-tools">
+    {tools && (compactTools ? <div className="drawing-compact-tools">
+      <select aria-label={t('drawing.colour')} value={color} disabled={disabled} onChange={event => setColor(Number(event.currentTarget.value))}>
+        {COLOR_NAMES.map((name, index) => <option key={name} value={index}>{d(name)}</option>)}
+      </select>
+      <select aria-label={t('drawing.size')} value={width} disabled={disabled} onChange={event => setWidth(Number(event.currentTarget.value))}>
+        {WIDTH_NAMES.map((name, index) => <option key={name} value={index}>{d(name)}</option>)}
+      </select>
+      <button type="button" className="ghost" aria-label={t('drawing.undo')} disabled={cannotEdit} onClick={undo}>↶</button>
+      <button type="button" className="ghost" aria-label={t('drawing.clear')} disabled={cannotEdit} onClick={clear}>×</button>
+    </div> : <div className="drawing-tools">
       <div className="drawing-colors" role="radiogroup" aria-label={t('drawing.colour')}>{DRAWING_COLORS.map((swatch, index) => <button key={swatch} type="button" role="radio" aria-checked={color === index} aria-label={d(COLOR_NAMES[index]!)}
         style={{ background: swatch }} onClick={() => setColor(index)} />)}</div>
       <div className="drawing-widths" role="radiogroup" aria-label={t('drawing.size')}>{DRAWING_WIDTHS.map((size, index) => <button key={size} type="button" role="radio" aria-checked={width === index} aria-label={d(WIDTH_NAMES[index]!)} onClick={() => setWidth(index)}>
         <span style={{ width: Math.max(4, size / 2), height: Math.max(4, size / 2), background: DRAWING_COLORS[color] }} /></button>)}</div>
-      <div className="drawing-actions"><button type="button" className="ghost small-button" disabled={disabled || !value.strokes.length} onClick={() => onChange({ ...value, strokes: value.strokes.slice(0, -1) })}>{t('drawing.undo')}</button>
-        <button type="button" className="ghost small-button" disabled={disabled || !value.strokes.length} onClick={() => onChange({ ...value, strokes: [] })}>{t('drawing.clear')}</button></div>
-    </div>}
+      <div className="drawing-actions"><button type="button" className="ghost small-button" disabled={cannotEdit} onClick={undo}>{t('drawing.undo')}</button>
+        <button type="button" className="ghost small-button" disabled={cannotEdit} onClick={clear}>{t('drawing.clear')}</button></div>
+    </div>)}
   </div>;
 }

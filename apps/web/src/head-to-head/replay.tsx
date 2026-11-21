@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { HeadToHeadReplay } from '@party/contracts';
+import { POOL_HEIGHT, POOL_WIDTH, type HeadToHeadReplay } from '@party/contracts';
+import { paintPool } from './eight-ball/table.js';
 import { CREATURE_NAMES } from './creature-board.js';
 import { h } from './h2h.text.js';
 import { PIECES, RPS_ICONS, squaresOf } from './pieces.js';
@@ -15,6 +16,15 @@ function draw(ctx: CanvasRenderingContext2D, replay: HeadToHeadReplay, index: nu
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const last = index === frameCount(replay) - 1;
   ctx.font = '600 15px system-ui, sans-serif'; ctx.fillText(last ? result : h('versus', { first: names[0], second: names[1] }), SIZE / 2, SIZE + 20);
+  if (replay.game === 'eight-ball') {
+    ctx.save();
+    const scale = SIZE / POOL_WIDTH;
+    ctx.translate(0, (SIZE - POOL_HEIGHT * scale) / 2);
+    ctx.scale(scale, scale);
+    paintPool(ctx, replay.frames[index]!);
+    ctx.restore();
+    return;
+  }
   if (replay.game === 'rps') {
     const rounds = replay.rounds.slice(0, index); const round = rounds.at(-1);
     const wins = [0, 1].map(seat => rounds.filter(entry => entry.winner === seat).length);

@@ -5,6 +5,7 @@ import { parseDefinition, type GameDefinition } from '../../../src/game/definiti
 import { createGameService } from '../../../src/game/service.js';
 import { readSessionView } from '../../../src/game/views.js';
 import { readMinigameRun } from '../../../src/minigames/shared/rules.js';
+import { minigameTryout } from '../../../src/hosting/minigame-tryout.js';
 import { createLiveSignals } from '../../../src/minigames/tap-race/live.js';
 import { db, fixture, prisma } from '../game-fixture.js';
 
@@ -27,6 +28,38 @@ const play = (w: ReturnType<typeof world>, f: Fixture, index: number, stageRunId
   w.service.execute({ role: 'player', playerId: f.players[index]!.id }, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'submission.submit', stageRunId, value: { kind: 'minigame', value, ...(early ? { early } : {}) } });
 
 describe('minigames', () => {
+  it('only lets the host replay rounds in a designated rehearsal, keeping the seats and ignoring stale attempts', async () => {
+    const w = world();
+    const regular = await fixture(2, minigameTryout);
+    const f = await fixture(2, minigameTryout);
+    const stored = await prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } });
+    await prisma.gameSession.update({ where: { id: f.sessionId }, data: { state: { ...(stored.state as object), tryout: true } } });
+    await expect(host(w, regular, 'minigame.tryout', { game: 'heads-or-tails' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const player = { role: 'player' as const, playerId: f.players[0]!.id };
+    const command = { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'minigame.tryout', expectedRevision: stored.revision, game: 'heads-or-tails' };
+    await expect(w.service.execute(player, command)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const first = await w.service.execute(f.host, command);
+    expect(await w.service.execute(f.host, command)).toEqual(first);
+    w.advance(3000);
+    await play(w, f, 0, first.stageRunId!, 0);
+
+    const retry = await host(w, f, 'minigame.tryout', { game: 'heads-or-tails' });
+    expect(retry.stageRunId).not.toBe(first.stageRunId);
+    expect(await prisma.stageRun.findUniqueOrThrow({ where: { id: first.stageRunId! } }))
+      .toMatchObject({ status: 'CLOSED', revealedAt: null, deadlineAt: null });
+    expect(await prisma.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(0);
+    await expect(play(w, f, 1, first.stageRunId!, 0)).rejects.toMatchObject({ code: 'INVALID_STATE' });
+
+    await host(w, f, 'session.pause');
+    const next = await host(w, f, 'minigame.tryout', { game: 'count-the-dots' });
+    const view = await readSessionView(prisma, player, f.sessionId, () => new Date(w.now()));
+    expect(view.status).toBe('RUNNING');
+    expect(view.stage).toMatchObject({ id: next.stageRunId, eligibleCount: 2, submittedCount: 0, minigame: { game: 'count-the-dots' } });
+    expect(view.ownSubmission).toBeNull();
+    expect(await prisma.sessionPlayer.count({ where: { sessionId: f.sessionId } })).toBe(2);
+  });
+
   it('keeps coin guesses secret and pays every correct player on one timed reveal', async () => {
     const w = world();
     const f = await fixture(4, game({ game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['7000'] }));
@@ -73,19 +106,22 @@ describe('minigames', () => {
     expect(await prisma.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(2);
   });
 
-  it('keeps Count the Dots private to the displays and opens guessing only after the viewing window', async () => {
+  it('keeps Count the Dots private to the displays and accepts guesses during the viewing window', async () => {
     const w = world();
-    const f = await fixture(5, game({ game: 'count-the-dots', durationMs: 15_000, settings: { viewSeconds: 5 } }));
+    const f = await fixture(5, game({ game: 'count-the-dots', durationMs: 15_000, settings: { viewSeconds: 5, count: { mode: 'exact', value: 14 } } }));
     const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
     const clock = () => new Date(w.now());
     const display = { role: 'display' as const, sessionId: f.sessionId };
     const player = (index: number) => ({ role: 'player' as const, playerId: f.players[index]!.id });
     const view = (actor: typeof display | typeof f.host | ReturnType<typeof player>) => readSessionView(prisma, actor, f.sessionId, clock);
+    await expect(play(w, f, 0, stageRunId, 20)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
     w.advance(3000);
     const opened = (await view(display)).stage!;
     const dots = opened.minigame!.dots!;
     const pattern = dots.pattern!;
     const count = pattern.length;
+    expect(count).toBe(14);
+    expect((await view(player(0))).stage!.minigame!.settings).toEqual({ viewSeconds: 5 });
     expect(opened.deadlineAt).toBe(new Date(w.now() + 20_000).toISOString());
     expect((await view(f.host)).stage!.minigame!.dots).toEqual(dots);
     expect((await view(player(0))).stage!.minigame!.dots).toEqual({ guessAt: dots.guessAt });
@@ -94,7 +130,8 @@ describe('minigames', () => {
     }
 
     w.advance(2000);
-    await expect(play(w, f, 0, stageRunId, count)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await play(w, f, 0, stageRunId, count + 2);
+    expect((await view(player(0))).ownSubmission?.value).toEqual({ kind: 'minigame', value: count + 2 });
     await host(w, f, 'session.pause');
     w.advance(10_000);
     expect((await view(display)).stage!.minigame!.dots?.pattern).toBeUndefined();
@@ -104,10 +141,9 @@ describe('minigames', () => {
     expect(resumed.minigame!.dots).toEqual({ pattern, guessAt: new Date(w.now() + 3000).toISOString() });
     expect(resumed.deadlineAt).toBe(new Date(w.now() + 13_000).toISOString());
     w.advance(2999);
-    await expect(play(w, f, 0, stageRunId, count)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    expect((await view(display)).stage!.minigame!.dots?.pattern).toEqual(pattern);
     w.advance(1);
     expect((await view(display)).stage!.minigame!.dots?.pattern).toBeUndefined();
-    await play(w, f, 0, stageRunId, count + 2);
     w.advance(100);
     await play(w, f, 1, stageRunId, count - 2);
     await expect(play(w, f, 2, stageRunId, 1000)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
@@ -127,6 +163,12 @@ describe('minigames', () => {
     await host(w, f, 'stage.reveal', { stageRunId });
     const result = await view(player(0));
     expect(result.stage!.minigame!.dots?.pattern).toBeUndefined();
+    expect(result.stage!.reveal!.answer).not.toHaveProperty('dotReveal');
+    for (const actor of [f.host, display]) {
+      expect((await view(actor)).stage!.reveal!.answer).toMatchObject({
+        dotReveal: { pattern, startedAt: new Date(w.now()).toISOString() },
+      });
+    }
     expect(result.stage!.reveal!.answer).toMatchObject({ game: 'count-the-dots', dotCount: count, entries: [
       { playerId: f.players[3]!.id, value: 0, dotGuess: count, place: 1 },
       { playerId: f.players[0]!.id, value: 2, dotGuess: count + 2, place: 2 },
@@ -140,9 +182,21 @@ describe('minigames', () => {
     ]));
   });
 
+  it('keeps the dots visible for their full viewing time even when every player answers immediately', async () => {
+    const w = world();
+    const f = await fixture(1, game({ game: 'count-the-dots', settings: { viewSeconds: 10 } }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+    w.advance(3100);
+    await play(w, f, 0, stageRunId, 20);
+    const stage = (await readSessionView(prisma, f.host, f.sessionId, () => new Date(w.now()))).stage!;
+    expect(stage.minigame?.dots?.pattern).toBeDefined();
+    expect(stage.deadlineAt).toBe(stage.minigame?.dots?.guessAt);
+  });
+
   it('keeps graph answers private and ranks the whole line before breaking ties by receipt time', async () => {
     const w = world();
-    const chart = { visible: [20, 50], hidden: [50, 50], startLabel: '2000', endLabel: '2020' };
+    const chart = { visible: [20, 50], hidden: [50, 50], startLabel: '2000', endLabel: '2020',
+      scale: { min: 0, max: 2000 }, splitAt: .4, source: 'Source on reveal only', sourceUrl: 'https://example.org/data', sourceNote: 'Context for the reveal' };
     const f = await fixture(4, game({ game: 'draw-the-graph', settings: { graph: chart } }));
     const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
     const player = (index: number) => ({ role: 'player' as const, playerId: f.players[index]!.id });
@@ -154,7 +208,7 @@ describe('minigames', () => {
     });
     const level = (value: number) => Array<number>(GRAPH_SAMPLES).fill(value);
 
-    const { hidden, ...prefix } = chart;
+    const { hidden, source, sourceUrl, sourceNote, ...prefix } = chart;
     const colors = await Promise.all([0, 1, 2, 3].map(async index => {
       const active = (await view(player(index))).stage!.minigame!;
       expect(active.settings).toEqual({});
@@ -191,9 +245,10 @@ describe('minigames', () => {
     expect((await view(player(3))).stage!.minigame!.graph!.hue).toBe(colors[3]);
     await submit(3, [...level(650).slice(1), 500]);
     await host(w, f, 'stage.close', { stageRunId });
+    await expect(host(w, f, 'stage.graphPlayback', { stageRunId, action: 'replay' })).rejects.toMatchObject({ code: 'INVALID_STATE' });
     await host(w, f, 'stage.reveal', { stageRunId });
     const result = await view(display);
-    expect(result.stage!.reveal!.answer).toMatchObject({ game: 'draw-the-graph', graph: { ...prefix, hidden }, entries: [
+    expect(result.stage!.reveal!.answer).toMatchObject({ game: 'draw-the-graph', graph: { ...prefix, hidden, source, sourceUrl, sourceNote }, entries: [
       { playerId: f.players[2]!.id, graphHue: colors[2], graphLine: level(500), value: 0, place: 1 },
       { playerId: f.players[0]!.id, graphHue: colors[0], graphLine: level(510), value: 100, place: 2 },
       { playerId: f.players[1]!.id, graphHue: colors[1], graphLine: level(490), value: 100, place: 3 },
@@ -204,6 +259,21 @@ describe('minigames', () => {
       { playerId: f.players[0]!.id, amountMilli: '6000' },
       { playerId: f.players[1]!.id, amountMilli: '3000' },
     ]));
+    const action = (next: string) => host(w, f, 'stage.graphPlayback', { stageRunId, action: next });
+    const updated = await view(f.host);
+    await expect(w.service.execute(player(0), { formatVersion: 1, type: 'stage.graphPlayback', commandId: randomUUID(),
+      expectedRevision: updated.revision, sessionId: f.sessionId, stageRunId, action: 'replay' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    w.advance(3000);
+    await action('replay');
+    w.advance(750);
+    await action('pause');
+    w.advance(3000);
+    expect((await view(display)).stage?.graphPlayback).toEqual({ positionMs: 750, playingSince: null });
+    expect((await view(player(0))).stage?.graphPlayback).toBeUndefined();
+    await action('resume');
+    expect((await view(display)).stage?.graphPlayback).toEqual({ positionMs: 750, playingSince: new Date(w.now()).toISOString() });
+    await action('finish');
+    expect((await view(display)).standings).toEqual(result.standings);
   });
 
   it('ranks Match the Angle by circular error, then by the server receipt time', async () => {

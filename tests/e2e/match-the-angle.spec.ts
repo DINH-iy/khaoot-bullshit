@@ -70,6 +70,14 @@ test('Match the Angle works in editor practice and in a live room with a touch c
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
     await expect(host.locator('.mg-podium .first')).toContainText(result);
+    const dialResult = phone.locator('.mg-angle-comparison');
+    await expect(dialResult.locator('.target-ray')).toHaveCSS('transform', /matrix/);
+    await expect(dialResult.locator('.mg-angle-ray')).toHaveCount(2);
+    const recap = phone.getByRole('region', { name: 'Round results' });
+    await expect(recap.locator('dd')).toHaveText([`${target}°`, '91°']);
+    await phone.setViewportSize({ width: 320, height: 568 });
+    expect(await recap.evaluate(node =>
+      node.getBoundingClientRect().bottom <= document.querySelector('.phone-dock-buttons')!.getBoundingClientRect().top)).toBe(true);
   } finally {
     await mobile.close();
   }

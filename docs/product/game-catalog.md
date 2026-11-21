@@ -133,7 +133,7 @@ What drinking games need from the app:
 
 ## November minigame feedback
 
-The queue starts with short whole-room rounds. It groups ideas that can reuse controls, scoring or the submission flow. Each item gets its own playtest.
+Use the [minigame playtest checklist](minigame-playtest.md) to tune one implemented game at a time. The queue starts with short whole-room rounds. It groups ideas that can reuse controls, scoring or the submission flow. Each item gets its own playtest.
 
 | Order | Idea | First playable version |
 | --- | --- | --- |
@@ -149,7 +149,7 @@ The queue starts with short whole-room rounds. It groups ideas that can reuse co
 | 10 | One-Tap Flight | Make an original aerial obstacle course with one-tap lift. |
 | 11 | Fruit Slice | Make an original swipe game with original visuals and rules. Validate touch input and scoring across phones. |
 | 12 | Territory Drawing | Cover the most area. Prototype simultaneous strokes in free-for-all first, then add two-player and team modes. |
-| 13 | 8-Ball Pool | Build a physics prototype and verify shot replay before adding solo and two-player modes. |
+| 13 | 8-Ball Pool | Hosted rounds and two-player phone challenges are playable. The host and TV mirror each shot. Solo practice remains open. |
 | 14 | Kart Race | Treat the report's “Mario card game” as a possible kart race. Confirm the mechanic and landscape controls before implementation. |
 | 15 | Krillion | Park until someone can describe the objective and the phone controls. |
 | 16 | Creature Adventure | Scope an original short adventure set around the existing Creature Duel. A full adventure is a separate project-sized decision. |

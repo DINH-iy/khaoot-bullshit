@@ -49,6 +49,62 @@ describe('a duel the host decides', () => {
   });
 });
 
+describe('hosted 8-ball pool', () => {
+  const contest = { kind: 'game', game: 'eight-ball' };
+  const shoot = { game: 'eight-ball', angle: 0, power: 100, shot: 0 };
+
+  it.each(['random', 'host'])('leaves the winner prediction to spectators, then pays the winner and correct picks (%s pair)', async pick => {
+    const f = await fixture(4, duelGame({ pick, contest }));
+    const stage = (await hostCommand(f, 'session.start')).stageRunId!;
+    if (pick === 'host') await hostCommand(f, 'duel.pick', { stageRunId: stage, playerIds: [f.players[0]!.id, f.players[1]!.id] });
+    const before = await readSessionView(prisma, f.host, f.sessionId);
+    const [a, b] = before.stage!.duel!.duelistIds!.map(id => f.players.findIndex(entry => entry.id === id));
+    const [correct, wrong] = [0, 1, 2, 3].filter(index => index !== a && index !== b);
+    await expect(bet(f, a!, stage, a!)).rejects.toThrow('INELIGIBLE');
+    await bet(f, correct!, stage, a!);
+    await bet(f, wrong!, stage, b!);
+    await expect(player(f, a!, 'duel.move', { stageRunId: stage, move: shoot })).rejects.toThrow('INVALID_STATE');
+    await hostCommand(f, 'stage.close', { stageRunId: stage });
+    await expect(player(f, correct!, 'duel.move', { stageRunId: stage, move: shoot })).rejects.toThrow('INELIGIBLE');
+    await player(f, a!, 'duel.move', { stageRunId: stage, move: shoot });
+    const views = await Promise.all([f.host, { role: 'display' as const, sessionId: f.sessionId }, actor(f, a!), actor(f, b!)]
+      .map(viewer => readSessionView(prisma, viewer, f.sessionId)));
+    const boards = views.map(view => {
+      const contestView = view.stage!.duel!.contest;
+      return contestView.kind === 'game' ? contestView.view?.board : null;
+    });
+    for (const board of boards) expect(board).toMatchObject({ game: 'eight-ball', shot: 1, motion: expect.any(Array) });
+    expect(boards.every(board => JSON.stringify(board) === JSON.stringify(boards[0]))).toBe(true);
+    await player(f, b!, 'duel.resign', { stageRunId: stage });
+    expect(await totals(f)).toEqual(f.players.map((_, index) => index === a ? '10000' : index === correct ? '1000' : '0'));
+  });
+
+  it('selects representatives from different teams and awards only the winning team', async () => {
+    const definition = parseDefinition({ formatVersion: 2, title: 'Team pool', startNodeKey: 'pick',
+      edges: [{ key: 'start-pool', from: 'pick', to: 'pool' }], nodes: [
+        { key: 'pick', stages: [{ key: 'main', kind: 'teams', prompt: 'Make teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }] },
+        { key: 'pool', stages: [{ key: 'main', kind: 'duel', prompt: 'Pool', durationMs: null, pick: 'teams', contest, betMilli: '1000' }] },
+      ] });
+    const f = await fixture(4, definition);
+    const start = (await hostCommand(f, 'session.start')).stageRunId!;
+    await hostCommand(f, 'teams.confirm', { stageRunId: start });
+    const stage = (await hostCommand(f, 'stage.advance', { stageRunId: start })).stageRunId!;
+    const match = await readSessionView(prisma, f.host, f.sessionId);
+    expect(match.stage).toMatchObject({ status: 'CLOSED', eligibleCount: 0, duel: { pick: 'teams', bets: [] } });
+    const pair = match.stage!.duel!.duelistIds!;
+    const teams = match.stage!.duel!.teamIds!;
+    expect(new Set(teams).size).toBe(2);
+    for (const [index, id] of pair.entries()) {
+      expect(match.teamStandings.find(team => team.teamId === teams[index])?.memberIds).toContain(id);
+    }
+    await player(f, f.players.findIndex(entry => entry.id === pair[1]), 'duel.resign', { stageRunId: stage });
+    const result = await readSessionView(prisma, f.host, f.sessionId);
+    expect(result.teamStandings.find(team => team.teamId === teams[0])?.amountMilli).toBe('10000');
+    expect(result.teamStandings.find(team => team.teamId === teams[1])?.amountMilli).toBe('0');
+    expect(await totals(f)).toEqual(['0', '0', '0', '0']);
+  });
+});
+
 describe('a duel played as a game', () => {
   it('lets the duelists play only after betting closes, and pays out as soon as the game is won', async () => {
     const f = await fixture(3, duelGame({ pick: 'host', contest: { kind: 'game', game: 'tictactoe' } }));

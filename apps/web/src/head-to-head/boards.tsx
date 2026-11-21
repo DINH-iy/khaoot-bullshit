@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { HEAD_TO_HEAD_GAMES, type HeadToHeadKey, type HeadToHeadMove, type HeadToHeadView } from '@party/contracts';
 import { CreatureBoard } from './creature-board.js';
+import { PoolBoard } from './eight-ball/pool-board.js';
 import { Replay } from './replay.js';
 import { PIECES, RPS_ICONS, squaresOf } from './pieces.js';
 import { h, listItem } from './h2h.text.js';
@@ -73,7 +74,7 @@ function ChessBoard({ view, board, canMove, onMove }: BoardProps<'chess'>) {
 }
 
 /** The registry of boards: one per head-to-head game, chosen by the game's key. */
-const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { rps: RpsBoard, tictactoe: TicTacToeBoard, chess: ChessBoard, 'creature-duel': CreatureBoard };
+const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { rps: RpsBoard, tictactoe: TicTacToeBoard, chess: ChessBoard, 'creature-duel': CreatureBoard, 'eight-ball': PoolBoard };
 
 /**
  * A head-to-head game as one phone (or screen) sees it: whose turn, the board,
@@ -85,7 +86,7 @@ export function HeadToHead({ view, names, busy, onMove, onResign }: { view: Head
   const turnText = view.outcome ? null : view.turn === 'both' ? h('bothPick') : view.turn === view.seat ? h('yourMove') : view.turn !== null ? h('theirMove', { name: names[view.turn] }) : null;
   const result = !view.outcome ? null : view.outcome.kind === 'draw' ? h('draw') : view.outcome.reason === 'resigned' ? h('winsGaveUp', { name: names[view.outcome.seat], other: names[view.outcome.seat === 0 ? 1 : 0] }) : h('wins', { name: names[view.outcome.seat] });
   return <div className={`h2h h2h-${view.game}`}>
-    <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong> · {h('versus', { first: names[0], second: names[1] })}</p>
+    <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong><span className="h2h-title-dot" aria-hidden="true"> · </span>{h('versus', { first: names[0], second: names[1] })}</p>
     {turnText && <p className="h2h-turn" role="status">{turnText}</p>}
     {result && <p className="h2h-result" role="status">{result}</p>}
     <Board view={view} board={view.board} names={names} canMove={!busy && view.seat !== null && !view.outcome} onMove={onMove} />

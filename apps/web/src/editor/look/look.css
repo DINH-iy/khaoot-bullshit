@@ -146,3 +146,16 @@
 }
 .phone-menu-editor .phone-menu-icon { color: var(--e-accent); }
 .phone-menu-editor > label > span { min-width: 0; overflow-wrap: anywhere; }
+
+.look-panel button.slider-option {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  color: var(--r-text);
+  background: var(--r-surface);
+  border: 1px solid var(--e-border);
+  font-weight: 700;
+}
+.look-panel button.slider-option[aria-pressed=true] { border-color: var(--r-accent); box-shadow: inset 0 0 0 1px var(--r-accent); }
+
+.dial-preview { padding: 12px; border-radius: 12px; min-width: 0; }

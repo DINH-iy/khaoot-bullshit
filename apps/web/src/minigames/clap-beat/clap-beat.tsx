@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CLAP_BEATS_MS, CLAP_END_MS, clapBeatAt } from '@party/contracts';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { listenToMicrophone, microphoneAvailable } from '../../room-extras/microphone-level.js';
@@ -73,13 +73,24 @@ export function ClapBeat({ startsAt, offset, disabled, onResult }: { startsAt: s
     }).then(() => { if (!controller.signal.aborted) setMic('on'); })
       .catch(() => { if (!controller.signal.aborted) { stop(); setMic('failed'); } });
   };
+  const micHelp = useId();
+  const active = !over && clapBeatAt(elapsed) >= 0;
+  const cue = over ? tGame('timer.up') : t(active ? 'hit' : 'ready');
   const using = mic === 'on' || mic === 'asking';
   return <div className="clap-beat">
     {elapsed < 0 && <p role="timer">{tGame('timer.left', { time: Math.ceil(-elapsed / 1000) })}</p>}
-    {!over && <ClapCue elapsed={elapsed} />}
     <p className="mg-sub">{t('result', { hits: count, total: CLAP_BEATS_MS.length })}</p>
-    <button type="button" className="mg-pad" disabled={disabled || elapsed < 0 || over} onClick={punch}>{t('tap')}</button>
-    {!over && microphoneAvailable() && <button type="button" onClick={() => { if (using) { stop(); setMic('off'); } else enable(); }}>{t(using ? 'disable' : 'enable')}</button>}
-    <p className="hint">{mic === 'failed' ? t('failed') : mic === 'asking' ? t('requesting') : t('privacy')}</p>
+    <button type="button" className={`mg-pad clap-pad${active ? ' go' : ''}`} aria-label={t('tap')} disabled={disabled || elapsed < 0 || over} onClick={punch}>
+      <strong>{t('tap')}</strong>
+      <small aria-hidden="true">{cue}</small>
+    </button>
+    <span role="status" className="visually-hidden">{cue}</span>
+    {!over && microphoneAvailable() && <>
+      <button type="button" className="ghost" aria-describedby={micHelp}
+        onClick={() => { if (using) { stop(); setMic('off'); } else enable(); }}>{t(using ? 'disable' : 'enable')}</button>
+      <p id={micHelp} className={mic === 'failed' || mic === 'asking' ? 'hint' : 'visually-hidden'}>
+        {mic === 'failed' ? t('failed') : mic === 'asking' ? t('requesting') : t('privacy')}
+      </p>
+    </>}
   </div>;
 }

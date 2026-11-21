@@ -6,7 +6,10 @@ export * from './authoring.js';
 export * from './live-editing.js';
 export * from './presentation.js';
 export * from './minigames/shared/catalog.js';
+export * from './minigames/shared/number-choice.js';
+export * from './minigames/cut-the-line/target.js';
 export * from './minigames/count-the-dots/dot-pattern.js';
+export * from './minigames/shared/reveal-easing.js';
 export * from './minigames/draw-the-graph/graph.js';
 export * from './minigames/heads-or-tails/coin.js';
 export * from './minigames/red-or-black-roulette/roulette.js';
@@ -20,6 +23,7 @@ export * from './packs.js';
 export * from './side-games.js';
 export * from './prefabs.js';
 export * from './head-to-head.js';
+export * from './minigames/eight-ball/pool.js';
 export * from './arcade.js';
 export * from './media.js';
 

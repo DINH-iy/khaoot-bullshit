@@ -17,6 +17,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
   changeWon: 'Change how it is won…', howWon: 'How is the duel won?', whoDuels: 'Who duels', twoRandom: 'Two at random', hostPicks: 'The host picks', winsNeeded: 'Wins needed',
   // minigame-fields.tsx
   rainbow: 'A team whose four cards are four different suits makes the other teams drink the last round’s sips.', gSpeed: 'Speed', gDrawing: 'Drawing', gPrecision: 'Precision', gLuck: 'Luck & choices', gDrinking: 'Drinking',
+  revealEasing: 'Reveal easing', 'ease-in': 'Ease in', 'ease-out': 'Ease out', 'ease-in-out': 'Ease in and out', linear: 'Linear', instant: 'Instant',
   dotViewTime: 'Dot viewing time',
   coinPoints: 'Points per correct guess',
   byPlace: 'Points by place', byPlaceHint: 'The best results get these, given when the results are shown.', teamResult: 'In a team round, a team’s result is', average: 'Its average', best: 'Its best player', added: 'Everyone added up',
@@ -47,6 +48,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
   pDraw: 'Draw on the phone', pOrder: 'Put the items in order', pChoose: 'Choose an answer', sharedScreen: 'Shared screen', phone: 'Phone', playerOne: 'Player one', playerTwo: 'Player two', playerThree: 'Player three',
 }, {
   nl: {
+    revealEasing: 'Timing van de onthulling', 'ease-in': 'Rustig beginnen', 'ease-out': 'Rustig eindigen', 'ease-in-out': 'Rustig beginnen en eindigen', linear: 'Gelijkmatig', instant: 'Direct',
     even: 'Gelijke stappen', evenHint: 'Zoals 3, 2, 1', steep: 'Winnaar krijgt het meest', steepHint: 'Zoals 4, 2, 1', equal: 'Evenveel voor elke plaats', givenAs: 'Punten worden gegeven als', none: 'Geen',
     eachPlace: 'Punten per plaats', totalSplit: 'Een totaal, verdeeld over de plaatsen', place: '{ordinal} plaats', removePlace: '{ordinal} plaats weghalen', pts: 'ptn', addPlace: '+ Plaats',
     total: 'Punten in totaal', numberPlaces: 'Aantal plaatsen', howSplit: 'Hoe het verdeeld wordt', previewPlace: '{ordinal}: {points}',
@@ -85,6 +87,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
     pDraw: 'Teken op de telefoon', pOrder: 'Zet de items op volgorde', pChoose: 'Kies een antwoord', sharedScreen: 'Gedeeld scherm', phone: 'Telefoon', playerOne: 'Speler een', playerTwo: 'Speler twee', playerThree: 'Speler drie',
   },
   de: {
+    revealEasing: 'Tempo der Auflösung', 'ease-in': 'Langsam beginnen', 'ease-out': 'Langsam enden', 'ease-in-out': 'Langsam beginnen und enden', linear: 'Gleichmäßig', instant: 'Sofort',
     even: 'Gleichmäßige Stufen', evenHint: 'Etwa 3, 2, 1', steep: 'Der Sieger bekommt am meisten', steepHint: 'Etwa 4, 2, 1', equal: 'Gleich viel für jeden Platz', givenAs: 'Punkte werden vergeben als', none: 'Keine',
     eachPlace: 'Punkte für jeden Platz', totalSplit: 'Eine Summe, auf die Plätze verteilt', place: '{ordinal} Platz', removePlace: '{ordinal} Platz entfernen', pts: 'Pkt.', addPlace: '+ Platz',
     total: 'Punkte insgesamt', numberPlaces: 'Anzahl der Plätze', howSplit: 'Wie verteilt wird', previewPlace: '{ordinal}: {points}',
@@ -123,6 +126,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
     pDraw: 'Auf dem Handy zeichnen', pOrder: 'Die Einträge ordnen', pChoose: 'Eine Antwort wählen', sharedScreen: 'Gemeinsamer Bildschirm', phone: 'Handy', playerOne: 'Spieler eins', playerTwo: 'Spieler zwei', playerThree: 'Spieler drei',
   },
   ro: {
+    revealEasing: 'Ritmul dezvăluirii', 'ease-in': 'Pornire lentă', 'ease-out': 'Oprire lentă', 'ease-in-out': 'Pornire și oprire lentă', linear: 'Liniar', instant: 'Imediat',
     even: 'Pași egali', evenHint: 'De exemplu 3, 2, 1', steep: 'Câștigătorul ia cel mai mult', steepHint: 'De exemplu 4, 2, 1', equal: 'La fel pentru fiecare loc', givenAs: 'Punctele se dau ca', none: 'Niciunul',
     eachPlace: 'Puncte pentru fiecare loc', totalSplit: 'Un total, împărțit pe locuri', place: 'Locul {ordinal}', removePlace: 'Elimină locul {ordinal}', pts: 'pct', addPlace: '+ Loc',
     total: 'Puncte în total', numberPlaces: 'Numărul de locuri', howSplit: 'Cum se împarte', previewPlace: '{ordinal}: {points}',

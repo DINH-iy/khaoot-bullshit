@@ -15,6 +15,7 @@ import { OWNER_COOKIE, type OwnerAccess } from './owner-access.js';
 import { readRoomState } from '../rooms/reclaim.js';
 import { linkNextRoom } from '../rooms/restart.js';
 import { closeRoom } from '../rooms/close.js';
+import { minigameTryout } from './minigame-tryout.js';
 import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
 
 // Local owner hosting: the person running this server opens a private link and
@@ -29,7 +30,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   const secure = config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : '';
   const ownerCookie = (token: string) => `${OWNER_COOKIE}=${token}; Path=/api/host; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`;
   const ownerCreator = () => sharedOwnerCreator(client);
-  async function versionFor(creatorId: string, game: (typeof builtInGames)[number]): Promise<string> {
+  async function versionFor(creatorId: string, game: Pick<(typeof builtInGames)[number], 'definition'>): Promise<string> {
     const hash = contentHash(game.definition);
     return client.$transaction(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('local-owner-games', 0))::text AS locked`;
@@ -42,7 +43,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   }
 
   /** Opens a room as the owner's host. Deterministic per request, so a retried click returns the same room and access. */
-  async function openRoom(roomSecret: string, creatorId: string, gameVersionId: string, sessionId: string, commandId: string) {
+  async function openRoom(roomSecret: string, creatorId: string, gameVersionId: string, sessionId: string, commandId: string, tryout = false) {
       const token = joinToken(roomSecret, sessionId, `owner:${commandId}`);
       await service.execute({ role: 'host', creatorId: creatorId }, { formatVersion: 1, type: 'session.create', sessionId, commandId, expectedRevision: 0, mode: 'REHEARSAL', gameVersionId });
       const expiresAt = await client.$transaction(async tx => {
@@ -50,7 +51,9 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
         const previous = await tx.roomCredential.findUnique({ where: { tokenHash: tokenHash(token) } });
         if (previous) { roomAssert(!previous.revokedAt && previous.expiresAt.getTime() > Date.now(), 'UNAUTHORIZED'); return previous.expiresAt; }
         const expires = new Date(Date.now() + HOST_ACCESS_MS);
-        await tx.gameSession.update({ where: { id: sessionId }, data: { roomCode: makeRoomCode() } });
+        const session = tryout ? await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId }, select: { state: true } }) : null;
+        await tx.gameSession.update({ where: { id: sessionId }, data: { roomCode: makeRoomCode(),
+          ...(session ? { state: { ...readRoomState(session.state), tryout: true, testBench: true } } : {}) } });
         await tx.roomCredential.create({ data: { sessionId, role: 'HOST', source: 'LOCAL_REHEARSAL', tokenHash: tokenHash(token), expiresAt: expires } });
         return expires;
       });
@@ -112,6 +115,18 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       const expiresAt = await openRoom(settings.roomSecret, creator.id, gameVersionId, sessionId, commandId);
       const token = joinToken(settings.roomSecret, sessionId, `owner:${commandId}`);
       reply.header('set-cookie', roomCookie(config, sessionId, token, expiresAt));
+      return { ok: true, data: { sessionId } };
+    } catch (error) { return fail(reply, error); }
+  });
+  app.post('/api/host/minigame-tryout', async (request, reply) => {
+    try {
+      const settings = await requireEditor(request);
+      const parsed = RestartRoomSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+      const { sessionId, commandId } = parsed.data;
+      const creator = await ownerCreator();
+      const versionId = await versionFor(creator.id, { definition: minigameTryout });
+      const expiresAt = await openRoom(settings.roomSecret, creator.id, versionId, sessionId, commandId, true);
+      reply.header('set-cookie', roomCookie(config, sessionId, joinToken(settings.roomSecret, sessionId, `owner:${commandId}`), expiresAt));
       return { ok: true, data: { sessionId } };
     } catch (error) { return fail(reply, error); }
   });

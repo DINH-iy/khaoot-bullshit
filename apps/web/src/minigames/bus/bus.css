@@ -12,3 +12,8 @@
 .bus-mark.right { background: #137a52; } .bus-mark.wrong { background: #b3261e; }
 .bus-sips { font-weight: 800; } .bus-drink { margin: 0; color: var(--r-bad); font-weight: 800; text-align: center; } .bus-safe { margin: 0; color: var(--r-ok); font-weight: 800; text-align: center; }
 .bus-rainbow { margin: 0; font-weight: 900; text-align: center; background: linear-gradient(90deg, #e63946, #f4a261, #e9c46a, #2a9d8f, #457b9d, #8e44ad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+@media (max-width: 380px), (max-height: 460px) {
+  .room-player .bus-cards.big { gap: 6px; }
+  .room-player .bus-cards.big .bus-card { width: clamp(2rem, 13vw, 2.75rem); height: 3.4rem; }
+}

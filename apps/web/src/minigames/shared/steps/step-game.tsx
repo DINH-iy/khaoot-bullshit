@@ -52,7 +52,7 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
   const side = steps?.sides.find(entry => entry.playerId === me || (entry.teamId !== null && stage.teams?.teams.find(team => team.teamId === entry.teamId)?.memberIds.includes(me ?? '')));
   const starts = minigame.startsAt ? Date.parse(minigame.startsAt) : null;
   const now = useServerNow(offset, Boolean(side?.voteEndsAt) || (starts !== null && starts > Date.now() + offset - 1000));
-  if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('minigame.paused')}</p>;
+  if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('phase.paused')}</p>;
   if (!steps || !side) return <p className="wait-note">{t(howToPlayKey(game))}</p>;
   const board = renderer.board?.(side, settings, true);
   const head = <>{side.teamId && <p className="step-team-title">{side.name}</p>}{board}</>;
@@ -97,10 +97,11 @@ export function StepScreen({ state, stage, offset }: { state: RoomSnapshot; stag
     if (side.captainId) return c('captainChooses', { name: nameOf(state, side.captainId) });
     return side.step > 0 ? c('step', { number: side.step + 1 }) : c('choosing');
   };
+  const title = name(game);
+  const repeatingTitle = stage.prompt.trim().replace(/[.!?]+$/, '').toLocaleLowerCase() === title.toLocaleLowerCase();
   return <div className={`mg-screen mg-${game}`}>
-    <p className="mg-name">{name(game)}</p>
-    <p className="mg-how">{t(howToPlayKey(game))}</p>
-    {state.view.status === 'PAUSED' ? <p className="mg-big wait" role="status">{t('minigame.paused')}</p>
+    {!repeatingTitle && <p className="mg-name">{title}</p>}
+    {state.view.status === 'PAUSED' ? <p className="mg-paused" role="status">{t('phase.paused')}</p>
       : game === 'speed-run' && now < start ? <p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil((start - now) / 1000)}</p>
       : steps && <ol className="step-sides" aria-label={c('progress')}>{steps.sides.map(side =>
         <li key={side.teamId ?? side.playerId} className={side.options ? undefined : 'done'}><span className="step-side-name">{side.name}</span>{renderer.board?.(side, settings, false)}<span className="step-status">{status(side)}</span></li>)}</ol>}

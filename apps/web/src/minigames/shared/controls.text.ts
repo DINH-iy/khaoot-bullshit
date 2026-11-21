@@ -1,9 +1,10 @@
 import { defineTexts } from '../../i18n/texts.js';
 
 export const CONTROL_TEXTS = defineTexts('controls.text', {
-    cutTarget: "Cut at {target}%", cutPosition: "Cut position", lockCut: "Lock in cut", cutOff: "{value} pp off",
+    cutTarget: "Cut at {target}%", cutPosition: "Cut position", lockCut: "Lock in cut", cutOff: "{value} percentage points off",
     angleTarget: "Aim for {target}°", anglePosition: "Ray angle", lockAngle: "Lock in angle", angleOff: "{value}° off",
     dotPattern: "Dot pattern", dotGuess: "How many dots?", dotWatch: "Watch the shared screen.", dotGuessNow: "Enter your guess on your phone.", dotSaved: "Guess saved: {guess}", dotTotal: "{count} dots", dotOff: "{value} off",
+    dotSubmit: "Lock in count", dotActual: "Actual count", dotYours: "Your guess", dotExact: "Exact guess", dotNoGuess: "No guess submitted", dotPoints: "+{points} pts",
     starts: "Starts in",
     target: "Target:",
     circle: "Your circle",
@@ -54,6 +55,7 @@ export const CONTROL_TEXTS = defineTexts('controls.text', {
     cutTarget: "Knip op {target}%", cutPosition: "Knippositie", lockCut: "Zet knip vast", cutOff: "{value} procentpunt verschil",
     angleTarget: "Richt op {target}°", anglePosition: "Hoek van de lijn", lockAngle: "Zet hoek vast", angleOff: "{value}° verschil",
     dotPattern: "Stippenpatroon", dotGuess: "Hoeveel stippen?", dotWatch: "Kijk naar het gedeelde scherm.", dotGuessNow: "Voer je schatting in op je telefoon.", dotSaved: "Schatting opgeslagen: {guess}", dotTotal: "{count} stippen", dotOff: "{value} verschil",
+    dotSubmit: "Aantal vastleggen", dotActual: "Echt aantal", dotYours: "Jouw schatting", dotExact: "Precies goed", dotNoGuess: "Geen schatting ingevuld", dotPoints: "+{points} pt",
     starts: "Begint over",
     target: "Doel:",
     circle: "Jouw cirkel",
@@ -104,6 +106,7 @@ export const CONTROL_TEXTS = defineTexts('controls.text', {
     cutTarget: "Teile bei {target} %", cutPosition: "Schnittposition", lockCut: "Position bestätigen", cutOff: "{value} Prozentpunkte Abweichung",
     angleTarget: "Ziele auf {target}°", anglePosition: "Winkel des Strahls", lockAngle: "Winkel bestätigen", angleOff: "{value}° Abweichung",
     dotPattern: "Punktemuster", dotGuess: "Wie viele Punkte?", dotWatch: "Schau auf den gemeinsamen Bildschirm.", dotGuessNow: "Gib deinen Tipp am Handy ein.", dotSaved: "Tipp gespeichert: {guess}", dotTotal: "{count} Punkte", dotOff: "{value} Abweichung",
+    dotSubmit: "Tipp abgeben", dotActual: "Anzahl", dotYours: "Dein Tipp", dotExact: "Genau richtig", dotNoGuess: "Kein Tipp abgegeben", dotPoints: "+{points} Pkt.",
     starts: "Beginnt in",
     target: "Ziel:",
     circle: "Dein Kreis",
@@ -151,9 +154,10 @@ export const CONTROL_TEXTS = defineTexts('controls.text', {
     voteMany: "{value} Stimmen",
   },
   ro: {
-    cutTarget: "Taie la {target}%", cutPosition: "Poziția tăieturii", lockCut: "Confirmă tăietura", cutOff: "Diferență de {value} pp",
+    cutTarget: "Taie la {target}%", cutPosition: "Poziția tăieturii", lockCut: "Confirmă tăietura", cutOff: "Diferență de {value} puncte procentuale",
     angleTarget: "Țintește la {target}°", anglePosition: "Unghiul razei", lockAngle: "Confirmă unghiul", angleOff: "Diferență de {value}°",
     dotPattern: "Model de puncte", dotGuess: "Câte puncte?", dotWatch: "Privește ecranul comun.", dotGuessNow: "Introdu estimarea pe telefon.", dotSaved: "Estimare salvată: {guess}", dotTotal: "{count} puncte", dotOff: "Diferență de {value}",
+    dotSubmit: "Confirmă numărul", dotActual: "Numărul real", dotYours: "Estimarea ta", dotExact: "Estimare exactă", dotNoGuess: "Nicio estimare", dotPoints: "+{points} pct.",
     starts: "Începe în",
     target: "Țintă:",
     circle: "Cercul tău",

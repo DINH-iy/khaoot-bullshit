@@ -3,3 +3,7 @@
   background: linear-gradient(180deg, var(--a2), color-mix(in srgb, var(--a2) 70%, black)); border: 3px solid color-mix(in srgb, var(--a2) 60%, black); display: grid; place-items: center; gap: 4px; padding: 10px; }
 .mg-doors.revealed .mg-door strong { font-size: 1.8rem; }
 .step-doors { margin: 0; } .mg-door.picked { outline: 3px solid var(--r-accent); }
+
+.room-player .mg-doors { grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.5rem), 1fr)); gap: 8px; }
+.room-player .mg-door { min-height: clamp(48px, 13svh, 5.5rem); padding: 6px; font-size: 1rem; }
+.room .mg-doors.revealed .mg-door { min-height: clamp(48px, 11svh, 5rem); }

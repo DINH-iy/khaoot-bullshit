@@ -15,6 +15,10 @@
 - Use bounded pools, queues, retries, telemetry, logs, and media preloading. Keep heavy processing off the live game path. Never disable database durability for speed.
 - Keep credentials, .env files, runtime data, media uploads, database volumes, logs, and generated builds out of tracked source.
 
+## Design review
+
+- Before implementing a new screen or minigame, read [docs/design/style.md](docs/design/style.md) and review the planned states against its visual standards. Apply the same rules to affected states when changing an existing screen.
+
 ## Verification
 
 - For code/dependency changes, run npm run check and relevant targeted checks. Add meaningful tests for permissions, transactions, state/scoring invariants, and recovery; avoid tests that merely mirror an implementation.

@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
+import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
-import { checkBet, decideDuel, duelPlay, openDuel, pickDuelists } from './duel.js';
+import { checkBet, decideDuel, duelPlay, openDuel, openTeamPool, pickDuelists } from './duel.js';
+import { matchOutcome } from '../head-to-head/match.js';
 import { judgeResult, readMinigameRun, startMinigame, usesSubmissionTime } from '../minigames/shared/rules.js';
 import { CLOCK_SLACK_MS, NO_FAIRNESS } from '../minigames/shared/fairness.js';
+import { changeGraphPlayback } from '../minigames/draw-the-graph/playback.js';
 import { shiftDotWindow } from '../minigames/count-the-dots/dots.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay-drawing/relay.js';
 import { stepDecide, stepMove } from '../minigames/shared/steps/engine.js';
@@ -37,6 +39,8 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   }
   const ids = players.map(player => player.id);
   let lineupId: string | null = null; let eligible = ids; let timed = true;
+  let teamDuelStarted = false;
+  let teamDuelUnavailable = false;
   if (entry.stage.kind === 'route') {
     const opened = await openRoute(tx, sessionId, entry.stage, ids);
     presentation = opened.presentation; eligible = opened.eligibility; lineupId = opened.lineupId;
@@ -50,7 +54,21 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
     eligible = []; timed = false;
   }
   // A duel: everyone but the two duelists bets; when the host picks the pair, betting waits (untimed) until then.
-  if (entry.stage.kind === 'duel') { const opened = openDuel(entry.stage, ids); presentation = { duel: opened.duel }; eligible = opened.eligible; timed = opened.timed; }
+  if (entry.stage.kind === 'duel') {
+    if (entry.stage.pick === 'teams') {
+      const lineup = await gameLineupForRound(tx, sessionId, ids);
+      const duel = openTeamPool(entry.stage, ids, lineup?.members ?? []);
+      lineupId = lineup?.id ?? null;
+      presentation = { duel };
+      eligible = [];
+      timed = false;
+      teamDuelStarted = true;
+      teamDuelUnavailable = !duel.match;
+    } else {
+      const opened = openDuel(entry.stage, ids);
+      presentation = { duel: opened.duel }; eligible = opened.eligible; timed = opened.timed;
+    }
+  }
   const play = entry.stage.kind === 'route' || entry.stage.kind === 'duel' || entry.stage.kind === 'teams' || isShowOnly(entry.stage) ? { kind: 'solo' as const } : effectivePlay(definition, entry.stage);
   if (play.kind === 'teams') {
     const teamPlay = { answers: play.answers, points: play.points };
@@ -71,6 +89,7 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   // A minigame starts (after its countdown) as soon as players can play it.
   if (timed) presentation = { ...presentation, ...countdownPresentation(entry.stage, now) };
   const stage = await tx.stageRun.create({ data: { sessionId, number, nodeKey: entry.nodeKey, stageKey: entry.stage.key, openedAt: now, presentation, lineupId,
+    ...(teamDuelStarted ? { status: 'CLOSED', closedAt: now, ...(teamDuelUnavailable ? { revealedAt: now } : {}) } : {}),
     ...timerColumns(timed ? await startedDuration(tx, entry.stage, lineupId, presentation, now) : null, false, now), eligibility: { formatVersion: 1, playerIds: eligible } } });
   await tx.gameSession.update({ where: { id: sessionId }, data: { status: 'RUNNING', currentNodeKey: entry.nodeKey } });
   return stage;
@@ -190,8 +209,26 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     if (look.success && look.data.picture) { const { picture: _removed, ...rest } = look.data; await tx.sessionPlayer.update({ where: { id: player.id }, data: { look: rest } }); }
     return empty;
   }
+  const roomState = (session.state ?? {}) as { tryout?: boolean; roomClosed?: boolean; nextRoom?: string | null };
+  if (command.type === 'minigame.tryout') {
+    requireGame(session.mode === 'REHEARSAL' && roomState.tryout === true, 'FORBIDDEN');
+    requireGame(session.status !== 'FINISHED' && !roomState.roomClosed && !roomState.nextRoom, 'INVALID_STATE');
+    const chosen = locateStage(definition, command.game, 'play');
+    requireGame(chosen?.stage.kind === 'minigame' && chosen.stage.game === command.game, 'INVALID_COMMAND');
+    const minPlayers = TEAM_MINIGAMES.some(game => game === command.game) ? 2 : 1;
+    requireGame((await present(tx, session.id)).length >= minPlayers, 'INELIGIBLE');
+    const previous = await tx.stageRun.findFirst({ where: { sessionId: session.id }, orderBy: { number: 'desc' } });
+    if (previous?.status === 'ACTIVE') {
+      // An abandoned attempt stays in history without a reveal or a score award.
+      await tx.stageRun.update({ where: { id: previous.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
+    }
+    if (session.status === 'PAUSED') {
+      await tx.gameSession.update({ where: { id: session.id }, data: { state: { ...roomState, breakStartedAt: null, breakVoters: [] } } });
+    }
+    return { ...empty, stageRunId: (await openStage(tx, session.id, (previous?.number ?? 0) + 1, chosen, definition, now)).id };
+  }
   if (command.type === 'session.start') {
-    requireGame(session.status === 'LOBBY', 'INVALID_STATE');
+    requireGame(session.status === 'LOBBY' && !roomState.tryout, 'INVALID_STATE');
     return { ...empty, stageRunId: (await openStage(tx, session.id, 1, firstStage(definition), definition, now)).id };
   }
   if (command.type === 'session.pause' || command.type === 'session.resume') {
@@ -283,6 +320,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type === 'duel.decide') {
     // Naming the winner closes the betting, pays out and shows the result, in one step.
     requireGame(entry.stage.kind === 'duel', 'INVALID_STATE');
+    requireGame(entry.stage.contest?.kind !== 'game' || entry.stage.contest.game !== 'eight-ball', 'INVALID_STATE');
     const decided = await decideDuel(tx, stage, entry.stage, command.winnerId);
     await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: decided.duel as object },
       ...(stage.status === 'ACTIVE' ? { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } : {}) } });
@@ -293,7 +331,11 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     // A duelist plays the duel's game (after betting has closed). A win names the winner and pays out at once; a draw waits for the host.
     requireGame(actor.role === 'player' && entry.stage.kind === 'duel', 'INVALID_STATE');
     const played = duelPlay(stage, actor.playerId, command.type === 'duel.move' ? { move: command.move } : { resign: true });
-    if (!played.winnerId) { await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: played.duel as object } } }); return { ...empty, stageRunId: stage.id }; }
+    if (!played.winnerId) {
+      await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: played.duel as object } } });
+      if (played.duel.match?.game === 'eight-ball' && matchOutcome(played.duel.match)?.kind === 'draw') await reveal(tx, stage, now);
+      return { ...empty, stageRunId: stage.id };
+    }
     const decided = await decideDuel(tx, stage, entry.stage, played.winnerId, played.duel);
     await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), duel: decided.duel as object } } });
     await reveal(tx, stage, now);
@@ -311,6 +353,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       { voterCount, counts, leaders: leadersOf(counts), resolution: 'host', random: null, closedBy: 'decide' }) };
   }
   if (command.type === 'stage.advance') {
+    requireGame(!roomState.tryout, 'INVALID_STATE');
     // A show-only scene ends when the host moves on; other stages are closed first.
     // A Pick teams scene ends once its teams are confirmed.
     const done = isShowOnly(entry.stage) || (entry.stage.kind === 'teams' && !readForming(stage.presentation));
@@ -389,6 +432,14 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     const next = change.kind === 'clear' ? null : change.kind === 'set' ? change.ms + beforeGuess : current! + change.ms;
     requireGame(next === null || next <= MAX_REMAINING_MS, 'INVALID_STATE');
     await tx.stageRun.update({ where: { id: stage.id }, data: timerColumns(next, session.status === 'PAUSED', now) });
+    return { ...empty, stageRunId: stage.id };
+  }
+  if (command.type === 'stage.graphPlayback') {
+    requireGame(stage.revealedAt && entry.stage.kind === 'minigame' &&
+      entry.stage.game === 'draw-the-graph' && entry.stage.settings?.revealEasing !== 'instant' && readMinigameRun(stage.presentation)?.graph, 'INVALID_STATE');
+    const presentation = stage.presentation as Record<string, unknown>;
+    const graphPlayback = changeGraphPlayback(presentation, stage.revealedAt, command.action, now);
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...presentation, graphPlayback } } });
     return { ...empty, stageRunId: stage.id };
   }
   if (command.type === 'stage.nextResult') {

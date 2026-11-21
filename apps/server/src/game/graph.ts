@@ -145,6 +145,7 @@ export function graphIssues(definition: GameDefinition): GraphIssue[] {
         if (!teams) fail('Game teams are used before they are defined', key);
         if (!formed) fail('Captain vote needs teams earlier on every path', key);
       }
+      if (stage.kind === 'duel' && stage.pick === 'teams' && !formed) fail('Team pool needs teams earlier on every path', key);
       seen.add(`${key}/${stage.key}`);
     }
     after.set(key, { seen, teams, formed });

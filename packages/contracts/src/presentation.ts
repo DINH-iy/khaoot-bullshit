@@ -76,11 +76,13 @@ const FullColorsSchema = z.object({
   answers: z.array(Color).min(2).max(8), answerText: Color,
 });
 export const ColorsSchema = FullColorsSchema.partial().strict();
+export const SLIDER_STYLES = ['blade', 'notch', 'ring', 'dial'] as const;
 export const ThemeSchema = z.object({
   preset: z.string().max(40).optional(),
   colors: ColorsSchema.optional(),
   font: z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]).optional(), headingFont: z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]).optional(),
   radius: z.number().int().min(0).max(40).optional(), textScale: z.number().min(.8).max(1.6).optional(),
+  sliderStyle: z.enum(SLIDER_STYLES).optional(),
   background: z.enum(['gradient', 'solid', 'dots', 'stripes', 'glow', 'grid']).optional(), tiles: z.enum(['filled', 'outline', 'glass', 'flat']).optional(),
   backgroundMotion: z.enum(['none', 'starlight', 'light-lines']).optional(),
   // A shine and glow on answer tiles and main buttons; off unless chosen.
@@ -95,57 +97,57 @@ export const ThemeSchema = z.object({
 }).strict();
 export type Theme = z.infer<typeof ThemeSchema>;
 export type FullTheme = { [K in Exclude<keyof Theme, 'preset' | 'colors'>]-?: NonNullable<Theme[K]> } & { colors: z.infer<typeof FullColorsSchema> };
-// Every style starts with the classic marks: A B C in a circle before the answer, arrows on party choices.
-const MARKS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const, backgroundMotion: 'none' as const };
-const SPACE: FullTheme = { ...MARKS, font: 'system', headingFont: 'condensed', radius: 14, textScale: 1, background: 'glow', backgroundMotion: 'starlight', tiles: 'glass', uppercaseHeadings: true, gradients: false,
+// Defaults shared by the built-in styles.
+const PRESET_DEFAULTS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const, backgroundMotion: 'none' as const, sliderStyle: 'blade' as const };
+const SPACE: FullTheme = { ...PRESET_DEFAULTS, font: 'system', headingFont: 'condensed', radius: 14, textScale: 1, background: 'glow', backgroundMotion: 'starlight', tiles: 'glass', uppercaseHeadings: true, gradients: false,
     colors: { background: '#0a1024', background2: '#21113e', surface: '#18213c', text: '#f5f4ff', muted: '#bec9e8', accent: '#a3e6ff', accentText: '#081827', success: '#97f0ba', danger: '#ffa8bd',
       answers: ['#8c275c', '#23508e', '#795324', '#206754', '#584097', '#8c422e'], answerText: '#ffffff' } };
 /** Starting points. Every value can be changed afterwards. */
 export const THEME_PRESETS: Record<string, { name: string; theme: FullTheme }> = {
-  party: { name: 'Party', theme: { ...MARKS, font: 'system', headingFont: 'system', radius: 24, textScale: 1, background: 'glow', tiles: 'filled', uppercaseHeadings: false, gradients: false,
+  party: { name: 'Party', theme: { ...PRESET_DEFAULTS, font: 'system', headingFont: 'system', radius: 24, textScale: 1, background: 'glow', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#241a4d', background2: '#0f1022', surface: '#2a2547', text: '#f6f3ff', muted: '#c3bce0', accent: '#ffcf4a', accentText: '#2a1d00', success: '#5ee6a8', danger: '#ff8a8a',
       answers: ['#c2185b', '#1d5fc2', '#8a6a00', '#137a52', '#6d3fd6', '#b4530f'], answerText: '#ffffff' } } },
-  neon: { name: 'Neon night', theme: { ...MARKS, font: 'condensed', headingFont: 'condensed', radius: 6, textScale: 1.05, background: 'grid', tiles: 'outline', uppercaseHeadings: true, gradients: false,
+  neon: { name: 'Neon night', theme: { ...PRESET_DEFAULTS, font: 'condensed', headingFont: 'condensed', radius: 6, textScale: 1.05, background: 'grid', tiles: 'outline', uppercaseHeadings: true, gradients: false,
     colors: { background: '#05010f', background2: '#120025', surface: '#120a24', text: '#f2fbff', muted: '#9fb3c8', accent: '#00f0ff', accentText: '#001417', success: '#39ff88', danger: '#ff4f81',
       answers: ['#ff2bd6', '#00c2ff', '#f5e000', '#22ff8a', '#a35bff', '#ff8a00'], answerText: '#05010f' } } },
-  pub: { name: 'Pub quiz', theme: { ...MARKS, font: 'serif', headingFont: 'slab', radius: 10, textScale: 1, background: 'stripes', tiles: 'flat', uppercaseHeadings: false, gradients: false,
+  pub: { name: 'Pub quiz', theme: { ...PRESET_DEFAULTS, font: 'serif', headingFont: 'slab', radius: 10, textScale: 1, background: 'stripes', tiles: 'flat', uppercaseHeadings: false, gradients: false,
     colors: { background: '#2b1a10', background2: '#140b06', surface: '#3a2416', text: '#fbf1e1', muted: '#d7c2a5', accent: '#e8b04a', accentText: '#2b1a10', success: '#9ad17a', danger: '#ef8a6a',
       answers: ['#7a2e1f', '#1f4e5f', '#6b5b14', '#2f5e2e', '#4a2f5e', '#7a4a14'], answerText: '#fbf1e1' } } },
-  clean: { name: 'Clean', theme: { ...MARKS, font: 'system', headingFont: 'system', radius: 16, textScale: 1, background: 'solid', tiles: 'filled', uppercaseHeadings: false, gradients: false,
+  clean: { name: 'Clean', theme: { ...PRESET_DEFAULTS, font: 'system', headingFont: 'system', radius: 16, textScale: 1, background: 'solid', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#f5f6f8', background2: '#e9ebf0', surface: '#ffffff', text: '#16181d', muted: '#5b6070', accent: '#2251d1', accentText: '#ffffff', success: '#137a52', danger: '#b3261e',
       answers: ['#c2185b', '#1d5fc2', '#8a6a00', '#137a52', '#6d3fd6', '#b4530f'], answerText: '#ffffff' } } },
-  retro: { name: 'Retro arcade', theme: { ...MARKS, font: 'mono', headingFont: 'mono', radius: 0, textScale: 1, background: 'dots', tiles: 'filled', uppercaseHeadings: true, gradients: false,
+  retro: { name: 'Retro arcade', theme: { ...PRESET_DEFAULTS, font: 'mono', headingFont: 'mono', radius: 0, textScale: 1, background: 'dots', tiles: 'filled', uppercaseHeadings: true, gradients: false,
     colors: { background: '#1b1b3a', background2: '#0b0b1f', surface: '#26264f', text: '#fffbe6', muted: '#c8c3a3', accent: '#ff5c8a', accentText: '#1b1b3a', success: '#7cff6b', danger: '#ff6b6b',
       answers: ['#c62f3d', '#2459c4', '#8a6a00', '#1a7a42', '#8e44ad', '#a84300'], answerText: '#ffffff' } } },
-  terminal: { name: 'ASCII Terminal', theme: { ...MARKS, font: 'mono', headingFont: 'mono', radius: 2, textScale: 1, background: 'grid', tiles: 'outline', uppercaseHeadings: false, gradients: false,
+  terminal: { name: 'ASCII Terminal', theme: { ...PRESET_DEFAULTS, font: 'mono', headingFont: 'mono', radius: 2, textScale: 1, background: 'grid', tiles: 'outline', uppercaseHeadings: false, gradients: false,
     markers: 'custom', customMarks: ['[A]', '[B]', '[C]', '[D]', '[E]', '[F]', '[G]', '[H]'], markerShape: 'plain',
     colors: { background: '#0b1510', background2: '#050b07', surface: '#13221a', text: '#dbffe6', muted: '#a3c9b0', accent: '#8cffa8', accentText: '#08170e', success: '#8cffa8', danger: '#ff9d95',
       answers: ['#8cffa8', '#9cddfb', '#f4d484', '#e6b9ff', '#ffb5c6', '#90e8d9'], answerText: '#08170e' } } },
-  kids: { name: 'Bright & playful', theme: { ...MARKS, font: 'playful', headingFont: 'rounded', radius: 32, textScale: 1.1, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
+  kids: { name: 'Bright & playful', theme: { ...PRESET_DEFAULTS, font: 'playful', headingFont: 'rounded', radius: 32, textScale: 1.1, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#fff7e0', background2: '#ffe2ef', surface: '#ffffff', text: '#2a2140', muted: '#6a5f80', accent: '#ff6f3c', accentText: '#2a1300', success: '#1d8a4a', danger: '#c62828',
       answers: ['#d81b60', '#1e63d6', '#8a6a00', '#2e7d32', '#7b3fd6', '#c2410c'], answerText: '#ffffff' } } },
-  elegant: { name: 'Gala', theme: { ...MARKS, font: 'serif', headingFont: 'elegant', radius: 4, textScale: 1, background: 'gradient', tiles: 'glass', uppercaseHeadings: true, gradients: false,
+  elegant: { name: 'Gala', theme: { ...PRESET_DEFAULTS, font: 'serif', headingFont: 'elegant', radius: 4, textScale: 1, background: 'gradient', tiles: 'glass', uppercaseHeadings: true, gradients: false,
     colors: { background: '#11131a', background2: '#05060a', surface: '#1b1e28', text: '#f4efe4', muted: '#b9b1a0', accent: '#d4b26a', accentText: '#15120a', success: '#8fcfa4', danger: '#e39a9a',
       answers: ['#8c2f39', '#2c4f7c', '#7d6a2b', '#2f6b52', '#5a3f7a', '#8a5a2b'], answerText: '#f4efe4' } } },
   space: { name: 'Space', theme: SPACE },
   mars: { name: 'Mars', theme: { ...SPACE, colors: { ...SPACE.colors, background: '#250f16', background2: '#471c1a', surface: '#391e25', text: '#fff4eb', muted: '#e2bdb7', accent: '#ffae85', accentText: '#32150f' } } },
   saturn: { name: 'Saturn', theme: { ...SPACE, colors: { ...SPACE.colors, background: '#211927', background2: '#43281e', surface: '#352934', text: '#fff7e8', muted: '#dfc8b6', accent: '#ffd697', accentText: '#301c12' } } },
   neptune: { name: 'Neptune', theme: { ...SPACE, colors: { ...SPACE.colors, background: '#071830', background2: '#153760', surface: '#102948', text: '#eff9ff', muted: '#b4cbe3', accent: '#91d8ff', accentText: '#0a2339' } } },
-  ocean: { name: 'Ocean', theme: { ...MARKS, font: 'rounded', headingFont: 'rounded', radius: 20, textScale: 1, background: 'gradient', tiles: 'glass', uppercaseHeadings: false, gradients: false,
+  ocean: { name: 'Ocean', theme: { ...PRESET_DEFAULTS, font: 'rounded', headingFont: 'rounded', radius: 20, textScale: 1, background: 'gradient', tiles: 'glass', uppercaseHeadings: false, gradients: false,
     colors: { background: '#023e5a', background2: '#011627', surface: '#0b3a52', text: '#eefaff', muted: '#a9d3e3', accent: '#5ce1e6', accentText: '#012030', success: '#7ef0b0', danger: '#ff9b9b',
       answers: ['#b0306a', '#1565c0', '#8a6d00', '#00796b', '#5e35b1', '#ad4a00'], answerText: '#ffffff' } } },
   // Christmas: deep green with snow (dots), gold buttons, red, green and blue tiles.
-  christmas: { name: 'Christmas', theme: { ...MARKS, font: 'rounded', headingFont: 'serif', radius: 18, textScale: 1, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
+  christmas: { name: 'Christmas', theme: { ...PRESET_DEFAULTS, font: 'rounded', headingFont: 'serif', radius: 18, textScale: 1, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#0f3b2a', background2: '#071f16', surface: '#16503a', text: '#fffaf0', muted: '#d4e6d8', accent: '#f2c14e', accentText: '#2a1d00', success: '#9be7b0', danger: '#ffb0b0',
       answers: ['#b3122e', '#1f7a3f', '#1d4f91', '#8a5a00', '#6a2c91', '#a3341a'], answerText: '#ffffff' } } },
   // Birthday: light pink and yellow with confetti (dots), a pink button, bright tiles, playful titles.
-  birthday: { name: 'Birthday', theme: { ...MARKS, font: 'rounded', headingFont: 'playful', radius: 28, textScale: 1.05, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
+  birthday: { name: 'Birthday', theme: { ...PRESET_DEFAULTS, font: 'rounded', headingFont: 'playful', radius: 28, textScale: 1.05, background: 'dots', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#fff0f6', background2: '#fff7d6', surface: '#ffffff', text: '#2b1740', muted: '#6b5a7d', accent: '#d61f6f', accentText: '#ffffff', success: '#137a52', danger: '#b3261e',
       answers: ['#d6246e', '#2266d6', '#7a3fd6', '#0f7f6a', '#c2410c', '#8a6a00'], answerText: '#ffffff' } } },
   // MBO Utrecht's colours (from its website): deep brand blue, yellow buttons with black text as on the site,
   // orange, mint and light-blue answer tiles, near-square corners. Dark text on the tiles reads best.
   // (Background "Gradient" and the gradient effect suit it well; both are off to start.)
-  mbou: { name: 'MBO Utrecht', theme: { ...MARKS, font: 'system', headingFont: 'condensed', radius: 4, textScale: 1, background: 'solid', tiles: 'filled', uppercaseHeadings: false, gradients: false,
+  mbou: { name: 'MBO Utrecht', theme: { ...PRESET_DEFAULTS, font: 'system', headingFont: 'condensed', radius: 4, textScale: 1, background: 'solid', tiles: 'filled', uppercaseHeadings: false, gradients: false,
     colors: { background: '#006aa6', background2: '#003a63', surface: '#0a4a75', text: '#ffffff', muted: '#d4edfc', accent: '#ffde00', accentText: '#000000', success: '#8ff0c0', danger: '#ffb3a8',
       answers: ['#f39200', '#7ac6b6', '#5fc3ef', '#ffde00', '#fab573', '#d4edfc'], answerText: '#1a1a1a' } } },
 };

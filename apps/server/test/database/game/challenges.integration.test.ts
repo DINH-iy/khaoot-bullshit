@@ -36,6 +36,18 @@ async function room() {
 const move = (r: Awaited<ReturnType<typeof room>>, phone: number, id: string, cell: number) => call('POST', `${r.base}/${id}/move`, { move: { game: 'tictactoe', cell } }, r.phones[phone]);
 
 describe('challenges between players', () => {
+  it('plays 8-ball with a stake through the existing phone challenge flow', async () => {
+    const r = await room(); const id = randomUUID();
+    expect((await call('POST', r.base, { challengeId: id, opponentId: r.ids[1], game: 'eight-ball', stake: 50 }, r.phones[0])).statusCode).toBe(200);
+    expect((await call('POST', `${r.base}/${id}/accept`, {}, r.phones[1])).statusCode).toBe(200);
+    const shoot = { move: { game: 'eight-ball', angle: 0, power: 100, shot: 0 } };
+    expect((await call('POST', `${r.base}/${id}/move`, shoot, r.phones[1])).statusCode).toBe(400);
+    expect((await call('POST', `${r.base}/${id}/move`, shoot, r.phones[0])).json().data.view.board).toMatchObject({ game: 'eight-ball', shot: 1 });
+    expect((await call('POST', `${r.base}/${id}/resign`, {}, r.phones[1])).statusCode).toBe(200);
+    expect(await r.balance(r.phones[0]!)).toBe(START_CHIPS + 50);
+    expect(await r.balance(r.phones[1]!)).toBe(START_CHIPS - 50);
+  });
+
   it('take both stakes when accepted and give the winner both', async () => {
     const r = await room(); const id = randomUUID();
     const invite = await call('POST', r.base, { challengeId: id, opponentId: r.ids[1], game: 'tictactoe', stake: 100 }, r.phones[0]);

@@ -1,9 +1,10 @@
-import { HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, type Places } from '@party/contracts';
+import { HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, placePoints, type Places } from '@party/contracts';
 import { PlacesFields } from './places-fields.js';
 import { useState } from 'react';
 import { ChoiceDialog, type CardChoice } from '../../controls/choice-dialog.js';
 import { withDuelContest, type Stage } from '../../model.js';
 import { CREATURE_TEXTS } from '../../../head-to-head/creature-board.js';
+import { HOSTED_POOL_TEXTS } from '../../../head-to-head/eight-ball/hosted.text.js';
 import { translate, useTexts } from '../../../i18n/texts.js';
 import { FIELDS_TEXTS } from '../fields.text.js';
 import { gameDescription, gameHowToPlay, gameName } from '../../../presentation/catalog.text.js';
@@ -24,10 +25,22 @@ const duelChoices = (): CardChoice[] => [{ value: 'host', label: t('anyContest')
  */
 export function DuelFields({ part, stage, onChange }: { part: 'settings' | 'points'; stage: Stage; onChange: (next: Stage, field: string) => void }) {
   const c = useTexts(CREATURE_TEXTS);
+  const pool = useTexts(HOSTED_POOL_TEXTS);
   const contest = (stage['contest'] as { kind: 'host' } | { kind: 'game'; game: string; settings?: Record<string, unknown> } | undefined) ?? { kind: 'host' };
   const game = contest.kind === 'game' && isHeadToHeadKey(contest.game) ? contest.game : null;
   const set = (change: Partial<Stage>, field: string) => onChange({ ...stage, ...change }, field);
   const [picking, setPicking] = useState(false);
+  const teamPool = game === 'eight-ball' && stage['pick'] === 'teams';
+  if (part === 'points' && game === 'eight-ball') {
+    const value = stage['places'] as Places | undefined;
+    return <>
+      <label className="ed-inline">{pool(teamPool ? 'teamAward' : 'winnerAward')}
+        <input type="number" min={0} value={points(value ? placePoints(value)[0] : '10000')}
+          onChange={event => set({ places: { kind: 'list', pointsMilli: [milli(event.currentTarget.value)] } }, 'places')} /></label>
+      {!teamPool && <label className="ed-inline">{pool('pickAward')}<input type="number" min={0} value={points(stage['betMilli'])}
+        onChange={event => set({ betMilli: milli(event.currentTarget.value) }, 'bet')} /></label>}
+    </>;
+  }
   if (part === 'points') return <>
     <PlacesFields legend={t('duelists')} hint={t('duelistsHint')} required fallback={['10000']}
       value={stage['places'] as Places | undefined} onChange={places => { const copy: Stage = { ...stage }; if (places) copy['places'] = places; else delete copy['places']; onChange(copy, 'places'); }} />
@@ -40,7 +53,9 @@ export function DuelFields({ part, stage, onChange }: { part: 'settings' | 'poin
       <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('changeWon')}</button></div>
     {picking && <ChoiceDialog title={t('howWon')} value={game ?? 'host'} choices={duelChoices()}
       onPick={next => { setPicking(false); if (next !== (game ?? 'host')) onChange(withDuelContest(stage, next), 'contest'); }} onClose={() => setPicking(false)} />}
-    <Segmented label={t('whoDuels')} value={String(stage['pick'] ?? 'random')} choices={[{ value: 'random', label: t('twoRandom') }, { value: 'host', label: t('hostPicks') }]} onChange={pick => set({ pick }, 'pick')} />
+    <Segmented label={t('whoDuels')} value={String(stage['pick'] ?? 'random')} choices={[{ value: 'random', label: t('twoRandom') }, { value: 'host', label: t('hostPicks') },
+      ...(game === 'eight-ball' ? [{ value: 'teams', label: pool('teams') }] : [])]} onChange={pick => set({ pick }, 'pick')} />
+    {teamPool && <p className="hint">{pool('teamsHint')}</p>}
     {game === 'creature-duel' && <Segmented label={c('teamSize')} inline
       value={String((contest as { settings?: { size?: number } }).settings?.size ?? 1)}
       choices={[{ value: '1', label: c('solo') }, { value: '3', label: c('team') }]}

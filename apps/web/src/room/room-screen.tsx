@@ -16,8 +16,11 @@ import { ExpectedPeople, NameRequests, NewKeyCard, PickYourName, SignupSetting, 
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
 import { ExplainPanel } from './explain-panel.js';
+import { HOSTED_POOL_TEXTS } from '../head-to-head/eight-ball/hosted.text.js';
 import { DuelPanel } from './duel.js';
 import { MinigameStage } from '../minigames/shared/minigame-stage.js';
+import { isDefaultGraphQuestion } from '../minigames/draw-the-graph/graph-question.js';
+import { GRAPH_TEXTS } from '../minigames/draw-the-graph/graph.text.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
@@ -208,6 +211,8 @@ export function RoomScreen() {
     if (!state) return; const base = { formatVersion: 1, commandId: newId(), sessionId: state.view.sessionId, type };
     room.send(GameCommandSchema.parse({ ...base, ...((PLAYER_COMMANDS as readonly string[]).includes(type) ? {} : { expectedRevision: state.view.revision }), ...extra }));
   };
+  const graphText = useTexts(GRAPH_TEXTS);
+  const poolText = useTexts(HOSTED_POOL_TEXTS);
   const stage = state?.view.stage; const disabled = room.saving || Boolean(room.pending) || room.connection !== 'Connected';
   const remaining = useRemaining(stage, room.clockOffset); const timeUp = remaining === 0 && stage?.pausedRemainingMs === null;
   // Time is up with an answer chosen or typed but not sent (a choice, text, an order, an upload, a route vote): send it
@@ -310,15 +315,16 @@ export function RoomScreen() {
   const saved = t((stage?.kind === 'vote' || stage?.kind === 'route' ? (captainAnswers(stage?.teams ?? null) ? 'vote.savedTeam' : 'vote.saved') : captainAnswers(stage?.teams ?? null) ? 'answer.savedTeam' : 'answer.saved') as TextKey);
 
   // The one big button the host needs right now, plus the less frequent ones.
-  const primary = !state ? null : state.view.status === 'LOBBY' ? { label: t('host.start'), run: () => command('session.start') }
+  const poolDuel = stage?.duel?.contest.kind === 'game' && stage.duel.contest.game === 'eight-ball';
+  const primary = !state ? null : state.view.status === 'LOBBY' ? (state.tryout ? null : { label: t('host.start'), run: () => command('session.start') })
     : state.view.status === 'PAUSED' ? { label: t('host.resume'), run: () => command('session.resume') }
     // While teams are picked, confirming them is the host's next step (possible once anyone is in a team).
     : running && stage?.status === 'ACTIVE' && stage.teams?.forming ? { label: t('host.startTeams'), run: () => command('teams.confirm', { stageRunId: stage.id }), blocked: stage.teams.teams.every(team => team.memberIds.length === 0) }
     // A scene that explains itself first: the host starts it once everyone has read it.
     : running && stage?.status === 'ACTIVE' && stage.explain ? { label: t('explain.start'), run: () => command('stage.explained', { stageRunId: stage.id }) }
-    : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
+    : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: poolDuel ? poolText('closeVotes') : t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
     : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
-    : running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
+    : !state.tryout && running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId || (poolDuel && stage.revealed)) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
     : null;
   // What is happening now, in a word or two, above the round.
   const forming = Boolean(stage?.teams?.forming);
@@ -333,7 +339,7 @@ export function RoomScreen() {
   const canSeeScores = Boolean(state && (host || state.settings.showScores || scoreMoment));
   const scoreBubbles = scoreMoment && canSeeScores && (state?.view.status === 'FINISHED' || stage?.scoreboard?.show !== 'teams');
   const ownPoints = role === 'player' && stage?.revealed && state ? stage.reveal?.awards.find(award => award.playerId === state.selfPlayerId)?.amountMilli ?? null : null;
-  const nextAlso = running && stage && stage.status === 'CLOSED' && primary?.label !== t('host.next') && (stage.kind !== 'route' || stage.route?.decision);
+  const nextAlso = !state?.tryout && running && stage && stage.status === 'CLOSED' && primary?.label !== t('host.next') && (!poolDuel || stage.revealed) && (stage.kind !== 'route' || stage.route?.decision);
 
   return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''} ${lookClass}`} style={lookStyle}>
     <header className="room-bar session-bar">
@@ -395,7 +401,7 @@ export function RoomScreen() {
                 </ul>
               </div></>}
         </section>}
-        {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}`} aria-labelledby="stage-heading">
+        {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}${stage.minigame?.graph ? ' round-graph' : stage.minigame?.dots ? ' round-dots' : ''}`} aria-labelledby="stage-heading">
           <SceneComposition layout={stage.mediaLayout} media={showingScene && (stage.youtube || stage.media) ? <div ref={mediaRef}>
             {stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} />
               : stage.media ? <StageMedia key={stage.id} media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} /> : null
@@ -403,7 +409,10 @@ export function RoomScreen() {
           </div> : null}>
             {stage.info && <p className="stage-banner">{stage.info.title}</p>}
             {/* While teams are picked, the round's question waits: one thing at a time. */}
-            <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard') : stage.prompt)}</h2>
+            <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard')
+              : stage.minigame?.graph && isDefaultGraphQuestion(stage.prompt)
+                ? graphText(state.tryout || stage.minigame.graph.chart.yLabel === 'Books lent (thousands)' ? 'sampleQuestion' : 'trendQuestion')
+                : stage.prompt)}</h2>
             {stage.info && <p className="info-text">{stage.prompt}</p>}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
@@ -415,10 +424,10 @@ export function RoomScreen() {
           {!forming && !explaining && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
           {stage.kind === 'vote' && !stage.revealed && <div ref={ballotRef}><VoteBallot key={stage.id} state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
             onVote={value => command('submission.submit', { stageRunId: stage.id, value })} /></div>}
-          {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
+          {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !(role === 'player' && stage.kind === 'minigame') && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
           {host && stage.kind === 'challenge' && stage.status === 'CLOSED' && !stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
           {stage.countdownUntil && role !== 'player' && <Countdown startsAt={stage.countdownUntil} offset={room.clockOffset}>{null}</Countdown>}
-          {stage.kind === 'minigame' && <div ref={miniRef}><MinigameStage state={state} stage={stage} offset={room.clockOffset}
+          {stage.kind === 'minigame' && !stage.revealed && <div ref={miniRef}><MinigameStage state={state} stage={stage} offset={room.clockOffset}
             disabled={disabled || (timeUp && (stage.minigame?.game === 'cut-the-line' || stage.minigame?.game === 'match-the-angle'
               || stage.minigame?.game === 'count-the-dots' || stage.minigame?.game === 'draw-the-graph' || isSharedPrediction(stage.minigame?.game ?? '')))}
             canPlay={role === 'player' && !answerBlock && stage.status === 'ACTIVE' && running}
@@ -427,7 +436,8 @@ export function RoomScreen() {
             onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} /></div>}
           {stage.kind === 'route' && <div ref={routeRef}><RouteChoice state={state} stage={stage} disabled={disabled} send={command} /></div>}
           {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel state={state} stage={stage} disabled={disabled} send={command} /></div>}
-          {stage.kind !== 'route' && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })} disabled={disabled} /></div>}
+          {stage.kind !== 'route' && stage.revealed && (!poolDuel || (role !== 'player' && stage.duel?.pick !== 'teams' && stage.reveal?.awards.length)) && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })}
+            onGraphPlayback={action => command('stage.graphPlayback', { stageRunId: stage.id, action })} disabled={disabled} /></div>}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>{r('shownWithoutNames')}</p>}
           {stage.kind === 'minigame' ? (role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p> : null)
             : role === 'player' && state.view.ownSubmission ? <p ref={savedRef} role="status" className="answer-in">{saved}</p>
@@ -451,6 +461,10 @@ export function RoomScreen() {
 
       {host && <aside className="room-controls" aria-label={h('hostControls')}>
         {primary && <button className="primary big" disabled={disabled || ('blocked' in primary && primary.blocked)} onClick={primary.run}>{primary.label}</button>}
+        {!state.tryout && poolDuel && running && stage?.status === 'CLOSED' && !stage.revealed &&
+          <button type="button" className="ghost small-button" disabled={disabled} onClick={() => {
+            if (confirm(poolText('confirmSkip'))) command('stage.advance', { stageRunId: stage.id });
+          }}>{poolText('skip')}</button>}
         {nextAlso && <button disabled={disabled} onClick={() => command('stage.advance', { stageRunId: stage!.id })}>{t('host.next')}</button>}
         {running && stage && state.view.wheel.canSpin && <button disabled={disabled} onClick={() => command('wheel.spin', { stageRunId: stage.id })}>{state.view.wheel.spin ? t('wheel.again') : t('wheel.spin')}</button>}
         {/* The round's tools in one row of icons (names on hover and for screen readers). */}
@@ -475,12 +489,12 @@ export function RoomScreen() {
         {/* Everything less frequent behind four icons; one sheet at a time, under the icons. */}
         <div className="host-tabs" role="group" aria-label={h('more')}>
           {([['settings', 'gear', h('roomSettings')], ['invite', 'tv', h('sharedAndInvite')], ['players', 'users', h('playersCount', { count: state.players.length })], ['lobby', 'arrow-rotate-left', h('backToLobby')]] as const).map(([key, icon, label]) =>
-            (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">{h('playersHidden')}</span><span className="tool-count">{state.players.length}</span></>}</button>)}
+            (!state.tryout || key !== 'lobby') && (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">{h('playersHidden')}</span><span className="tool-count">{state.players.length}</span></>}</button>)}
         </div>
         {sheet === 'settings' && <HostDialog portal={roomRoot.current} title={h('roomSettings')} icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
           <div className="settings-col"><h3>{h('phonesWaiting')}</h3><SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
             <h3>{h('joining')}</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} /><TestBenchSetting state={state} sessionId={state.view.sessionId} onError={setError} />
-            <p className="control-back"><a href="/?host=1">{h('backToHostMenu')}</a></p>
+            <p className="control-back"><a className="link-button" href="/?host=1">{h('backToHostMenu')}</a></p>
             {state.view.status !== 'FINISHED' && <button type="button" className="danger" disabled={disabled || busy} onClick={() => {
               if (!confirm(management('closeAsk'))) return;
               setBusy(true);
@@ -509,6 +523,7 @@ export function RoomScreen() {
           <div className="actions"><button className="danger" onClick={backToLobby}>{h('yesBackToLobby')}</button><button className="ghost" onClick={() => setSheet(null)}>{h('cancel')}</button></div></div>}
         {/* The scores, small and foldable, at the bottom of the panel (big only at a scoreboard scene and the end). */}
         {!scoreMoment && state.view.status !== 'LOBBY' && <FloatingScores docked leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
+        <div className="host-leave"><LeaveRoom host /></div>
       </aside>}
     </div>}
     {state && me && editingLook && <div className="look-sheet" role="dialog" aria-modal="true" aria-labelledby="look-builder-heading" onKeyDown={event => { if (event.key === 'Escape') setEditingLook(false); }}><LookBuilder initial={me.look} name={me.displayName} busy={disabled} sessionId={state.view.sessionId}

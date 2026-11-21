@@ -49,6 +49,7 @@ export const RoomSnapshotSchema = z.object({
   // The host went back to the lobby: this room has ended and everyone moves into this one (phones and the shared screen follow by themselves).
   nextRoom: GameIdSchema.nullable(),
   roomClosed: z.boolean().optional(),
+  tryout: z.literal(true).optional(),
   // An arcade round: its lobby, and whether this phone is the leader who runs the round (absent outside the arcade).
   arcade: ArcadeLinkSchema.nullable().optional(),
 }).strict();

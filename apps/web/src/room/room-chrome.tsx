@@ -73,7 +73,9 @@ export function RoundBar({ state, stage, phase, remaining, timerRef, tools }: { 
     {mine && <p className="chip team-flag" style={{ '--team': teamColor(mine.name, mine.index) } as React.CSSProperties} title={r('yourTeam', { team: mine.name })}>
       <FaIcon name="flag" /><span className="visually-hidden">{r('yourTeamHidden')}</span>{mine.name}{mine.captainId === state.selfPlayerId && <span className="team-captain" title={r('youCaptain')}><FaIcon name="star" label={r('captain')} /></span>}</p>}
     {stage.input?.kind === 'drawing' && stage.input.blind && <p className="chip chip-warn"><span aria-hidden="true">🙈</span> {r('blind')}</p>}
-    {!forming && !stage.explain && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
+    {!forming && !stage.explain && stage.minigame?.game !== 'stop-clock' && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
+    {stage.minigame?.game === 'stop-clock' && stage.status === 'ACTIVE' && !stage.explain &&
+      stage.pausedRemainingMs === null && remaining === 0 && <p className="chip" role="status">{t('timer.up')}</p>}
     {details.length > 0 && <Popover label={r('aboutRound')} icon="circle-info" className="round-about" align="end">
       <ul className="round-details">{details.map(([icon, text]) => <li key={text}><FaIcon name={icon} />{text}</li>)}</ul></Popover>}
     {/* Extra tools at the right end, after the ⓘ (an arcade round's leader menu). */}

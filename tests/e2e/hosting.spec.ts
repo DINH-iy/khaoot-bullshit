@@ -304,8 +304,14 @@ test('owner opens a room from the host menu and stays in control of a timed stag
     await expect(page.getByText('Your answer is in!')).toBeVisible();
 
     // The owner can always get back into the room from the menu.
-    await openHostFold(host, 'Room settings');
-    await host.getByRole('link', { name: 'Back to the host menu' }).click();
+    await host.getByRole('button', { name: 'Leave room', exact: true }).click();
+    const leave = host.getByRole('alertdialog', { name: 'Leave the room?' });
+    await expect(leave).toContainText('The room stays open');
+    await leave.getByRole('button', { name: 'Stay' }).click();
+    await expect(host.getByRole('heading', { name: `Room ${roomCode}` })).toBeVisible();
+    await host.getByRole('button', { name: 'Leave room', exact: true }).click();
+    await leave.getByRole('link', { name: 'OK, leave' }).click();
+    await expect(page.getByText('Your answer is in!')).toBeVisible();
     await host.getByRole('button', { name: `Return to room ${roomCode}` }).click();
     await expect(host.getByRole('heading', { name: `Room ${roomCode}` })).toBeVisible();
     await expect(host.getByRole('button', { name: 'Close answers' })).toBeVisible();

@@ -1,6 +1,6 @@
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
-import { isSharedPrediction, MINIGAMES, placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
+import { isSharedPrediction, placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields } from './fields/explain-fields.js';
@@ -14,6 +14,7 @@ import { Icon, sceneIcon } from '../controls/icons.js';
 import { WheelOfScene } from '../shell/show-settings.js';
 import { PlacesFields } from './fields/places-fields.js';
 import { MinigameFields } from './fields/minigame-fields.js';
+import { MinigameConfiguration } from './minigame-configuration.js';
 import { DrawingFields } from './fields/drawing-fields.js';
 import { DuelFields } from './fields/duel-fields.js';
 import { translate, useTexts } from '../../i18n/texts.js';
@@ -68,8 +69,7 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
   const withPlaces = <T extends Record<string, unknown>>(base: T, places: Places | undefined): T => { const copy: Record<string, unknown> = { ...base }; if (places) copy['places'] = places; else delete copy['places']; return copy as T; };
   const fastest = (legendFor: string) => <PlacesFields legend={t('extraFastest', { what: legendFor })} hint={t('extraFastestHint')} value={scoring?.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring ?? {}, places) }), 'places')} />;
   const id = (field: string) => `${node.key}-${index}-${field}`;
-  const timed = !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
-  const dotRound = stage.kind === 'minigame' && stage['game'] === 'count-the-dots';
+  const timed = !(stage.kind === 'duel' && stage['pick'] === 'teams') && !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
   const graphRound = stage.kind === 'minigame' && stage['game'] === 'draw-the-graph';
   const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || stage.kind === 'duel' || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
   const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
@@ -79,17 +79,17 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
   return <div className="stage-fields">
     <Section title={t('content')} memory="Content" open>
       {stage.kind === 'info' && <label>{t('title')}<input value={String(stage.title ?? '')} maxLength={120} onChange={event => edit(current => ({ ...current, title: event.target.value }), 'title')} /></label>}
-      <label>{t(stage.kind === 'info' ? 'lInfo' : stage.kind === 'scoreboard' ? 'lScoreboard' : stage.kind === 'route' ? 'lRoute' : stage.kind === 'minigame' ? 'lMinigame' : 'lQuestion')}
-        <textarea rows={3} value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>
+      {stage.kind !== 'minigame' && <label>{t(stage.kind === 'info' ? 'lInfo' : stage.kind === 'scoreboard' ? 'lScoreboard' : stage.kind === 'route' ? 'lRoute' : 'lQuestion')}
+        <textarea rows={3} value={String(stage.prompt ?? '')} maxLength={2000} onChange={event => edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} /></label>}
       {stage.kind === 'collect' && input?.kind === 'text' && <details className="writing-starters">
         <summary>{t('writingStarters')}</summary>
         <div>{WRITING_STARTERS.map(starter => <button key={starter.key} type="button" className="small-button" title={starter.prompt}
           onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
       </details>}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
-      {timed && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : dotRound ? 'dotGuessTime' : 'timer')}
+      {timed && stage.kind !== 'minigame' && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : 'timer')}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600}
-          placeholder={dotRound ? String(MINIGAMES['count-the-dots'].defaultSeconds) : graphRound ? String(MINIGAMES['draw-the-graph'].defaultSeconds) : t('none')} value={toSeconds(stage.durationMs)}
+          placeholder={t('none')} value={toSeconds(stage.durationMs)}
           onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />{t('sec')}</span></label>}
 
       {stage.kind === 'collect' && input?.kind === 'choice' && <Segmented label={t('kindOfQuestion')} value={quizKind(input)} choices={QUIZ_KINDS}
@@ -134,11 +134,11 @@ export function StageFields({ definition, node, index, onChange, mediaOpen, open
         {typeof cards === 'number' && <label>{rounds('interval')}<input type="number" min={1} max={60} value={cards}
           onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 1 && value <= 60) edit(current => ({ ...current, resultCards: value }), 'result-cards'); }} /></label>}
       </>}
-      {(stage.kind === 'minigame' || (stage.kind === 'collect' && input?.kind === 'drawing')) && <label>{rounds('countdown')}
-        <input type="number" min={0} max={15} value={Number(stage['countdownSeconds'] ?? (stage.kind === 'minigame' ? 3 : 0))}
+      {(stage.kind === 'collect' && input?.kind === 'drawing') && <label>{rounds('countdown')}
+        <input type="number" min={0} max={15} value={Number(stage['countdownSeconds'] ?? 0)}
           onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= 15) edit(current => ({ ...current, countdownSeconds: value }), 'countdown'); }} /></label>}
       {stage.kind === 'scoreboard' && <Segmented label={t('show')} value={String(stage['show'] ?? 'players')} choices={scoreboardShows()} onChange={show => edit(current => ({ ...current, show }), 'show')} />}
-      {stage.kind === 'minigame' && <MinigameFields part="settings" definition={definition} node={node} index={index} onChange={onChange} />}
+      {stage.kind === 'minigame' && <MinigameConfiguration key={stage.key} definition={definition} node={node} index={index} onApply={next => edit(() => next, 'minigame-configuration')} />}
       {stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
       {stage.kind === 'route' && <RouteFields definition={definition} node={node} stage={stage} onChange={onChange} />}
       {stage.kind === 'teams' && <PickTeamsFields definition={definition} node={node} stage={stage} onChange={(next, field) => edit(() => next, field)} />}

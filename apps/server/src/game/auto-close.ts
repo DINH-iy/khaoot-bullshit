@@ -5,6 +5,7 @@ import { EligibilitySchema, type Transaction } from './model.js';
 import { readRoute } from './routes/routes.js';
 import { readForming, teamContext } from './teams/teams.js';
 import { ACCEPTANCE_GRACE_MS, remainingMs, SETTLE_MS, timerColumns } from './timing.js';
+import { readMinigameRun } from '../minigames/shared/rules.js';
 import { isStepMinigame } from '@party/contracts';
 
 /** How long after the last answer the round closes unless the room sets another delay, so everyone sees "all in" before the result. */
@@ -35,7 +36,9 @@ export async function closeSoonWhenAllIn(tx: Transaction, session: GameSession, 
   const answered = await tx.submission.count({ where: { stageRunId: stage.id, slotKey: 'answer' } });
   if (needed === 0 || answered < needed) return;
   // A deadline that closes the round ALL_IN_CLOSE_MS from now, after the usual grace for answers in flight.
-  const wanted = Math.max(1, delay - ACCEPTANCE_GRACE_MS - SETTLE_MS);
+  const dots = entry.stage.kind === 'minigame' && entry.stage.game === 'count-the-dots' ? readMinigameRun(stage.presentation)?.dots : undefined;
+  const viewingLeft = dots ? Date.parse(dots.guessAt) - now.getTime() : 0;
+  const wanted = Math.max(1, viewingLeft, delay - ACCEPTANCE_GRACE_MS - SETTLE_MS);
   const current = remainingMs(stage, now);
   if (current !== null && current <= wanted) return;
   await tx.stageRun.update({ where: { id: stage.id }, data: timerColumns(wanted, false, now) });
