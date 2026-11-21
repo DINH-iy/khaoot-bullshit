@@ -1,11 +1,15 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { isMinigameKey, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings } from '@party/contracts';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { isMinigameKey, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameSettings } from '@party/contracts';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
+import { isDefaultGraphQuestion } from '../../minigames/draw-the-graph/graph-question.js';
+import { GRAPH_TEXTS } from '../../minigames/draw-the-graph/graph.text.js';
 import { gameName } from '../../presentation/catalog.text.js';
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
+import { Icon } from '../controls/icons.js';
 import { updateStage, type Definition, type Node, type Stage } from '../model.js';
-import { MinigameFields } from './fields/minigame-fields.js';
 import { FIELDS_TEXTS } from './fields.text.js';
+import { GraphDataImport } from './fields/graph-data-import.js';
+import { MinigameFields } from './fields/minigame-fields.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { ScenePreview } from './scene-preview.js';
 import './minigame-configuration.css';
@@ -18,36 +22,49 @@ const TEXTS = defineTexts('minigame-configuration', {
   ro: { title: 'Configurează minijocul', settings: 'Setări', timing: 'Text și timp', apply: 'Aplică modificările', cancel: 'Anulează' },
 });
 
+type EntryPanel = 'import' | 'settings';
+type Panel = EntryPanel | 'timing' | 'preview';
+
 type Props = { definition: Definition; node: Node; index: number; onApply: (stage: Stage) => void };
 
 export function MinigameConfiguration(props: Props) {
   const t = useTexts(TEXTS);
-  const [open, setOpen] = useState(false);
+  const graphText = useTexts(GRAPH_TEXTS);
+  const [open, setOpen] = useState<EntryPanel>();
   const stage = props.node.stages[props.index]!;
   const game = String(stage['game'] ?? '');
   return <div className="ed-chosen">
     {isMinigameKey(game) && <strong>{gameName(game)}</strong>}
-    <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>{t('title')}</button>
-    {open && <ConfigurationDialog {...props} initial={stage} onClose={() => setOpen(false)} />}
+    <div className="configuration-launch">
+      {game === 'draw-the-graph' && <button type="button" className="small-button graph-import-launch" aria-haspopup="dialog" onClick={() => setOpen('import')}>
+        <Icon name="upload" size={18} />{graphText('importData')}
+      </button>}
+      <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => setOpen('settings')}>{t('title')}</button>
+    </div>
+    {open && <ConfigurationDialog {...props} initial={stage} initialPanel={open} onClose={() => setOpen(undefined)} />}
   </div>;
 }
 
-function ConfigurationDialog({ definition, node, index, onApply, initial, onClose }: Props & { initial: Stage; onClose: () => void }) {
+function ConfigurationDialog({ definition, node, index, onApply, initial, initialPanel, onClose }: Props & { initial: Stage; initialPanel: EntryPanel; onClose: () => void }) {
   const t = useTexts(TEXTS);
   const fields = useTexts(FIELDS_TEXTS);
+  const graphText = useTexts(GRAPH_TEXTS);
   const inspector = useTexts(INSPECTOR_TEXTS);
   const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
+  const settingsButton = useRef<HTMLButtonElement>(null);
   const [draft, setDraft] = useState(initial);
   const [device, setDevice] = useState<'phone' | 'sharedScreen'>(initial['game'] === 'count-the-dots' ? 'sharedScreen' : 'phone');
-  const [panel, setPanel] = useState<'settings' | 'timing' | 'preview'>('settings');
+  const [panel, setPanel] = useState<Panel>(initialPanel);
   const game = String(draft['game'] ?? '');
+  const graph = game === 'draw-the-graph';
+  const importing = panel === 'import';
   const known = isMinigameKey(game);
   const valid = known && parseMinigameSettings(game, draft['settings']) !== null;
   const draftDefinition = updateStage(definition, node.key, index, () => draft);
   const draftNode = draftDefinition.nodes.find(candidate => candidate.key === node.key)!;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const element = dialog.current;
     element?.showModal();
@@ -58,13 +75,23 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, onClos
     onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="configuration-window">
-      <header><h2 id={title}>{t('title')}</h2></header>
+      <header><h2 id={title}>{initialPanel === 'import' ? gameName('draw-the-graph') : t('title')}</h2></header>
       <div className="segmented configuration-nav" role="group" aria-label={t('title')}>
-        <button type="button" aria-pressed={panel === 'settings'} onClick={() => setPanel('settings')}>{t('settings')}</button>
+        {graph && <button type="button" aria-pressed={importing} onClick={() => setPanel('import')}>{graphText('importData')}</button>}
+        <button type="button" ref={settingsButton} aria-pressed={panel === 'settings'} onClick={() => setPanel('settings')}>{t('settings')}</button>
         <button type="button" aria-pressed={panel === 'timing'} onClick={() => setPanel('timing')}>{t('timing')}</button>
         <button className="configuration-preview-tab" type="button" aria-pressed={panel === 'preview'} onClick={() => setPanel('preview')}>{fields('preview')}</button>
       </div>
-      <div className="configuration-columns" data-panel={panel}>
+      {importing && <GraphDataImport cancelLabel={t('cancel')} onCancel={onClose} onImport={(data, question) => {
+        setDraft(current => ({
+          ...current,
+          settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph: data },
+          ...(question && isDefaultGraphQuestion(current.prompt) ? { prompt: question } : {}),
+        }));
+        setPanel('settings');
+        settingsButton.current?.focus();
+      }} />}
+      <div className="configuration-columns" data-panel={panel} hidden={importing}>
         <div className="configuration-fields" role="region" aria-label={panel === 'timing' ? t('timing') : t('settings')}>
           <div className="configuration-pane" hidden={panel === 'timing'}>
           <MinigameFields part="settings" definition={draftDefinition} node={draftNode} index={index}
@@ -111,8 +138,8 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, onClos
             definition={draftDefinition} node={draftNode} index={index} device={device} interactive compactIntro />
         </div>
       </div>
-      <footer className="configuration-actions">
-        <button type="button" className="small-button" autoFocus onClick={onClose}>{t('cancel')}</button>
+      <footer className="configuration-actions" hidden={importing}>
+        <button type="button" className="small-button" autoFocus={!importing} onClick={onClose}>{t('cancel')}</button>
         <button type="button" className="configuration-apply" disabled={!valid} onClick={() => { if (draft !== initial) onApply(draft); onClose(); }}>{t('apply')}</button>
       </footer>
     </div>

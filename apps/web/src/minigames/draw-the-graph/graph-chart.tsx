@@ -14,9 +14,9 @@ export const chartInk = (hue: number) => `hsl(${hue} 78% 33%)`;
 
 type Trace = { id: string; line: number[]; hue: number; name?: string; winner?: boolean };
 
-export function GraphChart({ chart, traces = [], answer, cursor, portrait = false, showDifference = false, animateReveal = false, children }: {
+export function GraphChart({ chart, traces = [], answer, cursor, portrait = false, showDifference = false, animateReveal = false, accessibleLabel, children }: {
   chart: GraphView; traces?: Trace[]; answer?: number[]; cursor?: { step: number; height: number; hue: number };
-  portrait?: boolean; showDifference?: boolean; animateReveal?: boolean; children?: ReactNode;
+  portrait?: boolean; showDifference?: boolean; animateReveal?: boolean; accessibleLabel?: string; children?: ReactNode;
 }) {
   const t = useTexts(GRAPH_TEXTS);
   const revealClip = useId();
@@ -44,7 +44,7 @@ export function GraphChart({ chart, traces = [], answer, cursor, portrait = fals
       Math.max((labels[i - 1] ?? TOP - 19) + 19, y(trace.line.at(-1)!))));
   });
   return <div className={`graph-chart${revealing ? ' graph-chart-revealing' : ''}`}>
-    <svg role={children ? undefined : 'img'} aria-label={children ? undefined : t(answer ? 'revealed' : 'chart')}
+    <svg role={children ? undefined : 'img'} aria-label={children ? undefined : accessibleLabel ?? t(answer ? 'revealed' : 'chart')}
       viewBox={`-12 0 ${named.length ? 486 : 396} ${bottom + (lowerSplitLabel ? 40 : 26)}`}>
       <rect x={split} y={TOP} width={RIGHT - split} height={bottom - TOP} className="graph-future" />
       {[0, 25, 50, 75, 100].map(mark => <g key={mark}>

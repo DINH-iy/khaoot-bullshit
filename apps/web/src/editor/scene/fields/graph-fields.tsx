@@ -1,4 +1,3 @@
-import { GraphDataImport } from './graph-data-import.js';
 import { GraphDataSchema, SAMPLE_GRAPH, type GraphData } from '@party/contracts';
 import { useState } from 'react';
 import { useTexts } from '../../../i18n/texts.js';
@@ -8,10 +7,9 @@ const AXIS_LABELS = [
   ['startLabel', 'firstLabel'], ['splitLabel', 'splitLabel'], ['endLabel', 'lastLabel'], ['yLabel', 'units'],
 ] as const;
 
-export function GraphFields({ graph, onChange }: { graph: GraphData | undefined; onChange: (graph?: GraphData, question?: string) => void }) {
+export function GraphFields({ graph, onChange }: { graph: GraphData | undefined; onChange: (graph?: GraphData) => void }) {
   const t = useTexts(GRAPH_TEXTS);
   return <div className="minigame-fields">
-    <GraphDataImport onImport={onChange} />
     <label className="check"><input type="checkbox" checked={Boolean(graph)} onChange={event => onChange(
       event.target.checked ? { ...SAMPLE_GRAPH, hidden: [58, 60, 64, 70, 68, 76, 80, 87] } : undefined,
     )} />{t('custom')}</label>

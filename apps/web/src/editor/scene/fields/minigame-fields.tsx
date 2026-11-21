@@ -1,5 +1,4 @@
 import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
-import { isDefaultGraphQuestion } from '../../../minigames/draw-the-graph/graph-question.js';
 import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
 import { SpeedRunCourseFields } from './speed-run-course.js';
@@ -66,9 +65,7 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
       onPick={next => { setPicking(false); if (next !== game) edit(current => withMinigame(current, next as MinigameKey, definition), 'game'); }} onClose={() => setPicking(false)} />}
     {known && !settings && <p className="hint warn" role="alert">{t('misfit')} <button type="button" className="small-button" onClick={() => edit(current => { const copy = { ...current }; delete copy['settings']; return copy; }, 'reset')}>{t('standardSettings')}</button></p>}
     {game === 'draw-the-graph' && settings && <GraphFields key={`${node.key}:${index}`} graph={(stage['settings'] as MinigameSettings<'draw-the-graph'> | undefined)?.graph}
-      onChange={(graph, question) => edit(current => ({ ...current, settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph },
-        ...(question && isDefaultGraphQuestion(current.prompt) ? { prompt: question } : {}),
-      }), 'graph-data')} />}
+      onChange={graph => edit(current => ({ ...current, settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph } }), 'graph-data')} />}
     {(game === 'count-the-dots' || game === 'draw-the-graph') && settings && <label>{t('revealEasing')}
       <select value={(settings as MinigameSettings<'count-the-dots' | 'draw-the-graph'>).revealEasing ?? DEFAULT_REVEAL_EASING}
         onChange={event => setSettings({ ...settings, revealEasing: RevealEasingSchema.parse(event.currentTarget.value) }, 'reveal-easing')}>

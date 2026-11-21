@@ -2,7 +2,7 @@
 
 ## What works today
 
-In the Scene editor, set the **Question**, then open **Import graph data**. Paste a supported chart URL, preview the chart, pick a series and the last visible period, and choose **Use this data**. The published scene stores the sampled values, scale, question, and attribution. A live round can run while the source is offline. The answer, source link, and source note first appear at reveal.
+In the Scene editor, select **Import graph data** on the Draw the Graph scene. Choose **Chart link**, **CSV file**, or **Paste data**. Review the imported chart, pick a series and the last visible period, then choose **Use this data**. Review the player preview and choose **Apply changes** to update the scene. Set the question under **Text & timing**. The published scene stores the sampled values, scale, question, and attribution. A live round can run while the source is offline. The answer, source link, and source note first appear at reveal.
 
 Try [life expectancy in the Netherlands](https://ourworldindata.org/grapher/life-expectancy?country=~NLD&time=1950..2023). Remove the country filter in the original chart link to pick from its default series, or select multiple countries on the source chart and copy that link.
 
