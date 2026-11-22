@@ -173,9 +173,10 @@ test('8-ball free play lets one phone shoot for both sides in landscape', async 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  // Start with one seat so a second phone cannot join while the bench opens.
+  await page.evaluate(() => localStorage.setItem('party_bench_phones', '1'));
   await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('button', { name: 'Minigame Tryout', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Minigame Tryout' });
-  await page.getByRole('button', { name: 'One phone less' }).click();
   await panel.getByRole('combobox', { name: 'Minigame' }).selectOption('eight-ball');
   await panel.getByRole('combobox', { name: 'Ball behavior' }).selectOption('custom');
   const resistance = panel.getByRole('spinbutton', { name: 'Rolling resistance' });

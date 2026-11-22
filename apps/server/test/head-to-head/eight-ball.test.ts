@@ -70,9 +70,10 @@ describe('8-ball pool', () => {
   it('keeps touch shots soft while a medium shot can roll most of the table', () => {
     const frame: PoolFrame = [[0, 100, 200]];
     expect(shootPool(frame, 0, 5).balls[0]![1]).toBeLessThan(150);
-    const railShot = shootPool(frame, 0, 35);
-    expect(railShot.balls[0]![1]).toBeGreaterThan(650);
-    expect(railShot.impacts).toEqual([]);
+    expect(shootPool(frame, 0, 35).balls[0]![1]).toBeGreaterThan(650);
+    const railShot = shootPool([[0, 740, 200]], 0, 60);
+    expect(railShot.impacts.length).toBeGreaterThan(0);
+    expect(railShot.impacts.every(impact => impact[2] === 'cushion')).toBe(true);
   });
 
   it('changes both roll distance and settling time with cloth choice, including custom resistance', () => {

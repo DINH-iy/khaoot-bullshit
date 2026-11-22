@@ -47,8 +47,11 @@ export const PoolPositionSchema = z.tuple([z.number().int().min(BALL_RADIUS).max
 const Ball = z.tuple([z.number().int().min(0).max(15), z.number().min(0).max(POOL_WIDTH), z.number().min(0).max(POOL_HEIGHT)]);
 export const PoolFrameSchema = z.array(Ball).max(16);
 export type PoolFrame = z.infer<typeof PoolFrameSchema>;
-const PoolImpactSchema = z.tuple([z.number().int().min(1).max((POOL_MAX_MOTION_FRAMES - 1) * POOL_STEPS_PER_FRAME), z.number().int().min(1).max(100)]);
+const ImpactStep = z.number().int().min(1).max((POOL_MAX_MOTION_FRAMES - 1) * POOL_STEPS_PER_FRAME);
+const ImpactStrength = z.number().int().min(1).max(100);
+const PoolImpactSchema = z.union([z.tuple([ImpactStep, ImpactStrength]), z.tuple([ImpactStep, ImpactStrength, z.literal('cushion')])]);
 export type PoolImpact = z.infer<typeof PoolImpactSchema>;
+export type PoolImpactKind = 'ball' | 'cushion';
 export type PoolBall = z.infer<typeof Ball>;
 export function rackPool(start: ResolvedPoolStart = DEFAULT_POOL_START): PoolFrame {
   const rack = [[1], [9, 2], [3, 8, 10], [11, 4, 12, 5], [13, 6, 14, 7, 15]];
@@ -68,7 +71,7 @@ export const PoolBoardSchema = z.strictObject({
   eightPocket: z.number().int().min(0).max(5).nullable(),
   ending: z.enum(['early', 'scratch', 'wrong-pocket', 'foul', 'clean']).nullable(),
   motion: z.array(PoolFrameSchema).max(POOL_MAX_MOTION_FRAMES),
-  impacts: z.array(PoolImpactSchema).max(POOL_MAX_MOTION_FRAMES - 1).optional(),
+  impacts: z.array(PoolImpactSchema).max(2 * (POOL_MAX_MOTION_FRAMES - 1)).optional(),
   ballBehavior: PoolBallBehaviorSchema.optional(),
   start: ResolvedPoolStartSchema.optional(),
   potsBySeat: z.tuple([z.array(z.number().int().min(1).max(15)).max(15), z.array(z.number().int().min(1).max(15)).max(15)]).optional(),

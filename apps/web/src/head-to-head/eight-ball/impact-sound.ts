@@ -1,23 +1,49 @@
+import type { PoolImpactKind } from '@party/contracts';
 import { activeSoundContext } from '../../room-extras/celebrate.js';
+import ball from './audio/ball.wav?no-inline';
+import cushion from './audio/cushion.wav?no-inline';
 
-let click: AudioBuffer | undefined;
+const recordings = { ball, cushion };
+const files = new Map<PoolImpactKind, Promise<ArrayBuffer>>();
+const buffers = new WeakMap<AudioContext, Map<PoolImpactKind, Promise<AudioBuffer>>>();
 
-export function playPoolImpact(strength: number) {
+function loadRecording(kind: PoolImpactKind) {
+  let file = files.get(kind);
+  if (!file) {
+    file = fetch(recordings[kind]).then(response => {
+      if (!response.ok) throw new Error('Could not load pool sound');
+      return response.arrayBuffer();
+    });
+    files.set(kind, file);
+    void file.catch(() => { files.delete(kind); });
+  }
+  return file;
+}
+
+export function preloadPoolSounds() {
+  void loadRecording('ball');
+  void loadRecording('cushion');
+}
+
+export function playPoolImpact(kind: PoolImpactKind, strength: number) {
   const audio = activeSoundContext();
   if (!audio) return;
-  if (!click || click.sampleRate !== audio.sampleRate) {
-    click = audio.createBuffer(1, Math.ceil(audio.sampleRate * .045), audio.sampleRate);
-    const samples = click.getChannelData(0);
-    for (let index = 0; index < samples.length; index++) {
-      const time = index / audio.sampleRate;
-      const body = Math.sin(2 * Math.PI * 940 * time) + .45 * Math.sin(2 * Math.PI * 2300 * time);
-      samples[index] = .55 * body * Math.exp(-time * 245) + .25 * (Math.random() * 2 - 1) * Math.exp(-time * 650);
-    }
+  const samples = buffers.get(audio) ?? new Map<PoolImpactKind, Promise<AudioBuffer>>();
+  buffers.set(audio, samples);
+  let sample = samples.get(kind);
+  if (!sample) {
+    sample = loadRecording(kind).then(bytes => audio.decodeAudioData(bytes.slice(0)));
+    samples.set(kind, sample);
   }
-  const source = audio.createBufferSource();
-  const gain = audio.createGain();
-  source.buffer = click;
-  gain.gain.value = .26 * Math.sqrt(strength / 100);
-  source.connect(gain).connect(audio.destination);
-  source.start();
+  const at = audio.currentTime;
+  void sample.then(buffer => {
+    if (audio.currentTime - at > .1 || activeSoundContext() !== audio) return;
+    const source = audio.createBufferSource();
+    const gain = audio.createGain();
+    source.buffer = buffer;
+    source.playbackRate.value = .96 + Math.random() * .08;
+    gain.gain.value = (kind === 'ball' ? .46 : .36) * Math.sqrt(strength / 100);
+    source.connect(gain).connect(audio.destination);
+    source.start();
+  }).catch(() => { samples.delete(kind); });
 }

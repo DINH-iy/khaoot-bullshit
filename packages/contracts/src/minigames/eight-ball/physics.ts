@@ -28,16 +28,20 @@ function collide(a: Ball, b: Ball) {
 }
 
 function cushion(ball: Ball, bounce: number, sideSpin: number) {
+  let impact = 0;
   if (ball.x < BALL_RADIUS || ball.x > POOL_WIDTH - BALL_RADIUS) {
+    impact = Math.max(0, ball.x < BALL_RADIUS ? -ball.vx : ball.vx);
     ball.x = Math.max(BALL_RADIUS, Math.min(POOL_WIDTH - BALL_RADIUS, ball.x));
     ball.vx = (ball.x === BALL_RADIUS ? Math.abs(ball.vx) : -Math.abs(ball.vx)) * bounce;
     ball.vy += ball.vx * sideSpin * .23;
   }
   if (ball.y < BALL_RADIUS || ball.y > POOL_HEIGHT - BALL_RADIUS) {
+    impact = Math.max(impact, ball.y < BALL_RADIUS ? -ball.vy : ball.vy);
     ball.y = Math.max(BALL_RADIUS, Math.min(POOL_HEIGHT - BALL_RADIUS, ball.y));
     ball.vy = (ball.y === BALL_RADIUS ? Math.abs(ball.vy) : -Math.abs(ball.vy)) * bounce;
     ball.vx -= ball.vy * sideSpin * .23;
   }
+  return impact;
 }
 
 /** Fixed time steps keep the table consistent for both players and everyone watching. */
@@ -51,6 +55,12 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
   const picture = (): PoolFrame => moving.map(({ id, x, y }) => [id, Math.round(x), Math.round(y)]);
   const motion: PoolFrame[] = [picture()];
   const impacts = new Map<number, PoolImpact>();
+  const recordImpact = (step: number, impulse: number, rail = false) => {
+    if (impulse < 15) return;
+    const slot = 2 * Math.ceil(step / SAMPLE_INTERVAL) + Number(rail);
+    const strength = Math.min(100, Math.round(impulse / 10));
+    if (strength > (impacts.get(slot)?.[1] ?? 0)) impacts.set(slot, rail ? [step, strength, 'cushion'] : [step, strength]);
+  };
   const pocketed: { id: number; pocket: number }[] = [];
   let firstHit: number | null = null;
   const table = behavior?.preset === 'custom' ? behavior : POOL_BALL_PRESETS[behavior?.preset ?? 'arcade'];
@@ -69,7 +79,7 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
         moving.splice(index, 1);
         continue;
       }
-      cushion(ball, table.railBounce, ball.id === 0 ? sideSpin : 0);
+      recordImpact(step, cushion(ball, table.railBounce, ball.id === 0 ? sideSpin : 0), true);
       const velocity = Math.hypot(ball.vx, ball.vy);
       const keep = velocity < table.stopSpeed ? 0 : 1 - (clothDrag / velocity + .13) / RATE;
       ball.vx *= keep;
@@ -86,12 +96,7 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
         const vx = cueContact ? cue.vx : 0;
         const vy = cueContact ? cue.vy : 0;
         const impulse = collide(a, b);
-        if (impulse >= 15) {
-          const interval = Math.ceil(step / SAMPLE_INTERVAL);
-          const strength = Math.min(100, Math.max(1, Math.round(impulse / 10)));
-          const strongest = impacts.get(interval);
-          if (!strongest || strength > strongest[1]) impacts.set(interval, [step, strength]);
-        }
+        recordImpact(step, impulse);
         if (impulse && cueContact) {
           firstHit = a.id === 0 ? b.id : a.id;
           cue.vx += vx * spinKick;
@@ -99,12 +104,12 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
         }
       }
     }
-    for (const ball of moving) cushion(ball, table.railBounce, ball.id === 0 ? sideSpin : 0);
+    for (const ball of moving) recordImpact(step, cushion(ball, table.railBounce, ball.id === 0 ? sideSpin : 0), true);
     if (step % SAMPLE_INTERVAL === 0) motion.push(picture());
     if (moving.every(ball => ball.vx === 0 && ball.vy === 0)) break;
   }
   const balls = picture();
   if (motion.length < POOL_MAX_MOTION_FRAMES) motion.push(balls);
   else motion[motion.length - 1] = balls;
-  return { balls, motion, impacts: [...impacts.values()], pocketed, firstHit };
+  return { balls, motion, impacts: [...impacts.values()].sort((a, b) => a[0] - b[0]), pocketed, firstHit };
 }

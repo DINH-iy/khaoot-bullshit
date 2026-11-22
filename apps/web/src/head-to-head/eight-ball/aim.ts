@@ -1,6 +1,19 @@
 import { BALL_RADIUS, POOL_HEIGHT, POOL_WIDTH, type PoolBall, type PoolFrame } from '@party/contracts';
 
 type BallPath = { distance: number; hit?: PoolBall };
+export const POOL_CUE_LENGTH = 145;
+export const poolCueOffset = (power: number) => 17 + power * .6;
+
+export function isPoolCueShaftAt([, cueX, cueY]: PoolBall, angle: number, power: number, x: number, y: number, tolerance: number) {
+  const radians = angle * Math.PI / 180;
+  const dx = Math.cos(radians), dy = Math.sin(radians);
+  const backX = cueX - x, backY = cueY - y;
+  const along = backX * dx + backY * dy;
+  const across = backX * dy - backY * dx;
+  const tip = poolCueOffset(power);
+  const beyond = Math.max(tip - along, along - (tip + POOL_CUE_LENGTH), 0);
+  return Math.hypot(across, beyond) <= tolerance;
+}
 
 /** Trace a ball center to the first ball it would contact or the edge of the cushion. */
 export function poolAimPath(origin: PoolBall, dx: number, dy: number, balls: PoolFrame): BallPath {

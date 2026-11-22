@@ -1,5 +1,5 @@
 import { BALL_RADIUS, DEFAULT_POOL_START, isLegalPoolContact, POCKET_RADIUS, POOL_HEIGHT, POOL_POCKETS, POOL_WIDTH, poolStartX, type PoolFrame, type PoolTarget, type ResolvedPoolStart } from '@party/contracts';
-import { poolAimPath, poolObjectPath } from './aim.js';
+import { POOL_CUE_LENGTH, poolAimPath, poolCueOffset, poolObjectPath } from './aim.js';
 
 const COLORS = ['#faf8f1', '#f6c942', '#477bdd', '#df463d', '#9161cf', '#ff9d45', '#37b879', '#af424c', '#171c23'];
 export const poolBallColor = (id: number) => COLORS[id > 8 ? id - 8 : id]!;
@@ -16,36 +16,50 @@ export function poolPocketCenter(index: number): readonly [number, number] {
 
 function paintRails(ctx: CanvasRenderingContext2D) {
   const rail = ctx.createLinearGradient(0, -POOL_RAIL, 0, POOL_HEIGHT + POOL_RAIL);
-  rail.addColorStop(0, '#885e4d');
-  rail.addColorStop(.5, '#4d302b');
-  rail.addColorStop(1, '#795344');
+  rail.addColorStop(0, '#795244');
+  rail.addColorStop(.5, '#3d2925');
+  rail.addColorStop(1, '#54372e');
   ctx.fillStyle = rail;
   ctx.fillRect(-POOL_RAIL, -POOL_RAIL, POOL_CANVAS_WIDTH, POOL_CANVAS_HEIGHT);
-  ctx.strokeStyle = '#b68a70';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ad7c54';
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.roundRect(2 - POOL_RAIL, 2 - POOL_RAIL, POOL_CANVAS_WIDTH - 4, POOL_CANVAS_HEIGHT - 4, 12);
+  ctx.roundRect(2 - POOL_RAIL, 2 - POOL_RAIL, POOL_CANVAS_WIDTH - 4, POOL_CANVAS_HEIGHT - 4, 23);
   ctx.stroke();
 
   const cushion = (from: number, to: number) => {
+    const deck = ctx.createLinearGradient(0, -37, 0, -18);
+    deck.addColorStop(0, '#bd8359');
+    deck.addColorStop(.24, '#88583d');
+    deck.addColorStop(1, '#55362d');
     ctx.beginPath();
-    ctx.moveTo(from, -13);
-    ctx.lineTo(to, -13);
-    ctx.lineTo(to - 9, 0);
-    ctx.lineTo(from + 9, 0);
+    ctx.moveTo(from - 5, -36);
+    ctx.lineTo(to + 5, -36);
+    ctx.lineTo(to, -17);
+    ctx.lineTo(from, -17);
     ctx.closePath();
-    ctx.fillStyle = '#104b40';
+    ctx.fillStyle = deck;
     ctx.fill();
-    ctx.strokeStyle = '#35927a';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = '#dec4a4';
+
+    const bevel = ctx.createLinearGradient(0, -17, 0, 0);
+    bevel.addColorStop(0, '#499682');
+    bevel.addColorStop(.24, '#276f61');
+    bevel.addColorStop(1, '#113e36');
+    ctx.beginPath();
+    ctx.moveTo(from, -17);
+    ctx.lineTo(to, -17);
+    ctx.lineTo(to - 15, 0);
+    ctx.lineTo(from + 15, 0);
+    ctx.closePath();
+    ctx.fillStyle = bevel;
+    ctx.fill();
+    ctx.fillStyle = '#d9b28a';
     ctx.beginPath();
     const middle = (from + to) / 2;
-    ctx.moveTo(middle, -22);
-    ctx.lineTo(middle + 4, -18);
-    ctx.lineTo(middle, -14);
-    ctx.lineTo(middle - 4, -18);
+    ctx.moveTo(middle, -32);
+    ctx.lineTo(middle + 4, -28);
+    ctx.lineTo(middle, -24);
+    ctx.lineTo(middle - 4, -28);
     ctx.fill();
   };
   for (const [x, y, angle] of [[0, 0, 0], [POOL_WIDTH, POOL_HEIGHT, Math.PI], [0, POOL_HEIGHT, -Math.PI / 2], [POOL_WIDTH, 0, Math.PI / 2]] as const) {
@@ -61,8 +75,8 @@ function paintRails(ctx: CanvasRenderingContext2D) {
 }
 
 export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, options: {
-  aim?: { angle: number; power: number } | undefined; eightPocket?: number | null; placing?: boolean;
-  strike?: { angle: number; power: number; progress: number } | undefined; respottedEight?: boolean;
+  aim?: { angle: number; power: number; pull?: number | undefined } | undefined; eightPocket?: number | null; placing?: boolean;
+  strike?: { angle: number; power: number; progress: number; pull?: number | undefined } | undefined; respottedEight?: boolean;
   rotations?: ReadonlyMap<number, BallRotation>;
   target?: PoolTarget | null; objectGuide?: boolean; start?: ResolvedPoolStart;
   sinking?: ReadonlyMap<number, number> | undefined;
@@ -94,27 +108,50 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     const [x, y] = poolPocketCenter(index);
     const side = mouthX === POOL_WIDTH / 2;
     const radius = side ? POCKET_RADIUS - 4 : POCKET_RADIUS - 1;
+    const direction = mouthY === 0 ? 1 : -1;
+    ctx.save();
+    ctx.translate(mouthX, mouthY);
+    ctx.scale(mouthX === POOL_WIDTH ? -1 : 1, direction);
+    ctx.beginPath();
     if (side) {
-      const direction = mouthY === 0 ? -1 : 1;
-      ctx.beginPath();
-      ctx.moveTo(x - 12, mouthY);
-      ctx.lineTo(x + 12, mouthY);
-      ctx.lineTo(x + 17, mouthY + direction * 13);
-      ctx.lineTo(x - 17, mouthY + direction * 13);
-      ctx.closePath();
-      ctx.fillStyle = '#183c34';
-      ctx.fill();
+      ctx.moveTo(-25, 0);
+      ctx.lineTo(25, 0);
+      ctx.lineTo(17, -22);
+      ctx.lineTo(-17, -22);
+    } else {
+      ctx.moveTo(29, 0);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(0, 29);
+      ctx.lineTo(-21, 14);
+      ctx.lineTo(-32, -15);
+      ctx.lineTo(-15, -32);
+      ctx.lineTo(14, -21);
     }
+    ctx.closePath();
+    ctx.fillStyle = '#142c27';
+    ctx.fill();
+    ctx.restore();
+
+    const collar = ctx.createLinearGradient(x, y - radius, x, y + radius);
+    collar.addColorStop(0, '#e0b384');
+    collar.addColorStop(.42, '#946343');
+    collar.addColorStop(1, '#39281f');
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
+    ctx.fillStyle = collar;
+    ctx.fill();
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    const pocket = ctx.createRadialGradient(x, y, 2, x, y, radius);
-    pocket.addColorStop(.55, '#070b0b');
-    pocket.addColorStop(1, '#22302b');
+    const pocket = ctx.createRadialGradient(x, y + direction * 6, 2, x, y, radius);
+    pocket.addColorStop(.6, '#060909');
+    pocket.addColorStop(1, '#493128');
     ctx.fillStyle = pocket;
     ctx.fill();
-    ctx.strokeStyle = index === eightPocket ? '#ffda72' : '#382925';
-    ctx.lineWidth = index === eightPocket ? 4 : 2;
-    ctx.stroke();
+    if (index === eightPocket) {
+      ctx.strokeStyle = '#ffda72';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
   }
 
   const cue = balls.find(([id]) => id === 0);
@@ -167,7 +204,7 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     const radians = cueAction.angle * Math.PI / 180;
     const dx = Math.cos(radians), dy = Math.sin(radians);
     const [, x, y] = cue;
-    const gap = 17 + cueAction.power * .6 - BALL_RADIUS;
+    const gap = (cueAction.pull ?? poolCueOffset(cueAction.power)) - BALL_RADIUS;
     const pull = BALL_RADIUS + gap * (1 - (strike?.progress ?? 0)) ** 2;
     ctx.save();
     ctx.lineCap = 'round';
@@ -175,7 +212,7 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(x - dx * pull, y - dy * pull);
-    ctx.lineTo(x - dx * (pull + 145), y - dy * (pull + 145));
+    ctx.lineTo(x - dx * (pull + POOL_CUE_LENGTH), y - dy * (pull + POOL_CUE_LENGTH));
     ctx.stroke();
     ctx.restore();
   }

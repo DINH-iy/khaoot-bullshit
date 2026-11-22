@@ -4,6 +4,8 @@ import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { usePoolLandscape } from './landscape.js';
 import { paintPool, POOL_CANVAS_HEIGHT, POOL_CANVAS_WIDTH, POOL_RAIL } from './table.js';
 import { usePoolPlayback, type PredictedPoolShot } from './playback.js';
+import { preloadPoolSounds } from './impact-sound.js';
+import { isPoolCueShaftAt, poolCueOffset } from './aim.js';
 import { unlockSound } from '../../room-extras/celebrate.js';
 import { PotTrays } from './pot-trays.js';
 import { FaIcon } from '../../presentation/icons.js';
@@ -39,6 +41,7 @@ const RESPOT_TEXT = defineTexts('pool-respot', { eight: '8 ball returned to the 
 
 type PoolView = Extract<HeadToHeadView['board'], { game: 'eight-ball' }>;
 type Shot = Extract<HeadToHeadMove, { game: 'eight-ball' }>;
+type CueDrag = { pointerId: number; x: number; y: number; angle: number; offset: number };
 const STRIKE_MS = 65;
 const POCKET_NAMES = ['topLeft', 'topMiddle', 'topRight', 'bottomLeft', 'bottomMiddle', 'bottomRight'] as const;
 const angleOf = (angle: number) => (Math.round(angle / POOL_AIM_STEP) * POOL_AIM_STEP + 360) % 360;
@@ -54,7 +57,8 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
   const orientation = usePoolLandscape();
   const canvas = useRef<HTMLCanvasElement>(null);
   const lastShot = useRef(board.shot);
-  const pulling = useRef(false);
+  const cueDrag = useRef<CueDrag>(undefined);
+  const [pulledDistance, setPulledDistance] = useState<number>();
   const startArea = board.start ?? DEFAULT_POOL_START;
   const [angle, setAngle] = useState(startArea.side === 'right' ? 180 : 0);
   const [power, setPower] = useState(75);
@@ -67,12 +71,15 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
   const [cue, setCue] = useState<Shot['cue']>();
   const [prediction, setPrediction] = useState<PredictedPoolShot>();
   const { roll, rotations, shownPots } = usePoolPlayback(board, prediction);
-  const [strike, setStrike] = useState<{ angle: number; power: number; shot: number; start: number }>();
+  const [strike, setStrike] = useState<{ angle: number; power: number; shot: number; start: number; pull?: number | undefined }>();
   const [strikeProgress, setStrikeProgress] = useState(0);
   const waitingForShot = prediction?.shot === board.shot + 1;
   const rolling = Boolean(roll && (roll.shot === board.shot || waitingForShot && roll.shot === prediction?.shot));
   const striking = strike && (strike.shot === board.shot || strike.shot === board.shot - 1) ? strike : undefined;
   const ready = canMove && view.turn === view.seat && !rolling && !striking && !waitingForShot;
+  const aimAngle = cueDrag.current?.angle ?? angle;
+  const pullOffset = cueDrag.current && pulledDistance !== undefined ? cueDrag.current.offset + pulledDistance : undefined;
+  const shownPower = pulledDistance === undefined ? power : powerFromPull(pulledDistance);
   const balls = rolling && roll ? roll.balls : board.balls;
   const placement = ready && board.ballInHand ? cue : undefined;
   const table = placement ? balls.map((ball): PoolFrame[number] => ball[0] === 0 ? [0, ...placement] : ball) : balls;
@@ -110,7 +117,13 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
     }
   }, [waitingForShot, canMove, view.outcome]);
 
+  useLayoutEffect(() => {
+    cueDrag.current = undefined;
+    setPulledDistance(undefined);
+  }, [board.shot, orientation.landscape, ready, placing, editingSpin]);
+
   useEffect(() => {
+    preloadPoolSounds();
     window.addEventListener('pointerup', unlockSound, { once: true });
     window.addEventListener('keydown', unlockSound, { once: true });
     return () => {
@@ -122,12 +135,12 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
   useLayoutEffect(() => {
     const ctx = canvas.current?.getContext('2d');
     if (ctx) paintPool(ctx, table, {
-      aim: ready && !placing ? { angle, power } : undefined,
-      strike: striking ? { angle: striking.angle, power: striking.power, progress: strikeProgress } : undefined,
+      aim: ready && !placing ? { angle: aimAngle, power, pull: pullOffset } : undefined,
+      strike: striking ? { angle: striking.angle, power: striking.power, progress: strikeProgress, pull: striking.pull } : undefined,
       respottedEight,
       placing: ready && placing, eightPocket: rolling ? null : board.eightPocket, rotations: rotations.current, target, objectGuide, start: startArea, sinking: roll?.sinking,
     });
-  }, [table, ready, placing, angle, power, rolling, board.eightPocket, orientation.landscape, target, objectGuide, startArea, roll, striking, strikeProgress, respottedEight]);
+  }, [table, ready, placing, aimAngle, power, pullOffset, rolling, board.eightPocket, orientation.landscape, target, objectGuide, startArea, roll, striking, strikeProgress, respottedEight]);
 
   const coordinates = (event: PointerEvent<HTMLCanvasElement>) => {
     const element = event.currentTarget;
@@ -145,12 +158,16 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
     if (Math.hypot(dx, dy) <= BALL_RADIUS) return;
     return angleOf(Math.atan2(dy, dx) * 180 / Math.PI);
   };
-  const pullDistance = (x: number, y: number) => {
-    if (!white) return 0;
-    const radians = angle * Math.PI / 180;
-    return (white[1] - x) * Math.cos(radians) + (white[2] - y) * Math.sin(radians);
+  const pullDistance = (drag: CueDrag, x: number, y: number) => {
+    const radians = drag.angle * Math.PI / 180;
+    return Math.max(0, Math.min(145, (drag.x - x) * Math.cos(radians) + (drag.y - y) * Math.sin(radians)));
   };
-  const sendShot = (shotAngle: number, shotPower: number) => {
+  const cancelCueDrag = (pointerId: number) => {
+    if (cueDrag.current?.pointerId !== pointerId) return;
+    cueDrag.current = undefined;
+    setPulledDistance(undefined);
+  };
+  const sendShot = (shotAngle: number, shotPower: number, pull?: number) => {
     if (!ready || placing) return;
     unlockSound();
     onMove({ game: 'eight-ball', angle: shotAngle, power: shotPower, shot: board.shot, ...(placement ? { cue: placement } : {}),
@@ -160,7 +177,7 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
       const resolved = shootPool(table, shotAngle, shotPower, board.ballBehavior, spin[0] || spin[1] ? spin : undefined);
       setPrediction({ shot: board.shot + 1, motion: resolved.motion, impacts: resolved.impacts, start: start + STRIKE_MS });
       setStrikeProgress(0);
-      setStrike({ angle: shotAngle, power: shotPower, shot: board.shot, start });
+      setStrike({ angle: shotAngle, power: shotPower, shot: board.shot, start, pull });
     }
   };
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -171,8 +188,12 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-    pulling.current = Boolean(white && Math.hypot(x - white[1], y - white[2]) <= 29);
-    const next = pulling.current ? undefined : aimFrom(x, y);
+    const tolerance = (event.pointerType === 'mouse' ? 8 : 18) * POOL_CANVAS_WIDTH / event.currentTarget.clientWidth;
+    if (white && (Math.hypot(x - white[1], y - white[2]) <= 29 || isPoolCueShaftAt(white, angle, power, x, y, tolerance))) {
+      cueDrag.current = { pointerId: event.pointerId, x, y, angle, offset: poolCueOffset(power) };
+      return;
+    }
+    const next = aimFrom(x, y);
     if (next !== undefined) setAngle(next);
   };
   const toolbar = (!view.outcome || orientation.landscape) && <div className="pool-toolbar">
@@ -188,27 +209,34 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
     </div>;
   const playfield = <div className="pool-playfield">
       {view.seat !== null && !view.outcome && <label className="pool-power">
-        <input className="game-slider" type="range" min={1} max={100} value={power} aria-label={t('power')} aria-orientation="vertical"
-          disabled={!ready || placing || editingSpin} aria-valuetext={`${power}%`} style={{ '--pool-power': `${power}%` } as CSSProperties}
+        <input className="game-slider" type="range" min={1} max={100} value={shownPower} aria-label={t('power')} aria-orientation="vertical"
+          disabled={!ready || placing || editingSpin} aria-valuetext={`${shownPower}%`} style={{ '--pool-power': `${shownPower}%` } as CSSProperties}
           onChange={event => setPower(event.currentTarget.valueAsNumber)} />
-        <span aria-hidden="true">{power}%</span>
+        <span aria-hidden="true">{shownPower}%</span>
       </label>}
       <canvas className="pool-table" ref={canvas} width={POOL_CANVAS_WIDTH} height={POOL_CANVAS_HEIGHT} role="img" aria-label={t('table')}
         data-shot={board.shot} data-rolling={rolling} data-aiming={ready} data-striking={Boolean(striking)} onPointerDown={down}
         onPointerMove={event => {
           if (!ready || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-          if (pulling.current) {
-            setPower(powerFromPull(pullDistance(...coordinates(event))));
+          const drag = cueDrag.current;
+          if (drag?.pointerId === event.pointerId) {
+            setPulledDistance(pullDistance(drag, ...coordinates(event)));
           } else {
             const next = aimFrom(...coordinates(event));
             if (next !== undefined) setAngle(next);
           }
         }}
         onPointerUp={event => {
-          const distance = pulling.current && ready ? pullDistance(...coordinates(event)) : 0;
-          pulling.current = false;
-          if (distance >= 24) sendShot(angle, powerFromPull(distance));
-        }} onLostPointerCapture={() => { pulling.current = false; }} />
+          const drag = cueDrag.current;
+          if (drag?.pointerId !== event.pointerId) return;
+          cancelCueDrag(event.pointerId);
+          const distance = ready && !editingSpin ? pullDistance(drag, ...coordinates(event)) : 0;
+          if (distance >= 24) {
+            const shotPower = powerFromPull(distance);
+            setPower(shotPower);
+            sendShot(drag.angle, shotPower, drag.offset + distance);
+          }
+        }} onPointerCancel={event => cancelCueDrag(event.pointerId)} onLostPointerCapture={event => cancelCueDrag(event.pointerId)} />
     </div>;
   const trays = <PotTrays names={names} pots={shownPots ?? [[], []]} turn={view.turn === 'both' ? null : view.turn} />;
   const controls = <>

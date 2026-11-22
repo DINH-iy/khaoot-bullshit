@@ -153,18 +153,22 @@
 .duel-pool-playing .h2h-title > :is(strong, .h2h-title-dot) { display: none; }
 .room-display .duel-pool-playing .pool { width: min(100%, 58rem, max(14rem, calc((100svh - 16rem) * var(--pool-table-ratio)))); }
 .room-display.pool-tv {
-  position: fixed; inset: 0; display: grid; place-items: center;
+  position: fixed; inset: 0; display: grid; align-items: center;
+  grid-template: auto minmax(0, 1fr) / minmax(0, 1fr) auto;
   padding: 12px; overflow: hidden; box-sizing: border-box; background: #121519;
+  --pool-tv-space: 76px;
 }
+.pool-tv:has(.pool-tv-clock:not(:empty), .duel-result, .duel-tie) { --pool-tv-space: 132px; row-gap: 6px; }
 .pool-tv .duel-pool-playing, .pool-tv .h2h-eight-ball { display: contents; }
-.room-display.pool-tv .pool { width: min(100%, calc((100dvh - 76px) * var(--pool-table-ratio))); }
+.room-display.pool-tv .pool { grid-area: 2 / 1 / 3 / -1; width: min(100%, calc((100dvh - var(--pool-tv-space)) * var(--pool-table-ratio))); }
 .pool-tv .pool-pot-tray { background: #ffffff12; }
 .pool-tv .pool-pot-tray strong { font-size: clamp(.875rem, 1.7vw, 1.3rem); }
 .pool-tv :is(.h2h-title, .h2h-turn, .pool-open, .pool-toolbar, .h2h-replay, .h2h-result) { display: none; }
 .pool-tv :is(.duel-result, .duel-tie) {
-  position: absolute; inset: 16px auto auto 16px; margin: 0; padding: 6px 12px;
+  grid-area: 1 / 1; justify-self: start; margin: 0; padding: 6px 12px;
   border-radius: 8px; background: #111d; color: #fff;
 }
 .pool-tv .duel-tie p { margin: 0; color: inherit; }
-.pool-tv-clock { position: absolute; inset: 16px 16px auto auto; }
+.pool-tv-clock { grid-area: 1 / 2; }
+.pool-tv-clock:empty { display: none; }
 .pool-tv-clock .timer { margin: 0; padding: 6px 12px; border-radius: 8px; background: #111d; color: #fff; font-variant-numeric: tabular-nums; }
