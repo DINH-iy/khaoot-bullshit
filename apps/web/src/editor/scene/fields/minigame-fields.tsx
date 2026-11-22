@@ -1,4 +1,4 @@
-import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
 import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
 import { SpeedRunCourseFields } from './speed-run-course.js';
@@ -78,7 +78,7 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
     {game === 'count-the-dots' && settings && (() => {
       const dots = settings as MinigameSettings<'count-the-dots'>;
       return <>
-        <NumberChoiceFields label={numberText('count')} value={dots.count} min={1} max={DOT_COUNT_MAX} initial={20} range={[12, 30]}
+        <NumberChoiceFields label={numberText('count')} value={dots.count} min={1} max={DOT_COUNT_MAX} initial={20} range={[DOT_RANDOM_MIN, DOT_COUNT_MAX]}
           onChange={count => setSettings({ ...dots, count }, 'dot-count')} />
         <label className="choice"><input type="checkbox" checked={dots.allowOverlap ?? false}
           onChange={event => setSettings({ ...dots, allowOverlap: event.currentTarget.checked }, 'dot-overlap')} />{numberText('overlap')}</label>

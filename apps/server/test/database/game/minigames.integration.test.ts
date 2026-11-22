@@ -108,7 +108,7 @@ describe('minigames', () => {
 
   it('keeps Count the Dots private to the displays and accepts guesses during the viewing window', async () => {
     const w = world();
-    const f = await fixture(5, game({ game: 'count-the-dots', durationMs: 15_000, settings: { viewSeconds: 5, count: { mode: 'exact', value: 14 } } }));
+    const f = await fixture(5, game({ game: 'count-the-dots', durationMs: 15_000, settings: { viewSeconds: 5, count: { mode: 'exact', value: 500 } } }));
     const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
     const clock = () => new Date(w.now());
     const display = { role: 'display' as const, sessionId: f.sessionId };
@@ -120,7 +120,7 @@ describe('minigames', () => {
     const dots = opened.minigame!.dots!;
     const pattern = dots.pattern!;
     const count = pattern.length;
-    expect(count).toBe(14);
+    expect(count).toBe(500);
     expect((await view(player(0))).stage!.minigame!.settings).toEqual({ viewSeconds: 5 });
     expect(opened.deadlineAt).toBe(new Date(w.now() + 20_000).toISOString());
     expect((await view(f.host)).stage!.minigame!.dots).toEqual(dots);

@@ -78,13 +78,28 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
   await configuration.getByRole('button', { name: 'Text & timing' }).click();
   await expect(host.getByLabel('Guessing time')).toHaveValue('12');
   await configuration.getByRole('button', { name: 'Settings', exact: true }).click();
-  await host.getByRole('group', { name: 'Dot count' }).getByRole('button', { name: 'Exact' }).click();
-  await host.getByRole('spinbutton', { name: 'Dot count' }).fill('14');
+  const dotCountOptions = host.getByRole('group', { name: 'Dot count' });
+  await dotCountOptions.getByRole('button', { name: 'Random range' }).click();
+  const minimum = host.getByRole('spinbutton', { name: 'Minimum' });
+  await expect(minimum).toHaveValue('50');
+  await expect(host.getByRole('spinbutton', { name: 'Maximum' })).toHaveValue('500');
+  await minimum.fill('1');
+  await expect(minimum).toHaveValue('1');
+  await dotCountOptions.getByRole('button', { name: 'Exact' }).click();
+  const dotCount = host.getByRole('spinbutton', { name: 'Dot count' });
+  await expect(dotCount).toHaveAttribute('max', '500');
+  await dotCount.fill('1');
+  await expect(dotCount).toHaveValue('1');
+  await dotCount.fill('500');
+  await expect(dotCount).toHaveValue('500');
+  await dotCount.fill('501');
+  await expect(dotCount).toHaveValue('500');
+  await dotCount.fill('100');
   await host.getByRole('checkbox', { name: 'Allow slight overlap' }).check();
   await configuration.getByRole('button', { name: 'Apply changes' }).click();
   const readDraft = async () => (await (await host.request.get(`${games}/${gameId}`, { headers })).json()).data;
   await expect.poll(async () => (await readDraft()).definition.nodes[0].stages[0].settings).toMatchObject({
-    viewSeconds: 6, count: { mode: 'exact', value: 14 }, allowOverlap: true, revealEasing: 'ease-in-out',
+    viewSeconds: 6, count: { mode: 'exact', value: 100 }, allowOverlap: true, revealEasing: 'ease-in-out',
   });
   const saved = await readDraft();
   await host.getByRole('button', { name: 'Try this scene' }).click();
@@ -92,8 +107,8 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
   await practice.getByRole('button', { name: 'Start practice' }).click();
   const practiceBoard = practice.locator('.tv-screen').getByRole('img', { name: 'Dot pattern' });
   await expect(practiceBoard).toBeVisible();
-  await expect(practiceBoard.locator('span')).toHaveCount(14);
-  const practiceCount = 14;
+  const practiceCount = 100;
+  await expect(practiceBoard.locator('span')).toHaveCount(practiceCount);
   const practiceGuess = practice.getByRole('textbox', { name: 'How many dots?' });
   await expect(practiceGuess).toBeVisible();
   await expect(practiceBoard).toBeVisible();
@@ -138,7 +153,7 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
     await expect(guess).toHaveAttribute('inputmode', 'numeric');
     const positions = (page: typeof host) => board(page).locator('span').evaluateAll(dots => dots.map(dot => dot.getAttribute('style')));
     const dots = await positions(host);
-    expect(dots).toHaveLength(14);
+    expect(dots).toHaveLength(100);
     expect(await positions(display)).toEqual(dots);
 
     await guess.fill(String(dots.length - 1));
@@ -169,8 +184,13 @@ test('Count the Dots shows one pattern on both displays and accepts a guess whil
       await expect(page.locator('.mg-dot-reveal [role=status]')).toHaveText(`${dots.length} dots`);
       expect(await positions(page)).toEqual(dots);
     }
-    const expectedCounts = Array.from({ length: dots.length + 1 }, (_, count) => count);
-    for (const history of progress) expect(await history.jsonValue()).toEqual(expectedCounts);
+    for (const history of progress) {
+      const counts = await history.jsonValue();
+      expect(counts[0]).toBe(0);
+      expect(counts.at(-1)).toBe(dots.length);
+      expect(counts.length).toBeGreaterThan(2);
+      expect(counts.every((count, index) => index === 0 || count > counts[index - 1]!)).toBe(true);
+    }
     await expect(display.getByText(`${dots.length} dots`, { exact: true })).toBeVisible();
     await expect(display.locator('.mg-podium .first')).toContainText(`${dots.length - 1} · 1 off`);
     const phoneResult = phone.getByRole('region', { name: 'Results', exact: true });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANGLE_TARGETS, MINIGAMES, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteColor, rouletteReturn } from '@party/contracts';
+import { ANGLE_TARGETS, DOT_RADIUS, DotPatternSchema, DotSettingsSchema, MINIGAMES, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteColor, rouletteReturn } from '@party/contracts';
 import { judgeResult, places, startMinigame, teamValue } from '../../src/minigames/shared/rules.js';
 import { FASTEST_REACTION_MS } from '../../src/minigames/reaction/judge.js';
 import { TAP_TAIL } from '../../src/minigames/tap-race/judge.js';
@@ -175,5 +175,27 @@ describe('authored precision targets', () => {
     expect(Math.min(...distances)).toBe(20);
     const last = startMinigame('count-the-dots', { viewSeconds: 5, count: { mode: 'range', min: 14, max: 18 } }, now, max => max - 1);
     expect(last.dots!.pattern).toHaveLength(18);
+  });
+
+  it('packs the maximum authored range with at most slight overlap and keeps the default range', () => {
+    for (const allowOverlap of [false, true]) {
+      const settings = DotSettingsSchema.parse({ viewSeconds: 5, count: { mode: 'range', min: 1, max: 500 }, allowOverlap });
+      for (const [random, count] of [[(max: number) => Math.min(99, max - 1), 100], [(max: number) => max - 1, 500]] as const) {
+        const { pattern } = startMinigame('count-the-dots', settings, now, random).dots!;
+        expect(DotPatternSchema.parse(pattern)).toHaveLength(count);
+        let closest = Infinity;
+        for (const [index, [x, y]] of pattern.entries()) {
+          for (const [otherX, otherY] of pattern.slice(index + 1)) closest = Math.min(closest, Math.hypot(x - otherX, y - otherY));
+        }
+        if (allowOverlap) expect(closest).toBe(2 * DOT_RADIUS - 2);
+        else expect(closest).toBeGreaterThanOrEqual(2 * DOT_RADIUS);
+      }
+    }
+    const customRange = DotSettingsSchema.parse({ viewSeconds: 5, count: { mode: 'range', min: 1, max: 500 } });
+    expect(startMinigame('count-the-dots', customRange, now, () => 0).dots!.pattern).toHaveLength(1);
+    expect(DotSettingsSchema.safeParse({ viewSeconds: 5, count: { mode: 'exact', value: 0 } }).success).toBe(false);
+    expect(DotSettingsSchema.safeParse({ viewSeconds: 5, count: { mode: 'exact', value: 501 } }).success).toBe(false);
+    expect(startMinigame('count-the-dots', { viewSeconds: 5 }, now, () => 0).dots!.pattern).toHaveLength(50);
+    expect(startMinigame('count-the-dots', { viewSeconds: 5 }, now, max => max - 1).dots!.pattern).toHaveLength(500);
   });
 });

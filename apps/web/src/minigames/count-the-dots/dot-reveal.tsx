@@ -29,8 +29,8 @@ export function DotReveal({ pattern, startedAt, offset, easing, children }: {
   const t = useTexts(CONTROL_TEXTS);
   const total = pattern.length;
   const start = Date.parse(startedAt);
-  // Dense patterns need enough time for each dot to land even at the fastest part of the curve.
-  const duration = Math.max(3600, total * 160);
+  // Large patterns reveal several dots per frame so the standings stay prompt.
+  const duration = Math.min(6000, Math.max(3600, total * 160));
   const countAt = (time: number) => easing === 'instant' ? total : Math.floor(
     total * curveAt(Math.max(0, Math.min(1, (time - start) / duration)), easing),
   );
