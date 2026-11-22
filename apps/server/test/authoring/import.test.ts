@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { importDefinition } from '../../src/authoring/import.js';
 import { inspectDefinition } from '../../src/authoring/drafts.js';
+import { resolveTheme, ThemeSchema } from '@party/contracts';
 import { maxPathStages } from '../../src/game/graph.js';
 import { builtInGames } from '../../src/game/templates.js';
 
@@ -16,7 +17,7 @@ describe('importing a game from text', () => {
     expect(issues).toEqual([]);
     const game = definition as { formatVersion: number; nodes: { key: string; stages: Record<string, unknown>[] }[]; edges: { from: string; to: string; option?: string }[] };
     expect(game.formatVersion).toBe(2);
-    expect(game).toMatchObject({ idleCloseMinutes: 30, autoRevealSeconds: 2, presentation: { theme: { preset: 'neptune', sliderStyle: 'dial' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
+    expect(game).toMatchObject({ idleCloseMinutes: 30, autoRevealSeconds: 2, presentation: { theme: { preset: 'neptune', font: 'rounded', headingFont: 'condensed', sliderStyle: 'dial' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
     const stage = (key: string) => game.nodes.find(node => node.key === key)!.stages[0]!;
     expect(stage('welcome')).toMatchObject({ youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 5, endSeconds: 15 }, mediaLayout: { position: 'left', size: 'wide' } });
     expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
@@ -26,7 +27,7 @@ describe('importing a game from text', () => {
     expect(game.edges.filter(edge => edge.from === 'choose')).toEqual([expect.objectContaining({ to: 'music', option: 'music' }), expect.objectContaining({ to: 'sculpture', option: 'physical' })]);
     expect(game.edges.filter(edge => edge.to === 'finale').map(edge => edge.from).sort()).toEqual(['sculpture', 'sprint']);
     expect(stage('sprint')).toMatchObject({ kind: 'minigame', game: 'speed-run', durationMs: 45_000, settings: { course: ['S...#..', '.##...#', '....#..', '##.#...', '......F'] } });
-    expect(stage('cut')).toMatchObject({ kind: 'minigame', game: 'cut-the-line', durationMs: 20_000, settings: { target: { mode: 'exact', value: 37 } }, placementMilli: ['10000', '6000', '3000'] });
+    expect(stage('cut')).toMatchObject({ kind: 'minigame', game: 'cut-the-line', durationMs: 20_000, presentation: { theme: { font: 'serif' } }, settings: { target: { mode: 'exact', value: 37 } }, placementMilli: ['10000', '6000', '3000'] });
     expect(stage('angle')).toMatchObject({ kind: 'minigame', game: 'match-the-angle', durationMs: 20_000, placementMilli: ['10000', '6000', '3000'] });
     expect(stage('dots')).toMatchObject({ kind: 'minigame', game: 'count-the-dots', durationMs: 15_000, countdownSeconds: 3, settings: { viewSeconds: 6, count: { mode: 'range', min: 1, max: 500 }, allowOverlap: true, revealEasing: 'ease-in' } });
     expect(stage('coin')).toMatchObject({ kind: 'minigame', game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['10000'] });
@@ -37,6 +38,18 @@ describe('importing a game from text', () => {
     expect(stage('pool')).toMatchObject({ kind: 'duel', pick: 'random', durationMs: 20_000, betMilli: '2000', matchSeconds: 120,
       contest: { kind: 'game', game: 'eight-ball', settings: { ballBehavior: { preset: 'arcade' }, start: { side: 'random', percent: 30 } } }, places: { kind: 'list', pointsMilli: ['10000'] } });
     expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(16);
+  });
+
+  it('imports shared font references and keeps game fonts across scene presets unless explicitly overridden', () => {
+    const font = { id: 'ab99c61c-dace-4222-91db-aef612125c5a', name: 'Shared Font' };
+    const { issues, definition } = check(JSON.stringify({ title: 'Font night', look: { theme: { font, headingFont: font } },
+      scenes: [{ id: 'hello', type: 'info', question: 'Hello', look: { theme: { preset: 'neon', headingFont: 'mono' } } }] }));
+    expect(issues).toEqual([]);
+    const game = definition as { presentation: { theme: unknown }; nodes: { stages: { presentation: { theme: unknown } }[] }[] };
+    const base = ThemeSchema.parse(game.presentation.theme);
+    const scene = ThemeSchema.parse(game.nodes[0]!.stages[0]!.presentation.theme);
+    expect(resolveTheme(base, scene)).toMatchObject({ font, headingFont: 'mono' });
+    expect(resolveTheme(base, { ...scene, headingFont: undefined })).toMatchObject({ font, headingFont: font });
   });
 
   it('makes teams in a Pick teams scene and plays the rounds after it in them; a game without one is solo', () => {

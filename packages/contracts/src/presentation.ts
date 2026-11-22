@@ -1,3 +1,4 @@
+import { UploadedFontSchema } from './fonts.js';
 import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
 import { MINIGAME_KEYS, MINIGAMES, type MinigameKey } from './minigames/shared/catalog.js';
@@ -71,6 +72,8 @@ export const FONTS = { system: 'system-ui, -apple-system, "Segoe UI", Roboto, sa
   serif: 'Georgia, "Times New Roman", serif', slab: '"Rockwell", "Roboto Slab", Georgia, serif', mono: 'ui-monospace, Menlo, Consolas, monospace',
   condensed: '"Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif', playful: '"Chalkboard SE", "Comic Neue", "Comic Sans MS", cursive', elegant: '"Didot", "Bodoni 72", "Playfair Display", Georgia, serif' } as const;
 export type FontName = keyof typeof FONTS;
+const ThemeFontSchema = z.union([z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]), UploadedFontSchema]);
+export type ThemeFont = z.infer<typeof ThemeFontSchema>;
 const FullColorsSchema = z.object({
   background: Color, background2: Color, surface: Color, text: Color, muted: Color, accent: Color, accentText: Color, success: Color, danger: Color,
   answers: z.array(Color).min(2).max(8), answerText: Color,
@@ -80,7 +83,7 @@ export const SLIDER_STYLES = ['blade', 'notch', 'ring', 'dial'] as const;
 export const ThemeSchema = z.object({
   preset: z.string().max(40).optional(),
   colors: ColorsSchema.optional(),
-  font: z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]).optional(), headingFont: z.enum(Object.keys(FONTS) as [FontName, ...FontName[]]).optional(),
+  font: ThemeFontSchema.optional(), headingFont: ThemeFontSchema.optional(),
   radius: z.number().int().min(0).max(40).optional(), textScale: z.number().min(.8).max(1.6).optional(),
   sliderStyle: z.enum(SLIDER_STYLES).optional(),
   background: z.enum(['gradient', 'solid', 'dots', 'stripes', 'glow', 'grid']).optional(), tiles: z.enum(['filled', 'outline', 'glass', 'flat']).optional(),
@@ -155,11 +158,16 @@ export const DEFAULT_THEME = 'party';
 /** A theme with every value filled in: the preset, then the game's changes, then the scene's. */
 export function resolveTheme(...layers: (Theme | undefined)[]): FullTheme {
   let result: FullTheme = THEME_PRESETS[DEFAULT_THEME]!.theme;
+  let font: ThemeFont | undefined;
+  let headingFont: ThemeFont | undefined;
   for (const layer of layers) {
     if (!layer) continue;
     const base = layer.preset && THEME_PRESETS[layer.preset] ? THEME_PRESETS[layer.preset]!.theme : result;
-    const { preset: _preset, colors, ...rest } = layer;
-    result = { ...base, ...Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined)), colors: { ...base.colors, ...(colors ?? {}) } } as FullTheme;
+    const { preset: _preset, colors, font: nextFont, headingFont: nextHeadingFont, ...rest } = layer;
+    font = nextFont ?? font;
+    headingFont = nextHeadingFont ?? headingFont;
+    result = { ...base, ...Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined)),
+      font: font ?? base.font, headingFont: headingFont ?? base.headingFont, colors: { ...base.colors, ...(colors ?? {}) } } as FullTheme;
   }
   return result;
 }

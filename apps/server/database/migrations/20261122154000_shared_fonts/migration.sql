@@ -1,0 +1,1 @@
+ALTER TYPE "GameMediaKind" ADD VALUE 'FONT';

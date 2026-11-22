@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../../src/app.js';
 import { readConfig } from '../../../src/config.js';
 import { sniffLibrary } from '../../../src/assets/library.js';
@@ -24,6 +24,8 @@ const json = async (method: 'GET' | 'POST' | 'PUT', url: string, body?: object, 
   app.inject({ method, url, ...(body ? { payload: body } : {}), headers: { ...headers(), cookie: cookie ?? await ownerCookie() } });
 const upload = async (bytes: Buffer, name: string, cookie?: string) =>
   app.inject({ method: 'POST', url: `/api/host/media?name=${encodeURIComponent(name)}`, payload: bytes, headers: { ...headers(), cookie: cookie ?? await ownerCookie(), 'content-type': 'application/octet-stream' } });
+const uploadFont = async (bytes: Buffer, name: string, cookie?: string) =>
+  app.inject({ method: 'POST', url: `/api/host/fonts?name=${encodeURIComponent(name)}`, payload: bytes, headers: { ...headers(), cookie: cookie ?? await ownerCookie(), 'content-type': 'application/octet-stream' } });
 
 // Small real headers: enough for recognising the type; the rest is filler.
 const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(200, 1)]);
@@ -72,6 +74,44 @@ describe('the media library', () => {
     const part = await app.inject({ method: 'GET', url: `/api/media/${id}`, headers: { host: '127.0.0.1:4173', range: 'bytes=3-9' } });
     expect(part.statusCode).toBe(206); expect(part.rawPayload.equals(mp3.subarray(3, 10))).toBe(true);
     expect((await app.inject({ method: 'GET', url: `/api/media/${randomUUID()}`, headers: { host: '127.0.0.1:4173' } })).statusCode).toBe(404);
+  });
+
+  it('shares uploaded and imported font files with visitors while reserving uploads for editors', async () => {
+    const font = Buffer.alloc(60);
+    font.writeUInt32BE(0x00010000, 0);
+    font.writeUInt16BE(2, 4);
+    expect((await uploadFont(font, 'House Font.ttf', '')).statusCode).toBe(401);
+    expect((await uploadFont(png, 'Fake.ttf')).json().error.code).toBe('UNSUPPORTED_MEDIA');
+    expect((await uploadFont(font.subarray(0, 16), 'Truncated.ttf')).json().error.code).toBe('UNSUPPORTED_MEDIA');
+    const stored = (await uploadFont(font, 'House Font.ttf')).json().data;
+    expect(stored).toMatchObject({ name: 'House Font' });
+    expect((await json('GET', '/api/host/fonts')).json().data).toContainEqual(stored);
+    expect((await app.inject({ method: 'GET', url: '/api/host/fonts', headers: headers() })).statusCode).toBe(401);
+    const publicFont = await app.inject({ method: 'GET', url: `/api/fonts/${stored.id}`, headers: { host: '127.0.0.1:4173' } });
+    expect(publicFont.statusCode).toBe(200);
+    expect(publicFont.headers).toMatchObject({ 'content-type': 'font/ttf', 'x-content-type-options': 'nosniff' });
+    expect(publicFont.rawPayload).toEqual(font);
+    expect((await json('GET', `/api/media/${stored.id}`)).statusCode).toBe(404);
+    expect((await json('GET', '/api/host/media')).json().data.items).not.toContainEqual(expect.objectContaining({ id: stored.id }));
+
+    const upstream = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      expect((await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com/specimen/Inter' }, '')).statusCode).toBe(401);
+      expect((await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com.example.org/specimen/Inter' })).statusCode).toBe(400);
+      expect(upstream).not.toHaveBeenCalled();
+      upstream.mockResolvedValueOnce(new Response('@font-face { src: url(https://example.org/file.ttf); }'));
+      expect((await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com/specimen/Inter' })).json().error.code).toBe('FONT_IMPORT_FAILED');
+      expect(upstream).toHaveBeenCalledTimes(1);
+
+      upstream.mockResolvedValueOnce(new Response('@font-face { src: url(https://fonts.gstatic.com/s/inter/file.ttf); }'))
+        .mockResolvedValueOnce(new Response(new Uint8Array(font)));
+      const imported = await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com/share?selection.family=Inter:wght@400;700' });
+      expect(imported.json().data).toMatchObject({ name: 'Inter' });
+      expect(upstream).toHaveBeenCalledWith(new URL('https://fonts.googleapis.com/css2?family=Inter'), expect.objectContaining({ redirect: 'error' }));
+      expect(upstream).toHaveBeenCalledWith(new URL('https://fonts.gstatic.com/s/inter/file.ttf'), expect.objectContaining({ redirect: 'error' }));
+      expect((await json('GET', '/api/host/fonts')).json().data).toContainEqual(imported.json().data);
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it('keeps a file a game still uses, and removes one that is no longer used', async () => {

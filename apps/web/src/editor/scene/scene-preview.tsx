@@ -7,7 +7,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
 import { useLanguage } from '../../i18n/language.js';
 import { useTexts } from '../../i18n/texts.js';
-import { buildLook, LookContext, themeClass, themeStyle } from '../../presentation/look.js';
+import { buildLook, LookContext, themeClass, useThemeStyle } from '../../presentation/look.js';
 import { FaIcon } from '../../presentation/icons.js';
 import { gameDescription, gameName } from '../../presentation/catalog.text.js';
 import { Mark } from '../../presentation/mark-icons.js';
@@ -63,7 +63,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
     ? <StageYouTube key={clip.videoId} clip={clip} label={label} role={role} displayConnected preview />
     : media && <StageMedia key={media.id} media={{ ...media, url: sceneMediaUrl(media.id) }} label={label} role={role} displayConnected preview />;
   const classes = themeClass(theme);
-  const style = themeStyle(theme);
+  const style = useThemeStyle(theme);
   const phoneHint = t(stage.kind === 'info' || stage.kind === 'scoreboard' ? 'pWatch'
     : stage.kind === 'challenge' ? 'pHost' : stage.kind === 'minigame' ? 'pMinigame'
     : stage.kind === 'vote' ? 'pVote' : input?.kind === 'text' ? 'pType' : input?.kind === 'media' ? 'pUpload' : input?.kind === 'drawing' ? 'pDraw' : input?.kind === 'order' ? 'pOrder' : 'pChoose');

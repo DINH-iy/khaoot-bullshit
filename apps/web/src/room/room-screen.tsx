@@ -38,7 +38,7 @@ import { KeySignIn } from '../people/key-sign-in.js';
 import { JoinOption } from './join-option.js';
 import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
 import './room.css';
-import { LookContext, themeClass, themeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
+import { LookContext, themeClass, useThemeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 import { useSiteThemeState } from '../presentation/site-look.js';
 import { LeaveRoom } from '../room-extras/leave-room.js';
 import { SceneComposition } from '../presentation/scene-composition.js';
@@ -276,7 +276,7 @@ export function RoomScreen() {
   const look = useBuiltLook(lookInput); const t = look.text;
   // The host's own controls follow the language chosen in this browser; players' words stay the game's texts (t).
   const h = useTexts(HOST_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
-  const lookStyle = themeStyle(look.theme); const lookClass = themeClass(look.theme);
+  const lookStyle = useThemeStyle(look.theme); const lookClass = themeClass(look.theme);
   // Animation moments.
   const stageRef = useRef<HTMLElement>(null); const answersRef = useRef<HTMLDivElement>(null); const savedRef = useRef<HTMLParagraphElement>(null);
   const timerRef = useRef<HTMLDivElement>(null); const resultsRef = useRef<HTMLDivElement>(null); const scoresRef = useRef<HTMLDivElement>(null); const playersRef = useRef<HTMLUListElement>(null);

@@ -577,9 +577,10 @@ enum GameMediaKind {
   IMAGE
   VIDEO
   AUDIO
+  FONT
 }
 
-// The media library: pictures, videos and songs the owner and editors upload for their games
+// The media library: pictures, videos, songs and fonts the owner and editors upload for their games
 // (a scene shows one). The bytes live in the media folder under game-media/<id>, apart from the
 // rooms' uploads, so the room clean-up never touches them. Removing one keeps the row (removedAt).
 model GameMedia {

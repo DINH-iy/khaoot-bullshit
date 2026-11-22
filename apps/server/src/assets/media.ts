@@ -49,7 +49,7 @@ export const assetPath = (directory: string, sessionId: string, assetId: string)
  * file) when it is not supported media or exceeds its kind's limit.
  */
 /** What an upload may be: how it is recognised and how large each kind may get. Players' uploads by default. */
-export interface UploadRules<T extends { kind: string; contentType: string }> { sniff: (head: Uint8Array) => T | null; limit: (type: T) => number; max: number }
+export interface UploadRules<T extends { kind: string; contentType: string }> { sniff: (head: Uint8Array, byteSize: number) => T | null; limit: (type: T) => number; max: number }
 const PLAYER_UPLOADS: UploadRules<MediaType> = { sniff: sniffMedia, limit: type => MEDIA_LIMITS[type.kind], max: MAX_UPLOAD_BYTES };
 export async function storeUpload(source: Readable, directory: string, sessionId: string, assetId: string): Promise<(MediaType & { byteSize: number; sha256: string }) | null>;
 export async function storeUpload<T extends { kind: string; contentType: string }>(source: Readable, directory: string, sessionId: string, assetId: string, rules: UploadRules<T>): Promise<(T & { byteSize: number; sha256: string }) | null>;
@@ -65,9 +65,10 @@ export async function storeUpload(source: Readable, directory: string, sessionId
   } });
   try {
     await pipeline(source, meter, createWriteStream(partial, { mode: 0o600, flags: 'wx' }));
-    const file = await open(partial, 'r'); const head = Buffer.alloc(16);
-    try { await file.read(head, 0, 16, 0); } finally { await file.close(); }
-    const type = byteSize >= 12 ? rules.sniff(head) : null;
+    const file = await open(partial, 'r');
+    const head = Buffer.alloc(48);
+    const { bytesRead } = await file.read(head).finally(() => file.close());
+    const type = byteSize >= 12 ? rules.sniff(head.subarray(0, bytesRead), byteSize) : null;
     if (!type) { await rm(partial, { force: true }); return null; }
     if (byteSize > rules.limit(type)) throw new UploadTooLarge();
     await rename(partial, target);

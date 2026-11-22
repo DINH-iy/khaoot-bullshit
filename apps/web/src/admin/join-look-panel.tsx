@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { resolveTheme, SiteLookSchema, type SiteLook, type Theme } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
-import { themeClass, themeStyle } from '../presentation/look.js';
+import { themeClass, useThemeStyle } from '../presentation/look.js';
 import { ThemePanel } from '../editor/look/theme-panel.js';
 import { Icon } from '../editor/controls/icons.js';
 import '../editor/editor.css';
@@ -17,10 +17,11 @@ export function JoinLookPanel() {
   const [error, setError] = useState(''); const [saved, setSaved] = useState(false);
   const problem = (cause: unknown) => cause instanceof Error && cause.message === 'UNAUTHORIZED' ? SIGNED_OUT_TEXT : 'That did not work. Try again.';
   useEffect(() => { void roomApi('/api/host/site-look').then(data => { const look = SiteLookSchema.parse(data); setStored(look); setDraft(look); }).catch(cause => setError(problem(cause))); }, []);
+  const theme = resolveTheme(draft.theme);
+  const style = useThemeStyle(theme);
   if (!stored) return error ? <p role="alert" className="error">{error}</p> : <p role="status">Loading…</p>;
   const changed = JSON.stringify(draft) !== JSON.stringify(stored);
   const save = () => { setError(''); setSaved(false); void roomApi('/api/host/site-look', draft).then(data => { const look = SiteLookSchema.parse(data); setStored(look); setDraft(look); setSaved(true); }).catch(cause => setError(problem(cause))); };
-  const theme = resolveTheme(draft.theme);
   return <div className="join-look">
     <p className="admin-intro">The first screen players see, where they type the room code and their name. Once a code is typed, the screen takes the look of that room's game; rooms and scenes always use their game's look.</p>
     {error && <p role="alert" className="error">{error}</p>}
@@ -31,7 +32,7 @@ export function JoinLookPanel() {
       <div className="join-look-side">
         <figure className="join-look-preview" aria-label="Preview of the join screen"><figcaption>Preview</figcaption>
           <div className="join-look-phone">
-            <main className={`room room-join ${themeClass(theme)}`} style={themeStyle(theme)} inert>
+            <main className={`room room-join ${themeClass(theme)}`} style={style} inert>
               <section className="join-card"><p className="brand">party<span>.</span></p>
                 <div className="join-head"><h1>Join a game</h1></div>
                 <div className="join-form"><label>Room code<input className="code-input" readOnly value="ABC-123" tabIndex={-1} /></label>

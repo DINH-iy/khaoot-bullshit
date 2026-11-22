@@ -5,6 +5,7 @@ export * from './chat.js';
 export * from './authoring.js';
 export * from './live-editing.js';
 export * from './presentation.js';
+export * from './fonts.js';
 export * from './minigames/shared/catalog.js';
 export * from './minigames/shared/number-choice.js';
 export * from './minigames/cut-the-line/target.js';

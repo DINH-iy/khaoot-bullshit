@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { mergePresentationTexts, type Presentation } from '@party/contracts';
-import { buildLook, LookContext, themeClass, themeStyle } from '../../presentation/look.js';
+import { buildLook, LookContext, themeClass, useThemeStyle } from '../../presentation/look.js';
 import { useLanguage, type Language } from '../../i18n/language.js';
 import { cardText, type Definition } from '../model.js';
 import type { DraftState } from '../shell/use-draft.js';
@@ -38,6 +38,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
   const update = (patch: Partial<Presentation>, group: string) => d.change(withLayer(definition, live, { ...layer, ...patch }) as Definition, undefined, `look:${scopeValue(live)}:${group}`);
   // The look the preview shows: the game's, with this scene's changes on top.
   const look = buildLook({ ...mergePresentationTexts(game, live.kind === 'scene' ? layer : undefined), animations: { ...game.animations, ...(live.kind === 'scene' ? layer.animations : {}) }, themes: [game.theme, live.kind === 'scene' ? layer.theme : undefined].filter(Boolean) }, section === 'texts' && textLanguage ? textLanguage : editorLanguage);
+  const style = useThemeStyle(look.theme);
   const changedScenes = definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ node, index, stage }))).filter(entry => entry.stage['presentation']);
   return <div className="look-editor">
     <aside className="look-controls" aria-labelledby="look-heading">
@@ -56,7 +57,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
       </fieldset>
     </aside>
     <section className="look-preview-area" aria-label={t('previewLabel')}>
-      <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={themeStyle(look.theme)} className={themeClass(look.theme)} /></LookContext.Provider>
+      <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={style} className={themeClass(look.theme)} /></LookContext.Provider>
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>
   </div>;

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { buildLook, LookContext, themeStyle } from '../../presentation/look.js';
+import { buildLook, LookContext, useThemeStyle } from '../../presentation/look.js';
 import { WheelDisc } from '../../room-extras/show-extras.js';
 import { layerOf } from '../look/layer.js';
 import { useTexts } from '../../i18n/texts.js';
@@ -18,6 +18,7 @@ export function WheelTest({ definition, wheel, onClose }: {
   definition: Definition; wheel: { title: string; entries: { label: string }[]; spinSeconds: number; colors?: string[] | undefined }; onClose: () => void;
 }) {
   const look = buildLook({ themes: [layerOf(definition, { kind: 'game' }).theme] });
+  const style = useThemeStyle(look.theme);
   const entries = wheel.entries.map(entry => entry.label);
   const t = useTexts(SETTINGS_TEXTS);
   const [result, setResult] = useState<number | null>(null); const [spinning, setSpinning] = useState(false); const [boosts, setBoosts] = useState(0);
@@ -44,7 +45,7 @@ export function WheelTest({ definition, wheel, onClose }: {
       <h2 id={`${id}-title`}>Test spin: {wheel.title}</h2>
       <p>{t('testIntro')}</p>
       <LookContext.Provider value={look}>
-        <div ref={stage} className="wheel-test-stage" style={themeStyle(look.theme)}>
+        <div ref={stage} className="wheel-test-stage" style={style}>
           {/* Clicking the wheel itself does what the Spin / Boost button does (that button is the keyboard's way). */}          <div className={`wheel-hit${spinning ? ' turning' : ''}`} title={t(spinning ? 'clickBoost' : 'clickTurn')} onClick={spin}>
             <WheelDisc entries={entries} index={0} seconds={wheel.spinSeconds} spinKey="test" colors={wheel.colors} still /></div>
           <p className={`wheel-result${result !== null ? ' shown' : ''}`} role="status">{result !== null ? entries[result] : spinning ? (boosts ? `${boosts > 1 ? t('boostTimes', { count: boosts }) : t('boost')}!` : '…') : ' '}</p>

@@ -1,8 +1,9 @@
-import { contrast, FONTS, resolveTheme, SLIDER_STYLES, THEME_PRESETS, type FontName, type FullTheme, type Theme } from '@party/contracts';
+import { contrast, resolveTheme, SLIDER_STYLES, THEME_PRESETS, type FullTheme, type Theme } from '@party/contracts';
+import { FontFields, fontLabel } from './font-fields.js';
+import { fontCssFamily } from '../../presentation/theme-fonts.js';
 import { themeStyle } from '../../presentation/look.js';
 import { DialSlider } from '../../ui/dial-slider.js';
 import '../../ui/game-slider.css';
-import { Dropdown } from '../../ui/dropdown.js';
 import { Section } from '../controls/section.js';
 import { Swatches } from '../controls/swatches.js';
 import { useId, useState, type CSSProperties } from 'react';
@@ -16,10 +17,6 @@ import { ExportPalette, ImportPalette } from './palette-dialog.js';
 type Colors = FullTheme['colors'];
 type ColorName = Exclude<keyof Colors, 'answers'>;
 const COLOR_LABELS = { background: 'cBackground', background2: 'cBackground2', surface: 'cSurface', text: 'cText', muted: 'cMuted', accent: 'cAccent', accentText: 'cAccentText', success: 'cSuccess', danger: 'cDanger', answerText: 'cAnswerText' } as const satisfies Record<ColorName, keyof typeof LOOK_TEXTS.en>;
-const FONT_KEYS = { system: 'fSystem', rounded: 'fRounded', serif: 'fSerif', slab: 'fSlab', mono: 'fMono', condensed: 'fCondensed', playful: 'fPlayful', elegant: 'fElegant' } as const satisfies Record<FontName, keyof typeof LOOK_TEXTS.en>;
-const fontLabel = (font: FontName) => t(FONT_KEYS[font]);
-// Each font listed in itself, so the list shows what it looks like.
-const fontOptions = () => (Object.keys(FONTS) as FontName[]).map(font => ({ value: font, label: fontLabel(font), style: { fontFamily: FONTS[font] } }));
 const BACKGROUND_KEYS = { glow: 'bGlow', gradient: 'bGradient', solid: 'bSolid', dots: 'bDots', stripes: 'bStripes', grid: 'bGrid' } as const;
 const TILE_KEYS = { filled: 'tFilled', flat: 'tFlat', outline: 'tOutline', glass: 'tGlass' } as const;
 const SLIDER_KEYS = { blade: 'sliderBlade', notch: 'sliderNotch', ring: 'sliderRing', dial: 'sliderDial' } as const;
@@ -77,12 +74,12 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
   const warnings = contrastWarnings(full);
   // Small named groups (K4): only the style starts open; each group shows what is set when closed, and stays as it was left.
   const presetName = layer.preset && THEME_PRESETS[layer.preset] ? styleName(layer.preset) : t('yourOwn');
-  const fonts = full.headingFont === full.font ? fontLabel(full.font) : t('fontsTitles', { font: fontLabel(full.font), titles: fontLabel(full.headingFont) });
+  const fonts = fontCssFamily(full.headingFont) === fontCssFamily(full.font) ? fontLabel(full.font) : t('fontsTitles', { font: fontLabel(full.font), titles: fontLabel(full.headingFont) });
   const markName = { letters: 'A B C', numbers: '1 2 3', shapes: t('markShapes'), custom: t('markOwn'), none: t('markNone') }[full.markers];
   return <div className="look-panel">
     <Section title={t('style')} memory="look:style" open summary={presetName}>
       <div className="preset-grid">{Object.entries(THEME_PRESETS).map(([key, preset]) => <button key={key} className={`preset-card${layer.preset === key ? ' on' : ''}`} aria-pressed={layer.preset === key}
-        onClick={() => onChange({ preset: key })} style={{ background: `linear-gradient(160deg, ${preset.theme.colors.background}, ${preset.theme.colors.background2})`, color: preset.theme.colors.text, fontFamily: FONTS[preset.theme.headingFont] }}>
+        onClick={() => onChange({ preset: key })} style={{ background: `linear-gradient(160deg, ${preset.theme.colors.background}, ${preset.theme.colors.background2})`, color: preset.theme.colors.text, fontFamily: fontCssFamily(preset.theme.headingFont) }}>
         <strong>{styleName(key)}</strong>
         <span className="swatches" aria-hidden="true">{preset.theme.colors.answers.slice(0, 4).map(color => <i key={color} style={{ background: color }} />)}<i style={{ background: preset.theme.colors.accent }} /></span>
       </button>)}</div>
@@ -108,8 +105,8 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
     </Section>
 
     <Section title={t('text')} memory="look:text" summary={`${fonts} · ${Math.round(full.textScale * 100)}%`}>
-      <label>{t('font')}<Dropdown value={full.font} onChange={font => set({ font: font as FontName })} options={fontOptions()} /></label>
-      <label>{t('titleFont')}<Dropdown value={full.headingFont} onChange={font => set({ headingFont: font as FontName })} options={fontOptions()} /></label>
+      <FontFields theme={layer} full={full} onChange={set} inherited={below.length
+        ? resolveTheme(...below, { ...layer, font: undefined, headingFont: undefined }) : undefined} />
       <label>{t('textSize', { percent: Math.round(full.textScale * 100) })}<input type="range" min={80} max={160} step={5} value={Math.round(full.textScale * 100)} onChange={event => set({ textScale: Number(event.target.value) / 100 })} /></label>
       <label className="choice"><input type="checkbox" checked={full.uppercaseHeadings} onChange={event => set({ uppercaseHeadings: event.target.checked })} />{t('capitals')}</label>
     </Section>

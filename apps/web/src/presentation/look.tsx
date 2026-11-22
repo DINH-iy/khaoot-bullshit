@@ -2,8 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useRef, type CSSProperti
 import { currentLanguage, useLanguage, type Language } from '../i18n/language.js';
 import { translate } from '../i18n/texts.js';
 import { GAME_TEXTS } from './game-texts.text.js';
+import { fontCssFamily, useThemeFonts } from './theme-fonts.js';
 import { gameHowToPlay } from './catalog.text.js';
-import { contrast, EASINGS, FONTS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type TranslatedTexts, type Theme } from '@party/contracts';
+import { contrast, EASINGS, fillText, resolveAnimation, resolveTheme, TEXT_DEFAULTS, ThemeSchema, type AnimationChoice, type CustomAnimation, type Moment, type TextKey, type TranslatedTexts, type Theme } from '@party/contracts';
 
 export interface LookInput { texts?: Record<string, string>; translations?: TranslatedTexts | undefined; animations?: Record<string, unknown>; themes?: unknown[] }
 export interface Look { text: (key: TextKey, values?: Record<string, string | number>) => string; animation: (moment: Moment) => CustomAnimation | null; theme: ReturnType<typeof resolveTheme> }
@@ -21,11 +22,15 @@ export function themeStyle(theme: ReturnType<typeof resolveTheme>): CSSPropertie
     '--r-accent': colors.accent, '--r-accent-ink': colors.accentText, '--r-ok': colors.success, '--r-bad': colors.danger, '--a-text': colors.answerText,
     // For gradient tiles and buttons: the shine goes towards white under dark text and towards black under light text, so text stays readable.
     '--a-shine': shine(colors.answerText), '--r-accent-shine': shine(colors.accentText),
-    '--r-radius': `${theme.radius}px`, '--r-font': FONTS[theme.font], '--r-heading-font': FONTS[theme.headingFont], '--r-scale': String(theme.textScale),
+    '--r-radius': `${theme.radius}px`, '--r-font': fontCssFamily(theme.font), '--r-heading-font': fontCssFamily(theme.headingFont), '--r-scale': String(theme.textScale),
   };
   colors.answers.forEach((color, index) => { vars[`--a${index + 1}`] = color; });
   for (let index = colors.answers.length; index < 8; index++) vars[`--a${index + 1}`] = colors.answers[index % colors.answers.length]!;
   return vars as CSSProperties;
+}
+export function useThemeStyle(theme: ReturnType<typeof resolveTheme>) {
+  useThemeFonts(theme);
+  return themeStyle(theme);
 }
 export const themeClass = (theme: ReturnType<typeof resolveTheme>) => `bg-${theme.background} motion-${theme.backgroundMotion} tiles-${theme.tiles}${theme.uppercaseHeadings ? ' caps' : ''}${theme.gradients ? ' gradients' : ''} marks-${theme.markerShape} marks-${theme.markerPlace}`;
 
@@ -49,7 +54,8 @@ export const useBuiltLook = (look: LookInput | undefined) => { const language = 
 export { LookContext };
 export function LookProvider({ look, children, render }: { look: LookInput | undefined; children?: ReactNode; render?: (style: CSSProperties, className: string) => ReactNode }) {
   const value = useBuiltLook(look);
-  return <LookContext.Provider value={value}>{render ? render(themeStyle(value.theme), themeClass(value.theme)) : children}</LookContext.Provider>;
+  const style = useThemeStyle(value.theme);
+  return <LookContext.Provider value={value}>{render ? render(style, themeClass(value.theme)) : children}</LookContext.Provider>;
 }
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
