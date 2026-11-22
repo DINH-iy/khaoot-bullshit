@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import { POOL_CANVAS_WIDTH, POOL_RAIL } from '../../apps/web/src/head-to-head/eight-ball/table.js';
+import { POOL_START_LINE, POOL_WIDTH } from '@party/contracts';
 import { chooseOption, closeHostFold, closeRoundsByHand, openHostFold, openPhoneMenu } from './helpers.js';
 
 const token = process.env['LOCAL_OWNER_TOKEN'];
 if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
 
 test.use({ actionTimeout: 10_000 });
+
+const cueStart = (POOL_RAIL + POOL_START_LINE) / POOL_CANVAS_WIDTH;
+const cuePull = .18 * POOL_WIDTH / POOL_CANVAS_WIDTH;
 
 test('8-ball plays as a phone challenge and a hosted round with a live TV table', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'Uses CDP for the cue gesture.');
@@ -76,21 +81,48 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     const incoming = await challenges(bo);
     await incoming.getByRole('button', { name: 'Accept' }).click();
     await outgoing.getByRole('button', { name: 'Open', exact: true }).click();
-    await expect(outgoing.getByRole('img', { name: 'Pool table' })).toBeVisible();
+    const portraitTable = outgoing.getByRole('img', { name: 'Pool table' });
+    await expect(portraitTable).toBeVisible();
+    const portraitWidth = (await portraitTable.boundingBox())!.width;
+    await ada.emulateMedia({ reducedMotion: 'no-preference' });
     await ada.evaluate(() => Object.defineProperty(screen.orientation, 'lock', { configurable: true, value: undefined }));
-    await outgoing.getByRole('button', { name: 'Landscape mode' }).click();
+    await outgoing.getByRole('button', { name: 'Rotate table' }).click();
     const landscape = ada.getByRole('dialog', { name: 'Pool table' });
     const sidewaysTable = landscape.getByRole('img', { name: 'Pool table' });
+    const power = landscape.getByRole('slider', { name: 'Power' });
     await expect(sidewaysTable).toBeInViewport({ ratio: 1 });
+    await expect(power).toBeInViewport({ ratio: 1 });
+    await expect(landscape.getByRole('button', { name: 'Shoot' })).toBeInViewport({ ratio: 1 });
+    await expect(power).toHaveCSS('writing-mode', 'vertical-lr');
     await expect(landscape.locator('.pool-landscape-frame')).toHaveCSS('transform', /^matrix\(0, 1, -1, 0,/);
     const rotated = (await sidewaysTable.boundingBox())!;
+    expect(rotated.height).toBeGreaterThan(portraitWidth * 1.3);
     const rotatedX = rotated.x + rotated.width / 2;
-    const rotatedY = rotated.y + 6 + (rotated.height - 12) / 4;
+    const rotatedY = rotated.y + rotated.height * cueStart;
     const touch = await ada.context().newCDPSession(ada);
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: rotatedX, y: rotatedY }] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: rotatedX, y: rotatedY - (rotated.height - 12) * .18 }] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const movePath = '**/side/challenges/*/move';
+    let releaseMove!: () => void;
+    const moveGate = new Promise<void>(resolve => { releaseMove = resolve; });
+    await ada.route(movePath, async route => { await moveGate; await route.continue(); });
+    await sidewaysTable.evaluate(canvas => {
+      const observer = new MutationObserver(() => {
+        if (canvas.dataset['striking'] !== 'true') return;
+        canvas.dataset['shotAtStrike'] = canvas.dataset['shot'];
+        observer.disconnect();
+      });
+      observer.observe(canvas, { attributes: true, attributeFilter: ['data-striking'] });
+    });
+    try {
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: rotatedX, y: rotatedY }] });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: rotatedX, y: rotatedY - rotated.height * cuePull }] });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(sidewaysTable).toHaveAttribute('data-shot-at-strike', '0');
+    } finally {
+      releaseMove();
+    }
     await expect(incoming.getByRole('img', { name: 'Pool table' })).toHaveAttribute('data-shot', '1');
+    await ada.unroute(movePath);
+    await ada.emulateMedia({ reducedMotion: 'reduce' });
     await landscape.getByRole('button', { name: 'Exit landscape' }).click();
     await ada.setViewportSize({ width: 667, height: 375 });
     await expect(outgoing.getByRole('button', { name: 'Shoot' })).toBeInViewport({ ratio: 1 });
@@ -111,7 +143,7 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await expect(tv.getByRole('group', { name: 'Potted balls' })).toContainText('Ada');
     await expect(ada.getByRole('group', { name: 'Potted balls' })).toContainText('Bo');
     await expect(tv.locator('.session-bar')).toHaveCount(0);
-    expect((await table(tv).boundingBox())!.width).toBeGreaterThan(900);
+    expect((await table(tv).boundingBox())!.width).toBeGreaterThan(850);
     await expect(tv.getByRole('timer')).toBeVisible();
     await expect(table(ada)).toBeInViewport({ ratio: 1 });
     await expect(ada.getByRole('button', { name: 'Shoot' })).toBeInViewport({ ratio: 1 });
@@ -121,10 +153,10 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
 
     // Pull straight back from the cue ball to shoot toward the rack.
     const box = (await table(ada).boundingBox())!;
-    const x = box.x + 6 + (box.width - 12) / 4;
+    const x = box.x + box.width * cueStart;
     const y = box.y + box.height / 2;
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - (box.width - 12) * .18, y }] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - box.width * cuePull, y }] });
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect(table(tv)).toHaveAttribute('data-rolling', 'true');
     for (const page of [host, tv, ada, bo]) await expect(table(page)).toHaveAttribute('data-shot', '1');

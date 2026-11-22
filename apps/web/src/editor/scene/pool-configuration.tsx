@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { DEFAULT_POOL_START, PoolStartSchema, POOL_HEIGHT, POOL_WIDTH, rackPool } from '@party/contracts';
-import { paintPool } from '../../head-to-head/eight-ball/table.js';
+import { DEFAULT_POOL_START, PoolStartSchema, rackPool } from '@party/contracts';
+import { paintPool, POOL_CANVAS_HEIGHT, POOL_CANVAS_WIDTH } from '../../head-to-head/eight-ball/table.js';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { DuelFields } from './fields/duel-fields.js';
@@ -73,7 +73,7 @@ function PoolDialog({ stage, onChange, addTeams, close }: Props & { close: () =>
           </label>}
         </>}
         {panel === 'table' && <>
-          <canvas className="pool-config-table" width={POOL_WIDTH} height={POOL_HEIGHT} role="img" aria-label={t('preview')} ref={canvas => {
+          <canvas className="pool-config-table" width={POOL_CANVAS_WIDTH} height={POOL_CANVAS_HEIGHT} role="img" aria-label={t('preview')} ref={canvas => {
             const ctx = canvas?.getContext('2d');
             if (ctx) { const start = { ...previewStart, side: previewSide }; paintPool(ctx, rackPool(start), { start }); }
           }} />

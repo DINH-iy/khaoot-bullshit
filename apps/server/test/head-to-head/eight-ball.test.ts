@@ -55,6 +55,18 @@ describe('8-ball pool', () => {
     expect(() => eightBall.apply(missed, 1, { ...shot(180), cue: [600, 150] })).not.toThrow();
   });
 
+  it('returns the eight to the table after the break and omits it from both pot trays', () => {
+    const frame: PoolFrame = [[0, 400, 110], [1, 400, 75], [8, 400, 40], [9, 600, 160]];
+    const opening = eightBall.apply({ ...eightBall.start({}), frames: [frame] }, 0, shot(270, 0));
+    expect(opening.foul).toBe(false);
+    expect(eightBall.outcome(opening)).toBeNull();
+    const board = eightBall.board(opening, null);
+    expect(board.motion.at(-1)?.some(([id]) => id === 8)).toBe(false);
+    expect(board.balls.filter(([id]) => id === 8)).toEqual([[8, 550, 200]]);
+    expect(board.potsBySeat).toEqual([[], []]);
+    expect(eightBall.board({ ...opening, potsBySeat: [[8], []] }, null).potsBySeat).toEqual([[], []]);
+  });
+
   it('keeps touch shots soft while a medium shot can roll most of the table', () => {
     const frame: PoolFrame = [[0, 100, 200]];
     expect(shootPool(frame, 0, 5).balls[0]![1]).toBeLessThan(150);
@@ -98,7 +110,10 @@ describe('8-ball pool', () => {
 
   it('requires the opposite pocket and gives the opponent the win on an early 8 or a scratch with the 8', () => {
     const ready = { ...shotAfterBreak(straightPot(8)), solids: 0 as const, lastPocket: { solid: 4, stripe: null } };
-    expect(eightBall.outcome(eightBall.apply(ready, 0, shot()))).toMatchObject({ kind: 'win', seat: 0 });
+    const finished = eightBall.apply({ ...ready, potsBySeat: [[], [8]] }, 0, shot());
+    expect(eightBall.outcome(finished)).toMatchObject({ kind: 'win', seat: 0 });
+    expect(eightBall.board(finished, null).potsBySeat).toEqual([[8], []]);
+    expect(eightBall.board({ ...finished, potsBySeat: [[8], [8]] }, null).potsBySeat).toEqual([[8], []]);
     expect(eightBall.outcome(eightBall.apply({ ...ready, lastPocket: { solid: 3, stripe: null } }, 0, shot()))).toMatchObject({ kind: 'win', seat: 1 });
     const early = { ...ready, frames: [...ready.frames, [...straightPot(8), [1, 550, 100]] as PoolFrame] };
     expect(eightBall.outcome(eightBall.apply(early, 0, shot(270, 2)))).toMatchObject({ kind: 'win', seat: 1 });

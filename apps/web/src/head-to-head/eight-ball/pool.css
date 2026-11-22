@@ -1,5 +1,8 @@
-.pool { display: grid; gap: 8px; min-width: 0; width: min(100%, 58rem, max(14rem, calc((100svh - 15rem) * 2))); justify-self: center; }
-.pool-table { display: block; width: 100%; height: auto; border: 6px solid #604638; box-shadow: 0 0 0 1px #9f784d, 0 7px 14px #0004; border-radius: 12px; box-sizing: border-box; }
+.pool { --pool-table-ratio: calc(848 / 448); --pool-power-space: 0px; display: grid; gap: 8px; min-width: 0; width: min(100%, 58rem, max(14rem, calc((100svh - 15rem) * var(--pool-table-ratio) + var(--pool-power-space)))); justify-self: center; }
+.pool:has(.pool-power) { --pool-power-space: 52px; }
+.pool-playfield { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.pool-playfield:has(.pool-power) { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
+.pool-table { display: block; width: 100%; height: auto; box-shadow: 0 7px 14px #0004; border-radius: 10px; }
 .pool-table[data-aiming="true"] { cursor: crosshair; touch-action: none; }
 .pool-open { margin: 0; text-align: center; font-size: .875rem; color: var(--r-muted); }
 .pool-toolbar { display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: center; }
@@ -33,7 +36,20 @@
 .pool-controls label span { position: absolute; inset: 0 0 auto; display: flex; justify-content: space-between; gap: 4px; pointer-events: none; }
 .pool-controls label strong { font-variant-numeric: tabular-nums; color: var(--r-accent); }
 .room .pool-controls input.game-slider[type=range] { display: block; padding-block-start: 11px; border: 0; border-radius: 0; background: transparent; }
-.pool-power .game-slider { --slider-track-height: 8px; --slider-track-fill: linear-gradient(to right, var(--r-accent) var(--pool-power), var(--r-line) var(--pool-power)); }
+.pool-power { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; text-align: center; }
+.pool-power span { color: var(--r-text); font-size: .75rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.pool-power input.game-slider[type=range] {
+  writing-mode: vertical-lr; direction: ltr; width: 44px; height: 100%; min-height: 44px; touch-action: none;
+  --slider-track-height: 12px;
+  --slider-track-fill: linear-gradient(transparent var(--pool-power), #111722a6 var(--pool-power)),
+    repeating-linear-gradient(#0000 0 calc(25% - 1px), #181c276e calc(25% - 1px) 25%),
+    linear-gradient(#51aaff, #796eed 38%, #fdad4c 68%, #fa4b4f);
+  --slider-thumb-width: 18px; --slider-thumb-height: 9px; --slider-thumb-radius: 4px;
+  --slider-thumb-border: #2a2330; --slider-thumb-fill: #fff0cd;
+}
+.pool-power .game-slider::-webkit-slider-runnable-track { width: var(--slider-track-height); height: 100%; outline: 1px solid var(--r-muted); }
+.pool-power .game-slider::-moz-range-track { width: var(--slider-track-height); height: 100%; outline: 1px solid var(--r-muted); }
+.pool-power .game-slider::-webkit-slider-thumb { margin-top: 0; margin-left: calc((var(--slider-track-height) - var(--slider-thumb-width)) / 2); }
 .room .pool-controls button { min-height: 44px; min-width: 44px; padding: 4px 10px; }
 .pool-shot-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
 .pool-spin-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -56,12 +72,12 @@
 
 .pool-target { color: var(--r-accent); font-weight: 750; }
 .room .pool-toolbar .pool-landscape-button { display: none; }
-@media (orientation: portrait) and (max-width: 600px) {
-  .room.room-player .pool-toolbar .pool-landscape-button { display: inline-flex; }
+@media (max-width: 600px), (orientation: landscape) and (max-height: 540px) {
+  .room.room-player .pool-toolbar .pool-landscape-button { display: inline-flex; border-color: var(--r-accent); }
 }
 @media (orientation: landscape) and (max-height: 540px) {
   .room-player .pool { width: 100%; grid-template-columns: minmax(0, 1fr) minmax(150px, 31%); align-items: start; }
-  .room-player .pool-table { grid-column: 1; grid-row: 2; width: min(100%, max(11rem, calc((100svh - 13rem) * 2))); justify-self: center; }
+  .room-player .pool-playfield { grid-column: 1; grid-row: 2; width: min(100%, max(11rem, calc((100svh - 13rem) * var(--pool-table-ratio) + var(--pool-power-space)))); justify-self: center; }
   .room-player .pool-controls { grid-column: 2; grid-row: 2 / span 2; align-self: start; }
   .room-player .pool-toolbar { grid-column: 1 / -1; }
   .room-player :is(.pool-pot-trays, .pool-open, .pool-place) { grid-column: 1; }
@@ -80,20 +96,33 @@
 }
 .pool-landscape-frame {
   box-sizing: border-box; width: 100dvw; height: 100dvh; display: grid; grid-template-rows: minmax(0, 1fr);
+  container-type: size;
   align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
     max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  --pool-landscape-height: 100dvh;
 }
-.room .pool-landscape-exit { min-height: 44px; margin-inline-start: auto; }
-.room .pool-landscape-frame .pool { width: min(100%, 64rem); min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(140px, 28%); align-items: start; }
-.room .pool-landscape-frame .pool-table { grid-area: 2 / 1; width: min(100%, calc((var(--pool-landscape-height) - 10rem) * 2)); justify-self: center; }
-.room .pool-landscape-frame .pool-controls { grid-column: 2; grid-row: 2 / span 2; align-self: start; }
-.pool-landscape-frame .pool-toolbar { grid-column: 1 / -1; }
-.pool-landscape-frame :is(.pool-open, .pool-pot-trays, .pool-place) { grid-column: 1; }
+.room .pool-landscape-frame .pool {
+  width: min(100%, 72rem); height: 100%; min-height: 0;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr) minmax(160px, 23%); align-items: center;
+}
+.room .pool-landscape-frame .pool-playfield {
+  grid-area: 1 / 1; width: min(100%, calc(100cqh * var(--pool-table-ratio) + var(--pool-power-space)));
+  justify-self: center;
+}
+.pool-landscape-controls {
+  grid-area: 1 / 2; display: grid; align-content: start; gap: 8px;
+  min-width: 0; max-height: 100%; padding: 3px; box-sizing: border-box;
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.pool-landscape-controls > .pool-controls { grid-area: auto; }
+.pool-landscape-controls .pool-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+.pool-landscape-controls .pool-current { grid-area: 2 / 1 / 3 / -1; }
+.pool-landscape-controls .pool-aim-assist { justify-self: start; }
+.room .pool-landscape-controls .pool-landscape-exit { grid-area: 1 / 2; min-width: 44px; }
+.pool-landscape-controls .pool-aim { gap: 4px; }
 @media (orientation: portrait) {
   .pool-landscape-frame {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(90deg);
-    width: 100dvh; height: 100dvw; --pool-landscape-height: 100dvw;
+    width: 100dvh; height: 100dvw;
     padding: max(8px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
       max(8px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-top));
   }
@@ -122,16 +151,15 @@
 .duel-pool-playing .h2h-eight-ball { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .duel-pool-playing .h2h-eight-ball > :is(.pool, .h2h-result, .h2h-replay, .actions, button) { grid-column: 1 / -1; }
 .duel-pool-playing .h2h-title > :is(strong, .h2h-title-dot) { display: none; }
-.room-display .duel-pool-playing .pool { width: min(100%, 58rem, max(14rem, calc((100svh - 16rem) * 2))); }
+.room-display .duel-pool-playing .pool { width: min(100%, 58rem, max(14rem, calc((100svh - 16rem) * var(--pool-table-ratio)))); }
 .room-display.pool-tv {
   position: fixed; inset: 0; display: grid; place-items: center;
   padding: 12px; overflow: hidden; box-sizing: border-box; background: #121519;
 }
 .pool-tv .duel-pool-playing, .pool-tv .h2h-eight-ball { display: contents; }
-.room-display.pool-tv .pool { width: min(100%, calc((100dvh - 82px) * 2)); }
+.room-display.pool-tv .pool { width: min(100%, calc((100dvh - 82px) * var(--pool-table-ratio))); }
 .pool-tv .pool-pot-tray { background: #ffffff12; }
 .pool-tv .pool-pot-tray strong { font-size: clamp(.875rem, 1.7vw, 1.3rem); }
-.pool-tv .pool-table { border-width: clamp(5px, 1vw, 16px); }
 .pool-tv :is(.h2h-title, .h2h-turn, .pool-open, .pool-toolbar, .h2h-replay, .h2h-result) { display: none; }
 .pool-tv :is(.duel-result, .duel-tie) {
   position: absolute; inset: 16px auto auto 16px; margin: 0; padding: 6px 12px;

@@ -4,22 +4,72 @@ import { poolAimPath, poolObjectPath } from './aim.js';
 const COLORS = ['#faf8f1', '#f6c942', '#477bdd', '#df463d', '#9161cf', '#ff9d45', '#37b879', '#af424c', '#171c23'];
 export const poolBallColor = (id: number) => COLORS[id > 8 ? id - 8 : id]!;
 export type BallRotation = { phase: number; direction: number };
+export const POOL_RAIL = 24;
+export const POOL_CANVAS_WIDTH = POOL_WIDTH + POOL_RAIL * 2;
+export const POOL_CANVAS_HEIGHT = POOL_HEIGHT + POOL_RAIL * 2;
+
+function paintRails(ctx: CanvasRenderingContext2D) {
+  const rail = ctx.createLinearGradient(0, -POOL_RAIL, 0, POOL_HEIGHT + POOL_RAIL);
+  rail.addColorStop(0, '#885e4d');
+  rail.addColorStop(.5, '#4d302b');
+  rail.addColorStop(1, '#795344');
+  ctx.fillStyle = rail;
+  ctx.fillRect(-POOL_RAIL, -POOL_RAIL, POOL_CANVAS_WIDTH, POOL_CANVAS_HEIGHT);
+  ctx.strokeStyle = '#b68a70';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(2 - POOL_RAIL, 2 - POOL_RAIL, POOL_CANVAS_WIDTH - 4, POOL_CANVAS_HEIGHT - 4, 12);
+  ctx.stroke();
+
+  const cushion = (from: number, to: number) => {
+    ctx.beginPath();
+    ctx.moveTo(from, -13);
+    ctx.lineTo(to, -13);
+    ctx.lineTo(to - 9, 0);
+    ctx.lineTo(from + 9, 0);
+    ctx.closePath();
+    ctx.fillStyle = '#104b40';
+    ctx.fill();
+    ctx.strokeStyle = '#35927a';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#dec4a4';
+    ctx.beginPath();
+    const middle = (from + to) / 2;
+    ctx.moveTo(middle, -22);
+    ctx.lineTo(middle + 4, -18);
+    ctx.lineTo(middle, -14);
+    ctx.lineTo(middle - 4, -18);
+    ctx.fill();
+  };
+  for (const [x, y, angle] of [[0, 0, 0], [POOL_WIDTH, POOL_HEIGHT, Math.PI], [0, POOL_HEIGHT, -Math.PI / 2], [POOL_WIDTH, 0, Math.PI / 2]] as const) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    if (angle === 0 || angle === Math.PI) {
+      cushion(14, POOL_WIDTH / 2 - 13);
+      cushion(POOL_WIDTH / 2 + 13, POOL_WIDTH - 14);
+    } else cushion(14, POOL_HEIGHT - 14);
+    ctx.restore();
+  }
+}
 
 export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, options: {
   aim?: { angle: number; power: number } | undefined; eightPocket?: number | null; placing?: boolean;
+  strike?: { angle: number; power: number; progress: number } | undefined; respottedEight?: boolean;
   rotations?: ReadonlyMap<number, BallRotation>;
   target?: PoolTarget | null; objectGuide?: boolean; start?: ResolvedPoolStart;
   sinking?: ReadonlyMap<number, number> | undefined;
 } = {}) {
-  const { aim, eightPocket, placing, target, objectGuide, start = DEFAULT_POOL_START } = options;
+  const { aim, strike, eightPocket, placing, target, objectGuide, start = DEFAULT_POOL_START } = options;
+  ctx.save();
+  ctx.translate(POOL_RAIL, POOL_RAIL);
+  paintRails(ctx);
   const felt = ctx.createLinearGradient(0, 0, POOL_WIDTH, POOL_HEIGHT);
   felt.addColorStop(0, '#28886c');
   felt.addColorStop(1, '#155745');
   ctx.fillStyle = felt;
   ctx.fillRect(0, 0, POOL_WIDTH, POOL_HEIGHT);
-  ctx.strokeStyle = '#104b3e';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(2.5, 2.5, POOL_WIDTH - 5, POOL_HEIGHT - 5);
   const startingLine = poolStartX(start);
   if (placing) {
     const left = start.side === 'left';
@@ -34,24 +84,17 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
   ctx.lineTo(startingLine, POOL_HEIGHT - 7);
   ctx.stroke();
   ctx.setLineDash([]);
-  for (const [index, [px, py]] of POOL_POCKETS.entries()) {
-    // Move the visible pocket rim slightly inside the rail so the corner openings read clearly.
-    const x = Math.max(6, Math.min(POOL_WIDTH - 6, px));
-    const y = Math.max(5, Math.min(POOL_HEIGHT - 5, py));
+  for (const [index, [x, y]] of POOL_POCKETS.entries()) {
     ctx.beginPath();
-    ctx.arc(x, y, POCKET_RADIUS + 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#101b1c';
-    ctx.fill();
-    ctx.strokeStyle = index === eightPocket ? '#ffda72' : '#ad8867';
-    ctx.lineWidth = index === eightPocket ? 5 : 3;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(x, y, POCKET_RADIUS - 5, 0, Math.PI * 2);
-    const pocket = ctx.createRadialGradient(x, y, 1, x, y, POCKET_RADIUS - 4);
-    pocket.addColorStop(0, '#020506');
-    pocket.addColorStop(1, '#141f1e');
+    ctx.arc(x, y, POCKET_RADIUS - 2, 0, Math.PI * 2);
+    const pocket = ctx.createRadialGradient(x, y, 2, x, y, POCKET_RADIUS - 2);
+    pocket.addColorStop(.55, '#070b0b');
+    pocket.addColorStop(1, '#22302b');
     ctx.fillStyle = pocket;
     ctx.fill();
+    ctx.strokeStyle = index === eightPocket ? '#ffda72' : '#382925';
+    ctx.lineWidth = index === eightPocket ? 4 : 2;
+    ctx.stroke();
   }
 
   const cue = balls.find(([id]) => id === 0);
@@ -63,34 +106,50 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     const { distance, hit } = poolAimPath(cue, dx, dy, balls);
     const contactX = x + dx * distance;
     const contactY = y + dy * distance;
-    ctx.strokeStyle = '#f8f5db';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([6, 7]);
+    const legal = !hit || !target || isLegalPoolContact(target, hit[0]);
+    ctx.save();
+    ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(x + dx * Math.min(11, distance), y + dy * Math.min(11, distance));
     ctx.lineTo(contactX, contactY);
-    ctx.stroke();
-    ctx.setLineDash([]);
     if (hit) {
-      const legal = !target || isLegalPoolContact(target, hit[0]);
-      ctx.strokeStyle = legal ? '#f8f5db' : '#ff9d91';
-      ctx.beginPath();
-      ctx.arc(contactX, contactY, BALL_RADIUS, 0, Math.PI * 2);
-      ctx.stroke();
       const path = objectGuide ? poolObjectPath(hit, contactX, contactY, balls) : null;
-      if (path && path.distance > BALL_RADIUS + 2) {
+      if (path) {
         const [, bx, by] = hit;
-        ctx.strokeStyle = legal ? '#9ef6e1' : '#ff9d91';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([12, 5]);
-        ctx.beginPath();
-        ctx.moveTo(bx + path.dx * (BALL_RADIUS + 2), by + path.dy * (BALL_RADIUS + 2));
-        ctx.lineTo(bx + path.dx * path.distance, by + path.dy * path.distance);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        if (path.distance > BALL_RADIUS + 2) {
+          ctx.moveTo(bx + path.dx * BALL_RADIUS, by + path.dy * BALL_RADIUS);
+          ctx.lineTo(bx + path.dx * path.distance, by + path.dy * path.distance);
+        }
+        // The short cue-ball guide shows the tangent for a cut without spin.
+        const cut = dx * -path.dy + dy * path.dx;
+        if (Math.abs(cut) > .12) {
+          const tx = -path.dy * Math.sign(cut), ty = path.dx * Math.sign(cut);
+          const length = Math.min(12 + 48 * Math.abs(cut), poolAimPath([0, contactX, contactY], tx, ty, balls).distance);
+          if (length > BALL_RADIUS) {
+            ctx.moveTo(contactX + tx * BALL_RADIUS, contactY + ty * BALL_RADIUS);
+            ctx.lineTo(contactX + tx * length, contactY + ty * length);
+          }
+        }
       }
+      ctx.moveTo(contactX + BALL_RADIUS, contactY);
+      ctx.arc(contactX, contactY, BALL_RADIUS, 0, Math.PI * 2);
     }
-    const pull = 17 + aim.power * .6;
+    ctx.strokeStyle = '#122725';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = legal ? '#fff7dd' : '#ff9d91';
+    ctx.lineWidth = 2.3;
+    ctx.stroke();
+    ctx.restore();
+  }
+  const cueAction = strike ?? aim;
+  if (cueAction && cue) {
+    const radians = cueAction.angle * Math.PI / 180;
+    const dx = Math.cos(radians), dy = Math.sin(radians);
+    const [, x, y] = cue;
+    const gap = 17 + cueAction.power * .6 - BALL_RADIUS;
+    const pull = BALL_RADIUS + gap * (1 - (strike?.progress ?? 0)) ** 2;
+    ctx.save();
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#e8ba83';
     ctx.lineWidth = 5;
@@ -98,11 +157,11 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     ctx.moveTo(x - dx * pull, y - dy * pull);
     ctx.lineTo(x - dx * (pull + 145), y - dy * (pull + 145));
     ctx.stroke();
-    ctx.lineCap = 'butt';
+    ctx.restore();
   }
-  if (target && target !== 'break' && target !== 'open') {
+  if (target || options.respottedEight) {
     for (const [id, x, y] of balls) {
-      if (!isLegalPoolContact(target, id)) continue;
+      if (!(options.respottedEight && id === 8) && (!target || target === 'break' || target === 'open' || !isLegalPoolContact(target, id))) continue;
       ctx.beginPath();
       ctx.arc(x, y, BALL_RADIUS + 3.5, 0, Math.PI * 2);
       ctx.strokeStyle = '#182d29';
@@ -167,4 +226,5 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     }
     ctx.restore();
   }
+  ctx.restore();
 }

@@ -26,6 +26,15 @@ const other = (seat: Seat): Seat => seat === 0 ? 1 : 0;
 const current = (data: Pool) => data.frames.at(-1)!;
 const atLimit = (data: Pool) => data.frames.length > POOL_MAX_SHOTS;
 
+function pottedBallsBySeat(data: Pool): [number[], number[]] {
+  const [a, b] = data.potsBySeat ?? [[], []];
+  // Older saves recorded the break-shot 8 even though it was returned to play.
+  const eightPottedBy = data.ending && data.winner !== null
+    ? data.ending === 'clean' ? data.winner : other(data.winner)
+    : null;
+  return [eightPottedBy === 0 ? a : a.filter(id => id !== 8), eightPottedBy === 1 ? b : b.filter(id => id !== 8)];
+}
+
 function spot(balls: PoolFrame, id: 0 | 8, start: ResolvedPoolStart): PoolFrame {
   const fromEdge = (x: number) => start.side === 'right' ? POOL_WIDTH - x : x;
   const preferred = id === 0 ? poolStartX(start) : fromEdge(550);
@@ -111,15 +120,16 @@ export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
     const scratches: [number, number] = [...(data.scratches ?? [0, 0])];
     if (!opening && !foul) pots[seat] += shot.pocketed.filter(({ id }) => poolGroup(id) !== null).length;
     if (scratch) scratches[seat]++;
-    const potsBySeat: [number[], number[]] = [...(data.potsBySeat ?? [[], []])];
-    potsBySeat[seat] = [...new Set([...potsBySeat[seat], ...shot.pocketed.filter(({ id }) => id !== 0).map(({ id }) => id)])];
+    const potsBySeat = pottedBallsBySeat(data);
+    const keptPots = shot.pocketed.filter(({ id }) => id !== 0 && !(opening && id === 8));
+    potsBySeat[seat] = [...new Set([...potsBySeat[seat], ...keptPots.map(({ id }) => id)])];
     return { ...data, frames: [...data.frames, balls], motion: shot.motion, winner, ending, solids, foul, lastPocket, pots, scratches, potsBySeat,
       ballInHand: foul && winner === null, turn: keepTurn ? seat : other(seat) };
   },
   outcome: data => data.winner === null ? (data.timedOut || atLimit(data) ? { kind: 'draw' } : null) : { kind: 'win', seat: data.winner, reason: 'played' },
   board: data => ({ game: 'eight-ball', balls: current(data), motion: data.motion, solids: data.solids,
     ballInHand: data.ballInHand, foul: data.foul, shot: data.frames.length - 1,
-    start: data.start ?? DEFAULT_POOL_START, potsBySeat: data.potsBySeat ?? [[], []],
+    start: data.start ?? DEFAULT_POOL_START, potsBySeat: pottedBallsBySeat(data),
     eightPocket: eightBall.outcome(data) ? null : targetPocket(data, data.turn), ending: data.ending }),
   replay: data => ({ game: 'eight-ball', frames: data.frames }),
 };

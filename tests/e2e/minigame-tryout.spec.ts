@@ -186,7 +186,7 @@ test('8-ball free play lets one phone shoot for both sides in landscape', async 
   const phone = page.frameLocator('iframe[title="Phone of Player 1"]');
   const host = page.frameLocator('iframe[title="Host screen"]');
   const hostTable = host.getByRole('img', { name: 'Pool table' });
-  await phone.getByRole('button', { name: 'Landscape mode', exact: true }).click();
+  await phone.getByRole('button', { name: 'Rotate table', exact: true }).click();
   const landscape = phone.getByRole('dialog', { name: 'Pool table' });
   const shoot = landscape.getByRole('button', { name: 'Shoot', exact: true });
   const aim = landscape.getByRole('slider', { name: 'Aim' });

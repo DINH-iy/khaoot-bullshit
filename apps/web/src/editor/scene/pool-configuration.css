@@ -14,7 +14,7 @@
 .pool-configuration-tabs button { flex: 1; }
 .pool-config-table {
   display: block; width: min(100%, 380px); height: auto; margin-inline: auto;
-  border: 5px solid #604638; border-radius: 12px; box-sizing: border-box;
+  border-radius: 8px;
 }
 .pool-configuration .ed-unit { max-width: 55%; }
 .pool-configuration .ed-unit input { min-width: 0; width: 6rem; }
