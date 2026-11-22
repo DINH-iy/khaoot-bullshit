@@ -401,9 +401,15 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     socket.on('room.command', (input: unknown, ack: unknown) => {
       if (typeof ack !== 'function') return;
       if (commanding) { ack({ ok: false, error: { code: 'RATE_LIMITED' } }); return; } commanding = true;
-      void (async () => { const principal = await current(); roomAssert(input && typeof input === 'object' && (input as { sessionId?: string }).sessionId === id, 'FORBIDDEN'); const type = (input as { type?: string }).type;
+      void (async () => { const principal = await current(); roomAssert(input && typeof input === 'object' && (input as { sessionId?: string }).sessionId === id, 'FORBIDDEN');
+        const { type, move } = input as { type?: string; move?: { game?: string } };
         const delegated = principal.role === 'player' && (HOST_PHONE_COMMANDS as readonly string[]).includes(type ?? '');
-        return service.execute(delegated ? await hostPhoneActor(principal) : principal.actor, input); })()
+        const receipt = await service.execute(delegated ? await hostPhoneActor(principal) : principal.actor, input);
+        // The outbox remains the durable fallback. Watching clients can fetch this committed shot immediately.
+        if (type === 'duel.move' && move?.game === 'eight-ball') {
+          socket.to(`session:${id}`).emit('room.pool-shot', { formatVersion: 1, type: 'session.changed', sessionId: id, revision: receipt.revision });
+        }
+        return receipt; })()
         .then(data => ack({ ok: true, data })).catch(error => ack(failure(error))).finally(() => { commanding = false; });
     });
     socket.on('room.receipt', (input: unknown, ack: unknown) => {

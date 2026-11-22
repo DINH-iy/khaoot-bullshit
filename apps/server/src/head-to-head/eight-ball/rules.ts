@@ -1,12 +1,12 @@
 import { randomInt } from 'node:crypto';
 import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, oppositePoolPocket, POOL_HEIGHT, POOL_MAX_SHOTS, POOL_WIDTH,
-  poolGroup, poolLegalTarget, isLegalPoolContact, poolPositionClear, poolStartX, rackPool, type HeadToHeadView, type PoolBallBehavior, type PoolFrame, type ResolvedPoolStart } from '@party/contracts';
+  poolGroup, poolLegalTarget, isLegalPoolContact, poolPositionClear, poolStartX, rackPool, shootPool, type PoolImpact, type HeadToHeadView, type PoolBallBehavior, type PoolFrame, type ResolvedPoolStart } from '@party/contracts';
 import { illegal, type HeadToHeadRules, type Seat } from '../engine.js';
-import { shootPool } from './physics.js';
 
 interface Pool {
   frames: PoolFrame[];
   motion: PoolFrame[];
+  impacts?: PoolImpact[];
   turn: Seat;
   solids: Seat | null;
   ballInHand: boolean;
@@ -123,12 +123,13 @@ export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
     const potsBySeat = pottedBallsBySeat(data);
     const keptPots = shot.pocketed.filter(({ id }) => id !== 0 && !(opening && id === 8));
     potsBySeat[seat] = [...new Set([...potsBySeat[seat], ...keptPots.map(({ id }) => id)])];
-    return { ...data, frames: [...data.frames, balls], motion: shot.motion, winner, ending, solids, foul, lastPocket, pots, scratches, potsBySeat,
+    return { ...data, frames: [...data.frames, balls], motion: shot.motion, impacts: shot.impacts, winner, ending, solids, foul, lastPocket, pots, scratches, potsBySeat,
       ballInHand: foul && winner === null, turn: keepTurn ? seat : other(seat) };
   },
   outcome: data => data.winner === null ? (data.timedOut || atLimit(data) ? { kind: 'draw' } : null) : { kind: 'win', seat: data.winner, reason: 'played' },
   board: data => ({ game: 'eight-ball', balls: current(data), motion: data.motion, solids: data.solids,
     ballInHand: data.ballInHand, foul: data.foul, shot: data.frames.length - 1,
+    ...(data.ballBehavior ? { ballBehavior: data.ballBehavior } : {}), ...(data.impacts ? { impacts: data.impacts } : {}),
     start: data.start ?? DEFAULT_POOL_START, potsBySeat: pottedBallsBySeat(data),
     eightPocket: eightBall.outcome(data) ? null : targetPocket(data, data.turn), ending: data.ending }),
   replay: data => ({ game: 'eight-ball', frames: data.frames }),

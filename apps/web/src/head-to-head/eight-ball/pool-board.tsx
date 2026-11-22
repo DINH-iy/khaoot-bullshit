@@ -1,8 +1,10 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, poolLegalTarget, POOL_AIM_STEP, POOL_POCKETS, type HeadToHeadMove, type HeadToHeadView, type PoolFrame, type PoolSpin } from '@party/contracts';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, poolLegalTarget, POOL_AIM_STEP, shootPool, type HeadToHeadMove, type HeadToHeadView, type PoolFrame, type PoolSpin } from '@party/contracts';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { usePoolLandscape } from './landscape.js';
-import { paintPool, POOL_CANVAS_HEIGHT, POOL_CANVAS_WIDTH, POOL_RAIL, type BallRotation } from './table.js';
+import { paintPool, POOL_CANVAS_HEIGHT, POOL_CANVAS_WIDTH, POOL_RAIL } from './table.js';
+import { usePoolPlayback, type PredictedPoolShot } from './playback.js';
+import { unlockSound } from '../../room-extras/celebrate.js';
 import { PotTrays } from './pot-trays.js';
 import { FaIcon } from '../../presentation/icons.js';
 import { PoolSpinButton, PoolSpinPicker } from './spin-picker.js';
@@ -37,8 +39,7 @@ const RESPOT_TEXT = defineTexts('pool-respot', { eight: '8 ball returned to the 
 
 type PoolView = Extract<HeadToHeadView['board'], { game: 'eight-ball' }>;
 type Shot = Extract<HeadToHeadMove, { game: 'eight-ball' }>;
-const FRAME_MS = 1000 / 15;
-const STRIKE_MS = 130;
+const STRIKE_MS = 65;
 const POCKET_NAMES = ['topLeft', 'topMiddle', 'topRight', 'bottomLeft', 'bottomMiddle', 'bottomRight'] as const;
 const angleOf = (angle: number) => (Math.round(angle / POOL_AIM_STEP) * POOL_AIM_STEP + 360) % 360;
 const powerFromPull = (distance: number) => Math.max(1, Math.min(100, Math.round(distance / 1.45)));
@@ -52,7 +53,6 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
   const respotText = useTexts(RESPOT_TEXT);
   const orientation = usePoolLandscape();
   const canvas = useRef<HTMLCanvasElement>(null);
-  const rotations = useRef(new Map<number, BallRotation>());
   const lastShot = useRef(board.shot);
   const pulling = useRef(false);
   const startArea = board.start ?? DEFAULT_POOL_START;
@@ -65,15 +65,16 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
   const [spin, setSpin] = useState<PoolSpin>([0, 0]);
   const [editingSpin, setEditingSpin] = useState(false);
   const [cue, setCue] = useState<Shot['cue']>();
-  const [roll, setRoll] = useState<{ shot: number; balls: PoolFrame; sinking?: Map<number, number> }>();
+  const [prediction, setPrediction] = useState<PredictedPoolShot>();
+  const { roll, rotations, shownPots } = usePoolPlayback(board, prediction);
   const [strike, setStrike] = useState<{ angle: number; power: number; shot: number; start: number }>();
   const [strikeProgress, setStrikeProgress] = useState(0);
-  const [shownPots, setShownPots] = useState<PoolView['potsBySeat']>(board.potsBySeat);
-  const rolling = roll?.shot === board.shot;
+  const waitingForShot = prediction?.shot === board.shot + 1;
+  const rolling = Boolean(roll && (roll.shot === board.shot || waitingForShot && roll.shot === prediction?.shot));
   const striking = strike && (strike.shot === board.shot || strike.shot === board.shot - 1) ? strike : undefined;
-  const ready = canMove && view.turn === view.seat && !rolling && !striking;
-  const balls = roll?.shot === board.shot ? roll.balls : board.balls;
-  const placement = (ready || strike?.shot === board.shot) && board.ballInHand ? cue : undefined;
+  const ready = canMove && view.turn === view.seat && !rolling && !striking && !waitingForShot;
+  const balls = rolling && roll ? roll.balls : board.balls;
+  const placement = ready && board.ballInHand ? cue : undefined;
   const table = placement ? balls.map((ball): PoolFrame[number] => ball[0] === 0 ? [0, ...placement] : ball) : balls;
   const target = !rolling && (view.turn === 0 || view.turn === 1) ? poolLegalTarget(board.balls,
     board.solids === null ? null : board.solids === view.turn ? 'solid' : 'stripe', board.shot === 0) : null;
@@ -100,52 +101,23 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
     setPlacing(false);
     setSpin([0, 0]);
     setEditingSpin(false);
-    setRoll(undefined);
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches || board.motion.length < 2) { setShownPots(board.potsBySeat); return; }
-    // An early reply waits for the local cue to reach the ball before playback starts.
-    const start = Math.max(performance.now(), strike?.shot === board.shot - 1 ? strike.start + STRIKE_MS : 0);
-    const frameMs = Math.min(FRAME_MS, 4600 / (board.motion.length - 1));
-    let previous = new Map(board.motion[0]!.map(ball => [ball[0], ball]));
-    const rotateBalls = (next: PoolFrame) => {
-      for (const ball of next) {
-        const [id, x, y] = ball;
-        const before = previous.get(id);
-        if (!before) continue;
-        const dx = x - before[1], dy = y - before[2];
-        const distance = Math.hypot(dx, dy);
-        if (distance < .04) continue;
-        const old = rotations.current.get(id);
-        rotations.current.set(id, { phase: ((old?.phase ?? 0) + distance / BALL_RADIUS) % (Math.PI * 2), direction: Math.atan2(dy, dx) });
-      }
-      previous = new Map(next.map(ball => [ball[0], ball]));
-    };
-    let frame = 0;
-    const advance = (time: number) => {
-      if (time < start) { frame = requestAnimationFrame(advance); return; }
-      const position = (time - start) / frameMs;
-      const index = Math.floor(position);
-      const next = board.motion[index + 1];
-      if (!next) { rotateBalls(board.motion.at(-1)!); setShownPots(board.potsBySeat); setRoll(undefined); return; }
-      const fraction = position - index;
-      const to = new Map(next.map(ball => [ball[0], ball]));
-      const sinking = new Map<number, number>();
-      const picture: PoolFrame = board.motion[index]!.map(([id, x, y]) => {
-        const ball = to.get(id);
-        if (ball) return [id, x + (ball[1] - x) * fraction, y + (ball[2] - y) * fraction];
-        const [px, py] = POOL_POCKETS.reduce((nearest, pocket) =>
-          Math.hypot(pocket[0] - x, pocket[1] - y) < Math.hypot(nearest[0] - x, nearest[1] - y) ? pocket : nearest);
-        sinking.set(id, 1 - fraction);
-        return [id, x + (px - x) * fraction, y + (py - y) * fraction];
-      });
-      rotateBalls(picture);
-      setRoll({ shot: board.shot, balls: picture, sinking });
-      frame = requestAnimationFrame(advance);
-    };
-    setRoll({ shot: board.shot, balls: board.motion[0]! });
-    frame = requestAnimationFrame(advance);
-    return () => cancelAnimationFrame(frame);
-  // The motion belongs to this shot. Room snapshots can replace the board during playback.
   }, [board.shot]);
+
+  useLayoutEffect(() => {
+    if (waitingForShot && (canMove || view.outcome)) {
+      setPrediction(undefined);
+      setStrike(undefined);
+    }
+  }, [waitingForShot, canMove, view.outcome]);
+
+  useEffect(() => {
+    window.addEventListener('pointerup', unlockSound, { once: true });
+    window.addEventListener('keydown', unlockSound, { once: true });
+    return () => {
+      window.removeEventListener('pointerup', unlockSound);
+      window.removeEventListener('keydown', unlockSound);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const ctx = canvas.current?.getContext('2d');
@@ -180,12 +152,16 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel }: 
   };
   const sendShot = (shotAngle: number, shotPower: number) => {
     if (!ready || placing) return;
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setStrikeProgress(0);
-      setStrike({ angle: shotAngle, power: shotPower, shot: board.shot, start: performance.now() });
-    }
+    unlockSound();
     onMove({ game: 'eight-ball', angle: shotAngle, power: shotPower, shot: board.shot, ...(placement ? { cue: placement } : {}),
       ...(spin[0] || spin[1] ? { spin } : {}) });
+    if (white && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const start = performance.now();
+      const resolved = shootPool(table, shotAngle, shotPower, board.ballBehavior, spin[0] || spin[1] ? spin : undefined);
+      setPrediction({ shot: board.shot + 1, motion: resolved.motion, impacts: resolved.impacts, start: start + STRIKE_MS });
+      setStrikeProgress(0);
+      setStrike({ angle: shotAngle, power: shotPower, shot: board.shot, start });
+    }
   };
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
     if (!ready || editingSpin || event.button !== 0 || !event.isPrimary) return;

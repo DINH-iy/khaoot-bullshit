@@ -4,9 +4,15 @@ import { poolAimPath, poolObjectPath } from './aim.js';
 const COLORS = ['#faf8f1', '#f6c942', '#477bdd', '#df463d', '#9161cf', '#ff9d45', '#37b879', '#af424c', '#171c23'];
 export const poolBallColor = (id: number) => COLORS[id > 8 ? id - 8 : id]!;
 export type BallRotation = { phase: number; direction: number };
-export const POOL_RAIL = 24;
+export const POOL_RAIL = 40;
 export const POOL_CANVAS_WIDTH = POOL_WIDTH + POOL_RAIL * 2;
 export const POOL_CANVAS_HEIGHT = POOL_HEIGHT + POOL_RAIL * 2;
+
+export function poolPocketCenter(index: number): readonly [number, number] {
+  const [x, y] = POOL_POCKETS[index]!;
+  const side = x === POOL_WIDTH / 2;
+  return [side ? x : x === 0 ? -17 : x + 17, y + (y === 0 ? -1 : 1) * (side ? 20 : 17)];
+}
 
 function paintRails(ctx: CanvasRenderingContext2D) {
   const rail = ctx.createLinearGradient(0, -POOL_RAIL, 0, POOL_HEIGHT + POOL_RAIL);
@@ -84,10 +90,24 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
   ctx.lineTo(startingLine, POOL_HEIGHT - 7);
   ctx.stroke();
   ctx.setLineDash([]);
-  for (const [index, [x, y]] of POOL_POCKETS.entries()) {
+  for (const [index, [mouthX, mouthY]] of POOL_POCKETS.entries()) {
+    const [x, y] = poolPocketCenter(index);
+    const side = mouthX === POOL_WIDTH / 2;
+    const radius = side ? POCKET_RADIUS - 4 : POCKET_RADIUS - 1;
+    if (side) {
+      const direction = mouthY === 0 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(x - 12, mouthY);
+      ctx.lineTo(x + 12, mouthY);
+      ctx.lineTo(x + 17, mouthY + direction * 13);
+      ctx.lineTo(x - 17, mouthY + direction * 13);
+      ctx.closePath();
+      ctx.fillStyle = '#183c34';
+      ctx.fill();
+    }
     ctx.beginPath();
-    ctx.arc(x, y, POCKET_RADIUS - 2, 0, Math.PI * 2);
-    const pocket = ctx.createRadialGradient(x, y, 2, x, y, POCKET_RADIUS - 2);
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    const pocket = ctx.createRadialGradient(x, y, 2, x, y, radius);
     pocket.addColorStop(.55, '#070b0b');
     pocket.addColorStop(1, '#22302b');
     ctx.fillStyle = pocket;

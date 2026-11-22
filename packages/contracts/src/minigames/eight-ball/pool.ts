@@ -18,6 +18,7 @@ export const POOL_POCKETS = [0, POOL_HEIGHT].flatMap(y => [0, POOL_WIDTH / 2, PO
 export const oppositePoolPocket = (pocket: number) => POOL_POCKETS.length - 1 - pocket;
 export const POOL_MAX_SHOTS = 160;
 export const POOL_MAX_MOTION_FRAMES = 181;
+export const POOL_STEPS_PER_FRAME = 8;
 export const POOL_AIM_STEP = .25;
 export const POOL_MATCH_MAX_SECONDS = 3600;
 export const PoolMatchSecondsSchema = z.number().int().min(1).max(POOL_MATCH_MAX_SECONDS);
@@ -46,6 +47,8 @@ export const PoolPositionSchema = z.tuple([z.number().int().min(BALL_RADIUS).max
 const Ball = z.tuple([z.number().int().min(0).max(15), z.number().min(0).max(POOL_WIDTH), z.number().min(0).max(POOL_HEIGHT)]);
 export const PoolFrameSchema = z.array(Ball).max(16);
 export type PoolFrame = z.infer<typeof PoolFrameSchema>;
+const PoolImpactSchema = z.tuple([z.number().int().min(1).max((POOL_MAX_MOTION_FRAMES - 1) * POOL_STEPS_PER_FRAME), z.number().int().min(1).max(100)]);
+export type PoolImpact = z.infer<typeof PoolImpactSchema>;
 export type PoolBall = z.infer<typeof Ball>;
 export function rackPool(start: ResolvedPoolStart = DEFAULT_POOL_START): PoolFrame {
   const rack = [[1], [9, 2], [3, 8, 10], [11, 4, 12, 5], [13, 6, 14, 7, 15]];
@@ -65,6 +68,8 @@ export const PoolBoardSchema = z.strictObject({
   eightPocket: z.number().int().min(0).max(5).nullable(),
   ending: z.enum(['early', 'scratch', 'wrong-pocket', 'foul', 'clean']).nullable(),
   motion: z.array(PoolFrameSchema).max(POOL_MAX_MOTION_FRAMES),
+  impacts: z.array(PoolImpactSchema).max(POOL_MAX_MOTION_FRAMES - 1).optional(),
+  ballBehavior: PoolBallBehaviorSchema.optional(),
   start: ResolvedPoolStartSchema.optional(),
   potsBySeat: z.tuple([z.array(z.number().int().min(1).max(15)).max(15), z.array(z.number().int().min(1).max(15)).max(15)]).optional(),
 });

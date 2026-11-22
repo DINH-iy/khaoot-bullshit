@@ -1,4 +1,4 @@
-.pool { --pool-table-ratio: calc(848 / 448); --pool-power-space: 0px; display: grid; gap: 8px; min-width: 0; width: min(100%, 58rem, max(14rem, calc((100svh - 15rem) * var(--pool-table-ratio) + var(--pool-power-space)))); justify-self: center; }
+.pool { --pool-table-ratio: calc(880 / 480); --pool-power-space: 0px; display: grid; gap: 8px; min-width: 0; width: min(100%, 58rem, max(14rem, calc((100svh - 15rem) * var(--pool-table-ratio) + var(--pool-power-space)))); justify-self: center; }
 .pool:has(.pool-power) { --pool-power-space: 52px; }
 .pool-playfield { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .pool-playfield:has(.pool-power) { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
@@ -157,7 +157,7 @@
   padding: 12px; overflow: hidden; box-sizing: border-box; background: #121519;
 }
 .pool-tv .duel-pool-playing, .pool-tv .h2h-eight-ball { display: contents; }
-.room-display.pool-tv .pool { width: min(100%, calc((100dvh - 82px) * var(--pool-table-ratio))); }
+.room-display.pool-tv .pool { width: min(100%, calc((100dvh - 76px) * var(--pool-table-ratio))); }
 .pool-tv .pool-pot-tray { background: #ffffff12; }
 .pool-tv .pool-pot-tray strong { font-size: clamp(.875rem, 1.7vw, 1.3rem); }
 .pool-tv :is(.h2h-title, .h2h-turn, .pool-open, .pool-toolbar, .h2h-replay, .h2h-result) { display: none; }

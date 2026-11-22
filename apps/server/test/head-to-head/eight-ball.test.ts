@@ -1,7 +1,6 @@
-import { HeadToHeadViewSchema, type PoolFrame } from '@party/contracts';
+import { HeadToHeadViewSchema, shootPool, type PoolFrame } from '@party/contracts';
 import { describe, expect, it } from 'vitest';
 import { eightBall, finishPoolOnTime, settlePoolTie } from '../../src/head-to-head/eight-ball/rules.js';
-import { shootPool } from '../../src/head-to-head/eight-ball/physics.js';
 import { matchView, playMove, startMatch } from '../../src/head-to-head/match.js';
 
 const shot = (angle = 270, index = 1) => ({ game: 'eight-ball' as const, angle, power: 60, shot: index });
@@ -22,6 +21,7 @@ describe('8-ball pool', () => {
     if (player.board.game !== 'eight-ball') throw new Error('Wrong board');
     expect(player.board.motion.length).toBeGreaterThan(2);
     expect(player.board.motion[0]).not.toEqual(player.board.balls);
+    expect(player.board.impacts?.length).toBeGreaterThan(0);
     expect(player.board.solids).toBeNull();
   });
 
@@ -70,7 +70,9 @@ describe('8-ball pool', () => {
   it('keeps touch shots soft while a medium shot can roll most of the table', () => {
     const frame: PoolFrame = [[0, 100, 200]];
     expect(shootPool(frame, 0, 5).balls[0]![1]).toBeLessThan(150);
-    expect(shootPool(frame, 0, 35).balls[0]![1]).toBeGreaterThan(650);
+    const railShot = shootPool(frame, 0, 35);
+    expect(railShot.balls[0]![1]).toBeGreaterThan(650);
+    expect(railShot.impacts).toEqual([]);
   });
 
   it('changes both roll distance and settling time with cloth choice, including custom resistance', () => {

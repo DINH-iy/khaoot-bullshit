@@ -1,7 +1,7 @@
-import { BALL_RADIUS, POCKET_RADIUS, POOL_BALL_PRESETS, POOL_HEIGHT, POOL_MAX_MOTION_FRAMES, POOL_POCKETS, POOL_WIDTH, type PoolBallBehavior, type PoolFrame, type PoolSpin } from '@party/contracts';
+import { BALL_RADIUS, POCKET_RADIUS, POOL_BALL_PRESETS, POOL_HEIGHT, POOL_MAX_MOTION_FRAMES, POOL_POCKETS, POOL_WIDTH, POOL_STEPS_PER_FRAME, type PoolImpact, type PoolBallBehavior, type PoolFrame, type PoolSpin } from './pool.js';
 
 const RATE = 120;
-const SAMPLE_INTERVAL = 8;
+const SAMPLE_INTERVAL = POOL_STEPS_PER_FRAME;
 const MAX_STEPS = (POOL_MAX_MOTION_FRAMES - 1) * SAMPLE_INTERVAL;
 const DIAMETER = BALL_RADIUS * 2;
 type Ball = { id: number; x: number; y: number; vx: number; vy: number };
@@ -10,7 +10,7 @@ function collide(a: Ball, b: Ball) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const distance = Math.hypot(dx, dy);
-  if (distance >= DIAMETER || distance === 0) return false;
+  if (distance >= DIAMETER || distance === 0) return 0;
   const nx = dx / distance;
   const ny = dy / distance;
   const overlap = (DIAMETER - distance) / 2;
@@ -19,12 +19,12 @@ function collide(a: Ball, b: Ball) {
   b.x += overlap * nx;
   b.y += overlap * ny;
   const impulse = ((a.vx - b.vx) * nx + (a.vy - b.vy) * ny) * .97;
-  if (impulse <= 0) return false;
+  if (impulse <= 0) return 0;
   a.vx -= impulse * nx;
   a.vy -= impulse * ny;
   b.vx += impulse * nx;
   b.vy += impulse * ny;
-  return true;
+  return impulse;
 }
 
 function cushion(ball: Ball, bounce: number, sideSpin: number) {
@@ -50,6 +50,7 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
   cue.vy = Math.sin(radians) * speed;
   const picture = (): PoolFrame => moving.map(({ id, x, y }) => [id, Math.round(x), Math.round(y)]);
   const motion: PoolFrame[] = [picture()];
+  const impacts = new Map<number, PoolImpact>();
   const pocketed: { id: number; pocket: number }[] = [];
   let firstHit: number | null = null;
   const table = behavior?.preset === 'custom' ? behavior : POOL_BALL_PRESETS[behavior?.preset ?? 'arcade'];
@@ -84,7 +85,14 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
         const cueContact = firstHit === null && (a.id === 0 || b.id === 0);
         const vx = cueContact ? cue.vx : 0;
         const vy = cueContact ? cue.vy : 0;
-        if (collide(a, b) && cueContact) {
+        const impulse = collide(a, b);
+        if (impulse >= 15) {
+          const interval = Math.ceil(step / SAMPLE_INTERVAL);
+          const strength = Math.min(100, Math.max(1, Math.round(impulse / 10)));
+          const strongest = impacts.get(interval);
+          if (!strongest || strength > strongest[1]) impacts.set(interval, [step, strength]);
+        }
+        if (impulse && cueContact) {
           firstHit = a.id === 0 ? b.id : a.id;
           cue.vx += vx * spinKick;
           cue.vy += vy * spinKick;
@@ -98,5 +106,5 @@ export function shootPool(frame: PoolFrame, angle: number, power: number, behavi
   const balls = picture();
   if (motion.length < POOL_MAX_MOTION_FRAMES) motion.push(balls);
   else motion[motion.length - 1] = balls;
-  return { balls, motion, pocketed, firstHit };
+  return { balls, motion, impacts: [...impacts.values()], pocketed, firstHit };
 }

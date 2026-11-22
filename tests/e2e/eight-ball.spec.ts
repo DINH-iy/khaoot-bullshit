@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { POOL_CANVAS_WIDTH, POOL_RAIL } from '../../apps/web/src/head-to-head/eight-ball/table.js';
-import { POOL_START_LINE, POOL_WIDTH } from '@party/contracts';
+import { POOL_CANVAS_WIDTH, POOL_RAIL, poolPocketCenter } from '../../apps/web/src/head-to-head/eight-ball/table.js';
+import { POOL_HEIGHT, POOL_START_LINE, POOL_WIDTH } from '@party/contracts';
 import { chooseOption, closeHostFold, closeRoundsByHand, openHostFold, openPhoneMenu } from './helpers.js';
 
 const token = process.env['LOCAL_OWNER_TOKEN'];
@@ -55,6 +55,10 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
   const link = (await host.getByRole('link', { name: 'Open shared display' }).getAttribute('href'))!;
   await closeHostFold(host);
   const tv = await host.context().newPage();
+  const poolNotices: string[] = [];
+  tv.on('websocket', socket => socket.on('framereceived', ({ payload }) => {
+    if (typeof payload === 'string' && payload.includes('"room.pool-shot"')) poolNotices.push(payload);
+  }));
   await tv.setViewportSize({ width: 960, height: 540 });
   await tv.emulateMedia({ reducedMotion: 'no-preference' });
   await tv.goto(link);
@@ -101,9 +105,43 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     const rotatedY = rotated.y + rotated.height * cueStart;
     const touch = await ada.context().newCDPSession(ada);
     const movePath = '**/side/challenges/*/move';
+    const pixel = (x: number, y: number) => sidewaysTable.evaluate((canvas, point) => {
+      return Array.from((canvas as HTMLCanvasElement).getContext('2d')!.getImageData(point.x, point.y, 1, 1).data);
+    }, { x, y });
+    const [pocketX, pocketY] = poolPocketCenter(1);
+    expect((await pixel(POOL_RAIL + pocketX, POOL_RAIL + pocketY))[1]).toBeLessThan(25);
+    expect((await pixel(POOL_RAIL + pocketX, POOL_RAIL + 7))[1]).toBeGreaterThan(60);
+    const cueAtStart = async () => (await pixel(POOL_RAIL + POOL_START_LINE, POOL_RAIL + POOL_HEIGHT / 2))[0];
+    expect(await cueAtStart()).toBeGreaterThan(200);
+
+    // A rejected shot restores the confirmed table and gives the player control back.
+    let rejectMove!: () => void;
+    const rejectGate = new Promise<void>(resolve => { rejectMove = resolve; });
+    await ada.route(movePath, async route => { await rejectGate; await route.abort(); }, { times: 1 });
+    const shoot = landscape.getByRole('button', { name: 'Shoot' });
+    try {
+      await shoot.tap();
+      await expect.poll(cueAtStart).toBeLessThan(100);
+    } finally {
+      rejectMove();
+    }
+    await expect(shoot).toBeEnabled();
+    expect(await cueAtStart()).toBeGreaterThan(200);
+
     let releaseMove!: () => void;
     const moveGate = new Promise<void>(resolve => { releaseMove = resolve; });
-    await ada.route(movePath, async route => { await moveGate; await route.continue(); });
+    await ada.route(movePath, async route => {
+      await Promise.all([moveGate, new Promise<void>(resolve => setTimeout(resolve, 500))]);
+      await route.continue();
+    });
+    await ada.evaluate(() => {
+      const start = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        if (this.buffer?.duration === undefined || this.buffer.duration > .05) return start.apply(this, args);
+        document.body.dataset['poolSounds'] = String(Number(document.body.dataset['poolSounds'] ?? 0) + 1);
+        return start.apply(this, args);
+      };
+    });
     await sidewaysTable.evaluate(canvas => {
       const observer = new MutationObserver(() => {
         if (canvas.dataset['striking'] !== 'true') return;
@@ -117,10 +155,15 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
       await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: rotatedX, y: rotatedY - rotated.height * cuePull }] });
       await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await expect(sidewaysTable).toHaveAttribute('data-shot-at-strike', '0');
+      await expect.poll(cueAtStart).toBeLessThan(100);
+      await expect(sidewaysTable).toHaveAttribute('data-shot', '0');
+      await expect(ada.locator('body')).toHaveAttribute('data-pool-sounds', /^[1-9]/);
     } finally {
       releaseMove();
     }
     await expect(incoming.getByRole('img', { name: 'Pool table' })).toHaveAttribute('data-shot', '1');
+    await expect(sidewaysTable).toHaveAttribute('data-shot', '1');
+    expect(await cueAtStart()).toBeLessThan(100);
     await ada.unroute(movePath);
     await ada.emulateMedia({ reducedMotion: 'reduce' });
     await landscape.getByRole('button', { name: 'Exit landscape' }).click();
@@ -160,6 +203,7 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect(table(tv)).toHaveAttribute('data-rolling', 'true');
     for (const page of [host, tv, ada, bo]) await expect(table(page)).toHaveAttribute('data-shot', '1');
+    expect(poolNotices).toHaveLength(1);
     await ada.setViewportSize({ width: 390, height: 667 });
     await expect(table(ada)).toHaveAttribute('data-shot', '1');
     await bo.getByRole('button', { name: 'Give up', exact: true }).click();

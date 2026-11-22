@@ -8,7 +8,8 @@ export const setSound = (on: boolean) => { try { localStorage.setItem(SOUND_KEY,
 
 let audio: AudioContext | null = null;
 /** Phones only allow sound after a tap: the first tap anywhere prepares it. */
-export function unlockSound() { try { audio ??= new AudioContext(); if (audio.state === 'suspended') void audio.resume(); } catch { audio = null; } }
+export function unlockSound() { try { audio ??= new AudioContext(); if (audio.state === 'suspended') void audio.resume().catch(() => {}); } catch { audio = null; } }
+export const activeSoundContext = () => audio?.state === 'running' && soundOn() ? audio : null;
 /** A short rising chime, made on the phone (no sound files): bigger wins ring a little longer. */
 export function playChime(strength: number, effect: SoundEffect = 'chime') {
   if (!soundOn() || !audio || audio.state !== 'running') return;

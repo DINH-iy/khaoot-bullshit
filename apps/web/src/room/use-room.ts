@@ -7,7 +7,7 @@ import { translate } from '../i18n/texts.js';
 import { ROOM_TEXTS } from './room.text.js';
 import { isUnavailablePageError } from '../navigation.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
-import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, type GameCommand, type RoomReply, type RoomSnapshot } from '@party/contracts';
+import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, SessionChangedSchema, type GameCommand, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
@@ -123,7 +123,13 @@ export function useRoom(sessionId: string | undefined, display = false) {
         admissionTimer = setTimeout(() => { if (mounted && !socket.connected) socket.connect(); }, Math.min(5000, 500 * 2 ** Math.min(admissionRetries, 4)));
       }
     });
-    socket.on('room.changed', requestSync); socket.on('presence.changed', requestSync);
+    const syncIfNew = (input: unknown, run: () => void) => {
+      const event = SessionChangedSchema.safeParse(input);
+      if (event.success && event.data.sessionId === sessionId && event.data.revision > (latestRef.current?.view.revision ?? -1)) run();
+    };
+    socket.on('room.changed', input => syncIfNew(input, requestSync));
+    socket.on('room.pool-shot', input => syncIfNew(input, () => { clearTimeout(debounce); void sync(); }));
+    socket.on('presence.changed', requestSync);
     // The server measures its round trip to this phone; answering at once keeps minigame results fair.
     socket.on('room.ping', (_input: unknown, ack: unknown) => { if (typeof ack === 'function') ack(); });
     socket.on('minigame.go', (data: { stageRunId?: unknown; goAt?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && typeof data.goAt === 'string') { setGo({ stageRunId: data.stageRunId, goAt: data.goAt, receivedAt: performance.now() }); requestSync(); } });
