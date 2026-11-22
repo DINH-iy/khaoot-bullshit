@@ -28,7 +28,10 @@ test('an uploaded font reaches every room screen and a scene can override the ga
   await expect(host.getByRole('alert').filter({ hasText: 'Google Fonts link for one font family' })).toBeVisible();
   await host.getByLabel('Upload font', { exact: true }).setInputFiles(fixture);
   await expect(host.getByRole('status').filter({ hasText: 'Tiny5 is ready' })).toBeVisible();
+  await host.getByLabel('Upload font', { exact: true }).setInputFiles(fixture);
+  await expect(host.getByRole('status').filter({ hasText: 'Tiny5 is already in the shared library' })).toBeVisible();
   const fonts = (await (await host.request.get(`${baseURL}/api/host/fonts`, { headers })).json()).data as { id: string; name: string }[];
+  expect(fonts.filter(font => font.name === 'Tiny5')).toHaveLength(1);
   const asset = fonts.find(font => font.name === 'Tiny5')!;
   const textFont = host.getByRole('combobox', { name: 'Font', exact: true });
   const titleFont = host.getByRole('combobox', { name: 'Font for titles', exact: true });

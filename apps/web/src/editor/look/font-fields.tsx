@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FONT_FILE_ACCEPT, FONT_FILE_MAX, FONTS, FontLibrarySchema, UploadedFontSchema, type FontName, type FullTheme, type Theme, type ThemeFont, type UploadedFont } from '@party/contracts';
+import { FONT_FILE_ACCEPT, FONT_FILE_MAX, FONTS, FontLibrarySchema, FontUploadResultSchema, type FontName, type FontUploadResult, type FullTheme, type Theme, type ThemeFont, type UploadedFont } from '@party/contracts';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { fontCssFamily } from '../../presentation/theme-fonts.js';
 import { roomApi } from '../../room/api.js';
@@ -23,7 +23,7 @@ async function uploadFont(file: File) {
   });
   const reply = await response.json();
   if (!reply.ok) throw new Error(reply.error.code);
-  return UploadedFontSchema.parse(reply.data);
+  return FontUploadResultSchema.parse(reply.data);
 }
 
 export function FontFields({ theme, full, inherited, onChange }: {
@@ -34,7 +34,7 @@ export function FontFields({ theme, full, inherited, onChange }: {
   const [googleUrl, setGoogleUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<keyof typeof LOOK_TEXTS.en | ''>('');
-  const [added, setAdded] = useState<UploadedFont>();
+  const [added, setAdded] = useState<FontUploadResult>();
   const file = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -47,15 +47,16 @@ export function FontFields({ theme, full, inherited, onChange }: {
     return () => { active = false; };
   }, []);
 
-  const add = async (load: () => Promise<UploadedFont>) => {
+  const add = async (load: () => Promise<FontUploadResult>) => {
     if (busy) return;
     setBusy(true);
     setError('');
     setAdded(undefined);
     try {
-      const font = await load();
-      setFonts(previous => [...previous, font]);
-      setAdded(font);
+      const result = await load();
+      const { id, name } = result;
+      setFonts(previous => previous.some(font => font.id === id) ? previous : [...previous, { id, name }]);
+      setAdded(result);
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : '';
       const errors: Record<string, keyof typeof LOOK_TEXTS.en> = { FILE_TOO_LARGE: 'fontTooLarge', UNSUPPORTED_MEDIA: 'fontUnsupported', INVALID_COMMAND: 'fontGoogleLink',
@@ -93,7 +94,7 @@ export function FontFields({ theme, full, inherited, onChange }: {
     <form className="theme-font-import" onSubmit={event => {
       event.preventDefault();
       void add(async () => {
-        const font = UploadedFontSchema.parse(await roomApi('/api/host/fonts/google', { url: googleUrl }, 'POST', 15000));
+        const font = FontUploadResultSchema.parse(await roomApi('/api/host/fonts/google', { url: googleUrl }, 'POST', 15000));
         setGoogleUrl('');
         return font;
       });
@@ -103,7 +104,7 @@ export function FontFields({ theme, full, inherited, onChange }: {
       <button type="submit" className="small-button" disabled={busy || !googleUrl.trim()}>{t('fontImport')}</button>
     </form>
     {busy && <p role="status" className="hint">{t('fontAdding')}</p>}
-    {added && <p role="status" className="hint">{t('fontAdded', { name: added.name })}</p>}
+    {added && <p role="status" className="hint">{t(added.alreadyPresent ? 'fontAlreadyPresent' : 'fontAdded', { name: added.name })}</p>}
     {error && <p role="alert" className="error">{t(error)}</p>}
   </>;
 }

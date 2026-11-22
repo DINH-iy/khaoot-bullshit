@@ -94,6 +94,19 @@ describe('the media library', () => {
     expect((await json('GET', `/api/media/${stored.id}`)).statusCode).toBe(404);
     expect((await json('GET', '/api/host/media')).json().data.items).not.toContainEqual(expect.objectContaining({ id: stored.id }));
 
+    const beforeRepeat = (await readdir(join(mediaDir, 'game-media'))).sort();
+    const repeated = await uploadFont(font, 'Same file renamed.ttf');
+    expect(repeated.json().data).toEqual({ ...stored, alreadyPresent: true });
+    expect((await readdir(join(mediaDir, 'game-media'))).sort()).toEqual(beforeRepeat);
+
+    const otherFont = Buffer.from(font);
+    otherFont[59] = 1;
+    const simultaneous = await Promise.all([uploadFont(otherFont, 'Second font.ttf'), uploadFont(otherFont, 'Another copy.ttf')]);
+    const entries = simultaneous.map(response => response.json().data);
+    expect(entries.map(entry => entry.id)).toEqual([entries[0].id, entries[0].id]);
+    expect(entries.filter(entry => entry.alreadyPresent)).toHaveLength(1);
+    expect(await readdir(join(mediaDir, 'game-media'))).toHaveLength(beforeRepeat.length + 1);
+
     const upstream = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', upstream);
     try {
@@ -104,13 +117,20 @@ describe('the media library', () => {
       expect((await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com/specimen/Inter' })).json().error.code).toBe('FONT_IMPORT_FAILED');
       expect(upstream).toHaveBeenCalledTimes(1);
 
-      upstream.mockResolvedValueOnce(new Response('@font-face { src: url(https://fonts.gstatic.com/s/inter/file.ttf); }'))
-        .mockResolvedValueOnce(new Response(new Uint8Array(font)));
+      const googleFont = Buffer.from(font);
+      googleFont[59] = 2;
+      const simulateGoogle = () => upstream.mockResolvedValueOnce(new Response('@font-face { src: url(https://fonts.gstatic.com/s/inter/file.ttf); }'))
+        .mockResolvedValueOnce(new Response(new Uint8Array(googleFont)));
+      simulateGoogle();
       const imported = await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com/share?selection.family=Inter:wght@400;700' });
       expect(imported.json().data).toMatchObject({ name: 'Inter' });
       expect(upstream).toHaveBeenCalledWith(new URL('https://fonts.googleapis.com/css2?family=Inter'), expect.objectContaining({ redirect: 'error' }));
       expect(upstream).toHaveBeenCalledWith(new URL('https://fonts.gstatic.com/s/inter/file.ttf'), expect.objectContaining({ redirect: 'error' }));
       expect((await json('GET', '/api/host/fonts')).json().data).toContainEqual(imported.json().data);
+      simulateGoogle();
+      const duplicate = await json('POST', '/api/host/fonts/google', { url: 'https://fonts.google.com/specimen/Inter' });
+      expect(duplicate.json().data).toEqual({ ...imported.json().data, alreadyPresent: true });
+      expect((await uploadFont(googleFont, 'Downloaded Inter.ttf')).json().data).toEqual(duplicate.json().data);
     } finally { vi.unstubAllGlobals(); }
   });
 

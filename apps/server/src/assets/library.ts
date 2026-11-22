@@ -4,7 +4,7 @@ import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { FontLibrarySchema, GameIdSchema, GoogleFontImportSchema, ImportYouTubeAudioSchema, UploadedFontSchema, LIBRARY_LIMITS, LibraryItemSchema, MediaLibrarySchema, TrimAudioSchema, UpdateLibraryItemSchema, type SceneMediaKind } from '@party/contracts';
+import { FontLibrarySchema, FontUploadResultSchema, GameIdSchema, GoogleFontImportSchema, ImportYouTubeAudioSchema, LIBRARY_LIMITS, LibraryItemSchema, MediaLibrarySchema, TrimAudioSchema, UpdateLibraryItemSchema, type FontUploadResult, type SceneMediaKind } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { GameMediaKind, PrismaClient } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
@@ -48,6 +48,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
   const used = async () => (await client.gameMedia.aggregate({ where: { removedAt: null }, _sum: { byteSize: true } }))._sum.byteSize ?? 0;
   const item = (row: { id: string; kind: GameMediaKind; name: string; credit: string | null; contentType: string; byteSize: number; createdAt: Date }) =>
     LibraryItemSchema.parse({ id: row.id, kind: row.kind.toLowerCase(), name: row.name, credit: row.credit, contentType: row.contentType, byteSize: row.byteSize, createdAt: row.createdAt.toISOString() });
+  const fontResult = ({ id, name, alreadyPresent }: FontUploadResult) => FontUploadResultSchema.parse({ id, name, alreadyPresent });
 
   async function addFile(source: Readable, name: string, personId: string | null, credit: string | null = null, font = false) {
     const id = randomUUID();
@@ -60,16 +61,22 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
       row = await client.$transaction(async tx => {
         // Uploads and derived clips share the same quota, even when their final writes overlap.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(519243091)`;
+        if (font) {
+          const existing = await tx.gameMedia.findFirst({ where: { kind: 'FONT', removedAt: null, sha256: file.sha256 },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+          if (existing) return { ...existing, alreadyPresent: true as const };
+        }
         const total = await tx.gameMedia.aggregate({ where: { removedAt: null }, _sum: { byteSize: true } });
         roomAssert((total._sum.byteSize ?? 0) + file.byteSize <= LIBRARY_LIMITS.total, 'STORAGE_FULL');
         return tx.gameMedia.create({ data: { id, kind: KIND[file.kind], contentType: file.contentType, byteSize: file.byteSize,
           sha256: file.sha256, name, credit, personId } });
-      });
+      }, { isolationLevel: 'ReadCommitted' });
     } catch (error) {
       await removeStored(directory, LIBRARY_FOLDER, id).catch(() => undefined);
       throw error;
     }
-    app.log.info({ event: 'library_media_added', kind: file.kind, byteSize: file.byteSize }, 'Media added to the library');
+    if ('alreadyPresent' in row) await removeStored(directory, LIBRARY_FOLDER, id);
+    else app.log.info({ event: 'library_media_added', kind: file.kind, byteSize: file.byteSize }, 'Media added to the library');
     return row;
   }
 
@@ -111,10 +118,11 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
         const rules = font ? FONT_UPLOAD : RULES;
         if (Number.isFinite(declared) && declared > rules.max) throw new UploadTooLarge();
         roomAssert(active < MAX_ACTIVE_UPLOADS, 'RATE_LIMITED'); active++; counted = true;
-        roomAssert(await used() + (Number.isFinite(declared) ? declared : 0) <= LIBRARY_LIMITS.total, 'STORAGE_FULL');
+        // Font duplicates reuse the existing file, so check their quota after fingerprinting.
+        if (!font) roomAssert(await used() + (Number.isFinite(declared) ? declared : 0) <= LIBRARY_LIMITS.total, 'STORAGE_FULL');
         const name = cleanName((request.query as { name?: unknown }).name);
         const row = await addFile(request.body as Readable, font ? name.replace(/\.(woff2?|ttf|otf)$/i, '') || name : name, editor.personId, null, font);
-        return { ok: true, data: font ? UploadedFontSchema.parse({ id: row.id, name: row.name }) : item(row) };
+        return { ok: true, data: font ? fontResult(row) : item(row) };
       } catch (error) {
         // A refused upload must not leave its unread bytes on a reused connection.
         reply.header('connection', 'close');
@@ -135,10 +143,9 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
       roomAssert(family, 'INVALID_COMMAND');
       roomAssert(active < MAX_ACTIVE_UPLOADS && limiter.allow(`fonts:${editor.personId ?? 'owner'}`, 15), 'RATE_LIMITED');
       active++; counted = true;
-      roomAssert(await used() < LIBRARY_LIMITS.total, 'STORAGE_FULL');
       const source = await downloadGoogleFont(family);
       const row = await addFile(source, family, editor.personId, `https://fonts.google.com/specimen/${encodeURIComponent(family).replace(/%20/g, '+')}`, true);
-      return { ok: true, data: UploadedFontSchema.parse({ id: row.id, name: row.name }) };
+      return { ok: true, data: fontResult(row) };
     } catch (error) { return owner.fail(reply, error instanceof UploadTooLarge ? new RoomError('FILE_TOO_LARGE') : error); }
     finally { if (counted) active--; }
   });
