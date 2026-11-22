@@ -63,7 +63,7 @@ export function ArcadeHome() {
           : <ul className="arcade-lobbies">{list.lobbies.map(lobby => <li key={lobby.id}>
             <div><strong>{lobby.title}</strong>
               <p className="arcade-meta">{lobby.players} {lobby.players === 1 ? 'player' : 'players'}{lobby.leaderName ? ` · led by ${lobby.leaderName}` : ''}{lobby.playing ? ` · playing ${gameName(lobby.playing)}` : ''}{lobby.locked ? ' · locked' : lobby.protected ? ' · password required' : ''}</p></div>
-            <button type="button" className={lobby.member ? 'primary' : undefined} disabled={lobby.locked && !lobby.member} onClick={() => openLobby(lobby.id)}>{lobby.member ? 'Back in' : lobby.locked ? 'Locked' : 'Join'}</button>
+            {(lobby.member || !lobby.locked) && <button type="button" className={lobby.member ? 'primary' : undefined} onClick={() => openLobby(lobby.id)}>{lobby.member ? 'Back in' : 'Join'}</button>}
           </li>)}</ul>}
       </section>
       <Leaderboards board={board} signedIn={Boolean(account.person)} />

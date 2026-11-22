@@ -5,11 +5,13 @@ import { createLiveStrokes } from '../drawing/live-strokes.js';
 import { createReactionStore } from '../room-extras/reactions.js';
 import { translate } from '../i18n/texts.js';
 import { ROOM_TEXTS } from './room.text.js';
+import { isUnavailablePageError } from '../navigation.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
 import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, type GameCommand, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
+  const [deniedSession, setDeniedSession] = useState<string>();
   const [message, setMessage] = useState(''); const [samples, setSamples] = useState<number[]>([]); const [reconnects, setReconnects] = useState(0);
   const [pending, setPending] = useState<GameCommand>(); const [saving, setSaving] = useState(false); const [clockOffset, setClockOffset] = useState(0); const [confirmMs, setConfirmMs] = useState<number | null>(null);
   // Live minigame signals: GO the moment it happens, and the running tap counts of a race.
@@ -30,11 +32,13 @@ export function useRoom(sessionId: string | undefined, display = false) {
   useEffect(() => {
     // Another room (back to the lobby): nothing of the previous room may show or act in the meantime.
     setSnapshot(undefined);
+    setDeniedSession(undefined);
     if (!sessionId) return;
     try { const saved = localStorage.getItem(storageKey); if (saved && saved.length < 6000) { const parsed = GameCommandSchema.safeParse(JSON.parse(saved)); if (parsed.success && parsed.data.sessionId === sessionId) { pendingRef.current = parsed.data; setPending(parsed.data); } } } catch { /* Online submission remains available. */ }
     let mounted = true; let syncing = false; let syncAgain = false; let reconciled = false; let connections = 0; let debounce: ReturnType<typeof setTimeout> | undefined;
     let admissionRetries = 0; let admissionTimer: ReturnType<typeof setTimeout> | undefined;
     const socket = io({ autoConnect: false, auth: { sessionId, ...(display ? { display: true } : {}), ...(testSeat ? { seat: testSeat } : {}) }, reconnectionAttempts: 20, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 }); socketRef.current = socket;
+    const denyAccess = () => { setSnapshot(undefined); setDeniedSession(sessionId); };
     const emit = <T,>(event: string, input: unknown): Promise<T> => new Promise((resolve, reject) => {
       if (!socket.connected) { reject(new Error(r('notConnected'))); return; }
       socket.timeout(5000).emit(event, input, (error: Error | null, reply: RoomReply<T>) => {
@@ -84,21 +88,33 @@ export function useRoom(sessionId: string | undefined, display = false) {
         setSnapshot(previous => { const next = !previous || state.view.revision >= previous.view.revision ? state : previous; latestRef.current = next; return next; });
         setClockOffset(Date.parse(state.view.serverTime) - Date.now());
         if (!reconciled) { reconciled = true; await reconcile(state); }
-      } catch (error) { if (mounted) setMessage(error instanceof Error ? error.message : r('syncFailed')); }
+      } catch (error) {
+        if (!mounted) return;
+        if (isUnavailablePageError(error)) denyAccess();
+        else setMessage(error instanceof Error ? error.message : r('syncFailed'));
+      }
       finally { syncing = false; if (syncAgain) { syncAgain = false; requestSync(); } }
     };
     function requestSync() { if (debounce) clearTimeout(debounce); debounce = setTimeout(() => { void sync(); }, 150); }
     const heartbeat = async () => {
       if (!socket.connected || document.hidden) return; const nonce = String(Date.now()); const start = performance.now();
       try { const reply = HeartbeatReplySchema.parse(await emit('room.heartbeat', { nonce })); if (mounted && reply.nonce === nonce) setSamples(previous => [...previous.slice(-59), performance.now() - start]); }
-      catch { if (mounted) setMessage(r('checkFailed')); }
+      catch (error) {
+        if (!mounted) return;
+        if (isUnavailablePageError(error)) denyAccess();
+        else setMessage(r('checkFailed'));
+      }
     };
     socket.on('connect', () => { if (!mounted) return; admissionRetries = 0; if (admissionTimer) clearTimeout(admissionTimer); connections++; setReconnects(value => value + (connections > 1 ? 1 : 0)); setConnection('Connected'); reconciled = false; void sync(); void heartbeat(); });
-    socket.on('disconnect', () => { if (mounted) { setConnection('Disconnected — reconnecting'); setSaving(false); } });
+    socket.on('disconnect', reason => {
+      if (!mounted) return;
+      setConnection('Disconnected — reconnecting'); setSaving(false);
+      // A forced disconnect can mean this seat was revoked. Ask the server before deciding where to go.
+      if (reason === 'io server disconnect') socket.connect();
+    });
     socket.on('connect_error', (error: Error & { data?: { code?: string } }) => {
       if (!mounted) return; setConnection('Connection unavailable');
-      const denied = ['UNAUTHORIZED', 'CREDENTIAL_EXPIRED', 'FORBIDDEN', 'ORIGIN_REJECTED'].includes(error.data?.code ?? '');
-      if (denied) { setSnapshot(undefined); setMessage(r('denied')); return; }
+      if (isUnavailablePageError(error.data?.code)) { denyAccess(); return; }
       setMessage(r('unreachable'));
       // Socket.IO retries transport failures itself, but namespace middleware
       // rejection needs an explicit bounded retry for temporary DB/rate failures.
@@ -114,14 +130,18 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('drawing.live', (data: unknown) => { if (mounted) liveStrokes.apply(data); });
     socket.on('room.reaction', (data: unknown) => { if (mounted) reactions.add(data); });
     socket.on('minigame.progress', (data: { stageRunId?: unknown; counts?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && Array.isArray(data.counts)) setProgress({ stageRunId: data.stageRunId, counts: (data.counts as { playerId: string; count: number }[]).filter(entry => typeof entry?.playerId === 'string' && Number.isInteger(entry.count)).slice(0, 512) }); });
-    socket.on('room.error', (error: { code: string }) => { if (mounted) setMessage(error.code); });
+    socket.on('room.error', (error: { code: string }) => {
+      if (!mounted) return;
+      if (isUnavailablePageError(error.code)) denyAccess();
+      else setMessage(error.code);
+    });
     socket.on('side.challenge', () => { if (mounted) setChallengeTick(value => value + 1); });
     const interval = setInterval(() => { void heartbeat(); requestSync(); }, 10000);
     const foreground = () => { if (!document.hidden) { if (!socket.connected) socket.connect(); reconciled = false; requestSync(); void heartbeat(); } };
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
     return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
   }, [sessionId, display, remember, storageKey, liveStrokes, reactions]);
-  return { snapshot, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress, challengeTick,
+  return { snapshot, denied: deniedSession !== undefined && deniedSession === sessionId, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress, challengeTick,
     /** A tap race's running count; fire-and-forget, the final result is the saved one. */
     // Not volatile: a report waits for a busy connection instead of being dropped, so the server sees every tap it can.
     sendTaps(stageRunId: string, count: number) { socketRef.current?.emit('minigame.taps', { stageRunId, count }); },

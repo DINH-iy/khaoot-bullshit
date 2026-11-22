@@ -37,7 +37,7 @@ export function MinigameConfiguration(props: Props) {
     {isMinigameKey(game) && <strong>{gameName(game)}</strong>}
     <div className="configuration-launch">
       {game === 'draw-the-graph' && <button type="button" className="small-button graph-import-launch" aria-haspopup="dialog" onClick={() => setOpen('import')}>
-        <Icon name="upload" size={18} />{graphText('importData')}
+        <Icon name="bars" size={18} />{graphText('importData')}
       </button>}
       <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => setOpen('settings')}>{t('title')}</button>
     </div>
@@ -53,10 +53,11 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, initia
   const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
-  const settingsButton = useRef<HTMLButtonElement>(null);
+  const navigation = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(initial);
   const [device, setDevice] = useState<'phone' | 'sharedScreen'>(initial['game'] === 'count-the-dots' ? 'sharedScreen' : 'phone');
   const [panel, setPanel] = useState<Panel>(initialPanel);
+  const [returnPanel, setReturnPanel] = useState<Exclude<Panel, 'import'>>();
   const game = String(draft['game'] ?? '');
   const graph = game === 'draw-the-graph';
   const importing = panel === 'import';
@@ -70,26 +71,43 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, initia
     element?.showModal();
     return () => { element?.close(); previous?.focus(); };
   }, []);
+  const wasImporting = useRef(importing);
+  useLayoutEffect(() => {
+    if (!importing && wasImporting.current) {
+      navigation.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus();
+    }
+    wasImporting.current = importing;
+  }, [importing]);
 
-  return <dialog className="scene-preview-dialog minigame-configuration" ref={dialog} aria-labelledby={title}
-    onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
-    onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+  const cancel = () => {
+    if (importing && returnPanel) setPanel(returnPanel);
+    else onClose();
+  };
+
+  return <dialog className="scene-preview-dialog minigame-configuration" data-game={game} ref={dialog} aria-labelledby={title}
+    onCancel={event => { event.preventDefault(); event.stopPropagation(); cancel(); }}
+    onClick={event => { if (event.target === event.currentTarget) cancel(); }}>
     <div className="configuration-window">
-      <header><h2 id={title}>{initialPanel === 'import' ? gameName('draw-the-graph') : t('title')}</h2></header>
-      <div className="segmented configuration-nav" role="group" aria-label={t('title')}>
-        {graph && <button type="button" aria-pressed={importing} onClick={() => setPanel('import')}>{graphText('importData')}</button>}
-        <button type="button" ref={settingsButton} aria-pressed={panel === 'settings'} onClick={() => setPanel('settings')}>{t('settings')}</button>
+      <header>
+        <h2 id={title}>{graph ? gameName('draw-the-graph') : t('title')}</h2>
+        {importing && <button type="button" className="small-button configuration-import-action" onClick={cancel}>{t('cancel')}</button>}
+        {graph && panel !== 'import' && <button type="button" className="small-button configuration-import-action" aria-label={graphText('importData')} onClick={() => {
+          setReturnPanel(panel);
+          setPanel('import');
+        }}>{graphText('importShort')}</button>}
+      </header>
+      <div className="segmented configuration-nav" ref={navigation} hidden={importing} role="group" aria-label={t('title')}>
+        <button type="button" aria-pressed={panel === 'settings'} onClick={() => setPanel('settings')}>{t('settings')}</button>
         <button type="button" aria-pressed={panel === 'timing'} onClick={() => setPanel('timing')}>{t('timing')}</button>
         <button className="configuration-preview-tab" type="button" aria-pressed={panel === 'preview'} onClick={() => setPanel('preview')}>{fields('preview')}</button>
       </div>
-      {importing && <GraphDataImport cancelLabel={t('cancel')} onCancel={onClose} onImport={(data, question) => {
+      {importing && <GraphDataImport onImport={(data, question) => {
         setDraft(current => ({
           ...current,
           settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph: data },
           ...(question && isDefaultGraphQuestion(current.prompt) ? { prompt: question } : {}),
         }));
         setPanel('settings');
-        settingsButton.current?.focus();
       }} />}
       <div className="configuration-columns" data-panel={panel} hidden={importing}>
         <div className="configuration-fields" role="region" aria-label={panel === 'timing' ? t('timing') : t('settings')}>

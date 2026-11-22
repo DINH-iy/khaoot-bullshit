@@ -10,3 +10,16 @@ export function onNavigate(changed: () => void) {
   window.addEventListener(EVENT, changed); window.addEventListener('popstate', changed);
   return () => { window.removeEventListener(EVENT, changed); window.removeEventListener('popstate', changed); };
 }
+
+/** An explicit access denial or missing resource from a page or its session. */
+export function isUnavailablePageError(cause: unknown) {
+  const code = cause instanceof Error ? cause.message : cause;
+  return typeof code === 'string' && [
+    'UNAUTHORIZED', 'FORBIDDEN', 'ORIGIN_REJECTED', 'AUTH_UNAVAILABLE', 'CREDENTIAL_EXPIRED',
+    'NOT_FOUND', 'ROOM_NOT_AVAILABLE', 'INVALID_COMMAND',
+  ].includes(code);
+}
+
+export function replaceWithHome() {
+  location.replace('/');
+}

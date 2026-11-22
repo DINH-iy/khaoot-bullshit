@@ -3,6 +3,7 @@ import qrcode from 'qrcode-generator';
 import { PeopleListSchema, PeopleStatsSchema, PersonKeyViewSchema, type PersonKeyView, type PersonRow, type PersonStats } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
+import { replaceWithHome } from '../navigation.js';
 import { seenThisWeek } from './people-time.js';
 import { initials, LastSeen, PersonPage, type PersonActions } from './person-page.js';
 import { Leaderboard } from './leaderboard.js';
@@ -89,15 +90,17 @@ export function PeoplePanel() {
     remove: person => { if (confirm(`Remove ${person.name}? Their phones are signed out, their key stops working and the name is free again. Past games and chips stay in the history.`)) void run(async () => { await roomApi(`/api/host/people/${person.id}/remove`, {}); openPerson(null); }); },
   };
   const keyCard = shown && <KeyCard view={shown} onDone={() => setShown(undefined)} />;
+  const person = personId ? people?.find(candidate => candidate.id === personId) : undefined;
+  const personMissing = Boolean(personId && people && !person);
+  useEffect(() => { if (personMissing) replaceWithHome(); }, [personMissing]);
 
   if (personId) {
-    const person = people?.find(candidate => candidate.id === personId);
+    if (personMissing) return null;
     return <>
       <p className="person-back"><a href="?admin=people" onClick={event => { event.preventDefault(); openPerson(null); }}>‹ All people</a></p>
       {error && <p role="alert" className="error">{error}</p>}
       {keyCard}
       {!people && !error && <p role="status">Loading…</p>}
-      {people && !person && <p className="admin-empty">This person is not in the list (any more).</p>}
       {person && <PersonPage person={person} busy={busy} actions={actions} stats={stats?.find(row => row.personId === person.id)} all={stats ?? []} onOpen={openPerson} />}
     </>;
   }

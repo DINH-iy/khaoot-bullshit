@@ -7,7 +7,7 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   max-height: calc(100dvh - 26px);
 }
-.configuration-window > header { padding: 16px 20px; border-bottom: 1px solid var(--e-border); }
+.configuration-window > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 20px; border-bottom: 1px solid var(--e-border); }
 .configuration-window > header h2 { margin: 0; font-size: 1.2rem; }
 .configuration-columns {
   display: grid;
@@ -26,6 +26,8 @@
 .configuration-timing { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 10px; }
 .configuration-preview {
   display: grid;
+  align-self: start;
+  max-height: 100%;
   align-content: start;
   justify-items: center;
   gap: 12px;
@@ -61,8 +63,14 @@
 @media (max-width: 760px) {
   .configuration-window { grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .configuration-window > header { padding: 12px; }
-  .configuration-window .configuration-preview-tab { display: inline-flex; }
-  .configuration-window .configuration-nav { display: flex; justify-content: center; padding: 8px 12px; border-bottom: 1px solid var(--e-border); }
+  .configuration-window .configuration-preview-tab { display: inline-flex; align-items: center; justify-content: center; }
+  .configuration-window .configuration-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--e-border);
+  }
+  .configuration-window .configuration-nav button { padding-inline: 6px; }
   .configuration-columns { grid-template-columns: minmax(0, 1fr); padding-inline: 12px; }
   .configuration-columns:not([data-panel="preview"]) .configuration-preview,
   .configuration-columns[data-panel="preview"] .configuration-fields { display: none; }
@@ -80,6 +88,13 @@
   color: light-dark(#fff, #20163d);
   font-weight: 750;
 }
-.configuration-columns[hidden], .configuration-actions[hidden] { display: none; }
+.configuration-columns[hidden], .configuration-actions[hidden], .configuration-window .configuration-nav[hidden] { display: none; }
+.configuration-import-action { min-height: 44px; margin: 0; }
 .configuration-nav { flex-wrap: wrap; }
 .configuration-window .configuration-nav button { white-space: normal; }
+@media (max-width: 420px) {
+  .minigame-configuration[data-game="draw-the-graph"] .configuration-window > header,
+  .minigame-configuration[data-game="draw-the-graph"] .configuration-actions { padding-block: 6px; }
+  .minigame-configuration[data-game="draw-the-graph"] .configuration-preview { gap: 8px; padding: 8px; }
+  .minigame-configuration[data-game="draw-the-graph"] .phone-screen.compact-game-preview { min-height: 0; padding: 8px; }
+}

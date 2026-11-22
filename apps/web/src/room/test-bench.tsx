@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GameIdSchema, RoomSnapshotSchema, formatRoomCode } from '@party/contracts';
 import { roomApi } from './api.js';
+import { isUnavailablePageError, replaceWithHome } from '../navigation.js';
+import { hostMenuHref, useHostAccess } from '../owner/use-host-access.js';
 import { FaIcon } from '../presentation/icons.js';
 import { TryoutControls } from './tryout/controls.js';
 import './test-bench.css';
@@ -20,6 +22,8 @@ export function TestBench({ sessionId }: { sessionId: string }) {
   const [loaded, setLoaded] = useState<{ id: string; code: string; tryout: boolean }>();
   const [error, setError] = useState('');
   const benchRoom = loaded?.id === activeId ? loaded : undefined;
+  const hostAccess = useHostAccess({ enabled: benchRoom?.tryout === true, refreshOnFocus: true });
+  const hostHref = hostMenuHref(hostAccess?.role);
   const changeRoom = (id: string) => {
     const url = new URL(location.href);
     if (id === sessionId) url.searchParams.delete('tryout');
@@ -38,25 +42,30 @@ export function TestBench({ sessionId }: { sessionId: string }) {
     setError('');
     // Opening a regular bench lets its phones join. A tryout is created with bench access.
     void roomApi(`/api/rooms/${activeId}`).then(async data => {
+      if (!current) return;
       const snapshot = RoomSnapshotSchema.parse(data);
-      if (snapshot.role !== 'host' || snapshot.roomClosed || (activeId !== sessionId && !snapshot.tryout)) throw new Error('Bench access denied');
+      if (snapshot.role !== 'host' || snapshot.roomClosed || (activeId !== sessionId && !snapshot.tryout)) throw new Error('FORBIDDEN');
       if (!snapshot.settings.testBench) await roomApi(`/api/rooms/${activeId}/settings`, { testBench: true });
       if (current) setLoaded({ id: activeId, code: snapshot.roomCode, tryout: snapshot.tryout === true });
-    }).catch(() => {
+    }).catch(cause => {
       if (!current) return;
-      if (activeId === sessionId) setError('This browser is not the host of that room. Open the test bench from the host screen (Shared screen & invite).');
-      else changeRoom(sessionId);
+      if (isUnavailablePageError(cause)) {
+        if (activeId === sessionId) replaceWithHome();
+        else changeRoom(sessionId);
+      } else setError('The test bench could not be loaded.');
     });
     return () => { current = false; };
   }, [activeId, sessionId]);
   const changeCount = (next: number) => { const value = Math.max(1, Math.min(MAX_PHONES, next)); setCount(value); try { localStorage.setItem(COUNT_KEY, String(value)); } catch { /* this visit only */ } };
   const reload = (index: number) => setReloads(current => current.map((value, at) => at === index ? value + 1 : value));
+  if (!benchRoom) return error ? <main className="load-problem"><p role="alert">{error}</p>
+    <button type="button" className="primary" onClick={() => location.reload()}>Retry</button> <a href="/">Home</a></main> : null;
   return <main className="bench">
     <header className="bench-bar">
       <p className="bench-title"><strong>Test bench</strong>{benchRoom && <> · room <code>{formatRoomCode(benchRoom.code)}</code></>}</p>
       <p className="bench-hint">The host screen on the left; each phone is its own player and joins by itself. Add or remove phones with − and +.</p>
       {activeId !== sessionId ? <button type="button" className="bench-mode" onClick={() => changeRoom(sessionId)}>Back to test bench</button>
-        : benchRoom?.tryout && <a className="bench-back link-button" href="/?host=1">Back to host menu</a>}
+        : hostHref && <a className="bench-back link-button" href={hostHref}>{hostAccess?.role === 'owner' ? 'Back to host menu' : 'Back to your games'}</a>}
       <label className="bench-real"><input type="checkbox" checked={real} onChange={event => changeReal(event.target.checked)} />Real phones can join too</label>
       <div className="bench-count" role="group" aria-label="Phones">
         <button type="button" className="bench-icon" aria-label="One phone less" disabled={count <= 1} onClick={() => changeCount(count - 1)}><FaIcon name="minus" /></button>
@@ -64,7 +73,6 @@ export function TestBench({ sessionId }: { sessionId: string }) {
         <button type="button" className="bench-icon" aria-label="One phone more" disabled={count >= MAX_PHONES} onClick={() => changeCount(count + 1)}><FaIcon name="plus" /></button>
       </div>
     </header>
-    {error && <p role="alert" className="bench-error">{error}</p>}
     {benchRoom?.tryout && <TryoutControls key={`controls:${benchRoom.id}`} sessionId={benchRoom.id} phones={count} />}
     {benchRoom && <div className="bench-stage" key={`frames:${benchRoom.id}`}>
       <iframe key={real ? 'real' : 'bench'} className="bench-host" title="Host screen" src={`/?room=${benchRoom.id}&bench=${real ? 'real' : '1'}`} />

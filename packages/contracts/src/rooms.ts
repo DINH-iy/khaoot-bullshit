@@ -97,6 +97,9 @@ export const HeartbeatSchema = z.object({ nonce: z.string().regex(/^[A-Za-z0-9_-
 export const HeartbeatReplySchema = z.object({ nonce: z.string(), serverTime: z.string().datetime() }).strict();
 
 // Browser hosting menu. Lists only titles and shape, never prompts or answers.
+const HostRoleSchema = z.enum(['owner', 'editor']);
+export const HostAccessSchema = z.object({ role: HostRoleSchema.nullable(), localSignIn: z.boolean() }).strict();
+export type HostAccess = z.infer<typeof HostAccessSchema>;
 export const HostGameSchema = z.object({ key: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(1).max(160), description: z.string().max(240), stageCount: z.number().int().min(1), timed: z.boolean(), branches: z.boolean(),
   // For the menu: what is in the game, about how long it takes, and its colours (for the cover).
   features: z.array(z.enum(['quiz', 'order', 'writing', 'drawing', 'uploads', 'votes', 'minigames', 'challenges', 'teams', 'routes', 'duels'])), minutes: z.number().int().min(1),
@@ -109,7 +112,7 @@ export const HostMenuSchema = z.object({
   // The owner's own games, with their draft and publishing state.
   myGames: z.array(GameSummarySchema),
   // The owner sees everything; an editor (a person allowed to edit games) gets no open rooms and cannot host.
-  role: z.enum(['owner', 'editor']),
+  role: HostRoleSchema,
   rooms: z.array(z.object({ sessionId: GameIdSchema, roomCode: RoomCodeSchema, title: z.string().min(1).max(160), status: SessionViewSchema.shape.status, playerCount: z.number().int().min(0) }).strict()),
 }).strict();
 export type HostMenu = z.infer<typeof HostMenuSchema>;

@@ -4,6 +4,7 @@ const paths: Record<string, string> = {
   quiz: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7 M12 17h.01',
   writing: 'M4 20h4L19 9l-4-4L4 16z M14 6l4 4',
   upload: 'M4 5h16v14H4z M4 15l5-5 4 4 2-2 5 5 M15 9.5a1.5 1.5 0 1 0 0-.01',
+  file: 'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6',
   order: 'M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01',
   challenge: 'M5 21V4 M5 4h11l-2 4 2 4H5',
   vote: 'M5 11h14v9H5z M9 15l2 2 4-4 M8 11V5h8v6',

@@ -6,7 +6,8 @@ import { PeerBar } from '../live/presence.js';
 import { LookView } from '../look/look-view.js';
 import { estimateMinutes, isRoute } from '../model.js';
 import { useDraft, type SaveState } from './use-draft.js';
-import { AppMenu, useHostRole, type HostRole } from '../../owner/owner-nav.js';
+import { AppMenu } from '../../owner/owner-nav.js';
+import { hostMenuHref, useHostAccess, type HostRole } from '../../owner/use-host-access.js';
 import { GameSettingsPanel } from './game-settings.js';
 import { InvitePanel } from './invite-panel.js';
 import { FieldLimit } from '../controls/field-limit.js';
@@ -43,7 +44,8 @@ export function EditorShell({ gameId }: { gameId: string }) {
 }
 
 function EditorPage({ gameId }: { gameId: string }) {
-  const role = useHostRole();
+  const access = useHostAccess()?.role;
+  const role = access === 'owner' || access === 'editor' ? access : null;
   const { person } = useMe();
   const historyIdentity = role === 'owner' ? 'owner' : role === 'editor' ? person?.id : undefined;
   // No separate bar above the editor: its own "p." logo opens the other places (AppMenu), so it keeps one header.
@@ -92,9 +94,11 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
   });
-  if (d.loadError) return <main className="editor-message"><p role="alert" className="error">{d.loadError}</p><p><a href="/?host=1">{t('backToGames')}</a></p></main>;
+  const gamesHref = hostMenuHref(role);
+  if (d.loadError) return <main className="editor-message"><p role="alert" className="error">{d.loadError}</p>{gamesHref && <p><a href={gamesHref}>{t('backToGames')}</a></p>}</main>;
   if (!d.definition || !d.draft) return <main className="editor-message"><p role="status">{t('opening')}</p></main>;
   const { definition, draft } = d; const nodes = definition.nodes; const routes = nodes.filter(isRoute).length;
+  const gamesLabel = t(draft.builtIn && role === 'owner' ? 'builtInGames' : 'yourGames');
   const ready = d.issues.length === 0 && d.save === 'saved';
   // Problems of the whole game (not on a scene) are fixed in Game settings: the ☰ menu and that item show them.
   const gameIssues = d.issues.filter(issue => !issue.nodeKey || !definition.nodes.some(node => node.key === issue.nodeKey)); const gameProblems = gameIssues.length;
@@ -119,7 +123,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
       <div className="editor-title"><AppMenu role={role} />
         <div><label className="visually-hidden" htmlFor="game-title">{t('gameName')}</label>
           <input id="game-title" className="title-input" readOnly={d.readOnly} value={definition.title} maxLength={160} onChange={event => d.change({ ...definition, title: event.target.value }, undefined, 'title')} />
-          <p className="crumb" title={overview}>{draft.builtIn ? <><a href="/?host=1">{t('builtInGames')}</a> / <span className="crumb-builtin" title={t('yourVersionTitle', { title: draft.builtIn.title })}>{t('yourVersionOf', { title: draft.builtIn.title })}</span></> : <a href="/?host=1">{t('yourGames')}</a>} / {t('draft')}{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : t('changes')}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{t(SAVE_TEXT[d.save])}</span>{compactHeader && d.readOnly && <> · {t('viewing')}</>}<span className="game-overview"> · {overview}</span></p></div></div>
+          <p className="crumb" title={overview}>{gamesHref ? <a href={gamesHref}>{gamesLabel}</a> : gamesLabel}{draft.builtIn && <> / <span className="crumb-builtin" title={t('yourVersionTitle', { title: draft.builtIn.title })}>{t('yourVersionOf', { title: draft.builtIn.title })}</span></>} / {t('draft')}{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : t('changes')}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{t(SAVE_TEXT[d.save])}</span>{compactHeader && d.readOnly && <> · {t('viewing')}</>}<span className="game-overview"> · {overview}</span></p></div></div>
       <div className="editor-actions">
         {!compactHeader && <>
         <div className="history-buttons">

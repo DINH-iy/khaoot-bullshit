@@ -2,7 +2,7 @@ import { Dropdown } from '../ui/dropdown.js';
 import { useEffect, useRef, useState } from 'react';
 import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeLobbyView, type ArcadeTeams } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
-import { navigate } from '../navigation.js';
+import { isUnavailablePageError, navigate, replaceWithHome } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
 import { Avatar } from '../players/avatar.js';
 import { savedLook } from '../players/look-builder.js';
@@ -24,8 +24,17 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
   const entering = useRef(false);
   useEffect(() => {
     let mounted = true;
-    const load = () => { void roomApi(`/api/arcade/lobbies/${lobbyId}`).then(data => { if (mounted) { setLobby(ArcadeLobbyViewSchema.parse(data)); setGone(false); } })
-      .catch(cause => { if (mounted) { if (cause instanceof Error && ['ROOM_NOT_AVAILABLE', 'INVALID_COMMAND'].includes(cause.message)) setGone(true); else setError(arcadeProblem(cause)); } }); };
+    const leave = () => { setGone(true); replaceWithHome(); };
+    const load = () => { void roomApi(`/api/arcade/lobbies/${lobbyId}`).then(data => {
+      if (!mounted) return;
+      const next = ArcadeLobbyViewSchema.parse(data);
+      if (next.closed) leave();
+      else setLobby(next);
+    }).catch(cause => {
+      if (!mounted) return;
+      if (isUnavailablePageError(cause)) leave();
+      else setError(arcadeProblem(cause));
+    }); };
     load(); const timer = setInterval(load, POLL_MS);
     return () => { mounted = false; clearInterval(timer); };
   }, [lobbyId, tick]);
@@ -40,7 +49,7 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
   const shell = (content: React.ReactNode) => <main className={`room arcade ${frame.className}`} style={frame.style}>
     <header className="room-bar"><div className="room-id"><p className="brand">party<span>.</span></p><p className="room-game">Arcade{lobby ? ` · ${lobby.title}` : ''}</p></div><a href="/?arcade">All lobbies</a></header>
     <div className="arcade-page">{error && <p role="alert" className="join-error">{error}</p>}{content}</div></main>;
-  if (gone || lobby?.closed) return shell(<section className="arcade-card"><h1>This lobby has closed</h1><p>A lobby closes after 15 minutes without anyone in it.</p><p><a href="/?arcade">Open or join another lobby</a></p></section>);
+  if (gone) return null;
   if (!lobby) return shell(<p role="status">Opening the lobby…</p>);
   if (!lobby.me) return shell(<JoinLobby lobby={lobby} onJoined={refresh} />);
 

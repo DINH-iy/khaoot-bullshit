@@ -1,4 +1,9 @@
+.minigame-configuration:has(.graph-import-source) {
+  width: min(40rem, calc(100% - 24px));
+}
+
 .graph-data-import {
+  grid-row: 3;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
@@ -11,14 +16,12 @@
   padding: clamp(12px, 3vw, 24px);
 }
 
-.graph-import-content h3 { margin: 0; font-size: 1.125rem; }
+.graph-import-content h3 { justify-self: start; margin: 0; font-size: 1.125rem; }
 .graph-import-content .hint { margin: 0; overflow-wrap: anywhere; }
 
 .graph-import-source {
   display: grid;
   gap: 12px;
-  max-width: 40rem;
-  margin-inline: auto;
 }
 
 .graph-import-source .graph-import-methods {
@@ -31,6 +34,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: 100%;
   white-space: normal;
 }
 .graph-import-methods svg { flex: none; }
@@ -86,4 +90,13 @@
 }
 @media (max-width: 420px) {
   .graph-import-methods button { flex-direction: column; gap: 4px; padding: 6px; }
+  .graph-import-content { padding: 10px 12px; }
+  .graph-import-review { gap: 8px; }
+  .graph-import-controls { gap: 8px; padding: 8px 12px; }
+  .graph-import-chart { gap: 4px; }
+  .graph-import-controls label:has(select) {
+    grid-template-columns: 1fr 1.2fr;
+    align-items: center;
+    gap: 8px;
+  }
 }

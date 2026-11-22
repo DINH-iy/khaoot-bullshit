@@ -73,12 +73,17 @@ test('a tester points at a button and reports it; the owner finds it with its fi
 
   // Players and strangers cannot read reports.
   await page.goto('/?admin');
-  await expect(page.getByRole('alert')).toContainText('not signed in as the owner');
+  await expect(page).toHaveURL('/');
+  await expect(page.locator('.admin-page')).toHaveCount(0);
 
   const ownerContext = await browser.newContext(); const owner = await ownerContext.newPage();
   try {
-    await owner.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await owner.getByRole('link', { name: 'Admin: feedback from testers' }).click();
+    const claim = await owner.request.post(`${baseURL}/api/host/claim`, {
+      headers: { origin: baseURL!, 'x-party-request': '1' },
+      data: { token: ownerToken },
+    });
+    expect(claim.ok()).toBe(true);
+    await owner.goto(`${baseURL}/?admin`);
     await owner.getByRole('searchbox', { name: 'Search' }).fill(reportId.toUpperCase());
     await expect(owner.locator('.admin-item')).toHaveCount(1);
     const item = owner.getByRole('listitem').filter({ has: owner.getByRole('heading', { name: title }) });

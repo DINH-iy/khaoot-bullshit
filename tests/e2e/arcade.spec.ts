@@ -73,7 +73,8 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     await ann.page.getByRole('button', { name: 'Open: lock' }).click();
     await cy.page.goto(`${baseURL}/?arcade`);
     const card = cy.page.getByRole('listitem').filter({ hasText: title });
-    await expect(card.getByRole('button', { name: 'Locked' })).toBeDisabled();
+    await expect(card).toContainText('locked');
+    await expect(card.getByRole('button')).toHaveCount(0);
     await ann.page.getByRole('button', { name: 'Locked: unlock' }).click();
     await expect(card.getByRole('button', { name: 'Join' })).toBeEnabled({ timeout: 10_000 });
     await card.getByRole('button', { name: 'Join' }).click();

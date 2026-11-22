@@ -18,6 +18,9 @@ test('host and phone verify access, save privately, refresh and recover after a 
     await host.goto(`${baseURL}/?room=${f.sessionId}#access=${f.hostToken}`);
     await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
     await expect(host).not.toHaveURL(/access=/);
+    await openHostFold(host, 'Room settings');
+    await expect(host.getByRole('link', { name: 'Back to host menu' })).toHaveCount(0);
+    await closeHostFold(host);
     const qr = host.getByRole('img', { name: `Scan to join room ${f.roomCode}` });
     await expect(qr).toBeVisible();
     const pixels = await qr.evaluate(async element => {
@@ -57,9 +60,8 @@ test('host and phone verify access, save privately, refresh and recover after a 
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await openHostFold(host, 'Players');
     await host.getByRole('button', { name: 'Revoke access for Phone player' }).click();
-    await expect(await connectionStatus(page)).not.toHaveText('Connected');
-    await page.reload();
-    await expect(page.getByText('Room access denied. Your access may have expired, been revoked, or your seat was taken over on another phone.')).toBeVisible();
+    await expect(page).toHaveURL('/');
+    await expect(page.locator('.room-join .join-card')).toBeVisible();
   } finally { await hostContext.close(); }
 });
 

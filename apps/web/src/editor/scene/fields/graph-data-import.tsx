@@ -12,13 +12,11 @@ import './graph-data-import.css';
 
 const METHODS = [
   ['url', 'linkMethod', 'globe'],
-  ['file', 'fileMethod', 'upload'],
+  ['file', 'fileMethod', 'file'],
   ['paste', 'pasteMethod', 'writing'],
 ] as const;
 
-export function GraphDataImport({ cancelLabel, onCancel, onImport }: {
-  cancelLabel: string; onCancel: () => void; onImport: (data: GraphData, question?: string) => void;
-}) {
+export function GraphDataImport({ onImport }: { onImport: (data: GraphData, question?: string) => void }) {
   const t = useTexts(GRAPH_TEXTS);
   const [method, setMethod] = useState<(typeof METHODS)[number][0]>('url');
   const heading = useRef<HTMLHeadingElement>(null);
@@ -142,7 +140,7 @@ export function GraphDataImport({ cancelLabel, onCancel, onImport }: {
           </>}
           {method === 'file' && <>
             <label className="graph-import-file">
-              <Icon name="upload" size={24} />
+              <Icon name="file" size={24} />
               <span>{t('csvFile')}</span>
               <small>CSV / TSV</small>
               <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" aria-label={t('csvFile')}
@@ -171,12 +169,9 @@ export function GraphDataImport({ cancelLabel, onCancel, onImport }: {
         </div>
       </div>}
     </div>
-    <footer className="configuration-actions">
-      <button type="button" className="small-button" onClick={onCancel}>{cancelLabel}</button>
-      {candidate && <>
-        <button type="button" className="small-button" onClick={changeData}>{t('changeData')}</button>
-        <button type="button" className="configuration-apply" onClick={() => onImport(candidate, question)}>{t('useData')}</button>
-      </>}
-    </footer>
+    {candidate && <footer className="configuration-actions">
+      <button type="button" className="small-button" onClick={changeData}>{t('changeData')}</button>
+      <button type="button" className="configuration-apply" onClick={() => onImport(candidate, question)}>{t('useData')}</button>
+    </footer>}
   </div>;
 }

@@ -6,7 +6,9 @@ import { ImportGame } from './import-game.js';
 import { GamePicker } from './game-picker.js';
 import { OwnerNav } from '../owner/owner-nav.js';
 import { Icon } from '../editor/controls/icons.js';
-import { isLocalOwnerPage, rememberOwner } from '../owner/owner-session.js';
+import { isLocalOwnerPage } from '../owner/owner-session.js';
+import { isUnavailablePageError, replaceWithHome } from '../navigation.js';
+import { pendingClaim } from '../people/use-me.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { rich } from '../i18n/rich.js';
 import { OWNER_TEXTS } from '../owner/owner.text.js';
@@ -36,7 +38,6 @@ function CopyCode({ code }: { code: string }) {
 export function HostMenu() {
   const [menu, setMenu] = useState<HostMenu>(); const [error, setError] = useState(''); const [busy, setBusy] = useState(true);
   const [gameKey, setGameKey] = useState(''); const t = useTexts(HOSTING_TEXTS);
-  const ownerText = useTexts(OWNER_TEXTS);
   // One request identity per page load: a repeated click or retry returns the same room.
   const [request] = useState(() => ({ sessionId: newId(), commandId: newId() }));
   const [tryoutRequest] = useState(() => ({ sessionId: newId(), commandId: newId() }));
@@ -49,14 +50,15 @@ export function HostMenu() {
         const url = new URL(location.href);
         url.searchParams.delete('localOwner');
         history.replaceState(null, '', url);
-      }
+      } else await pendingClaim();
+      if (!mounted) return;
       const loaded = HostMenuSchema.parse(await roomApi('/api/host'));
-      rememberOwner(loaded.role === 'owner');
       if (mounted) { setMenu(loaded); setGameKey(loaded.games[0]?.key ?? ''); }
     })().catch(cause => {
-      const signedOut = cause instanceof Error && cause.message === 'UNAUTHORIZED';
-      if (signedOut) rememberOwner(false);
-      if (mounted && (!signedOut || !isLocalOwnerPage() || ownerToken)) setError(explain(cause));
+      if (!mounted) return;
+      if (isUnavailablePageError(cause)) {
+        replaceWithHome();
+      } else setError(explain(cause));
     }).finally(() => { if (mounted) setBusy(false); });
     // A page restored from the back/forward cache would reuse the previous room request.
     const restored = (event: PageTransitionEvent) => { if (event.persisted) location.reload(); };
@@ -68,7 +70,11 @@ export function HostMenu() {
   const scrolled = useRef(false);
   useEffect(() => { const changed = () => setHash(location.hash); window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed); }, []);
   useEffect(() => { if (menu && hash === '#my-games' && !scrolled.current) { scrolled.current = true; document.getElementById('my-games')?.scrollIntoView(); } }, [menu, hash]);
-  const reload = () => { void roomApi('/api/host').then(data => setMenu(HostMenuSchema.parse(data))).catch(cause => setError(explain(cause))); };
+  const reload = () => { void roomApi('/api/host').then(data => setMenu(HostMenuSchema.parse(data))).catch(cause => {
+    if (isUnavailablePageError(cause)) {
+      replaceWithHome();
+    } else setError(explain(cause));
+  }); };
   const open = (work: Promise<{ sessionId: string }>, screen: 'room' | 'bench' = 'room') => {
     setBusy(true); setError('');
     work.then(result => location.assign(`/?${screen}=${result.sessionId}`)).catch(cause => { setError(explain(cause)); setBusy(false); });
@@ -80,20 +86,21 @@ export function HostMenu() {
     roomApi(`/api/host/rooms/${sessionId}/close`, {}).then(() => { setClosing(null); reload(); }).catch(cause => setError(explain(cause))).finally(() => setBusy(false));
   };
   // Editors (people with editor rights) work on the games only: no hosting, no open rooms, no admin.
-  const owner = menu?.role === 'owner';
-  return <><OwnerNav current={hash === '#my-games' || (menu && !owner) ? 'editor' : 'host'} role={menu?.role ?? null}
+  if (!menu) return error ? <main className="load-problem">
+    <p role="alert" className="error">{error}</p>
+    <button type="button" className="primary" onClick={() => location.reload()}>{t('retryLoading')}</button>
+    <p><a href="/">{t('joinAsPlayer')}</a></p>
+  </main> : <main className="host-page" aria-busy="true"><p role="status">{t('loadingGames')}</p></main>;
+  const owner = menu.role === 'owner';
+  return <><OwnerNav current={hash === '#my-games' || !owner ? 'editor' : 'host'} role={menu.role}
     mainAction={<button type="button" disabled={busy}
       onClick={() => open(roomApi('/api/host/minigame-tryout', tryoutRequest), 'bench')}>{t('minigameTryout')}</button>} /><main className="host-page">
-    {!menu || owner
+    {owner
       ? <header className="host-hero"><p className="eyebrow">{t('eyebrowHost')}</p><h1>{t('heroHost')}</h1>
         <p>{t('heroHostText')}</p></header>
       : <header className="host-hero"><p className="eyebrow">{t('eyebrowEditor')}</p><h1>{t('heroEditor')}</h1>
         <p>{t('heroEditorText')}</p></header>}
     {error && <p role="alert" className="error">{error}</p>}
-    {busy && !menu && <p role="status">{t('loadingGames')}</p>}
-    {isLocalOwnerPage() && !owner && !busy && <button type="button" className="primary local-owner-signin"
-      onClick={() => location.assign('/?host=1&localOwner=1')}>{ownerText('ownerSignIn')}</button>}
-    {menu && <>
       {menu.rooms.length > 0 && <section aria-labelledby="rooms-heading"><div className="my-games-head"><h2 id="rooms-heading">{t('openRooms')}</h2><span className="my-games-count">{menu.rooms.length}</span></div>
         <ul className="open-rooms">{menu.rooms.map(room => <li key={room.sessionId} className={`open-room status-${room.status.toLowerCase()}`}>
           <div className="open-room-info"><div className="open-room-title"><h3>{room.title}</h3><span className="room-code-copy"><span className="room-code" aria-label={t('roomCode', { code: room.roomCode })}>{formatRoomCode(room.roomCode)}</span><CopyCode code={room.roomCode} /></span></div>
@@ -113,7 +120,6 @@ export function HostMenu() {
       </section>}
       <MyGames menu={menu} reload={reload} openRoom={owner ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
       <ImportGame />
-    </>}
     <p className="host-links"><a href="/">{t('joinAsPlayer')}</a>{owner && <><a href="/?admin">{t('adminFeedback')}</a><a href="/?admin=people">{t('adminPeople')}</a></>}</p>
   </main></>;
 }

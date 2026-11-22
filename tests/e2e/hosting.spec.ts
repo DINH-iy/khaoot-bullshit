@@ -6,7 +6,7 @@ import { chooseOption, closeRoundsByHand, expectPhoneScores, openHostFold, openH
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
 
-test('owner options sign in without a key on both localhost addresses', async ({ page, baseURL }) => {
+test('the start page signs in the local owner on both loopback addresses', async ({ page, baseURL }) => {
   for (const hostname of ['127.0.0.1', 'localhost']) {
     const local = new URL(baseURL!);
     local.hostname = hostname;
@@ -14,14 +14,21 @@ test('owner options sign in without a key on both localhost addresses', async ({
     const headers = { origin: local.origin, 'x-party-request': '1', 'sec-fetch-site': 'same-origin' };
     expect((await page.request.get(new URL('/api/host', local).href, { headers })).status()).toBe(401);
     expect((await page.request.post(new URL('/api/host/claim-local', local).href, { headers: { ...headers, 'x-forwarded-for': '192.0.2.1' }, data: {} })).status()).toBe(403);
-    await page.getByRole('link', { name: 'Owner options' }).click();
+    expect((await (await page.request.get(new URL('/api/host/access', local).href, { headers })).json()).data).toEqual({ role: null, localSignIn: true });
+    expect((await (await page.request.get(new URL('/api/host/access', local).href, { headers: { ...headers, 'x-forwarded-for': '192.0.2.1' } })).json()).data).toEqual({ role: null, localSignIn: false });
+    const claiming = page.waitForResponse(new URL('/api/host/claim-local', local).href);
+    await page.getByRole('button', { name: 'Sign in as owner' }).click();
+    expect((await claiming).ok()).toBe(true);
+    await expect(page).toHaveURL(new URL('/?host=1', local).href);
     await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
-    expect(new URL(page.url()).searchParams.has('localOwner')).toBe(false);
+    await expect(page.getByRole('radio', { name: /Timed quiz/ })).toBeVisible();
+    expect((await (await page.request.get(new URL('/api/host/access', local).href, { headers })).json()).data).toEqual({ role: 'owner', localSignIn: false });
     const cookie = (await page.context().cookies(`${local.origin}/api/host`)).find(item => item.name === 'party_owner');
     expect(cookie?.httpOnly).toBe(true);
     expect(cookie?.value).not.toBe(ownerToken);
-    expect((await page.request.get(new URL('/api/host/people', local).href, { headers })).status()).toBe(200);
-    expect((await page.request.get(new URL('/api/host/people', local).href, { headers: { ...headers, forwarded: 'for=192.0.2.1' } })).status()).toBe(401);
+    const forwarded = { ...headers, forwarded: 'for=192.0.2.1' };
+    expect((await (await page.request.get(new URL('/api/host/access', local).href, { headers: forwarded })).json()).data).toEqual({ role: null, localSignIn: false });
+    expect((await page.request.get(new URL('/api/host/people', local).href, { headers: forwarded })).status()).toBe(401);
   }
 });
 
@@ -172,8 +179,9 @@ test('ranked ballots preserve the saved choices and advance result cards on the 
 });
 
 test('owner opens a room from the host menu and stays in control of a timed stage', async ({ browser, page, baseURL }) => {
-  // A signed-out local browser can sign in before seeing the games.
+  // A signed-out local browser is sent back to the start page to sign in.
   await page.goto('/?host=1');
+  await expect(page).toHaveURL('/');
   await expect(page.getByRole('button', { name: 'Sign in as owner' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open room', exact: true })).toHaveCount(0);
 

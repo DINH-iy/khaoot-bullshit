@@ -4,7 +4,7 @@ import { roomApi } from '../../room/api.js';
 import { useTexts } from '../../i18n/texts.js';
 import { rich } from '../../i18n/rich.js';
 import { SETTINGS_TEXTS } from './settings.text.js';
-import type { HostRole } from '../../owner/owner-nav.js';
+import type { HostRole } from '../../owner/use-host-access.js';
 
 /** An invite: opens this game's editor and signs the device in as the person (their personal key, after #, never in server logs). */
 const inviteLink = (gameId: string, key: string) => `${location.origin}/?edit=${gameId}#person=${key}`;

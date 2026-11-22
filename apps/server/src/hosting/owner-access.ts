@@ -18,8 +18,12 @@ const digest = (value: string) => createHash('sha256').update(value).digest();
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422, NAME_TAKEN: 409, NOT_ENOUGH_CHIPS: 409, PREFAB_LIMIT: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, MEDIA_IN_USE: 409, FILE_TOO_LARGE: 413, UNSUPPORTED_MEDIA: 415, STORAGE_FULL: 507 };
 
 export type OwnerBucket = 'menu' | 'claim' | 'edit';
+const LIMITS = { menu: 120, claim: 20, edit: 600, access: 240 };
 export function createOwnerAccess(app: FastifyInstance, config: Config, client: PrismaClient) {
   const limiter = new RateLimiter(1024);
+  const settings = config.NODE_ENV !== 'production' && config.LOCAL_OWNER_TOKEN && config.ROOM_TOKEN_SECRET
+    ? { ownerToken: config.LOCAL_OWNER_TOKEN, roomSecret: config.ROOM_TOKEN_SECRET }
+    : undefined;
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
     app.log.warn({ event: 'host_request_rejected', code }, 'Host request rejected');
@@ -28,11 +32,14 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
   // Each limit has its own counter: a strict key-guessing limit on signing in
   // must not be used up by the owner's ordinary menu and room requests.
   // Editing saves every few keystrokes, and people editing together can share one address.
-  const guard = (request: FastifyRequest, bucket: OwnerBucket = 'menu') => {
+  const checkRequest = (request: FastifyRequest, bucket: keyof typeof LIMITS) => {
     roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
-    roomAssert(limiter.allow(`host-${bucket}:${request.ip}`, bucket === 'claim' ? 20 : bucket === 'edit' ? 600 : 120), 'RATE_LIMITED');
-    roomAssert(config.NODE_ENV !== 'production' && config.LOCAL_OWNER_TOKEN && config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE');
-    return { ownerToken: config.LOCAL_OWNER_TOKEN, roomSecret: config.ROOM_TOKEN_SECRET };
+    roomAssert(limiter.allow(`host-${bucket}:${request.ip}`, LIMITS[bucket]), 'RATE_LIMITED');
+  };
+  const guard = (request: FastifyRequest, bucket: OwnerBucket = 'menu') => {
+    checkRequest(request, bucket);
+    roomAssert(settings, 'AUTH_UNAVAILABLE');
+    return settings;
   };
   const isOwner = (expected: string, candidate: string | undefined) => candidate !== undefined && timingSafeEqual(digest(candidate), digest(expected));
   // The loopback session never carries the private owner key and is only valid on the same local origin.
@@ -62,6 +69,17 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
     roomAssert(hasOwnerCookie(settings, request), 'UNAUTHORIZED');
     return settings;
   };
+  const editorIdentity = async (settings: ReturnType<typeof guard>, request: FastifyRequest) => {
+    if (hasOwnerCookie(settings, request)) return { role: 'owner' as const, personId: null };
+    const found = await personFromCookie(client, request.headers.cookie);
+    return found?.person.canEdit ? { role: 'editor' as const, personId: found.person.id } : null;
+  };
+  const navigationAccess = async (request: FastifyRequest) => {
+    checkRequest(request, 'access');
+    if (!settings) return { role: null, localSignIn: false };
+    const role = (await editorIdentity(settings, request))?.role ?? null;
+    return { role, localSignIn: role !== 'owner' && request.headers['sec-fetch-site'] === 'same-origin' && Boolean(localToken(settings, request)) };
+  };
   /**
    * Working on games: the owner, or a person the owner gave editor rights to.
    * Checked against the database on every request, so taking the rights away,
@@ -70,11 +88,10 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
    */
   const requireEditor = async (request: FastifyRequest, bucket: 'menu' | 'edit' = 'menu') => {
     const settings = guard(request, bucket);
-    if (hasOwnerCookie(settings, request)) return { ...settings, role: 'owner' as const, personId: null };
-    const found = await personFromCookie(client, request.headers.cookie);
-    roomAssert(found?.person.canEdit, 'UNAUTHORIZED');
-    return { ...settings, role: 'editor' as const, personId: found.person.id };
+    const identity = await editorIdentity(settings, request);
+    roomAssert(identity, 'UNAUTHORIZED');
+    return { ...settings, ...identity };
   };
-  return { fail, guard, isOwner, localToken, requireOwner, requireEditor };
+  return { fail, guard, isOwner, localToken, requireOwner, requireEditor, navigationAccess };
 }
 export type OwnerAccess = ReturnType<typeof createOwnerAccess>;

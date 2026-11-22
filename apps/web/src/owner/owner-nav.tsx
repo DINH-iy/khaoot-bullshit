@@ -1,18 +1,14 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { HostMenuSchema } from '@party/contracts';
-import { roomApi } from '../room/api.js';
-import { rememberOwner } from './owner-session.js';
 import { openFeedback } from '../feedback/open-feedback.js';
 import { FEEDBACK_UI } from '../feedback/describe-element.js';
 import { FaIcon, type IconName } from '../presentation/icons.js';
 import { useTexts, type Translate } from '../i18n/texts.js';
 import { LanguagePicker } from '../i18n/language-picker.js';
+import type { HostRole } from './use-host-access.js';
 import { OWNER_TEXTS } from './owner.text.js';
 import './owner-nav.css';
 
 export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people' | 'packs' | 'look';
-/** Who is working here: the owner, a person with editor rights, or nobody (null). */
-export type HostRole = 'owner' | 'editor';
 type Text = Parameters<Translate<keyof typeof OWNER_TEXTS.en>>[0];
 type Link = { key: OwnerSection; label: Text; href: string; icon: IconName };
 // The main places, for everyone allowed (editors: Play and Editor). The editor opens per game, so "Editor" leads
@@ -22,6 +18,8 @@ const MAIN: (Link & { editor: boolean })[] = [
   { key: 'host', label: 'host', href: '/?host=1', icon: 'tv', editor: false },
   { key: 'editor', label: 'editor', href: '/?host=1#my-games', icon: 'diamond', editor: true },
 ];
+const mainLinks = (role: HostRole | null) => MAIN.filter(link =>
+  link.key === 'play' || role === 'owner' || (role === 'editor' && link.editor));
 // The owner's own pages, in the menu on the right.
 const OWNER: Link[] = [
   { key: 'admin', label: 'feedbackReports', href: '/?admin', icon: 'flag' },
@@ -29,23 +27,6 @@ const OWNER: Link[] = [
   { key: 'packs', label: 'packs', href: '/?admin=packs', icon: 'star' },
   { key: 'look', label: 'joinScreen', href: '/?admin=look', icon: 'circle-info' },
 ];
-
-/** Asks the host endpoint once who this browser is. Never used on the player screen. */
-export function useHostRole() {
-  const [role, setRole] = useState<HostRole | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    roomApi('/api/host').then(data => {
-      const found = HostMenuSchema.shape.role.parse((data as { role?: unknown }).role);
-      rememberOwner(found === 'owner'); if (mounted) setRole(found);
-    }, (cause: unknown) => {
-      // Only a definite "not signed in" forgets the hint; a network hiccup says nothing.
-      if (cause instanceof Error && cause.message === 'UNAUTHORIZED') rememberOwner(false);
-    });
-    return () => { mounted = false; };
-  }, []);
-  return role;
-}
 
 /** A small menu that closes on Escape, a click outside or picking an item. */
 function useMenu() {
@@ -76,7 +57,7 @@ export function OwnerNav({ current, role, mainAction }: { current: OwnerSection;
   const ownerPage = OWNER.find(link => link.key === current);
   return <header className="app-header">
     <a className="app-brand" href="/" aria-label={t('brand')}>party<span>.</span></a>
-    <nav className="app-main" aria-label={t('main')}><ul>{MAIN.filter(link => role === 'owner' || link.editor).map(link =>
+    <nav className="app-main" aria-label={t('main')}><ul>{mainLinks(role).map(link =>
       <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{t(link.label)}</a></li>)}
       {mainAction && <li>{mainAction}</li>}</ul></nav>
     <div className="app-end">
@@ -105,7 +86,7 @@ export function AppMenu({ role, current = 'editor' }: { role: HostRole | null; c
     </button>
     {menu.open && <nav id={id} className="app-menu app-navigation" aria-labelledby={`${id}-heading`}>
       <p className="app-navigation-heading" id={`${id}-heading`}>{t('goTo')}</p>
-      {links(MAIN.filter(link => role === 'owner' || link.editor))}
+      {links(mainLinks(role))}
       {role === 'owner' && <><p className="app-navigation-heading owner-heading">{t('owner')}</p>{links(OWNER)}</>}
       <div className="app-menu-language"><span aria-hidden="true">{t('language')}</span><LanguagePicker label={t('language')} /></div>
     </nav>}

@@ -1,6 +1,6 @@
 import { gameFacts } from './game-facts.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimRoomSchema, GameIdSchema, HostGameSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
+import { ClaimRoomSchema, GameIdSchema, HostAccessSchema, HostGameSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash } from '../game/definition.js';
@@ -77,6 +77,10 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       reply.header('set-cookie', ownerCookie(token));
       return { ok: true, data: {} };
     } catch (error) { return fail(reply, error); }
+  });
+  app.get('/api/host/access', async (request, reply) => {
+    try { return { ok: true, data: HostAccessSchema.parse(await owner.navigationAccess(request)) }; }
+    catch (error) { return fail(reply, error); }
   });
   // The menu. Editors get the same games, but never the owner's open rooms.
   app.get('/api/host', async (request, reply) => {

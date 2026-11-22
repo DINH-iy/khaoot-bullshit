@@ -41,6 +41,8 @@ describe('people with editor rights', () => {
     const menu = await call('GET', '/api/host', undefined, editor.cookie);
     expect(menu.statusCode).toBe(200); expect(menu.json().data).toMatchObject({ role: 'editor', rooms: [] });
     expect((await call('GET', '/api/host', undefined, owner)).json().data.role).toBe('owner');
+    expect((await call('GET', '/api/host/access', undefined, editor.cookie)).json()).toEqual({ ok: true, data: { role: 'editor', localSignIn: false } });
+    expect((await call('GET', '/api/host/access', undefined, owner)).json()).toEqual({ ok: true, data: { role: 'owner', localSignIn: false } });
     const game = await newGame(editor.cookie);
     expect((await call('GET', `/api/host/games/${game.gameId}`, undefined, editor.cookie)).statusCode).toBe(200);
     const saved = await call('PUT', `/api/host/games/${game.gameId}/draft`, { expectedRevision: game.revision, definition: { ...(game.definition as object), title: 'Renamed by the editor' } }, editor.cookie);
@@ -78,6 +80,7 @@ describe('people with editor rights', () => {
     expect((await call('GET', '/api/people/me', undefined, player.cookie)).json().data.person.canEdit).toBe(true);
     expect((await call('POST', `/api/host/people/${player.id}/editor`, { canEdit: false }, owner)).statusCode).toBe(200);
     expect((await call('GET', '/api/host', undefined, player.cookie)).statusCode).toBe(401);
+    expect((await call('GET', '/api/host/access', undefined, player.cookie)).json()).toEqual({ ok: true, data: { role: null, localSignIn: false } });
     // Signed-out phones and removed people lose them too.
     const signedOut = await makePerson(true);
     expect((await call('POST', `/api/host/people/${signedOut.id}/sign-out`, {}, owner)).statusCode).toBe(200);

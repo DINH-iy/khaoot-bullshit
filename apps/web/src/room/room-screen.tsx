@@ -1,9 +1,10 @@
 import { Countdown } from '../minigames/shared/countdown.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
-import { isSharedPrediction, answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
+import { isSharedPrediction, answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, GameIdSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
 import { newId, roomApi } from './api.js';
 import { useRoom } from './use-room.js';
+import { isUnavailablePageError } from '../navigation.js';
 import { BigCode, CopyIcon, JoinLink, JoinQr, publicJoinUrl } from './join-qr.js';
 import { StageTimer, useRemaining } from './stage-timer.js';
 import { ConnectionMenu, FloatingScores, HostDialog, Popover, RoundBar } from './room-chrome.js';
@@ -31,7 +32,7 @@ import { formatPoints } from './results.js';
 import { Avatar, RoomSessionContext } from '../players/avatar.js';
 import { LookBuilder, rememberLook, savedLook } from '../players/look-builder.js';
 import { useMe, type Person } from '../people/use-me.js';
-import { isLocalOwnerPage, wasOwner } from '../owner/owner-session.js';
+import { hostMenuHref, useHostAccess } from '../owner/use-host-access.js';
 import { OWNER_TEXTS } from '../owner/owner.text.js';
 import { KeySignIn } from '../people/key-sign-in.js';
 import { JoinOption } from './join-option.js';
@@ -72,7 +73,19 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
   // People in the room: whether a guest may make an account here, and the people the host added (pick your name).
   signup: boolean; makeAccount: boolean; setMakeAccount: (value: boolean) => void; expected: { id: string; name: string }[]; onPicked: (name: string) => void;
 }) {
-  const t = useText(); const [ownerBrowser] = useState(wasOwner);
+  const t = useText();
+  const access = useHostAccess({ enabled: person !== undefined, identity: person ?? null, refreshOnFocus: true });
+  const [signingInOwner, setSigningInOwner] = useState(false);
+  const [ownerSignInFailed, setOwnerSignInFailed] = useState(false);
+  const hostHref = hostMenuHref(access?.role);
+  const signInOwner = () => {
+    setSigningInOwner(true);
+    setOwnerSignInFailed(false);
+    void roomApi('/api/host/claim-local', {}).then(() => location.assign('/?host=1')).catch(() => {
+      setSigningInOwner(false);
+      setOwnerSignInFailed(true);
+    });
+  };
   // Our own messages under the field, instead of the browser's small "fill in this field" bubble.
   const [problems, setProblems] = useState<{ code?: string; name?: string }>({});
   const codeRef = useRef<HTMLInputElement>(null); const nameRef = useRef<HTMLInputElement>(null);
@@ -106,7 +119,10 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
         <button className="primary big" disabled={busy} type="submit">{busy ? t('join.joining') : t('join.button')}</button>
       </form>
       {person === null && roomCode.length === ROOM_CODE_LENGTH && <PickYourName roomCode={roomCode} people={expected} onSignedIn={onPicked} />}
-      {isLocalOwnerPage() && <a className="join-option join-owner" href="/?host=1&localOwner=1"><JoinOption icon="gear" title={translate(OWNER_TEXTS, 'ownerOptions')} /></a>}
+      {access?.localSignIn && <button type="button" className="join-option join-owner" disabled={signingInOwner} onClick={signInOwner}>
+        <JoinOption icon="gear" title={translate(OWNER_TEXTS, 'ownerSignIn')} />
+      </button>}
+      {ownerSignInFailed && <p role="alert" className="join-error">{translate(OWNER_TEXTS, 'ownerSignInFailed')}</p>}
       {/* Everything else stays folded away, so joining is just the code, a name and one button. */}
       <details className="join-more">
         <summary>{r('moreOptions')}<FaIcon name="chevron-down" /></summary>
@@ -114,9 +130,9 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
           {person === null && <KeySignIn onSignIn={onSignIn} />}
           <button type="button" className="join-option" onClick={onReclaim}><JoinOption icon="arrow-rotate-left" title={t('join.reclaimButton')} detail={t('join.reclaim')} /></button>
           <a className="join-option" href="/?arcade"><JoinOption icon="play" title={r('arcade')} detail={r('arcadeDetail')} /></a>
-          {/* The host link comes from this browser's owner hint. Editor access comes from /api/people/me. */}
-          {ownerBrowser && !isLocalOwnerPage() && <a className="join-option" href="/?host=1"><JoinOption icon="tv" title={r('hostInstead')} /></a>}
-          {!ownerBrowser && person?.canEdit && <a className="join-option" href="/?host=1#my-games"><JoinOption icon="gear" title={r('editGames')} /></a>}
+          {hostHref && <a className="join-option" href={hostHref}>
+            <JoinOption icon={access?.role === 'owner' ? 'tv' : 'gear'} title={r(access?.role === 'owner' ? 'hostInstead' : 'editGames')} />
+          </a>}
         </div>
       </details>
     </section>
@@ -126,12 +142,15 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
 export function RoomScreen() {
   // The address when this screen opened: the arcade switches rooms without reloading the page (navigation.ts).
   const [{ initial, access }] = useState(() => { const taken = pendingAccess; pendingAccess = null; return { initial: new URL(location.href), access: taken }; });
-  const [sessionId, setSessionId] = useState(initial.searchParams.get('room') ?? undefined);
+  const [sessionId, setSessionId] = useState(() => GameIdSchema.safeParse(initial.searchParams.get('room')).data);
   const [roomCode, setRoomCode] = useState(cleanRoomCode(initial.searchParams.get('code') ?? '')); const [name, setName] = useState('');
   const [error, setError] = useState(''); const [closedMessage, setClosedMessage] = useState(''); const [busy, setBusy] = useState(Boolean(access)); const [ready, setReady] = useState(!access);
+  const [claimDenied, setClaimDenied] = useState(false);
   const [draft, setDraft] = useState(emptyDraft(null)); const [editingLook, setEditingLook] = useState(false); const [displayUrl, setDisplayUrl] = useState(''); const [timerSeconds, setTimerSeconds] = useState('30'); const [reclaiming, setReclaiming] = useState(false);
   const room = useRoom(ready ? sessionId : undefined, initial.searchParams.get('display') === '1'); const language = useLanguage();
   const snapshot = room.snapshot;
+  const hostAccess = useHostAccess({ enabled: snapshot?.role === 'host', refreshOnFocus: true });
+  const hostHref = hostMenuHref(hostAccess?.role);
   const state = useMemo(() => {
     if (!snapshot?.view.stage) return snapshot;
     const stage = localizeStage(snapshot.view.stage, language);
@@ -142,7 +161,11 @@ export function RoomScreen() {
   useArcadeRound(state);
   useEffect(() => {
     if (!access || !sessionId) return; let mounted = true;
-    void roomApi(`/api/rooms/${sessionId}/claim`, { token: access }).then(() => { if (mounted) setReady(true); }).catch(() => { if (mounted) setError(r('accessFailed')); }).finally(() => { if (mounted) setBusy(false); });
+    void roomApi(`/api/rooms/${sessionId}/claim`, { token: access }).then(() => { if (mounted) setReady(true); }).catch(cause => {
+      if (!mounted) return;
+      if (isUnavailablePageError(cause)) setClaimDenied(true);
+      else setError(r('accessFailed'));
+    }).finally(() => { if (mounted) setBusy(false); });
     return () => { mounted = false; };
   }, [sessionId]);
   // Each stage starts from its own blank answer (and its own item order).
@@ -164,8 +187,8 @@ export function RoomScreen() {
     const target = initial.searchParams.has('bench') ? window.top : window;
     (target ?? window).location.replace('/');
   };
-  const roomClosed = state?.view.sessionId === sessionId && state?.roomClosed === true;
-  useEffect(() => { if (roomClosed) leaveClosedRoom(); }, [roomClosed]);
+  const roomUnavailable = claimDenied || room.denied || (state?.view.sessionId === sessionId && state?.roomClosed === true);
+  useEffect(() => { if (roomUnavailable) leaveClosedRoom(); }, [roomUnavailable]);
   // The host panel's one open sheet (settings, invite, players, back to lobby), or none.
   const [sheet, setSheet] = useState<'settings' | 'invite' | 'players' | 'lobby' | null>(null);
   const backToLobby = () => {
@@ -285,6 +308,8 @@ export function RoomScreen() {
   useMoment(playersRef, 'lobbyJoin', state?.view.status === 'LOBBY' && state.players.length ? state.players.length : null, {}, look);
 
   const waitingForRoomLook = firstCode.current === roomCode && roomLook?.code !== roomCode;
+  if (roomUnavailable) return null;
+  if (sessionId && !state && !error && !room.message) return <main className="join-startup" aria-busy="true"><p role="status">{r('connecting')}</p></main>;
   if (!sessionId && (waitingForRoomLook || (!joinLook && !siteLook))) return <main className="join-startup" aria-busy="true"><p role="status">{r('connecting')}</p></main>;
   if (!sessionId && reclaiming) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">{r('joinGame')}</h1><div className="join-card"><SeatReclaim roomCode={roomCode.trim().toUpperCase()} onCancel={() => setReclaiming(false)} onJoined={id => { history.replaceState(null, '', `/?room=${id}`); setReady(true); setSessionId(id); }} /></div></main>;
   if (!sessionId && newKey) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">{r('yourCode')}</h1><div className="join-card"><NewKeyCard name={newKey.name} personalKey={newKey.key} busy={busy} onContinue={() => { void join(newKey.name); }} />{error && <p role="alert" className="join-error">{error}</p>}</div></main>;
@@ -497,12 +522,14 @@ export function RoomScreen() {
         {/* Everything less frequent behind four icons; one sheet at a time, under the icons. */}
         <div className="host-tabs" role="group" aria-label={h('more')}>
           {([['settings', 'gear', h('roomSettings')], ['invite', 'tv', h('sharedAndInvite')], ['players', 'users', h('playersCount', { count: state.players.length })], ['lobby', 'arrow-rotate-left', h('backToLobby')]] as const).map(([key, icon, label]) =>
-            (!state.tryout || key !== 'lobby') && (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">{h('playersHidden')}</span><span className="tool-count">{state.players.length}</span></>}</button>)}
+            (key !== 'lobby' || (!state.tryout && hostAccess?.role === 'owner')) && (state.view.status !== 'LOBBY' || (key !== 'lobby' && key !== 'players')) && <button key={key} type="button" className="icon-tool" aria-label={key === 'players' ? undefined : label} title={label} aria-expanded={sheet === key} onClick={() => setSheet(sheet === key ? null : key)}><FaIcon name={icon} />{key === 'players' && <><span className="visually-hidden">{h('playersHidden')}</span><span className="tool-count">{state.players.length}</span></>}</button>)}
         </div>
         {sheet === 'settings' && <HostDialog portal={roomRoot.current} title={h('roomSettings')} icon="gear" onClose={() => setSheet(null)}><div className="settings-layout">
           <div className="settings-col"><h3>{h('phonesWaiting')}</h3><SideGamesSwitch state={state} sessionId={state.view.sessionId} onError={setError} />
             <h3>{h('joining')}</h3><SeatApprovalSetting state={state} sessionId={state.view.sessionId} onError={setError} /><SignupSetting state={state} sessionId={state.view.sessionId} onError={setError} /><TestBenchSetting state={state} sessionId={state.view.sessionId} onError={setError} />
-            <p className="control-back"><a className="link-button" href="/?host=1">{h('backToHostMenu')}</a></p>
+            {hostHref && <p className="control-back"><a className="link-button" href={hostHref}>
+              {hostAccess?.role === 'owner' ? h('backToHostMenu') : r('editGames')}
+            </a></p>}
             {state.view.status !== 'FINISHED' && <button type="button" className="danger" disabled={disabled || busy} onClick={() => {
               if (!confirm(management('closeAsk'))) return;
               setBusy(true);
@@ -526,12 +553,12 @@ export function RoomScreen() {
           {me && <button className="small-button ghost change-look" onClick={() => setEditingLook(true)}>{t('players.changeLook')}</button>}
           <HostPlayerList state={state} disabled={disabled} send={command} onError={setError} listRef={playersRef} />
           <ExpectedPeople state={state} sessionId={state.view.sessionId} onError={setError} /></section></HostDialog>}
-        {sheet === 'lobby' && <div className="host-sheet reset-confirm" role="group" aria-label={h('backToLobby')}>
+        {sheet === 'lobby' && hostAccess?.role === 'owner' && <div className="host-sheet reset-confirm" role="group" aria-label={h('backToLobby')}>
           <p>{h('lobbyAsk')}</p>
           <div className="actions"><button className="danger" onClick={backToLobby}>{h('yesBackToLobby')}</button><button className="ghost" onClick={() => setSheet(null)}>{h('cancel')}</button></div></div>}
         {/* The scores, small and foldable, at the bottom of the panel (big only at a scoreboard scene and the end). */}
         {!scoreMoment && state.view.status !== 'LOBBY' && <FloatingScores docked leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
-        <div className="host-leave"><LeaveRoom host /></div>
+        <div className="host-leave"><LeaveRoom host hostMenu={hostHref} /></div>
       </aside>}
     </div>}
     {state && me && editingLook && <div className="look-sheet" role="dialog" aria-modal="true" aria-labelledby="look-builder-heading" onKeyDown={event => { if (event.key === 'Escape') setEditingLook(false); }}><LookBuilder initial={me.look} name={me.displayName} busy={disabled} sessionId={state.view.sessionId}

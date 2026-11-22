@@ -23,7 +23,7 @@ test('players finish the same graph in their own colors and the host reveals all
   expect((await host.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).ok()).toBe(true);
   await host.goto(`${baseURL}/?edit=${gameId}&view=scene`);
   await host.getByRole('button', { name: 'Configure minigame', exact: true }).click();
-  const configuration = host.getByRole('dialog').filter({ has: host.getByRole('button', { name: 'Text & timing' }) });
+  const configuration = host.getByRole('dialog', { name: 'Draw the Graph', exact: true });
   await expect(configuration.getByLabel('Reveal easing')).toHaveValue('ease-in');
   await configuration.getByLabel('Reveal easing').selectOption('ease-out');
   await expect(host.getByRole('checkbox', { name: 'Use my own graph' })).toBeChecked();
@@ -46,6 +46,7 @@ test('players finish the same graph in their own colors and the host reveals all
   await configuration.getByRole('combobox', { name: 'Value column' }).selectOption({ label: 'Clicks' });
   const desktop = host.viewportSize()!;
   await host.setViewportSize({ width: 320, height: 568 });
+  await expect(configuration.getByRole('img', { name: 'Review imported graph' })).toBeInViewport({ ratio: 1 });
   await expect(configuration.getByRole('button', { name: 'Use this data' })).toBeInViewport({ ratio: 1 });
   await host.setViewportSize(desktop);
   await configuration.getByRole('button', { name: 'Change data' }).click();
@@ -63,6 +64,15 @@ test('players finish the same graph in their own colors and the host reveals all
   await host.getByRole('combobox', { name: 'Value column' }).selectOption({ label: 'Belgium' });
   await host.getByRole('button', { name: 'Use this data' }).click();
   await expect(host.getByRole('link', { name: 'Open original data source' })).toHaveAttribute('href', sourceUrl);
+  await host.setViewportSize({ width: 320, height: 568 });
+  const previewTab = configuration.getByRole('button', { name: 'Preview', exact: true });
+  const settingsTab = configuration.getByRole('button', { name: 'Settings', exact: true });
+  await expect(previewTab).toBeVisible();
+  expect((await previewTab.boundingBox())?.y).toBe((await settingsTab.boundingBox())?.y);
+  await previewTab.click();
+  await expect(configuration.locator('.phone-screen.compact-game-preview')).toBeInViewport({ ratio: 1 });
+  await expect(configuration.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  await host.setViewportSize(desktop);
   await configuration.getByRole('button', { name: 'Text & timing' }).click();
   const question = configuration.getByRole('textbox', { name: 'Question', exact: true });
   await expect(question).toHaveValue('Life expectancy — how did it change for Belgium?');

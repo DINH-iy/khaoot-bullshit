@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type Draft } from '@party/contracts';
 import { newId, roomApi } from '../../room/api.js';
-import { SIGNED_OUT_TEXT } from '../../owner/owner-session.js';
+import { isUnavailablePageError, replaceWithHome } from '../../navigation.js';
 import { convertLegacyTeams, type Definition, type Positions } from '../model.js';
 import { combine, fromDoc, toDoc, type Doc, type Snapshot } from '../live/document.js';
 import { same } from '../live/merge.js';
@@ -42,8 +42,10 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
   const show = (next: Snapshot) => { latest.current = next; setDefinition(next.definition); setPositions(next.positions); };
 
   const load = useCallback(() => {
+    let mounted = true;
     setLoadError('');
     void roomApi(`/api/host/games/${gameId}`).then(data => {
+      if (!mounted) return;
       const loaded = DraftSchema.parse(data);
       setDraft(loaded); setIssues(loaded.issues); revision.current = loaded.revision; server.current = loaded.definition as Doc; waiting.current = undefined;
       show(fromDoc(loaded.definition as Doc)); setSave('saved'); dirty.current = false;
@@ -54,7 +56,12 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
         show({ definition: converted.definition, positions: { ...opened.positions, ...(converted.added ? { [converted.added]: { x: start.x - 320, y: start.y } } : {}) } });
         setNotice('The teams of this game are now made in a Pick teams scene at the start.'); schedule();
       }
-    }).catch((cause: unknown) => setLoadError(cause instanceof Error && cause.message === 'UNAUTHORIZED' ? SIGNED_OUT_TEXT : 'This game could not be opened. It may have been removed, or the server is not running.'));
+    }).catch((cause: unknown) => {
+      if (!mounted) return;
+      if (isUnavailablePageError(cause)) replaceWithHome();
+      else setLoadError('This game could not be opened. Try reloading the page.');
+    });
+    return () => { mounted = false; };
   }, [gameId]);
   useEffect(load, [load]);
   const draftLoaded = draft?.gameId === gameId;
