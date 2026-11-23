@@ -62,7 +62,8 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .my-game-actions .primary:hover, .new-game button.primary:hover:not(:disabled) { background: #5b31bf; }
 /* Removing sits apart on the right and only looks dangerous once you confirm. */
 .my-game-actions .quiet-danger, .my-game-confirm { margin-left: auto; }
-.my-game-actions .quiet-danger { border-color: transparent; color: light-dark(#9d1717, #ffb4b4); }
+.my-game-actions .quiet-danger { border-color: currentColor; background: transparent; color: light-dark(#9d1717, #ffb4b4); }
+.my-game-actions .quiet-danger:hover:not(:disabled) { background: light-dark(#fdecec, #3a1c22); }
 .my-game-confirm { display: inline-flex; flex-wrap: wrap; gap: 8px; }
 .my-game-actions button.danger { background: light-dark(#b42318, #f97066); border-color: transparent; color: light-dark(#fff, #2a0d0b); }
 /* Stays red on hover: the general hover background above would leave its light text unreadable. */
@@ -90,9 +91,10 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .open-room-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .open-room-ask { font-weight: 600; }
 .open-room button.danger, .open-room button.keep { min-height: 44px; padding: 8px 16px; border-radius: 10px; font-weight: 700; }
-/* Red, with a white bin: closing a room ends the game for everyone in it. */
+/* The bin is outlined in red; the confirmation that closes the room for everyone is solid red. */
 .open-room button.danger { display: inline-grid; place-items: center; background: light-dark(#b42318, #d92d20); border: 1px solid transparent; color: #fff; }
-.open-room button.danger.icon-only { width: 44px; padding: 0; }
+.open-room button.danger.icon-only { width: 44px; padding: 0; background: transparent; border-color: currentColor; color: light-dark(#9d1717, #ffb4b4); }
+.open-room button.danger.icon-only:hover:not(:disabled) { background: light-dark(#fdecec, #3a1c22); }
 .open-room button.danger:hover:not(:disabled) { background: light-dark(#912018, #b42318); }
 .open-room button.keep { background: transparent; color: inherit; border: 1px solid light-dark(#cfc7e6, #4a4466); }
 /* The name, then the code and a small copy button on the same line. */

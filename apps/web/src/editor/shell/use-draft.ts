@@ -167,16 +167,19 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
 
   const publish = () => { setBusy(true); setNotice(''); void roomApi(`/api/host/games/${gameId}/publish`, { expectedRevision: revision.current }).then(data => { const saved = DraftSchema.parse(data); receive.current(saved); setNotice(`Published as version ${saved.published?.number}.`); }).catch(() => setNotice('Publishing did not work. Fix the problems listed and try again.')).finally(() => setBusy(false)); };
   // The tab opens on the click itself (popup blockers allow that) and is pointed at the room once it exists.
-  const openRoom = (path: string, body: object, failure: (code: string) => string) => {
-    setBusy(true); setNotice(''); const tab = window.open('about:blank', '_blank');
-    void roomApi<{ sessionId: string }>(path, body).then(result => { const url = `/?room=${result.sessionId}`; if (tab) tab.location.href = url; else window.open(url, '_blank'); })
-      .catch(cause => { tab?.close(); setNotice(failure(cause instanceof Error ? cause.message : '')); }).finally(() => setBusy(false));
+  // A named tab (one per game) is reused: rehearsing again shows the new room where the last one was.
+  const openRoom = (path: string, body: object, failure: (code: string) => string, tabName = '_blank') => {
+    setBusy(true); setNotice(''); const tab = window.open(tabName === '_blank' ? 'about:blank' : '', tabName);
+    // Only a tab opened just now (still blank) is closed when it fails; a reused one keeps its room.
+    const fresh = (() => { try { return tab?.location.href === 'about:blank'; } catch { return false; } })();
+    void roomApi<{ sessionId: string }>(path, body).then(result => { const url = `/?room=${result.sessionId}`; if (tab) tab.location.href = url; else window.open(url, tabName); })
+      .catch(cause => { if (fresh) tab?.close(); setNotice(failure(cause instanceof Error ? cause.message : '')); }).finally(() => setBusy(false));
   };
   const play = () => openRoom('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() }, () => 'Publish the game before playing it.');
   /** Practise the current draft without publishing it, from the start or from one scene (`only`: just that scene). */
   const rehearse = (startNodeKey: string | null, only = false) => openRoom(`/api/host/games/${gameId}/rehearse`, { expectedRevision: revision.current, startNodeKey, ...(only ? { only: true } : {}), sessionId: newId(), commandId: newId() },
     code => code === 'INVALID_DEFINITION' ? (startNodeKey ? 'This scene cannot be played on its own: it needs something earlier in the game, such as the teams it plays in. Use Rehearse from here on an earlier scene.' : 'Fix the problems listed before rehearsing.')
-      : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.');
+      : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.', `rehearse-${gameId}`);
 
   return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
     undo: () => restore('undo'), redo: () => restore('redo'), restore,

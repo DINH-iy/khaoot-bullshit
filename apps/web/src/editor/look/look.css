@@ -18,8 +18,10 @@
 .swatches { display: flex; gap: 4px; } .swatches i { width: 16px; height: 16px; border-radius: 50%; display: block; box-shadow: 0 0 0 1px rgb(255 255 255 / .4); }
 
 .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
-.look-panel .color-field { display: flex; gap: 8px; align-items: center; font-weight: 500; }
-.color-field input[type=color], .answer-color input[type=color] { width: 40px; height: 32px; padding: 0; border: 1px solid var(--e-border); border-radius: 8px; background: none; flex: none; }
+.look-panel .color-field { display: flex; gap: 10px; align-items: center; width: 100%; font-weight: 500; }
+.look-panel .color-field:hover { background: var(--e-accent-soft); }
+.color-field-text { display: grid; min-width: 0; line-height: 1.25; }
+.color-field-text code { font: .78rem ui-monospace, Menlo, Consolas, monospace; color: var(--e-muted); }
 .answer-colors { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .answer-color { display: inline-flex; gap: 2px; align-items: center; }
 .look-warnings { background: light-dark(#fff4e5, #3a2a12); color: light-dark(#6b3a00, #ffd9a8); border-radius: 12px; padding: 10px 14px; }
@@ -101,7 +103,7 @@
 .look-controls .small-button { margin-left: 0; justify-self: start; min-height: 36px; padding: 6px 14px; border-radius: 10px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 600; }
 .look-controls .small-button:hover:not(:disabled) { border-color: var(--e-accent); }
 /* The colour pickers look like the answer colours' swatches; sliders in the editor's colour. */
-.look-panel .color-field input[type=color] { width: 44px; height: 36px; min-height: 0; padding: 2px; border: 1px solid var(--e-border); border-radius: 10px; background: var(--e-panel); cursor: pointer; }
+
 .look-panel input[type=range] { accent-color: var(--e-accent); }
 /* R15: a checkbox and its words on one line. */
 .look-panel label.choice { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0; font-weight: 500; }
@@ -163,3 +165,23 @@
 .theme-font-import { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
 .theme-font-import label { flex: 1 1 12rem; min-width: 0; }
 .theme-font-import .small-button, .theme-font-upload { min-height: 44px; }
+.theme-font-manage { align-self: start; min-height: 44px; }
+.theme-font-manage .ed-chevron { flex: none; transition: transform .15s; }
+.theme-font-manage[aria-expanded=true] .ed-chevron { transform: rotate(90deg); }
+.theme-font-library { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; max-height: 16rem; overflow-y: auto; }
+.theme-font-library li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 4px 2px 12px; border: 1px solid var(--e-border); border-radius: 8px; }
+.theme-font-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-font-library .small-button.icon-only { width: 44px; min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .theme-font-manage .ed-chevron { transition: none; } }
+/* Saved styles: the card, with its delete button in the corner (a sibling, never inside the card's button). */
+.saved-style { position: relative; display: grid; min-width: 0; }
+.saved-style .preset-card { padding-right: 52px; overflow-wrap: anywhere; }
+.saved-style .danger-icon { position: absolute; top: 4px; right: 4px; width: 44px; min-height: 44px; }
+/* On the card's own colours the outline needs the panel behind it to read. */
+.editor .saved-style button.danger-icon.danger-icon { background: var(--e-panel); }
+.editor .saved-style button.danger-icon.danger-icon:hover:not(:disabled), .editor .saved-style button.danger-icon.danger-icon:focus-visible { background: color-mix(in srgb, var(--e-danger) 12%, var(--e-panel)); }
+.style-change-dialog label { display: grid; gap: 4px; font-weight: 600; }
+.style-change-dialog input { min-height: 44px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--e-border); font: inherit; font-weight: 400; background: var(--e-bg, var(--e-panel)); color: var(--e-text); }
+.style-change-actions { display: grid; gap: 8px; }
+.style-change-actions button { min-height: 44px; }
+.ed-dialog .style-change-actions button.primary { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1d1730); font-weight: 700; }

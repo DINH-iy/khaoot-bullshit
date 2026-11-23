@@ -13,7 +13,7 @@ import { lockRoom, makeRoomCode } from '../rooms/gateway.js';
 import { joinToken, newToken, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
 import { OWNER_COOKIE, type OwnerAccess } from './owner-access.js';
 import { readRoomState } from '../rooms/reclaim.js';
-import { linkNextRoom } from '../rooms/restart.js';
+import { linkNextRoom, replaceRehearsal } from '../rooms/restart.js';
 import { closeRoom } from '../rooms/close.js';
 import { minigameTryout } from './minigame-tryout.js';
 import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
@@ -229,9 +229,11 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     try {
       const settings = await requireEditor(request); const creator = await ownerCreator();
       const body = request.body as { sessionId?: unknown; commandId?: unknown };
-      const versionId = await authoring.rehearsalVersion(creator.id, gameParam(request), request.body);
+      const gameId = gameParam(request); const versionId = await authoring.rehearsalVersion(creator.id, gameId, request.body);
       const sessionId = String(body.sessionId); const commandId = String(body.commandId);
       const expiresAt = await openRoom(settings.roomSecret, creator.id, versionId, sessionId, commandId);
+      // One rehearsal room per game: the open one is replaced, and everyone in it moves along.
+      await client.$transaction(tx => replaceRehearsal(tx, creator.id, gameId, sessionId));
       reply.header('set-cookie', roomCookie(config, sessionId, joinToken(settings.roomSecret, sessionId, `owner:${commandId}`), expiresAt));
       return { ok: true, data: { sessionId } };
     } catch (error) { return fail(reply, error); }

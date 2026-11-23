@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { parseDefinition } from '../../../src/game/definition.js';
 import { db, fixture, hostCommand, prisma, service } from '../game-fixture.js';
+import { readSessionView } from '../../../src/game/views.js';
 
 // Points by place, paid through the real command service and ledger.
 afterAll(async () => { await db.close(); });
@@ -61,5 +62,28 @@ describe('points by place', () => {
     await hostCommand(f, 'stage.judge', { stageRunId: stage, playerId: f.players[0]!.id, amountMilli: '10000' });
     await hostCommand(f, 'stage.judge', { stageRunId: stage, playerId: f.players[1]!.id, amountMilli: '5000' });
     expect(await totals(f)).toEqual(['10000', '5000']);
+  });
+  it('let the host give points on a writing, upload or drawing round once its answers are shown: within the limit, once per player', async () => {
+    const open = (scoring: object) => parseDefinition({ formatVersion: 1, title: 'Jokes', startNodeKey: 'w', edges: [], nodes: [{ key: 'w', stages: [{ key: 'main', kind: 'collect', prompt: 'Your best joke', durationMs: null,
+      input: { kind: 'text', maxLength: 240 }, scoring }] }] });
+    const f = await fixture(2, open({ kind: 'judged', maxAwardMilli: '8000' })); const stage = (await hostCommand(f, 'session.start')).stageRunId!;
+    await submit(f, 0, stage, { kind: 'text', text: 'Knock knock' }); await submit(f, 1, stage, { kind: 'text', text: 'A pun' });
+    // Not while answers are still coming in.
+    await expect(hostCommand(f, 'stage.judge', { stageRunId: stage, playerId: f.players[0]!.id, amountMilli: '8000' })).rejects.toThrow('INVALID_STATE');
+    await hostCommand(f, 'stage.close', { stageRunId: stage });
+    await hostCommand(f, 'stage.reveal', { stageRunId: stage });
+    expect((await readSessionView(prisma, f.host, f.sessionId)).stage!.challenge).toEqual({ maxAwardMilli: '8000', placesMilli: null, judgedPlayerIds: [], judgedTeamIds: [] });
+    await expect(hostCommand(f, 'stage.judge', { stageRunId: stage, playerId: f.players[0]!.id, amountMilli: '8001' })).rejects.toThrow('INVALID_SUBMISSION');
+    await hostCommand(f, 'stage.judge', { stageRunId: stage, playerId: f.players[0]!.id, amountMilli: '8000' });
+    await expect(hostCommand(f, 'stage.judge', { stageRunId: stage, playerId: f.players[0]!.id, amountMilli: '1000' })).rejects.toThrow('ALREADY_JUDGED');
+    expect(await totals(f)).toEqual(['8000', '0']);
+    // Shown at once: the round is already revealed.
+    const phone = await readSessionView(prisma, actor(f, 1), f.sessionId);
+    expect(phone.standings).toContainEqual({ playerId: f.players[0]!.id, amountMilli: '8000' });
+    expect(phone.stage!.reveal!.awards).toContainEqual({ playerId: f.players[0]!.id, amountMilli: '8000' });
+    // A round without host points cannot be judged.
+    const plain = await fixture(1, open({ kind: 'none' })); const other = (await hostCommand(plain, 'session.start')).stageRunId!;
+    await hostCommand(plain, 'stage.close', { stageRunId: other });
+    await expect(hostCommand(plain, 'stage.judge', { stageRunId: other, playerId: plain.players[0]!.id, amountMilli: '1000' })).rejects.toThrow('INVALID_STATE');
   });
 });

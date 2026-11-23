@@ -15,8 +15,14 @@ const paths: Record<string, string> = {
   drawing: 'M3 21c3 0 4-2 4-4a2 2 0 0 1 4 0c0 2-2 4-8 4z M9.5 14.5L20 4 M17 3l4 4',
   start: 'M5 21V4 M5 4l12 5-12 5',
   undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
+  // An eraser (gum): a slanted block with its rubber end, on a line.
+  eraser: 'M14.5 4.5l5 5L11 18H6.5L3 14.5z M9 10l5 5 M6.5 18H21',
+  // Start over: a circular arrow back to the beginning.
+  restart: 'M4 12a8 8 0 1 0 2.4-5.7 M4 4v4h4',
   redo: 'M15 14l5-5-5-5 M20 9H9a5 5 0 0 0 0 10h3',
   plus: 'M12 5v14 M5 12h14',
+  // A minigame draw: a card held in front of a second one, with a question mark.
+  draw: 'M8 3h10a2 2 0 0 1 2 2v12 M4 7h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z M7 12.5a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.3 M9 18h.01',
   // A wheel of fortune: a wheel with spokes and a pointer.
   wheel: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 3v18 M3 12h18 M5.6 5.6l12.8 12.8 M18.4 5.6L5.6 18.4 M12 1l-2 3h4z',
   // A duel: two crossed swords.

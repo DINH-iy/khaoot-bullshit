@@ -26,6 +26,6 @@ export function DrawingFields({ stage, onChange }: { stage: Stage; onChange: (ne
         <button className="small-button" onClick={() => { setDoodle(input.start ?? emptyDrawing()); setEditing(false); }}>{t('cancel')}</button></div></div>
       : <div className="doodle-preview">{input.start && <DrawingView drawings={[input.start]} label={t('doodleLabel')} />}
         <div className="actions"><button className="small-button" onClick={() => setEditing(true)}>{t(input.start ? 'changeDoodle' : 'drawDoodle')}</button>
-          {input.start && <button className="small-button" onClick={() => { const { start: _start, ...rest } = input; setInput(rest, 'start'); setDoodle(emptyDrawing()); }}>{t('removeDoodle')}</button>}</div></div>}
+          {input.start && <button type="button" className="small-button danger-outline" onClick={() => { const { start: _start, ...rest } = input; setInput(rest, 'start'); setDoodle(emptyDrawing()); }}>{t('removeDoodle')}</button>}</div></div>}
   </fieldset>;
 }

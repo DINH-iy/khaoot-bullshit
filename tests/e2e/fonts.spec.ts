@@ -84,3 +84,31 @@ test('an uploaded font reaches every room screen and a scene can override the ga
     await Promise.all([display.close(), phone.close()]);
   }
 });
+
+test('a shared font can be removed once no look uses it', async ({ page: host, baseURL }, info) => {
+  test.skip(info.project.name !== 'desktop-chrome', 'Library management is an editor task.');
+  await host.goto(`${baseURL}/?host=1#owner=${token}`);
+  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  // A minimal TrueType header of its own, so the font is not shared with the other font test.
+  const bytes = Buffer.alloc(60); bytes.writeUInt32BE(0x00010000, 0); bytes.writeUInt16BE(2, 4); Buffer.from(randomUUID()).copy(bytes, 44, 0, 15);
+  const spare = (await (await host.request.post(`${baseURL}/api/host/fonts?name=Spare%20font.ttf`, { headers: { ...headers, 'content-type': 'application/octet-stream' }, data: bytes })).json()).data as { id: string; name: string };
+  const gameId = randomUUID();
+  const games = `${baseURL}/api/host/games`;
+  expect((await host.request.post(games, { headers, data: { gameId, title: "Spare fonts", startFrom: null } })).ok()).toBe(true);
+  await host.goto(`${baseURL}/?edit=${gameId}&view=look`);
+  await chooseOption(host.getByLabel('Change the look of'), { label: 'The whole game' });
+  await host.locator('.look-panel summary').filter({ has: host.locator('.ed-section-title', { hasText: /^Text$/ }) }).click();
+  const textFont = host.getByRole('combobox', { name: 'Font', exact: true });
+  await chooseOption(textFont, { label: 'Spare font' });
+  await host.getByRole('button', { name: /^Shared fonts \(\d+\)$/ }).click();
+  const removeSpare = host.getByRole('button', { name: 'Remove Spare font from the shared fonts' });
+  await expect(removeSpare).toBeDisabled();
+  await chooseOption(textFont, 'serif');
+  await expect.poll(async () => JSON.stringify((await (await host.request.get(`${games}/${gameId}`, { headers })).json()).data.definition)).not.toContain(spare.id);
+  await removeSpare.click();
+  await host.getByRole('alertdialog').getByRole('button', { name: 'Remove font' }).click();
+  await expect(host.getByRole('status').filter({ hasText: 'Spare font was removed from the shared fonts.' })).toBeVisible();
+  await expect(removeSpare).toHaveCount(0);
+  expect(((await (await host.request.get(`${baseURL}/api/host/fonts`, { headers })).json()).data as { id: string }[]).map(font => font.id)).not.toContain(spare.id);
+});

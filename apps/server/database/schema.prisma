@@ -53,6 +53,7 @@ enum DecisionReason {
   HOST
   TIE_BREAK
   FALLBACK
+  DRAW
 }
 
 enum EventAudience {
@@ -82,6 +83,7 @@ model Creator {
   versions GameVersion[]
   sessions GameSession[]
   prefabs  ScenePrefab[]
+  styles   ThemeStyle[]
 
   @@unique([issuer, subject])
   @@map("creators")
@@ -738,6 +740,22 @@ model ScenePrefab {
 
   @@index([creatorId, createdAt])
   @@map("scene_prefabs")
+}
+
+// Saved styles: looks made in Look & feel to reuse in other games, shared by the owner and editors
+// like prefabs. Games copy the values when they use one, so a change here never alters a game.
+model ThemeStyle {
+  id        String   @id @db.Uuid
+  creatorId String   @db.Uuid
+  name      String   @db.VarChar(60)
+  theme     Json     @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+
+  @@index([creatorId, createdAt])
+  @@map("theme_styles")
 }
 
 // A challenge between two players of a room (rock paper scissors, tic-tac-toe,

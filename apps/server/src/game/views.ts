@@ -1,10 +1,10 @@
 import { ballotTally } from './scoring/ballot.js';
-import { readExplain } from './explain.js';
+import { introView, readExplain } from './explain.js';
 import { isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/shared/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
-import { isVoteSource, minigameRules, parseDefinition, stagePlaces, type StageDefinition } from './definition.js';
+import { isVoteSource, judging, minigameRules, parseDefinition, stagePlaces, type StageDefinition } from './definition.js';
 import { duelView } from './duel.js';
 import { readMinigameRun } from '../minigames/shared/rules.js';
 import { readGraphPlayback } from '../minigames/draw-the-graph/playback.js';
@@ -71,7 +71,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       const eligible = current ? EligibilitySchema.safeParse(current.eligibility) : null;
       // Only answers count; the turns of a relay drawing are parts, not answers.
       const submissions = current ? await tx.submission.findMany({ where: { stageRunId: current.id, slotKey: 'answer' }, select: { value: true } }) : [];
-      const judged = current && stageEntry?.kind === 'challenge' ? await tx.stageJudgment.findMany({ where: { stageRunId: current.id }, select: { playerId: true }, orderBy: { playerId: 'asc' } }) : [];
+      const judged = current && stageEntry && judging(stageEntry) ? await tx.stageJudgment.findMany({ where: { stageRunId: current.id }, select: { playerId: true }, orderBy: { playerId: 'asc' } }) : [];
       const revealed = Boolean(current?.revealedAt);
       const awards = current && revealed ? await tx.scoreEntry.groupBy({ by: ['recipientPlayerId'], where: { stageRunId: current.id, recipientPlayerId: { not: null } }, _sum: { amountMilli: true }, orderBy: { recipientPlayerId: 'asc' } }) : [];
       const teamAwards = current && revealed ? await tx.scoreEntry.groupBy({ by: ['recipientTeamId'], where: { stageRunId: current.id, recipientTeamId: { not: null } }, _sum: { amountMilli: true }, orderBy: { recipientTeamId: 'asc' } }) : [];
@@ -158,12 +158,13 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       return SessionViewSchema.parse({ formatVersion: 1, sessionId: session.id, revision: session.revision, status: session.status, title: definition.title,
         stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt, translations: entry.stage.translations,
           input: entry.stage.kind === 'collect' ? publicInput(entry.stage.input, `${current.id}:${actorKey(actor.data)}`)
-            : entry.stage.kind === 'route' && entry.stage.decide.method !== 'host' ? { kind: 'choice', layout: 'tiles', options: entry.stage.options } : null, status: current.status,
+            : entry.stage.kind === 'route' && entry.stage.decide.method !== 'host' && entry.stage.decide.method !== 'draw' ? { kind: 'choice', layout: 'tiles', options: entry.stage.options } : null, status: current.status,
           deadlineAt: !current.revealedAt ? current.deadlineAt?.toISOString() ?? null : null, pausedRemainingMs: !current.revealedAt ? current.pausedRemainingMs : null,
           submittedCount: submissions.length, eligibleCount: choice ? choice.voterCount : eligible?.success ? eligible.data.playerIds.length : 0,
-          challenge: entry.stage.kind === 'challenge' ? { maxAwardMilli: entry.stage.maxAwardMilli, placesMilli: stagePlaces(entry.stage), judgedPlayerIds: judged.map(row => row.playerId), judgedTeamIds: [...new Set(judged.map(row => context?.teamOf.get(row.playerId)).filter(id => id !== undefined))] } : null,
+          // The host's judging: a challenge, or a writing, upload or drawing round with host points.
+          challenge: judging(entry.stage) ? { maxAwardMilli: judging(entry.stage)!.maxAwardMilli, placesMilli: stagePlaces(entry.stage), judgedPlayerIds: judged.map(row => row.playerId), judgedTeamIds: [...new Set(judged.map(row => context?.teamOf.get(row.playerId)).filter(id => id !== undefined))] } : null,
           teams, route: choice?.view ?? null,
-          explain: current.status === 'ACTIVE' && readExplain(current.presentation) ? { text: entry.stage.explain?.text ?? null, readyIds: readExplain(current.presentation)!.readyIds } : null,
+          explain: current.status === 'ACTIVE' && readExplain(current.presentation) ? introView(entry.stage, readExplain(current.presentation)!.readyIds) : null,
           youtube: entry.stage.youtube,
           mediaLayout: entry.stage.mediaLayout,
           media: entry.stage.media ? { ...entry.stage.media, url: sceneMediaUrl(entry.stage.media.id) } : null,

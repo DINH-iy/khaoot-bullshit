@@ -109,7 +109,7 @@ export function graphIssues(definition: GameDefinition): GraphIssue[] {
     if (new Set(connected).size !== connected.length) fail('Duplicate route option', node.key);
     if (options.some(option => !connected.includes(option))) fail('Unconnected route option', node.key);
     if (new Set(edges.map(edge => edge.to)).size !== edges.length) fail('Route options must lead to different scenes', node.key);
-    const usesDefault = route.decide.method !== 'host' && (route.decide.tie === 'default' || route.decide.noVotes === 'default');
+    const usesDefault = 'tie' in route.decide && (route.decide.tie === 'default' || route.decide.noVotes === 'default');
     if (usesDefault !== (route.defaultOptionKey !== undefined) || (route.defaultOptionKey !== undefined && !options.includes(route.defaultOptionKey))) fail('Invalid default route', node.key);
     if (route.decide.method === 'host' && route.durationMs !== null) fail('Host route choice has no timer', node.key);
   }

@@ -53,6 +53,7 @@ test('scene translations, background motion and a YouTube clip work from editor 
   await page.getByRole('button', { name: 'ASCII Terminal' }).click();
   await page.locator('summary').getByText('Shapes and background', { exact: true }).click();
   await page.getByRole('button', { name: 'Starlight' }).click();
+  await page.getByRole('dialog', { name: 'Change “ASCII Terminal”?' }).getByRole('button', { name: 'Only change this look' }).click();
   await expect(page.locator('.room-preview.motion-starlight')).toHaveCount(2);
   await page.getByRole('tab', { name: 'Texts', exact: true }).click();
   await chooseOption(page.getByLabel('Text language'), 'nl');

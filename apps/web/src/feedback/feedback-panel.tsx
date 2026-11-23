@@ -80,7 +80,7 @@ export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent
         <p>Is it about something on this screen? Point at it.</p>
         {elements.length > 0 && <ul>{elements.map((element, index) => <li key={index}>
           <span><strong>{element.label || element.text || element.tag}</strong>{element.source && <code>{element.source}</code>}</span>
-          <button type="button" className="quiet" aria-label={`Remove pointed element ${index + 1}`} onClick={() => setElements(list => list.filter((_, at) => at !== index))}>Remove</button></li>)}</ul>}
+          <button type="button" className="danger" aria-label={`Remove pointed element ${index + 1}`} onClick={() => setElements(list => list.filter((_, at) => at !== index))}>Remove</button></li>)}</ul>}
         {elements.length < 5 && <button type="button" className="quiet" onClick={() => setPicking(true)}>{elements.length ? 'Point at another thing' : 'Point at something'}</button>}
       </div>
       <div className="feedback-attachment">
@@ -94,7 +94,7 @@ export function FeedbackPanel({ onClose, onSent }: { onClose: () => void; onSent
             setFile(selected); setError('');
           }} />
         </label>
-        {file && <div className="feedback-file"><span>{file.name}</span><button type="button" className="quiet" disabled={sending} onClick={() => setFile(undefined)}>Remove attachment</button></div>}
+        {file && <div className="feedback-file"><span>{file.name}</span><button type="button" className="danger" disabled={sending} onClick={() => setFile(undefined)}>Remove attachment</button></div>}
       </div>
       <label>Your name <small>(optional)</small><input maxLength={60} autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} /></label>
       {error && <p role="alert" className="error">{error}</p>}

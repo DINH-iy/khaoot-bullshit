@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { inspectDefinition } from '../../src/authoring/drafts.js';
 // The editor's own model: what it adds must be what the server accepts.
 import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS } from '@party/contracts';
-import { addConnectedScene, insertOnEdge, setRouteOptions, QUIZ_KINDS, SCENE_TYPES, SCENE_VARIANTS, updateStage, withDuelContest, withMinigame, withQuizKind, type Definition } from '../../../web/src/editor/model.js';
+import { addConnectedScene, addDrawGames, DRAW_START, insertOnEdge, optionsOf, withDrawGame, setRouteOptions, QUIZ_KINDS, SCENE_TYPES, SCENE_VARIANTS, updateStage, withDuelContest, withMinigame, withQuizKind, type Definition } from '../../../web/src/editor/model.js';
 
 const blank = (): Definition => ({ formatVersion: 2, title: 'Variants', startNodeKey: 'welcome',
   nodes: [{ key: 'welcome', stages: [{ key: 'intro', kind: 'info', title: 'Hi', prompt: 'Welcome!', durationMs: null }] }], edges: [] });
@@ -15,6 +15,8 @@ describe('every kind in the add menu', () => {
     if (type === 'vote') definition = addConnectedScene(definition, 'writing', 'welcome', undefined).definition;
     const from = definition.nodes.at(-1)!.key;
     const added = addConnectedScene(definition, type, from, undefined, variant);
+    // A minigame draw comes with a scene per game, as the canvas adds it.
+    if (type === 'draw') added.definition = addDrawGames(added.definition, added.key).definition;
     const issues = inspectDefinition(added.definition).issues.filter(issue => issue.nodeKey === added.key);
     // A new party choice's routes still need somewhere to go: the only thing allowed to be left to do.
     expect(issues.map(issue => issue.message).filter(message => !(type === 'route' && message === 'A route option is not connected to a scene yet.'))).toEqual([]);
@@ -53,7 +55,10 @@ describe('adding a scene on an arrow', () => {
     const inserted = insertOnEdge(start, edge.key, type)!;
     // welcome → new scene → the scene the arrow went to.
     expect(inserted.definition.edges.find(entry => entry.key === edge.key)!.to).toBe(inserted.key);
-    expect(inserted.definition.edges.some(entry => entry.from === inserted.key && entry.to === edge.to)).toBe(true);
+    // A minigame draw leads there through each of its games.
+    const leads = type === 'draw' ? inserted.games!.map(key => ({ from: key })) : [{ from: inserted.key }];
+    for (const { from } of leads) expect(inserted.definition.edges.some(entry => entry.from === from && entry.to === edge.to)).toBe(true);
+    if (type === 'draw') expect(inserted.definition.edges.filter(entry => entry.from === inserted.key).map(entry => entry.to)).toEqual(inserted.games);
     const issues = inspectDefinition(inserted.definition).issues.map(issue => issue.message);
     expect(issues.filter(message => !(type === 'route' && message === 'A route option is not connected to a scene yet.'))).toEqual([]);
   });
@@ -75,5 +80,24 @@ describe('a party choice with many routes', () => {
   });
   it('refuses a 9th', () => {
     expect(inspectDefinition(withRoutes(9)).issues.filter(issue => issue.message !== 'A route option is not connected to a scene yet.').length).toBeGreaterThan(0);
+  });
+});
+
+describe('a minigame draw', () => {
+  const drawn = () => { const added = addConnectedScene(blank(), 'draw', 'welcome', undefined); return { key: added.key, definition: addDrawGames(added.definition, added.key) }; };
+  it('starts with a minigame scene for each of its games', () => {
+    const { key, definition } = drawn();
+    const games = definition.definition.edges.filter(edge => edge.from === key).map(edge => definition.definition.nodes.find(node => node.key === edge.to)!.stages[0]!['game']);
+    expect(games).toEqual(DRAW_START);
+    expect(inspectDefinition(definition.definition).issues).toEqual([]);
+  });
+  it.each(MINIGAME_KEYS)('switching a game to %s switches its scene too, and the game stays valid (team games get teams for that round)', game => {
+    const { key, definition } = drawn();
+    const option = optionsOf(definition.definition.nodes.find(node => node.key === key))[0]!;
+    if (DRAW_START.includes(game) && game !== option.key) return; // a game already in the draw is not offered twice
+    const switched = withDrawGame(definition.definition, key, option.key, game);
+    const target = switched.edges.find(edge => edge.from === key && edge.option === option.key)!.to;
+    expect(switched.nodes.find(node => node.key === target)!.stages[0]).toMatchObject({ kind: 'minigame', game });
+    expect(inspectDefinition(switched).issues).toEqual([]);
   });
 });

@@ -11,6 +11,7 @@ main.admin-page { max-width: 1280px; padding: 24px 28px 48px; }
 .admin-chips button[aria-pressed=true] { background: #6d3fd6; color: #fff; border-color: #6d3fd6; }
 .admin-chips span { margin-left: 4px; padding: 0 7px; border-radius: 999px; background: rgb(0 0 0 / .12); font-size: .8rem; }
 .admin-page button.danger { background: transparent; color: light-dark(#9d1717, #ffb4b4); border: 1px solid currentColor; }
+.admin-page button.danger:hover:not(:disabled), .admin-page button.danger:focus-visible { background: light-dark(#fdecec, #3a1c22); }
 .admin-empty { opacity: .7; }
 .admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .admin-item { margin: 0; padding: 16px 18px; border-radius: 16px; border: 1px solid light-dark(#e3def2, #3a3550); border-left: 6px solid #6d3fd6; background: light-dark(#fff, #1e1c28); display: grid; gap: 10px; }
@@ -201,8 +202,6 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .packs-item.new { border-left-style: dashed; }
 .packs-admin .packs-emoji { text-align: center; font-size: 1.25rem; padding: 0; }
 .packs-item-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
-.packs-admin .packs-item button.danger { border-color: transparent; }
-.packs-admin .packs-item button.danger:hover, .packs-admin .packs-item button.danger:focus-visible { border-color: currentColor; }
 @media (max-width: 720px) {
   .packs-set-row { flex-wrap: wrap; }
   .packs-set-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); } .packs-set-settings > *, .packs-set-settings > :nth-child(n) { grid-column: auto; } .packs-set-settings > .packs-name { grid-column: 1 / -1; }
@@ -231,7 +230,7 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 /* An item's picture (instead of its emoji), with a small × to go back to the emoji; the upload button next to save. */
 .packs-picture { position: relative; display: block; width: 42px; height: 42px; justify-self: center; }
 .packs-picture img { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; display: block; }
-.packs-admin button.packs-picture-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: light-dark(#3a3550, #e3def2); color: light-dark(#fff, #1e1c28); font-size: .85rem; line-height: 1; }
+.packs-admin button.packs-picture-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid currentColor; background: light-dark(#fff, #1e1c28); color: light-dark(#9d1717, #ffb4b4); font-size: .85rem; line-height: 1; }
 .packs-upload { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; border: 1px solid light-dark(#cfc8e3, #4a4560); cursor: pointer; }
 .packs-upload:focus-within { outline: 2px solid light-dark(#6d3fd6, #b9a2ff); outline-offset: 2px; }
 .packs-item { grid-template-columns: 3rem minmax(8rem, 1fr) 8rem minmax(10rem, 2fr) 140px; }

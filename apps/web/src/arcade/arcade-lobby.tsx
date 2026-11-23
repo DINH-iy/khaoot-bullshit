@@ -136,7 +136,7 @@ function LobbyPassword({ lobby, onChanged }: { lobby: ArcadeLobbyView; onChanged
         minLength={ARCADE_PASSWORD_MIN} maxLength={ARCADE_PASSWORD_MAX} value={password} onChange={event => setPassword(event.target.value)} /></label>
       <div className="arcade-password-actions">
         <button type="submit" className="primary" disabled={busy || password.trim().length === 0}>Save password</button>
-        {lobby.protected && <button type="button" disabled={busy} onClick={() => void save(null)}>Remove password</button>}
+        {lobby.protected && <button type="button" className="danger" disabled={busy} onClick={() => void save(null)}>Remove password</button>}
       </div>
       {notice && <p role="status">{notice}</p>}
       {error && <p role="alert" className="join-error">{error}</p>}

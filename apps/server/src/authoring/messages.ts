@@ -26,6 +26,7 @@ const RULES: Record<string, string> = {
   'Duplicate edge key': 'Two connections have the same name.',
   'Invalid correct choice': 'The correct answer is not one of the options.',
   'Invalid correct order': 'The correct order must use every item exactly once.',
+  'Only open rounds are judged': 'Only writing, upload and drawing rounds can get points from the host.',
   'Too many stages': 'This game has too many rounds (at most 200).',
   'Too many route choices': 'This game has too many party choices (at most 20).',
   'Too many connections': 'This game has too many connections.',

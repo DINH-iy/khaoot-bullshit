@@ -50,6 +50,8 @@ export const RoomStateSchema = z.object({
   testBench: z.boolean().default(false),
   // Set only by the authenticated local rehearsal launcher.
   tryout: z.boolean().default(false),
+  // The game a rehearsal room practises (set only by the rehearse route): rehearsing it again replaces this room (restart.ts).
+  rehearsalOf: GameIdSchema.nullable().default(null),
   expected: z.array(GameIdSchema).max(100).default([]),
   nameRequests: z.array(z.object({ id: GameIdSchema, personId: GameIdSchema, status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'USED']), requestedAt: z.string().datetime() }).strict()).max(50).default([]),
 }).strict();

@@ -16,6 +16,8 @@ export const TEXT_DEFAULTS = {
   ...HOW_TO_PLAY,
   // The explanation a scene can show before it starts (until the host continues).
   'explain.title': 'How it works', 'explain.ok': 'Got it!', 'explain.waiting': 'Waiting for the host to start…', 'explain.ready': '{count} of {total} ready', 'explain.start': 'Start the round',
+  'explain.atStake': 'At stake', 'explain.points': '{points} points', 'explain.upTo': 'Up to {points} points', 'explain.perVote': '{points} points per vote', 'explain.mostVotes': '+{points} for the most votes',
+  'explain.lookUp': 'Look at the screen: the round starts soon.',
   'join.title': 'Join a game', 'join.code': 'Room code', 'join.name': 'Your name', 'join.button': 'Join room', 'join.joining': 'Joining…',
   'join.reclaim': 'Phone died during a game?', 'join.reclaimButton': 'Take over my seat', 'join.notFound': 'No open room has that code. Check the code on the shared screen.',
   'join.codeMissing': 'Type the 6-character room code from the shared screen.', 'join.nameMissing': 'Type a name so the others know who you are.',
@@ -67,7 +69,10 @@ export function fillText(template: string, values: Record<string, string | numbe
 }
 
 // ---------- look ----------
-const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+/** A stored colour: `#rrggbb`, or `#rrggbbaa` when it is see-through (the last two digits are the opacity). */
+export const HEX_COLOR = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
+export const ColorSchema = z.string().regex(HEX_COLOR);
+const Color = ColorSchema;
 export const FONTS = { system: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', rounded: 'ui-rounded, "SF Pro Rounded", "Varela Round", "Nunito", system-ui, sans-serif',
   serif: 'Georgia, "Times New Roman", serif', slab: '"Rockwell", "Roboto Slab", Georgia, serif', mono: 'ui-monospace, Menlo, Consolas, monospace',
   condensed: '"Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif', playful: '"Chalkboard SE", "Comic Neue", "Comic Sans MS", cursive', elegant: '"Didot", "Bodoni 72", "Playfair Display", Georgia, serif' } as const;
@@ -185,13 +190,19 @@ export function answerMark(theme: Pick<FullTheme, 'markers' | 'routeMarkers'> & 
     default: return String.fromCharCode(65 + (index % 26));
   }
 }
-/** WCAG contrast ratio between two colours, for warnings in the editor. */
+/**
+ * WCAG contrast ratio between two colours, for warnings in the editor. A see-through first
+ * colour (`#rrggbbaa`) is mixed over the second, as it shows on screen.
+ */
 export function contrast(a: string, b: string): number {
-  const luminance = (hex: string) => {
-    const channels = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255).map(value => value <= .03928 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+  const rgb = (hex: string) => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+  const alpha = a.length === 9 ? parseInt(a.slice(7, 9), 16) / 255 : 1;
+  const front = rgb(a).map((value, index) => value * alpha + rgb(b)[index]! * (1 - alpha));
+  const luminance = (channels: number[]) => {
+    channels = channels.map(value => value <= .03928 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
     return .2126 * channels[0]! + .7152 * channels[1]! + .0722 * channels[2]!;
   };
-  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  const [light, dark] = [luminance(front), luminance(rgb(b))].sort((x, y) => y - x) as [number, number];
   return (light + .05) / (dark + .05);
 }
 

@@ -5,6 +5,17 @@ const t = (key: keyof typeof CONTROLS_TEXTS.en, values?: Record<string, string |
 import { createPortal } from 'react-dom';
 import './dropdown.css';
 
+/**
+ * After an option is clicked the list closes at once, and whatever was under it is exposed: a
+ * double click (or a quick second click) would land there, such as on a style card that replaces
+ * the whole look. The rest of that multi-click (detail above 1) is dropped; a new single click is not.
+ */
+function swallowStrayClick() {
+  const stop = (event: MouseEvent) => { if (event.detail > 1) { event.preventDefault(); event.stopPropagation(); } };
+  document.addEventListener('click', stop, true); document.addEventListener('dblclick', stop, true);
+  setTimeout(() => { document.removeEventListener('click', stop, true); document.removeEventListener('dblclick', stop, true); }, 400);
+}
+
 export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; lang?: string; style?: CSSProperties }
 
 /**
@@ -96,7 +107,7 @@ export function Dropdown({ id: buttonId, value, options, onChange, placeholder =
   options.forEach((option, index) => { const lastGroup = groups.at(-1); if (lastGroup && lastGroup.name === option.group) lastGroup.items.push(index); else groups.push({ name: option.group, items: [index] }); });
   const optionEl = (index: number) => { const option = options[index]!; return <div key={index} id={`${id}-${index}`} role="option" data-value={option.value} lang={option.lang} aria-selected={index === selected} aria-disabled={option.disabled || undefined}
     className={`ed-dropdown-option${index === active ? ' active' : ''}`} style={option.style}
-    onPointerMove={() => { if (enabled(index) && index !== active) setActive(index); }} onPointerDown={event => event.preventDefault()} onClick={() => choose(index)}>{index === selected && <span className="ed-dropdown-check" aria-hidden="true">✓</span>}{option.label}</div>; };
+    onPointerMove={() => { if (enabled(index) && index !== active) setActive(index); }} onPointerDown={event => event.preventDefault()} onClick={() => { choose(index); swallowStrayClick(); }}>{index === selected && <span className="ed-dropdown-check" aria-hidden="true">✓</span>}{option.label}</div>; };
   const root = (button.current?.closest('dialog[open], [role=dialog], .app-menu, .editor, .room') as HTMLElement | null) ?? document.body;
 
   return <>

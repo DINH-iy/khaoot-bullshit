@@ -20,8 +20,8 @@ export const readRoute = (presentation: unknown) => {
 };
 const Counts = z.array(z.object({ optionKey: GameKeySchema, count: z.number().int().min(0) }).strict());
 export const RouteSnapshotSchema = z.object({
-  formatVersion: z.literal(1), optionKey: GameKeySchema, method: z.enum(['players', 'captains', 'host']), voterCount: z.number().int().min(0),
-  counts: Counts, leaders: z.array(GameKeySchema), resolution: z.enum(['majority', 'host', 'default', 'random']),
+  formatVersion: z.literal(1), optionKey: GameKeySchema, method: z.enum(['players', 'captains', 'host', 'draw']), voterCount: z.number().int().min(0),
+  counts: Counts, leaders: z.array(GameKeySchema), resolution: z.enum(['majority', 'host', 'default', 'random', 'draw']),
   random: z.object({ candidates: z.array(GameKeySchema).min(1), index: z.number().int().min(0) }).strict().nullable(),
   closedBy: z.enum(['close', 'timeout', 'decide']),
 }).strict();
@@ -29,9 +29,9 @@ export type RouteSnapshot = z.infer<typeof RouteSnapshotSchema>;
 export type RouteCounts = z.infer<typeof Counts>;
 export interface RouteDecisionEffect { stageRunId: string; selectedEdgeKey: string; destinationNodeKey: string; reason: DecisionReason; voteSnapshot: RouteSnapshot }
 
-/** Who may vote, fixed when the vote opens: every present player, each team's captain (one vote per team), or nobody (the host decides). */
+/** Who may vote, fixed when the vote opens: every present player, each team's captain (one vote per team), or nobody (the host decides, or a draw does). */
 export async function openRoute(tx: Transaction, sessionId: string, stage: RouteStage, presentIds: string[]) {
-  if (stage.decide.method === 'host') return { eligibility: [], lineupId: null, presentation: { route: { formatVersion: 1, voterKeys: [] } } };
+  if (stage.decide.method === 'host' || stage.decide.method === 'draw') return { eligibility: [], lineupId: null, presentation: { route: { formatVersion: 1, voterKeys: [] } } };
   if (stage.decide.method === 'players') return { eligibility: presentIds, lineupId: null, presentation: { route: { formatVersion: 1, voterKeys: presentIds.map(id => `player:${id}`) } } };
   // Captains: the game's teams (late joiners placed as in any game-team round). A team whose captain is absent gets no vote.
   const lineup = await gameLineupForRound(tx, sessionId, presentIds);
@@ -60,6 +60,7 @@ export function leadersOf(counts: RouteCounts): string[] {
 /** Why a closed vote has not decided itself yet, or null when the rules decide it. */
 export function pendingReason(counts: RouteCounts, stage: RouteStage): Pending | null {
   if (stage.decide.method === 'host') return 'host';
+  if (stage.decide.method === 'draw') return null;
   const leaders = leadersOf(counts);
   if (leaders.length === 1) return null;
   if (leaders.length === 0) return stage.decide.noVotes === 'host' ? 'no-votes' : null;
@@ -77,6 +78,8 @@ export function resolveTally(counts: RouteCounts, stage: RouteStage, draw: (max:
   if (stage.decide.method === 'host') return { pending: 'host' };
   const leaders = leadersOf(counts);
   const pick = (candidates: string[], reason: DecisionReason) => { const index = draw(candidates.length); return { optionKey: candidates[index]!, reason, resolution: 'random' as const, leaders, random: { candidates, index } }; };
+  // A minigame draw: every route is a candidate; the draw and its candidates are stored, so it is never redrawn.
+  if (stage.decide.method === 'draw') return { ...pick(stage.options.map(option => option.key), 'DRAW'), resolution: 'draw' };
   if (leaders.length === 1) return { optionKey: leaders[0]!, reason: 'VOTE', resolution: 'majority', leaders, random: null };
   if (leaders.length === 0) {
     if (stage.decide.noVotes === 'default') return { optionKey: stage.defaultOptionKey!, reason: 'FALLBACK', resolution: 'default', leaders, random: null };

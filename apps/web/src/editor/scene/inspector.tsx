@@ -1,9 +1,9 @@
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
-import { isSharedPrediction, placePoints, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
+import { isSharedPrediction, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
-import { ExplainFields } from './fields/explain-fields.js';
+import { ExplainFields, stakeSummary } from './fields/explain-fields.js';
 import { ActionMenu, type MenuAction } from '../controls/action-menu.js';
 import { ReplaceSceneDialog, REPLACE_TEXTS } from './replace-scene.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
@@ -22,11 +22,16 @@ import { translate, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { MediaField } from './fields/media-field.js';
 import { musicSummary, SceneMusicFields } from './fields/music-fields.js';
-import { isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, QUIZ_KINDS, quizKind, setRouteOptions, uniqueKey, updateStage, withQuizKind, WRITING_STARTERS, type Definition, type Node, type Option, type Stage } from '../model.js';
+import { MINIGAME_KEYS, TEAM_MINIGAMES, type MinigameKey } from '@party/contracts';
+import { gameName } from '../../presentation/catalog.text.js';
+import { drawGameOf, isDrawScene, withDrawGame, isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, QUIZ_KINDS, quizKind, setRouteOptions, uniqueKey, updateStage, withQuizKind, WRITING_STARTERS, type Definition, type Node, type Option, type Stage } from '../model.js';
 
 type Change = (next: Definition, group?: string) => void;
 // In the current language; the editor redraws its panels when the language changes.
 const t = (key: keyof typeof INSPECTOR_TEXTS.en, values?: Record<string, string | number>) => translate(INSPECTOR_TEXTS, key, values);
+/** The intro's summary: off, the points it shows, or on. */
+const introSummary = (stage: Stage) => { const intro = stage['explain'] as { points?: boolean } | undefined; const stake = intro?.points ? pointsAtStake(stage) : null;
+  return !intro ? t('off') : stake ? stakeSummary(stake) : t('explanationOn'); };
 const toSeconds = (ms: unknown) => typeof ms === 'number' ? String(Math.round(ms / 1000)) : '';
 const toMs = (text: string) => { const value = Number(text); return text.trim() === '' ? null : Number.isFinite(value) ? Math.round(Math.min(3600, Math.max(1, value))) * 1000 : null; };
 const points = (milli: unknown) => typeof milli === 'string' ? String(Number(milli) / 1000) : '';
@@ -38,6 +43,7 @@ function pointsSummary(stage: Stage): string {
   const placesOf = (value: unknown) => { const parsed = PlacesSchema.safeParse(value); return parsed.success ? placePoints(parsed.data).map(entry => Number(entry) / 1000).join('/') : null; };
   const scoring = stage['scoring'] as { kind?: string; awardMilli?: string; places?: unknown } | undefined;
   const withPlaces = (main: string, value: unknown, label: string) => { const list = placesOf(value); return list ? t('withPlaces', { main, label, list }) : main; };
+  if (stage.kind === 'collect' && scoring?.kind === 'judged') return withPlaces(t('upTo', { count: points((scoring as { maxAwardMilli?: string }).maxAwardMilli) }), scoring.places, t('placesL'));
   if (stage.kind === 'collect') return scoring?.kind === 'none' || !scoring ? t('noPoints') : withPlaces(t('pointsN', { count: points(scoring.awardMilli) }), scoring.places, t('fastestL'));
   if (stage.kind === 'challenge') return withPlaces(t('upTo', { count: points(stage['maxAwardMilli']) }), stage['places'], t('placesL'));
   if (stage.kind === 'vote') return withPlaces(t('perVote', { count: points(stage['awardPerVoteMilli']) }), stage['places'], t('mostVotesL'));
@@ -73,7 +79,10 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
   const poolStage = stage.kind === 'duel' && (stage['contest'] as { kind?: string; game?: string } | undefined)?.game === 'eight-ball';
   const timed = !poolStage && !(stage.kind === 'duel' && stage['pick'] === 'teams') && !(stage.kind === 'route' && (stage['decide'] as { method?: string }).method === 'host') && stage.kind !== 'scoreboard' && stage.kind !== 'teams' && !isWheelScene(stage);
   const graphRound = stage.kind === 'minigame' && stage['game'] === 'draw-the-graph';
-  const hasPoints = (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || (stage.kind === 'duel' && !poolStage) || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
+  const openRound = stage.kind === 'collect' && (input?.kind === 'text' || input?.kind === 'media' || input?.kind === 'drawing');
+  // A Vote scene that votes on this round: it then gives no points of its own.
+  const votedOn = definition.nodes.some(other => other.stages.some(part => part.kind === 'vote' && (part['source'] as { nodeKey?: string; stageKey?: string } | undefined)?.nodeKey === node.key && (part['source'] as { stageKey?: string }).stageKey === stage.key));
+  const hasPoints = openRound || (stage.kind === 'collect' && (input?.kind === 'choice' || input?.kind === 'order')) || stage.kind === 'challenge' || stage.kind === 'vote' || (stage.kind === 'duel' && !poolStage) || (stage.kind === 'minigame' && stage['game'] !== 'lucky-doors');
   const hasPlay = ['collect', 'challenge', 'vote', 'minigame'].includes(stage.kind);
   const voting = stage['voteMode'] === 'multi' || stage['voteMode'] === 'ranked' ? stage['voteMode'] : 'single';
   const cards = stage['resultCards'];
@@ -93,7 +102,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
           onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
       </details>}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
-      {timed && stage.kind !== 'minigame' && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : 'timer')}
+      {timed && stage.kind !== 'minigame' && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : isDrawScene(stage) ? 'drawTimer' : 'timer')}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600}
           placeholder={t('none')} value={toSeconds(stage.durationMs)}
           onChange={event => edit(current => ({ ...current, durationMs: toMs(event.target.value) }), 'timer')} />{t('sec')}</span></label>}
@@ -104,7 +113,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
         {(input.options ?? []).map((option, position) => <div key={option.key} className="option-row">
           {scoring?.kind === 'correct-choice' && <input type="radio" name={id('correct')} aria-label={t('isCorrect', { label: option.label })} checked={scoring.correctChoiceKey === option.key} onChange={() => edit(current => ({ ...current, scoring: { ...scoring, correctChoiceKey: option.key } }))} />}
           <input aria-label={t('answerOption', { number: position + 1 })} value={option.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, options: input.options!.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
-          <button className="icon-button" disabled={(input.options ?? []).length <= 2} aria-label={t('removeAnswer', { number: position + 1 })} onClick={() => edit(current => {
+          <button className="icon-button danger-icon" disabled={(input.options ?? []).length <= 2} aria-label={t('removeAnswer', { number: position + 1 })} onClick={() => edit(current => {
             const options = input.options!.filter(entry => entry.key !== option.key);
             return { ...current, input: { ...input, options }, ...(scoring?.kind === 'correct-choice' && scoring.correctChoiceKey === option.key ? { scoring: { ...scoring, correctChoiceKey: options[0]!.key } } : {}) };
           })}>×</button></div>)}
@@ -115,7 +124,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
           <span className="order-number">{position + 1}.</span>
           <input aria-label={t('item', { number: position + 1 })} value={item.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, items: input.items!.map(entry => entry.key === item.key ? { ...entry, label: event.target.value } : entry) } }), `item-${item.key}`)} />
           <button className="icon-button" aria-label={t('moveItemUp', { number: position + 1 })} disabled={position === 0} onClick={() => edit(current => { const items = [...input.items!]; [items[position - 1], items[position]] = [items[position]!, items[position - 1]!]; return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>↑</button>
-          <button className="icon-button" aria-label={t('removeItem', { number: position + 1 })} disabled={(input.items ?? []).length <= 2} onClick={() => edit(current => { const items = input.items!.filter(entry => entry.key !== item.key); return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>×</button></div>)}
+          <button className="icon-button danger-icon" aria-label={t('removeItem', { number: position + 1 })} disabled={(input.items ?? []).length <= 2} onClick={() => edit(current => { const items = input.items!.filter(entry => entry.key !== item.key); return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>×</button></div>)}
         <button className="small-button" disabled={(input.items ?? []).length >= 8} onClick={() => edit(current => { const items = [...input.items!, { key: uniqueKey('item', input.items!.map(entry => entry.key)), label: t('newItem') }]; return { ...current, input: { ...input, items }, scoring: { ...scoring, kind: 'correct-order', correctOrder: items.map(entry => entry.key) } }; })}>{t('addItem')}</button>
         <p className="hint">{t('shuffled')}</p>
       </fieldset>}
@@ -164,6 +173,14 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
       {stage.kind === 'collect' && input?.kind === 'order' && scoring?.kind === 'correct-order' && <>
         <label className="ed-inline">{t('pointsOrder')}<input type="number" min={0} value={points(scoring.awardMilli)} onChange={event => edit(current => ({ ...current, scoring: { ...scoring, awardMilli: milli(event.target.value) } }), 'points')} /></label>
         {fastest(t('correctOrders'))}</>}
+      {openRound && <>
+        <Segmented label={t('scoring')} stacked value={scoring?.kind === 'judged' ? 'host' : 'none'} choices={[{ value: 'none', label: t('openNone'), hint: t('openNoneHint') }, { value: 'host', label: t('openHost'), hint: t('openHostHint') }]}
+          onChange={value => { if (value === 'host' && votedOn) return; edit(current => ({ ...current, scoring: value === 'host' ? { kind: 'judged', maxAwardMilli: '10000' } : { kind: 'none' } }), 'scoring'); }} />
+        {votedOn && scoring?.kind !== 'judged' && <p className="hint">{t('votedOn')}</p>}
+        {scoring?.kind === 'judged' && <>
+          <label className="ed-inline">{t('mostHost')}<input type="number" min={0} value={points((scoring as { maxAwardMilli?: string }).maxAwardMilli)} onChange={event => edit(current => ({ ...current, scoring: { ...scoring, maxAwardMilli: milli(event.target.value) } }), 'points')} /></label>
+          <PlacesFields legend={t('byPlace')} hint={t('byPlaceHint')} value={scoring.places} onChange={places => edit(current => ({ ...current, scoring: withPlaces(scoring, places) }), 'places')} /></>}
+      </>}
       {stage.kind === 'challenge' && <>
         <label className="ed-inline">{t('mostHost')}<input type="number" min={0} value={points(stage['maxAwardMilli'])} onChange={event => edit(current => ({ ...current, maxAwardMilli: milli(event.target.value) }), 'points')} /></label>
         <PlacesFields legend={t('byPlace')} hint={t('byPlaceHint')} value={stage['places'] as Places | undefined} onChange={places => edit(current => withPlaces(current, places), 'places')} /></>}
@@ -174,7 +191,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
       {stage.kind === 'duel' && <DuelFields part="points" stage={stage} onChange={(next, field) => edit(() => next, field)} />}
     </Section>}
 
-    {hasPlay && <Section title={t('explanation')} memory="Explanation first" summary={t(stage['explain'] ? 'explanationOn' : 'off')}><ExplainFields definition={definition} stage={stage} onChange={(next, field) => edit(() => next, field)} /></Section>}
+    {hasPlay && <Section title={t('explanation')} memory="Explanation first" summary={introSummary(stage)}><ExplainFields definition={definition} stage={stage} onChange={(next, field) => edit(() => next, field)} /></Section>}
 
     {hasPlay && !graphRound && !(stage.kind === 'minigame' && isSharedPrediction(String(stage['game']))) && <Section title={t('whoPlays')} memory="Who plays" summary={playSummary(stage)}><PlayFields definition={definition} node={node} index={index} onChange={onChange} /></Section>}
     <Section title={t('music')} memory="scene-music" summary={musicSummary(stage)}><SceneMusicFields stage={stage} onChange={next => edit(() => next, 'music')} /></Section>
@@ -301,7 +318,7 @@ export function Inspector({ definition, node, problems, onChange, onDelete, onCl
     </div>
     {problems.length > 0 && <div role="alert" className="inspector-problems"><ul>{problems.map((issue, position) => <li key={position}>{issue.stageIndex !== null && node.stages.length > 1 ? t('part', { number: issue.stageIndex + 1 }) : ''}{issue.message}</li>)}</ul></div>}
     <fieldset className="view-lock" disabled={readOnly}>
-    {isRoute(node) && <RouteNames definition={definition} node={node} onChange={onChange} />}
+    {isRoute(node) && (isDrawScene(node.stages[0]) ? <DrawGames definition={definition} node={node} onChange={onChange} /> : <RouteNames definition={definition} node={node} onChange={onChange} />)}
     <Section key={`next-${node.key}`} title={t('whereNext')} memory="Where next" open summary={nextSummary(definition, node)}><NextFields definition={definition} node={node} onChange={onChange} /></Section>
     </fieldset>
     {confirming && <ConfirmDialog title={t('deleteAsk', { title: text.title })} text={t('deleteText')} confirm={t('deleteConfirm')}
@@ -317,6 +334,7 @@ function RouteFields({ definition, node, stage, onChange }: { definition: Defini
     if (merged.method === 'host') { next.durationMs = null; delete next['defaultOptionKey']; }
     return next;
   }));
+  if (decide.method === 'draw') return <><DrawGames definition={definition} node={node} onChange={onChange} /><p className="hint">{t('drawHint')}</p></>;
   return <>
     <RouteNames definition={definition} node={node} onChange={onChange} />
     <Segmented label={t('whoDecides')} value={decide.method} choices={[{ value: 'players', label: t('everyoneVotes') }, { value: 'captains', label: t('captainsVote') }, { value: 'host', label: t('theHost') }]} onChange={method => setDecide({ method })} />
@@ -328,13 +346,33 @@ function RouteFields({ definition, node, stage, onChange }: { definition: Defini
   </>;
 }
 
+/**
+ * A minigame draw's games (its outputs), in both editors: which minigame each one is, removing one,
+ * and adding another (the first minigame not in the draw yet). A game is in the draw once.
+ */
+function DrawGames({ definition, node, onChange }: { definition: Definition; node: Node; onChange: Change }) {
+  const options = optionsOf(node);
+  const games = options.map(option => drawGameOf(definition, node.key, option));
+  const unused = MINIGAME_KEYS.find(key => !games.includes(key));
+  return <fieldset><legend>{t('drawGames')}</legend>
+    {options.map((option, position) => <div key={option.key} className="option-row">
+      <Dropdown label={t('drawGameN', { number: position + 1 })} value={games[position] ?? ''} placeholder={option.label}
+        onChange={game => onChange(withDrawGame(definition, node.key, option.key, game as MinigameKey), `${node.key}:draw-${option.key}`)}
+        options={MINIGAME_KEYS.map(key => ({ value: key, label: TEAM_MINIGAMES.includes(key) ? t('teamGameRound', { game: gameName(key) }) : gameName(key), disabled: key !== games[position] && games.includes(key) }))} />
+      <button type="button" className="small-button icon-only danger-icon" disabled={options.length <= 2} aria-label={t('removeGame', { number: position + 1 })} title={t('removeGame', { number: position + 1 })}
+        onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}><Icon name="trash" size={16} /></button></div>)}
+    <button type="button" className="small-button" disabled={options.length >= 8 || !unused} onClick={() => unused && onChange(setRouteOptions(definition, node.key,
+      [...options, { key: uniqueKey('game', options.map(entry => entry.key)), label: gameName(unused) }]))}><Icon name="plus" size={16} /> {t('addGame')}</button>
+  </fieldset>;
+}
+
 /** A party choice's routes (its outputs): their names, and adding or removing one. In both editors. */
 function RouteNames({ definition, node, onChange }: { definition: Definition; node: Node; onChange: Change }) {
   const options = optionsOf(node);
   return <fieldset><legend>{t('routes')}</legend>
     {options.map((option, position) => <div key={option.key} className="option-row">
       <input aria-label={t('routeName', { number: position + 1 })} value={option.label} maxLength={240} onChange={event => onChange(setRouteOptions(definition, node.key, options.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry)), `${node.key}:route-${option.key}`)} />
-      <button className="icon-button" disabled={options.length <= 2} aria-label={t('removeRoute', { number: position + 1 })} onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}>×</button></div>)}
+      <button className="icon-button danger-icon" disabled={options.length <= 2} aria-label={t('removeRoute', { number: position + 1 })} onClick={() => onChange(setRouteOptions(definition, node.key, options.filter(entry => entry.key !== option.key)))}>×</button></div>)}
     <button className="small-button" disabled={options.length >= 8} onClick={() => onChange(setRouteOptions(definition, node.key, [...options, { key: uniqueKey('route', options.map(entry => entry.key)), label: t('routeN', { number: options.length + 1 }) }]))}>{t('addRoute')}</button>
   </fieldset>;
 }

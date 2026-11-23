@@ -15,6 +15,7 @@
 .feedback-panel input:not([type=radio]), .feedback-panel textarea { width: 100%; min-height: 44px; padding: 10px; border-radius: 9px; border: 1px solid light-dark(#8a8a8a, #888); background: light-dark(#fff, #14131b); color: inherit; font: inherit; font-weight: 400; }
 .feedback-panel textarea { min-height: 90px; resize: vertical; }
 .feedback-panel button { min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 0; background: #6d3fd6; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.feedback-panel button.danger { background: transparent; color: light-dark(#9d1717, #ffb4b4); border: 1px solid currentColor; font-weight: 600; }
 .feedback-panel button.quiet { background: light-dark(#f1edfb, #2c2840); color: inherit; font-weight: 600; }
 .feedback-panel button:disabled { opacity: .55; cursor: default; }
 .feedback-panel .feedback-close { min-width: 44px; padding: 0; background: transparent; color: inherit; font-size: 1.6rem; line-height: 1; }

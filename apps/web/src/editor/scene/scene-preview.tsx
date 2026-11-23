@@ -6,7 +6,9 @@ import { SpeedRunBoard } from '../../minigames/speed-run/speed-run.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
 import { useLanguage } from '../../i18n/language.js';
-import { useTexts } from '../../i18n/texts.js';
+import { translate, useTexts } from '../../i18n/texts.js';
+import { DrawBoard } from '../../room/minigame-draw.js';
+import { PLAY_TEXTS } from '../../room/play.text.js';
 import { buildLook, LookContext, themeClass, useThemeStyle } from '../../presentation/look.js';
 import { FaIcon } from '../../presentation/icons.js';
 import { gameDescription, gameName } from '../../presentation/catalog.text.js';
@@ -16,7 +18,7 @@ import { StageMedia, StageYouTube } from '../../room/stage-media.js';
 import { formatRemaining } from '../../room/stage-timer.js';
 import { answerFit } from '../../room/answer-fit.js';
 import { layerOf } from '../look/layer.js';
-import { optionsOf, quizKind, uniqueKey, type Definition, type Node, type Stage } from '../model.js';
+import { isDrawScene, optionsOf, quizKind, uniqueKey, type Definition, type Node, type Stage } from '../model.js';
 import { FIELDS_TEXTS } from './fields.text.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
@@ -68,6 +70,8 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
     : stage.kind === 'challenge' ? 'pHost' : stage.kind === 'minigame' ? 'pMinigame'
     : stage.kind === 'vote' ? 'pVote' : input?.kind === 'text' ? 'pType' : input?.kind === 'media' ? 'pUpload' : input?.kind === 'drawing' ? 'pDraw' : input?.kind === 'order' ? 'pOrder' : 'pChoose');
   const ordered = input?.kind === 'order';
+  // A minigame draw shows its cards, as in the room.
+  const draw = isDrawScene(stage); const drawHint = translate(PLAY_TEXTS, 'drawWho');
   const scoring = stage['scoring'] as { kind?: string; correctChoiceKey?: string } | undefined;
   const choices = input?.kind === 'choice' ? input.options : undefined;
   const mediaButton = canvas && ['collect', 'challenge', 'info'].includes(stage.kind)
@@ -102,7 +106,8 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
         {!interactive && timer && <p className="timer">{timer}</p>}
         {minigameCard}
         {practice}
-        {!interactive && options.length > 0 && <ul className={`${canvas ? 'tv-options' : 'options-board'}${ordered || (canvas && input?.layout === 'list') ? ' order' : ''}`}
+        {!interactive && draw && <DrawBoard options={options} drawn={null} at={null} seed="" waiting={drawHint} />}
+        {!interactive && !draw && options.length > 0 && <ul className={`${canvas ? 'tv-options' : 'options-board'}${ordered || (canvas && input?.layout === 'list') ? ' order' : ''}`}
           style={canvas ? undefined : answerFit(options.map(option => option.label))}>{options.map((option, position) => {
           const mark = ordered ? String(position + 1) : answerMark(theme, position, options.length, stage.kind === 'route');
           return <li key={option.key} className={canvas && choices ? 'canvas-answer' : undefined}
@@ -129,7 +134,8 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
         {!interactive && timer && <p className="timer">{timer}</p>}
         {minigameCard}
         {practice}
-        {!interactive && !minigameCard && (['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && !ordered
+        {!interactive && draw && <DrawBoard options={options} drawn={null} at={null} seed="" waiting={drawHint} />}
+        {!interactive && !minigameCard && !draw && (['collect', 'vote', 'route'].includes(stage.kind) && options.length > 0 && !ordered
           ? (input?.layout === 'tiles' || stage.kind === 'route') ? <fieldset className="tiles" style={answerFit(options.map(option => option.label))}>
             <legend>{look.text('answer.legend')}</legend>
             {options.map((option, index) => {

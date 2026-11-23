@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
-import { PeopleListSchema, PeopleStatsSchema, PersonKeyViewSchema, type PersonKeyView, type PersonRow, type PersonStats } from '@party/contracts';
+import { PeopleSummarySchema, PersonKeyViewSchema, PersonRowSchema, PersonStandingSchema, type PeopleSummary as Summary, type PersonKeyView, type PersonRow, type PersonStanding } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
 import { replaceWithHome } from '../navigation.js';
-import { seenThisWeek } from './people-time.js';
+import { usePeoplePage } from '../people/use-people-page.js';
+import { PeoplePager } from '../people/people-pager.js';
 import { initials, LastSeen, PersonPage, type PersonActions } from './person-page.js';
 import { Leaderboard } from './leaderboard.js';
 import { GroupsPanel } from './groups-panel.js';
@@ -50,11 +51,10 @@ function KeyCard({ view, onDone }: { view: PersonKeyView; onDone: () => void }) 
 
 /** People: accounts for regular players (and editors), so they always join as themselves and keep their chips. */
 export function PeoplePanel() {
-  const [people, setPeople] = useState<PersonRow[]>(); const [error, setError] = useState(''); const [name, setName] = useState('');
+  const paging = usePeoplePage({ withKeys: true }); const { data, search, setSearch, query } = paging;
+  const [summary, setSummary] = useState<Summary>(); const [error, setError] = useState(''); const [name, setName] = useState('');
   const [canEdit, setCanEdit] = useState(false);
   const [shown, setShown] = useState<PersonKeyView>(); const [busy, setBusy] = useState(false);
-  const [search, setSearch] = useState('');
-  const found = useMemo(() => people?.filter(person => matches(person.name, search)), [people, search]);
   // One person's own page (?admin=people&person=…): the browser's back button returns to the list.
   // The list, the leaderboard (?admin=people&tab=leaderboard) or the groups (&tab=groups), each in the browser's history too.
   type Tab = 'people' | 'leaderboard' | 'groups';
@@ -66,13 +66,12 @@ export function PeoplePanel() {
     setPlace(next); setShown(undefined); window.scrollTo(0, 0);
   };
   const openPerson = (id: string | null) => go({ person: id, tab: 'people' });
-  const [stats, setStats] = useState<PersonStats[]>();
-  const load = () => Promise.all([
-    roomApi<unknown>('/api/host/people?withKeys=1').then(data => { setPeople(PeopleListSchema.parse(data).people); setError(''); }),
-    roomApi<unknown>('/api/host/people/stats').then(data => setStats(PeopleStatsSchema.parse(data).stats)),
-  ]).catch(cause => setError(explain(cause)));
-  useEffect(() => { void load(); }, []);
-  const run = async (work: () => Promise<unknown>) => { setBusy(true); setError(''); try { await work(); await load(); } catch (cause) { setError(explain(cause)); } finally { setBusy(false); } };
+  // The person page reloads itself after each change (see PersonView); the list and the numbers reload here.
+  const [changes, setChanges] = useState(0);
+  const loadSummary = () => roomApi<unknown>('/api/host/people/summary').then(result => { setSummary(PeopleSummarySchema.parse(result)); setError(''); }).catch(cause => setError(explain(cause)));
+  useEffect(() => { void loadSummary(); }, [changes]);
+  useEffect(() => { if (paging.failed) setError(explain(undefined)); }, [paging.failed]);
+  const run = async (work: () => Promise<unknown>) => { setBusy(true); setError(''); try { await work(); paging.reload(); setChanges(count => count + 1); } catch (cause) { setError(explain(cause)); } finally { setBusy(false); } };
   const show = (data: unknown) => setShown(PersonKeyViewSchema.parse(data));
   const add = (event: React.FormEvent) => { event.preventDefault(); void run(async () => { show(await roomApi('/api/host/people', { name, canEdit })); setName(''); setCanEdit(false); }); };
   const actions: PersonActions = {
@@ -90,33 +89,24 @@ export function PeoplePanel() {
     remove: person => { if (confirm(`Remove ${person.name}? Their phones are signed out, their key stops working and the name is free again. Past games and chips stay in the history.`)) void run(async () => { await roomApi(`/api/host/people/${person.id}/remove`, {}); openPerson(null); }); },
   };
   const keyCard = shown && <KeyCard view={shown} onDone={() => setShown(undefined)} />;
-  const person = personId ? people?.find(candidate => candidate.id === personId) : undefined;
-  const personMissing = Boolean(personId && people && !person);
-  useEffect(() => { if (personMissing) replaceWithHome(); }, [personMissing]);
 
-  if (personId) {
-    if (personMissing) return null;
-    return <>
-      <p className="person-back"><a href="?admin=people" onClick={event => { event.preventDefault(); openPerson(null); }}>‹ All people</a></p>
-      {error && <p role="alert" className="error">{error}</p>}
-      {keyCard}
-      {!people && !error && <p role="status">Loading…</p>}
-      {person && <PersonPage person={person} busy={busy} actions={actions} stats={stats?.find(row => row.personId === person.id)} all={stats ?? []} onOpen={openPerson} />}
-    </>;
-  }
+  if (personId) return <>
+    <p className="person-back"><a href="?admin=people" onClick={event => { event.preventDefault(); openPerson(null); }}>‹ All people</a></p>
+    {error && <p role="alert" className="error">{error}</p>}
+    {keyCard}
+    <PersonView key={personId} id={personId} changes={changes} busy={busy} actions={actions} onOpen={openPerson} />
+  </>;
   const tabs = <div className="people-tabs" role="tablist" aria-label="People">
     <button type="button" role="tab" aria-selected={place.tab === 'people'} onClick={() => go({ person: null, tab: 'people' })}>People</button>
     <button type="button" role="tab" aria-selected={place.tab === 'groups'} onClick={() => go({ person: null, tab: 'groups' })}>Groups</button>
     <button type="button" role="tab" aria-selected={place.tab === 'leaderboard'} onClick={() => go({ person: null, tab: 'leaderboard' })}>Leaderboard</button></div>;
-  if (place.tab === 'groups') return <>{tabs}<GroupsPanel people={people} /></>;
-  if (place.tab === 'leaderboard') return <>{tabs}
-    {error && <p role="alert" className="error">{error}</p>}
-    {people && stats ? <Leaderboard people={people} stats={stats} onOpen={openPerson} /> : !error && <p role="status">Loading the leaderboard…</p>}
-  </>;
+  if (place.tab === 'groups') return <>{tabs}<GroupsPanel /></>;
+  if (place.tab === 'leaderboard') return <>{tabs}<Leaderboard onOpen={openPerson} /></>;
+  const people = data?.people;
   return <>{tabs}
     <p className="admin-intro">Make an account for each regular player. Each gets a personal key: typed once on a phone (or opened as a link), that phone then always joins as them, with their look and their chips across games. Editors can also make and change games, but never host or see this menu. Players without an account still join as guests. Click a name for everything about that person.</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {people && people.length > 0 && <PeopleSummary people={people} />}
+    {summary && summary.people > 0 && <PeopleSummary summary={summary} />}
     {keyCard}
     <form className="person-add" onSubmit={add} aria-labelledby="person-add-heading">
       <h2 id="person-add-heading">Add a person</h2>
@@ -124,15 +114,15 @@ export function PeoplePanel() {
       <label className="person-check"><input type="checkbox" checked={canEdit} onChange={event => setCanEdit(event.target.checked)} />Can edit games</label>
       <button type="submit" className="primary" disabled={busy || !name.trim()}>Add person</button>
     </form>
-    {!people && !error && <p role="status">Loading people…</p>}
-    {people && !people.length && <p className="admin-empty">No people yet.</p>}
-    {people && people.length > 0 && <div className="people-search"><label><span className="visually-hidden">Search people</span>
-      <input type="search" placeholder="Search a person…" value={search} onChange={event => setSearch(event.target.value)} /></label>
-      <span role="status">{search.trim() ? `${found!.length} of ${people.length}` : ''}</span></div>}
-    {found && people!.length > 0 && !found.length && <p className="admin-empty">Nobody is called “{search.trim()}”.</p>}
-    {found && found.length > 0 && <div className="people-table-wrap"><table className="people-table">
+    {!data && !error && <p role="status">Loading people…</p>}
+    {summary?.people === 0 && <p className="admin-empty">No people yet.</p>}
+    {!!summary?.people && <div className="people-search"><label><span className="visually-hidden">Search people</span>
+      <input type="search" placeholder="Search a person…" maxLength={40} value={search} onChange={event => setSearch(event.target.value)} /></label>
+      <span role="status">{query && data ? `${data.total.toLocaleString()} found` : ''}</span></div>}
+    {query && data && !data.total && <p className="admin-empty">Nobody is called “{query}”.</p>}
+    {people && people.length > 0 && <div className="people-table-wrap"><table className="people-table">
       <thead><tr><th scope="col">Name</th><th scope="col">Editor</th><th scope="col" className="num">Phones</th><th scope="col">Last seen</th><th scope="col">Personal key</th></tr></thead>
-      <tbody>{found.map(person => <tr key={person.id}>
+      <tbody>{people.map(person => <tr key={person.id}>
         <th scope="row"><a className="person-name" href={`?admin=people&person=${person.id}`} onClick={event => { event.preventDefault(); openPerson(person.id); }}>
           <span className={`person-initials${person.canEdit ? ' is-editor' : ''}`} aria-hidden="true">{initials(person.name)}</span><span className="person-name-text">{person.name}</span></a></th>
         <td className="wide-only"><label className="person-switch"><input type="checkbox" role="switch" checked={person.canEdit} disabled={busy} onChange={event => actions.setEditor(person, event.target.checked)} /><span className="visually-hidden">{person.name} can edit games</span><span aria-hidden="true">{person.canEdit ? 'Yes' : 'No'}</span></label></td>
@@ -146,19 +136,33 @@ export function PeoplePanel() {
         </td>
       </tr>)}</tbody>
     </table></div>}
+    <PeoplePager paging={paging} />
   </>;
 }
 
-/** Ignores capitals and accents: "anouk" finds "Anoúk". */
-const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-const matches = (name: string, search: string) => fold(name).includes(fold(search.trim()));
+/** One person's page: the person and their standing are loaded for it, and again after each change. */
+function PersonView({ id, changes, busy, actions, onOpen }: { id: string; changes: number; busy: boolean; actions: PersonActions; onOpen: (id: string) => void }) {
+  const [person, setPerson] = useState<PersonRow | null>(); const [standing, setStanding] = useState<PersonStanding>(); const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void roomApi<unknown>(`/api/host/people/${id}`).then(result => { if (live) setPerson(PersonRowSchema.parse(result)); })
+      .catch(cause => { if (!live) return; if (cause instanceof Error && cause.message === 'NOT_FOUND') setPerson(null); else setFailed(true); });
+    void roomApi<unknown>(`/api/host/people/${id}/stats`).then(result => { if (live) setStanding(PersonStandingSchema.parse(result)); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [id, changes]);
+  // Nobody by that id (removed, or an old link): back to the start page.
+  useEffect(() => { if (person === null) replaceWithHome(); }, [person]);
+  if (failed) return <p role="alert" className="error">{explain(undefined)}</p>;
+  if (!person) return person === undefined ? <p role="status">Loading…</p> : null;
+  return <PersonPage person={person} busy={busy} actions={actions} standing={standing} onOpen={onOpen} />;
+}
 
-/** The numbers at a glance, above the list. */
-function PeopleSummary({ people }: { people: PersonRow[] }) {
+/** The numbers at a glance, above the list (over everyone, not only this page). */
+function PeopleSummary({ summary }: { summary: Summary }) {
   const tiles: [string, string, string?][] = [
-    ['People', String(people.length), `${people.filter(person => person.canEdit).length} can edit games`],
-    ['Seen this week', String(people.filter(person => seenThisWeek(person.lastSeenAt)).length), `${people.filter(person => !person.lastSeenAt).length} never signed in`],
-    ['Phones signed in', String(people.reduce((sum, person) => sum + person.devices, 0))],
+    ['People', summary.people.toLocaleString(), `${summary.editors.toLocaleString()} can edit games`],
+    ['Seen this week', summary.seenThisWeek.toLocaleString(), `${summary.neverSignedIn.toLocaleString()} never signed in`],
+    ['Phones signed in', summary.phones.toLocaleString()],
   ];
   return <ul className="people-summary" aria-label="People at a glance">{tiles.map(([label, value, note]) =>
     <li key={label}><span className="people-summary-label">{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</li>)}</ul>;

@@ -13,8 +13,8 @@ type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Route = NonNullable<Stage['route']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
 const labelOf = (route: Route, key: string) => route.options.find(option => option.key === key)?.label ?? key;
-const why = { majority: 'byVote', host: 'byHost', default: 'byDefault', random: 'byRandom' } as const satisfies Record<NonNullable<Route['decision']>['resolution'], keyof typeof PLAY_TEXTS.en>;
-const who = { players: 'everyoneVotes', captains: 'captainsVote', host: 'hostDecides' } as const satisfies Record<Route['method'], keyof typeof PLAY_TEXTS.en>;
+const why = { majority: 'byVote', host: 'byHost', default: 'byDefault', random: 'byRandom', draw: 'byDraw' } as const satisfies Record<NonNullable<Route['decision']>['resolution'], keyof typeof PLAY_TEXTS.en>;
+const who = { players: 'everyoneVotes', captains: 'captainsVote', host: 'hostDecides', draw: 'drawWho' } as const satisfies Record<Route['method'], keyof typeof PLAY_TEXTS.en>;
 
 /** Counts, the decision, and for the host: choose a route at any time until one is recorded. */
 export function RouteChoice({ state, stage, disabled, send }: { state: RoomSnapshot; stage: Stage; disabled: boolean; send: Send }) {

@@ -52,7 +52,7 @@ function WheelFields({ definition, wheel, set, onRemove }: { definition: Definit
     <label className="ed-inline">{t('spinTime')}<span className="ed-unit"><input type="number" min={2} max={15} value={wheel.spinSeconds} onChange={event => set(current => ({ ...current, spinSeconds: Math.round(Math.min(15, Math.max(2, Number(event.target.value) || 2))) }), 'seconds')} />{t('sec')}</span></label>
     <Segmented label={t('sliceColours')} value={colors ? 'own' : 'game'} choices={[{ value: 'game', label: t('gameColours') }, { value: 'own', label: t('ownColours') }]}
       onChange={value => setColors(value === 'own' ? gameColors.slice(0, Math.max(2, Math.min(8, gameColors.length))) : undefined)} />
-    {colors && <Swatches colors={colors} name={position => t('sliceColour', { number: position + 1, wheel: wheel.title })} removeName={position => t('removeSlice', { number: position + 1 })} addName={t('addSlice')} onChange={setColors} />}
+    {colors && <Swatches colors={colors} name={position => t('sliceColour', { number: position + 1, wheel: wheel.title })} removeName={position => t('removeSlice', { number: position + 1 })} addName={t('addSlice')} suggestions={gameColors} onChange={setColors} />}
     {/* The wheel's actions side by side: try it, and (in Game settings) remove it. */}
     <div className="wheel-actions">
       <button type="button" className="small-button with-icon" onClick={() => setTesting(true)}><Icon name="play" size={14} />{t('testSpin')}</button>

@@ -11,6 +11,7 @@ import type { OwnerAccess } from '../hosting/owner-access.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
 import { downloadGoogleFont, FONT_UPLOAD, googleFontFamily } from './fonts.js';
 import { withMp3, youtubeVideoUrl } from './audio-tools.js';
+import { libraryUsage } from './usage.js';
 import { defaultMediaDirectory, removeStored, sendStored, sniffMedia, storeUpload, UploadTooLarge, type UploadRules } from './media.js';
 
 // The media library (contracts/media.ts): the owner and editors upload pictures, videos and songs,
@@ -92,8 +93,10 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
   app.get('/api/host/media', async (request, reply) => {
     try {
       await owner.requireEditor(request);
-      const rows = await client.gameMedia.findMany({ where: { removedAt: null, kind: { not: 'FONT' } }, orderBy: { createdAt: 'desc' }, take: 1000 });
-      return { ok: true, data: MediaLibrarySchema.parse({ items: rows.map(item), usedBytes: await used(), limitBytes: LIBRARY_LIMITS.total }) };
+      const [rows, usage] = await Promise.all([
+        client.gameMedia.findMany({ where: { removedAt: null, kind: { not: 'FONT' } }, orderBy: { createdAt: 'desc' }, take: 1000 }), libraryUsage(client)]);
+      return { ok: true, data: MediaLibrarySchema.parse({ items: rows.map(row => ({ ...item(row), gameIds: usage.byMedia.get(row.id) ?? [] })),
+        games: usage.games, usedBytes: await used(), limitBytes: LIBRARY_LIMITS.total }) };
     } catch (error) { return owner.fail(reply, error); }
   });
 
@@ -190,24 +193,33 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
       return { ok: true, data: item(await client.gameMedia.findUniqueOrThrow({ where: { id } })) };
     } catch (error) { return owner.fail(reply, error); }
   });
-  // Removing: refused while a game's draft or its latest published version still uses the file.
-  app.post('/api/host/media/:id/remove', async (request, reply) => {
-    try {
-      await owner.requireEditor(request, 'edit'); const id = idParam(request);
-      const row = await client.gameMedia.findFirst({ where: { id, removedAt: null, kind: { not: 'FONT' } } }); roomAssert(row, 'NOT_FOUND');
-      const pattern = `%"${id}"%`;
-      const [drafts, versions] = await Promise.all([
-        client.$queryRaw<{ count: bigint }[]>`SELECT count(*)::bigint AS count FROM game_drafts WHERE definition::text LIKE ${pattern}`,
-        client.$queryRaw<{ count: bigint }[]>`SELECT count(*)::bigint AS count FROM game_versions v WHERE v.definition::text LIKE ${pattern}
-          AND v.number = (SELECT max(w.number) FROM game_versions w WHERE w."gameId" = v."gameId")`,
-      ]);
-      roomAssert(Number(drafts[0]?.count ?? 0) + Number(versions[0]?.count ?? 0) === 0, 'MEDIA_IN_USE');
-      // The file goes first: a row marked removed never points at a file that still exists.
-      await removeStored(directory, LIBRARY_FOLDER, id);
-      await client.gameMedia.update({ where: { id }, data: { removedAt: new Date() } });
-      return { ok: true, data: {} };
-    } catch (error) { return owner.fail(reply, error); }
-  });
+  // Removing: refused while a game's draft or its latest published version still uses the file. Fonts
+  // are also kept while a saved scene prefab uses them, since a prefab carries its scenes' looks.
+  async function removeItem(id: string, font: boolean) {
+    const row = await client.gameMedia.findFirst({ where: { id, removedAt: null, kind: font ? 'FONT' : { not: 'FONT' } } }); roomAssert(row, 'NOT_FOUND');
+    const pattern = `%"${id}"%`;
+    const [drafts, versions, prefabs, styles] = await Promise.all([
+      client.$queryRaw<{ count: bigint }[]>`SELECT count(*)::bigint AS count FROM game_drafts WHERE definition::text LIKE ${pattern}`,
+      client.$queryRaw<{ count: bigint }[]>`SELECT count(*)::bigint AS count FROM game_versions v WHERE v.definition::text LIKE ${pattern}
+        AND v.number = (SELECT max(w.number) FROM game_versions w WHERE w."gameId" = v."gameId")`,
+      font ? client.$queryRaw<{ count: bigint }[]>`SELECT count(*)::bigint AS count FROM scene_prefabs WHERE content::text LIKE ${pattern}` : [],
+      font ? client.$queryRaw<{ count: bigint }[]>`SELECT count(*)::bigint AS count FROM theme_styles WHERE theme::text LIKE ${pattern}` : [],
+    ]);
+    roomAssert([drafts, versions, prefabs, styles].every(rows => Number(rows[0]?.count ?? 0) === 0), 'MEDIA_IN_USE');
+    // The file goes first: a row marked removed never points at a file that still exists.
+    await removeStored(directory, LIBRARY_FOLDER, id);
+    await client.gameMedia.update({ where: { id }, data: { removedAt: new Date() } });
+    app.log.info({ event: 'library_media_removed', kind: row.kind.toLowerCase() }, 'Media removed from the library');
+  }
+  for (const [path, font] of [['/api/host/media/:id/remove', false], ['/api/host/fonts/:id/remove', true]] as const) {
+    app.post(path, async (request, reply) => {
+      try {
+        await owner.requireEditor(request, 'edit');
+        await removeItem(idParam(request), font);
+        return { ok: true, data: {} };
+      } catch (error) { return owner.fail(reply, error); }
+    });
+  }
 
   // For the screens and phones of a room, and the editor's previews. The id is a random UUID that a
   // phone only learns once the scene is on; nothing else about the file or its game is exposed.

@@ -4,9 +4,12 @@ import { useTexts } from '../i18n/texts.js';
 import { DRAWING_TEXTS } from './drawing.text.js';
 import { useText } from '../presentation/look.js';
 import { Strokes } from './drawing-view.js';
+import { Icon } from '../presentation/line-icons.js';
 
 const COLOR_NAMES = ["black","white","grey","red","orange","yellow","green","teal","blue","indigo","purple","pink","brown","skin","darkGreen","wine"] as const;
 const WIDTH_NAMES = ["fine","medium","thick","huge"] as const;
+/** The paper is white (palette index 1): what the eraser paints with. */
+const PAPER = DRAWING_COLORS.indexOf('#ffffff');
 /** Points closer than this (on the 1000 grid) are skipped: smaller drawings, same look. */
 const MIN_STEP = 4;
 export const countPoints = (drawing: Drawing) => drawing.strokes.reduce((sum, stroke) => sum + stroke.p.length / 2, 0);
@@ -16,10 +19,11 @@ export const countPoints = (drawing: Drawing) => drawing.strokes.reduce((sum, st
  * 1000 × 1000 grid, whatever the screen size. `under` is shown beneath and
  * cannot be changed (a doodle to finish, the team's drawing so far). `blind`
  * hides the player's own strokes until they are sent. `oneStroke` ends after
- * a single stroke (Perfect circle).
+ * a single stroke (Perfect circle). The eraser paints in the paper's white, so it also
+ * rubs out what is `under` (every drawing is shown on white).
  */
-export function DrawingPad({ value, onChange, under = [], blind = false, maxStrokes = 400, tools = true, compactTools = false, oneStroke = false, disabled = false, label, onStrokeEnd, onStrokeProgress, bringIntoView = false }: {
-  value: Drawing; onChange: (drawing: Drawing) => void; under?: readonly Drawing[]; blind?: boolean; maxStrokes?: number; tools?: boolean; compactTools?: boolean; oneStroke?: boolean; disabled?: boolean; label: string;
+export function DrawingPad({ value, onChange, under = [], blind = false, maxStrokes = 400, tools = true, oneStroke = false, disabled = false, label, onStrokeEnd, onStrokeProgress, bringIntoView = false }: {
+  value: Drawing; onChange: (drawing: Drawing) => void; under?: readonly Drawing[]; blind?: boolean; maxStrokes?: number; tools?: boolean; oneStroke?: boolean; disabled?: boolean; label: string;
   onStrokeEnd?: (stroke: Stroke, drawing: Drawing) => void;
   /** The stroke being drawn, as it grows (number `strokeId` in the drawing): for showing it live elsewhere. */
   onStrokeProgress?: (stroke: Stroke, strokeId: number) => void;
@@ -28,6 +32,8 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
 }) {
   const t = useText(); const d = useTexts(DRAWING_TEXTS); const surface = useRef<SVGSVGElement>(null); const hintId = useId();
   const [color, setColor] = useState(0); const [width, setWidth] = useState(1); const [current, setCurrent] = useState<Stroke | null>(null);
+  // The eraser: the paper's colour (white, palette index 1) at the chosen size.
+  const [erasing, setErasing] = useState(false); const ink = erasing ? PAPER : color;
   const pointer = useRef<number | null>(null);
   // Keyboard drawing: a pen moved with the arrow keys; Space puts it down or lifts it.
   const [pen, setPen] = useState<{ x: number; y: number; active: boolean }>({ x: DRAWING_SIZE / 2, y: DRAWING_SIZE / 2, active: false });
@@ -43,7 +49,7 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
   const start = (event: React.PointerEvent) => {
     if (disabled || full || pointer.current !== null) return;
     event.preventDefault(); surface.current!.setPointerCapture(event.pointerId); pointer.current = event.pointerId;
-    const [x, y] = at(event); grow({ c: oneStroke ? 0 : color, w: oneStroke ? 10 : DRAWING_WIDTHS[width]!, p: [x, y] });
+    const [x, y] = at(event); grow({ c: oneStroke ? 0 : ink, w: oneStroke ? 10 : DRAWING_WIDTHS[width]!, p: [x, y] });
   };
   const move = (event: React.PointerEvent) => {
     if (pointer.current !== event.pointerId || !current) return;
@@ -73,13 +79,13 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
     } else if (event.key === ' ') {
       event.preventDefault(); setPen({ ...pen, active: true });
       if (current && pointer.current === null) finish();
-      else if (!full && pointer.current === null) grow({ c: oneStroke ? 0 : color, w: oneStroke ? 10 : DRAWING_WIDTHS[width]!, p: [pen.x, pen.y] });
+      else if (!full && pointer.current === null) grow({ c: oneStroke ? 0 : ink, w: oneStroke ? 10 : DRAWING_WIDTHS[width]!, p: [pen.x, pen.y] });
     } else if ((event.key === 'Enter' || event.key === 'Escape') && current && pointer.current === null) { event.preventDefault(); finish(); }
   };
   const cannotEdit = disabled || !value.strokes.length;
   const undo = () => onChange({ ...value, strokes: value.strokes.slice(0, -1) });
   const clear = () => onChange({ ...value, strokes: [] });
-  return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}${compactTools ? ' compact-tools' : ''}`}>
+  return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}${erasing ? ' erasing' : ''}`}>
     {/* Impossible to miss: in a blind round your own lines stay hidden until you send the drawing. */}
     {blind && <p className="blind-banner"><span aria-hidden="true">🙈</span><strong>{t('drawing.blindTitle')}</strong><small>{t('drawing.blindHint')}</small></p>}
     <svg ref={surface} className="drawing-surface" viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription={d('area')} aria-label={label}
@@ -89,26 +95,22 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
       {under.map((drawing, index) => <Strokes key={index} strokes={drawing.strokes} />)}
       {!blind && <Strokes strokes={value.strokes} />}
       {!blind && current && <Strokes strokes={[current]} />}
-      {pen.active && <g className="drawing-pen" aria-hidden="true"><circle cx={pen.x} cy={pen.y} r={current ? 14 : 18} fill={current ? DRAWING_COLORS[color] : 'none'} stroke="#6d3fd6" strokeWidth={4} /></g>}
+      {pen.active && <g className="drawing-pen" aria-hidden="true"><circle cx={pen.x} cy={pen.y} r={current ? 14 : 18} fill={current ? DRAWING_COLORS[ink] : 'none'} stroke="#6d3fd6" strokeWidth={4} /></g>}
     </svg>
     <p id={hintId} className="drawing-keys">{d('keyboard')}</p>
     {blind && <p className="drawing-note">{t('drawing.blind')} · {value.strokes.length + (current ? 1 : 0)}</p>}
-    {tools && (compactTools ? <div className="drawing-compact-tools">
-      <select aria-label={t('drawing.colour')} value={color} disabled={disabled} onChange={event => setColor(Number(event.currentTarget.value))}>
-        {COLOR_NAMES.map((name, index) => <option key={name} value={index}>{d(name)}</option>)}
-      </select>
-      <select aria-label={t('drawing.size')} value={width} disabled={disabled} onChange={event => setWidth(Number(event.currentTarget.value))}>
-        {WIDTH_NAMES.map((name, index) => <option key={name} value={index}>{d(name)}</option>)}
-      </select>
-      <button type="button" className="ghost" aria-label={t('drawing.undo')} disabled={cannotEdit} onClick={undo}>↶</button>
-      <button type="button" className="ghost" aria-label={t('drawing.clear')} disabled={cannotEdit} onClick={clear}>×</button>
-    </div> : <div className="drawing-tools">
-      <div className="drawing-colors" role="radiogroup" aria-label={t('drawing.colour')}>{DRAWING_COLORS.map((swatch, index) => <button key={swatch} type="button" role="radio" aria-checked={color === index} aria-label={d(COLOR_NAMES[index]!)}
-        style={{ background: swatch }} onClick={() => setColor(index)} />)}</div>
-      <div className="drawing-widths" role="radiogroup" aria-label={t('drawing.size')}>{DRAWING_WIDTHS.map((size, index) => <button key={size} type="button" role="radio" aria-checked={width === index} aria-label={d(WIDTH_NAMES[index]!)} onClick={() => setWidth(index)}>
-        <span style={{ width: Math.max(4, size / 2), height: Math.max(4, size / 2), background: DRAWING_COLORS[color] }} /></button>)}</div>
-      <div className="drawing-actions"><button type="button" className="ghost small-button" disabled={cannotEdit} onClick={undo}>{t('drawing.undo')}</button>
-        <button type="button" className="ghost small-button" disabled={cannotEdit} onClick={clear}>{t('drawing.clear')}</button></div>
-    </div>)}
+    {tools && <div className="drawing-tools">
+      <div className="drawing-colors" role="radiogroup" aria-label={t('drawing.colour')}>{DRAWING_COLORS.map((swatch, index) => <button key={swatch} type="button" role="radio" aria-checked={!erasing && color === index} aria-label={d(COLOR_NAMES[index]!)}
+        style={{ background: swatch }} onClick={() => { setColor(index); setErasing(false); }} />)}</div>
+      {/* Sizes, the eraser (it rubs out at the chosen size), undo and start over. On a short screen they share one row
+          as icons (names stay as tooltips and for screen readers), so the drawing keeps its room. */}
+      <div className="drawing-row">
+        <div className="drawing-widths" role="radiogroup" aria-label={t('drawing.size')}>{DRAWING_WIDTHS.map((size, index) => <button key={size} type="button" role="radio" aria-checked={width === index} aria-label={d(WIDTH_NAMES[index]!)} onClick={() => setWidth(index)}>
+          <span style={{ width: Math.max(4, size / 2), height: Math.max(4, size / 2), background: DRAWING_COLORS[ink] }} /></button>)}
+          <button type="button" className="drawing-eraser" aria-pressed={erasing} disabled={disabled} title={d('eraser')} onClick={() => setErasing(!erasing)}><Icon name="eraser" size={18} /><span className="tool-label">{d('eraser')}</span></button></div>
+        <div className="drawing-actions"><button type="button" className="ghost small-button" disabled={cannotEdit} title={t('drawing.undo')} onClick={undo}><Icon name="undo" size={18} /><span className="tool-label">{t('drawing.undo')}</span></button>
+          <button type="button" className="ghost small-button" disabled={cannotEdit} title={t('drawing.clear')} onClick={clear}><Icon name="restart" size={18} /><span className="tool-label">{t('drawing.clear')}</span></button></div>
+      </div>
+    </div>}
   </div>;
 }

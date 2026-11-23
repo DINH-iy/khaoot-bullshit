@@ -75,7 +75,13 @@ export const LibraryItemSchema = z.object({
 export const UpdateLibraryItemSchema = z.object({ name: z.string().trim().min(1).max(120).optional(), credit: z.string().trim().max(300).optional() }).strict()
   .refine(value => value.name !== undefined || value.credit !== undefined, 'Nothing to change');
 export type LibraryItem = z.infer<typeof LibraryItemSchema>;
-export const MediaLibrarySchema = z.object({ items: z.array(LibraryItemSchema), usedBytes: z.number().int().min(0), limitBytes: z.number().int().min(0) }).strict();
+/** A game that uses library files (its draft or its latest published version), for grouping the library by game. */
+export const LibraryGameSchema = z.object({ id: z.uuid(), title: z.string().max(160), archived: z.boolean() }).strict();
+export type LibraryGame = z.infer<typeof LibraryGameSchema>;
+/** The library as listed: each file with the games that use it (gameIds into games; empty: no game uses it). */
+export const ListedLibraryItemSchema = LibraryItemSchema.extend({ gameIds: z.array(z.uuid()) });
+export type ListedLibraryItem = z.infer<typeof ListedLibraryItemSchema>;
+export const MediaLibrarySchema = z.object({ items: z.array(ListedLibraryItemSchema), games: z.array(LibraryGameSchema), usedBytes: z.number().int().min(0), limitBytes: z.number().int().min(0) }).strict();
 export type MediaLibrary = z.infer<typeof MediaLibrarySchema>;
 
 export const MAX_AUDIO_CLIP_SECONDS = 20 * 60;

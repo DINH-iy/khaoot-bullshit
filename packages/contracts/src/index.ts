@@ -6,6 +6,7 @@ export * from './authoring.js';
 export * from './live-editing.js';
 export * from './presentation.js';
 export * from './fonts.js';
+export * from './styles.js';
 export * from './minigames/shared/catalog.js';
 export * from './minigames/shared/number-choice.js';
 export * from './minigames/cut-the-line/target.js';
@@ -28,6 +29,7 @@ export * from './minigames/eight-ball/pool.js';
 export { shootPool } from './minigames/eight-ball/physics.js';
 export * from './arcade.js';
 export * from './media.js';
+export * from './points-at-stake.js';
 
 export const ProblemSchema = z.object({
   error: z.object({

@@ -37,7 +37,36 @@ describe('importing a game from text', () => {
     expect(game).toMatchObject({ presentation: { phoneMenuIcons: { scores: 'star', games: 'wheel', packs: 'sparkles', blackjack: 'cards' } } });
     expect(stage('pool')).toMatchObject({ kind: 'duel', pick: 'random', durationMs: 20_000, betMilli: '2000', matchSeconds: 120,
       contest: { kind: 'game', game: 'eight-ball', settings: { ballBehavior: { preset: 'arcade' }, start: { side: 'random', percent: 30 } } }, places: { kind: 'list', pointsMilli: ['10000'] } });
-    expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(16);
+    // The minigame draw: a party choice decided by a draw, one minigame scene per game; the team game gets teams for that round.
+    expect(stage('draw')).toMatchObject({ kind: 'route', durationMs: null, decide: { method: 'draw' }, options: [{ label: 'Tap race' }, { label: 'Relay drawing' }] });
+    expect(game.edges.filter(edge => edge.from === 'draw').map(edge => edge.to)).toEqual(['draw-tap', 'draw-relay']);
+    expect(stage('draw-relay')).toMatchObject({ kind: 'minigame', game: 'relay-drawing', play: { kind: 'teams', lineup: { kind: 'round' } } });
+    expect(stage('draw-tap')).not.toHaveProperty('play');
+    expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(18);
+  });
+
+  it('gives writing, upload and drawing rounds host points with maxPoints (and places); without them they stay votable', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Art night', scenes: [
+      { id: 'art', type: 'drawing', question: 'Draw a cat', maxPoints: 10, places: [10, 5] },
+      { id: 'joke', type: 'writing', question: 'Tell a joke' },
+      { id: 'joke-vote', type: 'vote', question: 'Best joke?', votesOn: 'joke' },
+      { id: 'pic', type: 'upload', question: 'Your pet', maxPoints: 5 },
+    ] }));
+    expect(issues).toEqual([]);
+    const stage = (key: string) => (definition as { nodes: { key: string; stages: Record<string, unknown>[] }[] }).nodes.find(node => node.key === key)!.stages[0]!;
+    expect(stage('art')['scoring']).toEqual({ kind: 'judged', maxAwardMilli: '10000', places: { kind: 'list', pointsMilli: ['10000', '5000'] } });
+    expect(stage('joke')['scoring']).toEqual({ kind: 'none' });
+    expect(stage('pic')['scoring']).toEqual({ kind: 'judged', maxAwardMilli: '5000' });
+  });
+
+  it('imports a minigame draw with a timer, so it draws by itself', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Draw night', scenes: [
+      { id: 'pick', type: 'random-minigame', question: 'Which one?', seconds: 10, games: [{ label: 'Reaction', to: 'a' }, { label: 'Stop the clock', to: 'b' }] },
+      { id: 'a', type: 'minigame', game: 'reaction', next: 'scores' }, { id: 'b', type: 'minigame', game: 'stop-clock', next: 'scores' },
+      { id: 'scores', type: 'scoreboard', title: 'Scores' },
+    ] }));
+    expect(issues).toEqual([]);
+    expect((definition as { nodes: { key: string; stages: unknown[] }[] }).nodes.find(node => node.key === 'pick')!.stages[0]).toMatchObject({ kind: 'route', durationMs: 10_000, decide: { method: 'draw' } });
   });
 
   it('imports shared font references and keeps game fonts across scene presets unless explicitly overridden', () => {
@@ -85,7 +114,20 @@ describe('importing a game from text', () => {
       { type: 'quiz', question: 'Capital?', answers: ['Canberra', 'Sydney'], correct: 'Canberra', explain: 'One try each.' },
       { type: 'minigame', question: 'Doors', game: 'lucky-doors', explain: true }] }));
     expect(issues).toEqual([]);
-    expect((definition.nodes as { stages: { explain?: unknown }[] }[]).map(node => node.stages[0]!.explain)).toEqual([{ text: 'One try each.' }, {}]);
+    // Rounds that earn points show them in their intro.
+    expect((definition.nodes as { stages: { explain?: unknown }[] }[]).map(node => node.stages[0]!.explain)).toEqual([{ text: 'One try each.', points: true }, { points: true }]);
+  });
+
+  it('takes an intro with only the points, without them, on the shared screen only, or leaves it out where there are no points', () => {
+    const picture = { id: '6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f', kind: 'image' };
+    const { issues, definition } = check(JSON.stringify({ title: 'Intros', scenes: [
+      { type: 'quiz', question: 'Big one', answers: ['A', 'B'], correct: 'A', points: 50, showPoints: true },
+      { type: 'quiz', question: 'Quiet', answers: ['A', 'B'], correct: 'A', explain: 'Read carefully.', showPoints: false },
+      { type: 'minigame', question: 'Doors', game: 'lucky-doors', explain: { screenOnly: true, picture, points: false } },
+      { type: 'poll', question: 'Tea or coffee?', answers: ['Tea', 'Coffee'], showPoints: true }] }));
+    expect(issues).toEqual([]);
+    expect((definition.nodes as { stages: { explain?: unknown }[] }[]).map(node => node.stages[0]!.explain)).toEqual([
+      { points: true }, { text: 'Read carefully.' }, { picture, screenOnly: true }, undefined]);
   });
 
   it('takes the open challenge invites per player from "openInvites", within 1 to 10', () => {
@@ -175,11 +217,16 @@ describe('wheel colours', () => {
     expect(definition.wheels[0]!.colors).toEqual(['#f39200', '#7ac6b6']);
     expect(inspectDefinition(definition).issues).toEqual([]);
   });
+  it('keeps see-through colours (#rrggbbaa)', () => {
+    const definition = game(['#F3920080', '#7ac6b6']);
+    expect(definition.wheels[0]!.colors).toEqual(['#f3920080', '#7ac6b6']);
+    expect(inspectDefinition(definition).issues).toEqual([]);
+  });
   it('without enough valid colours the wheel uses the game’s answer colours', () => {
     expect(game(['#f39200']).wheels[0]!.colors).toBeUndefined();
     expect(game(undefined).wheels[0]!.colors).toBeUndefined();
   });
-  it('refuses a colour that is not #rrggbb when saved from the editor', () => {
+  it('refuses a colour that is not #rrggbb or #rrggbbaa when saved from the editor', () => {
     const definition = game(['#f39200', '#7ac6b6']);
     definition.wheels[0]!.colors = ['#f39200', 'red'];
     expect(inspectDefinition(definition).issues.length).toBeGreaterThan(0);

@@ -19,7 +19,7 @@ const optionsOf = (field: unknown): string[] => {
 
 describe('the instructions for an AI know every feature', () => {
   it('every scene type', () => {
-    expect(missing(quoted(['cutscene', 'quiz', 'poll', 'order', 'writing', 'upload', 'vote', 'challenge', 'duel', 'party-choice', 'scoreboard', 'drawing', 'minigame', 'pick-teams']))).toEqual([]);
+    expect(missing(quoted(['cutscene', 'quiz', 'poll', 'order', 'writing', 'upload', 'vote', 'challenge', 'duel', 'party-choice', 'scoreboard', 'drawing', 'minigame', 'minigame-draw', 'pick-teams']))).toEqual([]);
   });
   it('every minigame and every head-to-head game', () => {
     expect(missing(quoted([...MINIGAME_KEYS, ...HEAD_TO_HEAD_KEYS]))).toEqual([]);
@@ -43,6 +43,12 @@ describe('the instructions for an AI know every feature', () => {
     expect(missing(quoted(fields))).toEqual([]);
     expect(missing(quoted(fields.flatMap(field => optionsOf(ThemeSchema.shape[field as keyof typeof ThemeSchema.shape]))))).toEqual([]);
     expect(missing(quoted([...Object.keys(ANIMATION_PRESETS), ...Object.keys(MOMENTS)]))).toEqual([]);
+  });
+  it('host points on writing, upload and drawing rounds', () => {
+    expect(instructions).toMatch(/Points on `"writing"`, `"upload"` and `"drawing"`: add `"maxPoints"/);
+  });
+  it('the intro before a round: its points, picture and shared-screen-only setting', () => {
+    expect(missing(['explain', 'showPoints', 'screenOnly', 'picture'])).toEqual([]);
   });
   it('asks the user its questions before writing the game', () => {
     expect(instructions).toMatch(/ask/i);

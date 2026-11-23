@@ -46,7 +46,7 @@ export function GameMusicFields({ definition, onChange }: { definition: Definiti
       <span className="music-name" title={name(track.id)}>{name(track.id)}</span>
       <audio src={sceneMediaUrl(track.id)} controls preload="none" aria-label={t('listen', { name: name(track.id) })} />
       <button type="button" className="icon-only" aria-label={t('moveUp', { name: name(track.id) })} disabled={position === 0} onClick={() => move(position, position - 1)}><span aria-hidden="true">↑</span></button>
-      <button type="button" className="icon-only" aria-label={t('takeOff', { name: name(track.id) })} onClick={() => set(tracks.filter((_, index) => index !== position))}><Icon name="trash" size={14} /></button>
+      <button type="button" className="icon-only danger-icon" aria-label={t('takeOff', { name: name(track.id) })} onClick={() => set(tracks.filter((_, index) => index !== position))}><Icon name="trash" size={14} /></button>
     </li>)}</ol>}
     <div className="actions">
       <button type="button" className="small-button with-icon" disabled={tracks.length >= 30} onClick={() => setAdding(true)}><Icon name="plus" size={16} />{t('addSong')}</button>

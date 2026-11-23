@@ -9,14 +9,14 @@ import { db, fixture, hostCommand, prisma, service } from '../game-fixture.js';
 afterAll(async () => { await db.close(); });
 const quiz = (key: string) => ({ key, stages: [{ key: 'q', kind: 'collect', prompt: `Scene ${key}`, durationMs: null,
   input: { kind: 'choice', options: [{ key: 'yes', label: 'Yes' }, { key: 'no', label: 'No' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'yes', awardMilli: '1000' } }] });
-type Decide = { method: 'host' } | { method: 'players' | 'captains'; tie: string; noVotes: string; counts: string };
+type Decide = { method: 'host' } | { method: 'draw' } | { method: 'players' | 'captains'; tie: string; noVotes: string; counts: string };
 function branching(decide: Decide, extra: { defaultOptionKey?: string; durationMs?: number | null; teams?: boolean } = {}) {
   return parseDefinition({
     formatVersion: 2, title: 'Branches', startNodeKey: 'start',
     ...(extra.teams ? { teams: { split: { kind: 'count', teams: 2 }, formation: 'host' } } : {}),
     nodes: [
       extra.teams ? { key: 'start', stages: [{ ...quiz('start').stages[0], play: { kind: 'teams', lineup: { kind: 'game' }, answers: 'everyone', points: 'members' } }] } : quiz('start'),
-      { key: 'choose', stages: [{ key: 'pick', kind: 'route', prompt: 'Music or physical?', durationMs: extra.durationMs === undefined ? (decide.method === 'host' ? null : 20_000) : extra.durationMs,
+      { key: 'choose', stages: [{ key: 'pick', kind: 'route', prompt: 'Music or physical?', durationMs: extra.durationMs === undefined ? (decide.method === 'host' || decide.method === 'draw' ? null : 20_000) : extra.durationMs,
         options: [{ key: 'music', label: 'Music' }, { key: 'physical', label: 'Physical' }], decide, ...(extra.defaultOptionKey ? { defaultOptionKey: extra.defaultOptionKey } : {}) }] },
       quiz('music'), quiz('physical'), quiz('finale'),
     ],
@@ -220,6 +220,40 @@ describe('route choices', () => {
       const json = JSON.stringify(await readSessionView(prisma, actor(f, 1), f.sessionId));
       for (const secret of ['secret-music-edge', 'secret-physical-edge', 'Scene music', 'Scene physical', 'finale', 'tie', 'noVotes']) expect(json).not.toContain(secret);
     }
+  });
+
+  it('a minigame draw: nobody votes, Draw picks once and shows it to everyone, and the game follows it', async () => {
+    const { f, choice } = await atChoice(branching({ method: 'draw' }));
+    expect((await readSessionView(prisma, actor(f, 0), f.sessionId)).stage).toMatchObject({ input: null, route: { method: 'draw', canVote: false, counts: null, decision: null } });
+    await expect(voteFor(f, 0, choice, 'music')).rejects.toMatchObject({ code: 'INELIGIBLE' });
+    await hostCommand(f, 'stage.close', { stageRunId: choice });
+    const row = (await decision(choice))!;
+    expect(row).toMatchObject({ reason: 'DRAW' });
+    expect(row.voteSnapshot).toMatchObject({ method: 'draw', resolution: 'draw', random: { candidates: ['music', 'physical'] }, closedBy: 'close' });
+    // Announced as it is drawn: the phone sees the drawn game and when it was drawn, but never where it leads.
+    const phone = (await readSessionView(prisma, actor(f, 1), f.sessionId)).stage!;
+    expect(phone.revealed).toBe(true);
+    expect(phone.route!.decision).toEqual({ optionKey: (row.voteSnapshot as { optionKey: string }).optionKey, reason: 'draw', resolution: 'draw', at: row.createdAt.toISOString() });
+    for (const secret of ['secret-music-edge', 'secret-physical-edge', 'Scene music', 'Scene physical']) expect(JSON.stringify(phone)).not.toContain(secret);
+    // Drawn once: no second draw, no reopening, no host override afterwards.
+    await expect(hostCommand(f, 'route.decide', { stageRunId: choice, optionKey: 'music' })).rejects.toMatchObject({ code: 'ALREADY_DECIDED' });
+    await expect(hostCommand(f, 'stage.reopen', { stageRunId: choice, durationMs: null })).rejects.toBeDefined();
+    const next = (await hostCommand(f, 'stage.advance', { stageRunId: choice })).stageRunId!;
+    expect((await prisma.stageRun.findUniqueOrThrow({ where: { id: next } })).nodeKey).toBe(row.destinationNodeKey);
+    expect(await prisma.scoreEntry.count({ where: { stageRunId: choice } })).toBe(0);
+  });
+
+  it('a timed minigame draw draws by itself; the host may also pick the game, announced at once', async () => {
+    let now = 0; const clock = () => new Date(now); const timed = createGameService(prisma, undefined, clock);
+    const auto = await atChoice(branching({ method: 'draw' }, { durationMs: 10_000 }));
+    now = Date.now() + 10_000 + ACCEPTANCE_GRACE_MS + SETTLE_MS + 10;
+    await closeExpiredStages(prisma, timed, clock);
+    expect(await decision(auto.choice)).toMatchObject({ reason: 'DRAW' });
+    expect((await decision(auto.choice))!.voteSnapshot).toMatchObject({ closedBy: 'timeout' });
+    const picked = await atChoice(branching({ method: 'draw' }));
+    await hostCommand(picked.f, 'route.decide', { stageRunId: picked.choice, optionKey: 'physical' });
+    expect(await decision(picked.choice)).toMatchObject({ reason: 'HOST', destinationNodeKey: 'physical' });
+    expect((await readSessionView(prisma, actor(picked.f, 0), picked.f.sessionId)).stage!.route!.decision).toMatchObject({ optionKey: 'physical', resolution: 'host' });
   });
 
   it('lets a host decide alone, without votes or a timer', async () => {

@@ -1,0 +1,32 @@
+/* Minigame draw: the games as cards; a highlight runs around them, slows down, lands, flashes, and the drawn game pops forward. */
+.minigame-draw { display: grid; justify-items: center; gap: 14px; container-type: inline-size; }
+.draw-cards { list-style: none; margin: 0; padding: 6px; width: 100%; box-sizing: border-box; display: grid; gap: 12px; justify-content: center;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 180px)); }
+.draw-card { position: relative; display: grid; place-content: center; justify-items: center; gap: 10px; aspect-ratio: 3 / 4; max-height: 30vh; padding: 12px; box-sizing: border-box;
+  border-radius: calc(var(--r-radius) * .75); border: 2px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); text-align: center;
+  transition: transform 300ms ease, opacity 300ms ease, background-color 300ms ease; }
+.draw-card strong { font-size: clamp(1rem, .85rem + 1cqi, 1.35rem); line-height: 1.15; text-wrap: balance; overflow-wrap: anywhere; }
+.draw-badge { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: color-mix(in srgb, var(--r-accent) 22%, transparent); color: var(--r-accent); }
+/* The highlight: switched on and off instantly, so fast steps read as a running light. */
+.draw-card.is-lit { transition: none; transform: scale(1.07); background: color-mix(in srgb, var(--r-accent) 26%, var(--r-card-strong)); border-color: var(--r-accent);
+  box-shadow: 0 0 0 4px var(--r-accent), 0 0 28px color-mix(in srgb, var(--r-accent) 60%, transparent); }
+.draw-card.is-lit .draw-badge { background: var(--r-accent); color: var(--r-accent-ink); }
+/* Landed: the highlight flashes on the drawn game. */
+.draw-landed .draw-card.is-lit { animation: draw-flash 300ms steps(1, end) 3; }
+@keyframes draw-flash { 50% { box-shadow: 0 0 0 4px transparent; background: var(--r-card-strong); } }
+/* The drawn game pops forward; the others step back. */
+.draw-card.is-drawn { z-index: 1; border-color: var(--r-accent); box-shadow: 0 0 0 5px var(--r-accent), 0 16px 36px rgb(0 0 0 / .4); animation: draw-pop 420ms cubic-bezier(.3, 1.6, .5, 1) forwards; }
+.draw-card.is-drawn .draw-badge { background: var(--r-accent); color: var(--r-accent-ink); }
+@keyframes draw-pop { from { transform: scale(1.07); } to { transform: scale(1.14); } }
+.draw-card.is-out { opacity: .35; transform: scale(.94); }
+.draw-now { margin: 0; font-family: var(--r-heading-font); font-size: clamp(1.4rem, 1rem + 2.4cqi, 2.4rem); font-weight: 900; line-height: 1.1; color: var(--r-accent); text-align: center; }
+.draw-status { margin: 0; min-height: 1.5em; font-size: 1.05rem; text-align: center; }
+.draw-done .draw-status strong { font-size: clamp(1.15rem, 1rem + 1.2cqi, 1.6rem); color: var(--r-accent); }
+.draw-pick { display: grid; gap: 8px; }
+.draw-pick button { min-height: 44px; }
+.room-player .draw-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 140px)); gap: 8px; }
+.room-player .draw-badge { width: 40px; height: 40px; }
+@media (prefers-reduced-motion: reduce) {
+  .draw-card { transition: none; }
+  .draw-card.is-drawn, .draw-landed .draw-card.is-lit { animation: none; transform: scale(1.1); }
+}

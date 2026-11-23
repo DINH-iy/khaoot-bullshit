@@ -88,6 +88,7 @@
 .hint, .start-note { margin: 0; color: var(--e-muted); font-size: .9rem; }
 .editor button.danger { background: var(--e-danger); color: light-dark(#fff, #2a0d12); border-color: var(--e-danger); }
 .editor button.danger-outline { color: var(--e-danger); border-color: var(--e-danger); background: transparent; }
+.editor button.danger-outline:hover:not(:disabled), .editor button.danger-outline:focus-visible { background: color-mix(in srgb, var(--e-danger) 12%, transparent); }
 @media (max-width: 700px) {
   .flow-hint { display: none; }
   .editor-body.with-inspector { grid-template-columns: minmax(0, 1fr); }
@@ -146,7 +147,7 @@
 .editor .scene-row.current { border-color: var(--e-accent) !important; background: var(--e-accent-soft) !important; }
 .row-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; flex: none; background: light-dark(#f0eadb, #3d3624); color: light-dark(#8a6514, #f0c66e); }
 .row-icon.thumb-info { background: light-dark(#1d1d22, #f2f2f5); color: light-dark(#fff, #1d1d22); }
-.row-icon.thumb-route, .row-icon.thumb-vote, .row-icon.thumb-scoreboard, .row-icon.thumb-minigame { background: var(--e-accent-soft); color: var(--e-accent); }
+.row-icon.thumb-route, .row-icon.thumb-vote, .row-icon.thumb-scoreboard, .row-icon.thumb-minigame, .row-icon.thumb-draw { background: var(--e-accent-soft); color: var(--e-accent); }
 .row-icon.thumb-challenge { background: light-dark(#dff2ec, #20382f); color: light-dark(#1d6b54, #8fe0c4); }
 .row-icon.thumb-text, .row-icon.thumb-media, .row-icon.thumb-order { background: light-dark(#e2ecfa, #22304a); color: light-dark(#2457a6, #9cc0ff); }
 .row-text { display: grid; min-width: 0; } .row-text small { color: var(--e-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
@@ -243,8 +244,8 @@
 .add-menu .add-menu-foot .add-cancel { margin-left: auto; }
 .prefab-row { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 4px; min-width: 0; }
 .prefab-row > button:first-child { flex: 1; min-width: 0; }
-.add-menu .prefab-row .prefab-delete { flex: none; width: 40px; min-height: 40px; padding: 0; justify-content: center; align-items: center; font-size: 1.2rem; color: var(--e-muted) !important; }
-.add-menu .prefab-row .prefab-delete:hover, .add-menu .prefab-row .prefab-delete:focus-visible { color: var(--e-danger) !important; }
+.add-menu .prefab-row .prefab-delete { flex: none; width: 40px; min-height: 40px; padding: 0; justify-content: center; align-items: center; font-size: 1.2rem; color: var(--e-danger) !important; background: transparent !important; border: 1px solid var(--e-danger) !important; }
+.add-menu .prefab-row .prefab-delete:hover, .add-menu .prefab-row .prefab-delete:focus-visible { background: color-mix(in srgb, var(--e-danger) 12%, transparent) !important; }
 .save-prefab { display: grid; gap: 8px; }
 .save-prefab form { display: grid; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--e-border); }
 .save-prefab .hint { margin: 0; }
@@ -615,14 +616,16 @@
 /* S: colour chips. The chip is the colour (click it to change); hovering or focusing shows a pencil and a bin on it
    (always on touch screens); a dashed + chip adds one. All chips one size, in one wrapping row. */
 .swatch-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.swatch { position: relative; display: block; width: 48px; height: 40px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .15); overflow: hidden; }
-.editor .swatch input[type=color] { position: absolute; inset: 0; width: 100% !important; height: 100%; min-height: 0 !important; padding: 0; border: 0; opacity: 0; cursor: pointer; }
-.swatch:has(input:focus-visible) { outline: 2px solid var(--e-accent); outline-offset: 2px; }
-.swatch-tools { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 2px; background: rgb(0 0 0 / .45); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.swatch { position: relative; display: block; width: 48px; height: 40px; border-radius: 10px; }
+.swatch > .color-trigger.swatch-pick { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border-radius: 10px; }
+.swatch .swatch-pick > .color-chip { width: 100%; height: 100%; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .15); }
+.swatch .swatch-pick:hover > .color-chip, .swatch .swatch-pick[aria-expanded=true] > .color-chip { box-shadow: inset 0 0 0 1px rgb(0 0 0 / .15), 0 0 0 2px var(--e-accent); }
+.swatch-tools { position: absolute; inset: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 2px; background: rgb(0 0 0 / .45); opacity: 0; transition: opacity .12s; pointer-events: none; }
 .swatch:hover .swatch-tools, .swatch:focus-within .swatch-tools { opacity: 1; }
 .editor .swatch-tool { display: grid; place-items: center; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #fff; pointer-events: auto; }
-.editor .swatch-tool:hover, .editor .swatch-tool:focus-visible { background: rgb(255 255 255 / .25); }
-.editor .swatch-remove:hover, .editor .swatch-remove:focus-visible { background: #c4183a; }
+.swatch-hint { pointer-events: none !important; }
+.editor .swatch-remove { background: #c4183a; }
+.editor .swatch-remove:hover, .editor .swatch-remove:focus-visible { background: #9c1230; }
 @media (hover: none) { .swatch-tools { opacity: 1; background: linear-gradient(transparent 40%, rgb(0 0 0 / .5)); align-items: end; justify-content: end; padding: 2px; } .swatch-tool:not(.swatch-remove) { display: none !important; } }
 @media (prefers-reduced-motion: reduce) { .swatch-tools { transition: none; } }
 .editor .swatch-add { display: grid; place-items: center; width: 48px; height: 40px; min-height: 0; padding: 0; border: 1.5px dashed var(--e-line); border-radius: 10px; background: transparent; color: var(--e-muted); }
@@ -672,8 +675,9 @@
 .editor input[type=checkbox]:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { .editor input[type=checkbox], .editor input[type=checkbox]::after { transition: none; } }
 /* S4: a wheel's Test spin and a bin to remove it, on one line. */
-.editor .danger-icon { color: var(--e-danger); }
-.editor .danger-icon:hover, .editor .danger-icon:focus-visible { border-color: var(--e-danger); background: color-mix(in srgb, var(--e-danger) 10%, transparent); }
+/* Remove buttons are always outlined in red: this outranks panel button styles that set their own text colour. */
+.editor button.danger-icon.danger-icon { color: var(--e-danger); border-color: var(--e-danger); background: transparent; }
+.editor button.danger-icon.danger-icon:hover:not(:disabled), .editor button.danger-icon.danger-icon:focus-visible { background: color-mix(in srgb, var(--e-danger) 12%, transparent); }
 /* S5: the scene list: fold all routes; Add after this floats over the preview, on top of everything. */
 .scene-list-head h2 { margin-right: auto; }
 .floating-menu { position: fixed; z-index: 60; display: grid; overflow: auto; border-radius: 14px; }
@@ -861,6 +865,9 @@
 .media-library .media-dialog-close { flex: none; }
 .media-empty { display: grid; place-items: center; min-height: 56px; padding: 10px; color: var(--e-muted); font-size: .9rem; border: 1px dashed var(--e-border); border-radius: 10px; }
 .media-storage { text-align: right; font-size: .8rem; }
+.media-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.media-filters .media-game-filter { min-width: min(220px, 100%); max-width: 100%; }
+.media-item-games { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-audio-form { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .media-audio-fields { display: grid; gap: 10px; min-height: 0; overflow: auto; margin-inline: -6px; padding: 6px; }
 .media-audio-fields label { display: grid; gap: 4px; font-size: .9rem; min-width: 0; }
@@ -901,6 +908,11 @@
 .music-list .music-name { grid-area: name; } .music-list audio { grid-area: player; width: 100%; height: 36px; }
 .music-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-own { display: grid; gap: 6px; } .music-own audio { width: 100%; height: 36px; }
+/* A scene's intro (explain-fields.tsx): the points it will show next to the switch, and its picture with Change and remove. */
+.hint-inline { color: var(--e-muted); font-weight: 400; }
+.intro-picture { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.intro-picture-label { flex-basis: 100%; font-weight: 600; }
+.intro-picture img { width: 96px; height: 64px; object-fit: contain; border-radius: 8px; background: rgb(0 0 0 / .08); }
 .media-credit { display: grid; gap: 2px; font-size: .8rem; color: var(--e-muted); }
 .media-credit input { font-size: .85rem; min-height: 32px; }
 .music-fields .actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1017,8 +1029,8 @@
 .compact-game-preview .speed-run-board { width: min(100%, 13rem, 46svh); }
 .compact-game-preview .mg-angle-dial { width: min(100%, 12rem, 36svh); }
 .compact-game-preview .drawing-pad { width: min(100%, max(9rem, calc(100svh - 22rem))); }
-.compact-game-preview .drawing-pad.compact-tools { width: 100%; justify-items: center; }
-.compact-game-preview .drawing-pad.compact-tools .drawing-surface { width: min(100%, max(8rem, calc(100svh - 25rem))); }
+.compact-game-preview .drawing-pad { width: 100%; justify-items: center; }
+.compact-game-preview .drawing-pad .drawing-surface { width: min(100%, max(8rem, calc(100svh - 25rem))); }
 .compact-game-preview .scene-practice .mg-paused { margin-inline: auto; }
 .compact-game-preview .graph-reading { min-block-size: 2.25em; font-size: .875rem; }
 .compact-game-preview .graph-chart { max-width: min(100%, max(12rem, calc((100dvh - 25rem) * 1.25))); }

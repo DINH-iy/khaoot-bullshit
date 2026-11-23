@@ -106,7 +106,7 @@ export function pointOnRoute(segments: Point[][], fraction: number): Point {
 }
 
 // ---------- scene types ----------
-export type SceneType = 'intro' | 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel';
+export type SceneType = 'intro' | 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel' | 'draw';
 // `name` and `hint` are read in the current language each time.
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
   { type: 'intro', icon: 'start', get name() { return t('tIntro'); }, get hint() { return t('hIntro'); } },
@@ -122,17 +122,22 @@ export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: s
   { type: 'teams', icon: 'teams', get name() { return t('tTeams'); }, get hint() { return t('hTeams'); } },
   { type: 'scoreboard', icon: 'scoreboard', get name() { return t('tScoreboard'); }, get hint() { return t('hScoreboard'); } },
   { type: 'minigame', icon: 'minigame', get name() { return t('tMinigame'); }, get hint() { return t('hMinigame'); } },
+  { type: 'draw', icon: 'draw', get name() { return t('tDraw'); }, get hint() { return t('hDraw'); } },
   { type: 'duel', icon: 'duel', get name() { return t('tDuel'); }, get hint() { return t('hDuel'); } },
   { type: 'wheel', icon: 'wheel', get name() { return t('tWheel'); }, get hint() { return t('hWheel'); } },
 ];
 /** The add menu's tabs: every scene type is in exactly one group. */
 export const SCENE_GROUPS: { key: string; name: string; types: SceneType[] }[] = [
   { key: 'rounds', get name() { return t('gRounds'); }, types: ['quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote'] },
-  { key: 'games', get name() { return t('gGames'); }, types: ['minigame', 'duel', 'wheel'] },
+  { key: 'games', get name() { return t('gGames'); }, types: ['minigame', 'draw', 'duel', 'wheel'] },
   { key: 'between', get name() { return t('gBetween'); }, types: ['intro', 'info', 'scoreboard', 'route', 'teams'] },
 ];
 /** A Wheel of fortune scene: a show scene whose purpose is spinning one of the game's wheels. */
 export const isWheelScene = (stage: Stage | undefined) => stage?.kind === 'info' && Boolean((stage['spin'] as { wheel?: string } | undefined)?.wheel);
+/** A Minigame draw scene: a party choice that a random draw decides; each route is one minigame's scene. */
+export const isDrawScene = (stage: Stage | undefined) => stage?.kind === 'route' && (stage['decide'] as { method?: string } | undefined)?.method === 'draw';
+/** The minigames a new draw starts with: quick ones for any group, no teams needed. */
+export const DRAW_START: MinigameKey[] = ['tap-race', 'reaction', 'stop-clock'];
 const wheelEntries = () => (['w1', 'w2', 'w3', 'w4', 'w5', 'w6'] as const).map(key => t(key));
 /**
  * The kinds within a scene type, offered in a second menu after picking the type:
@@ -212,6 +217,8 @@ function baseStage(type: SceneType, definition: Definition): Stage {
     }
     case 'route': return { key: 'main', kind: 'route', prompt: t('nRoute'), durationMs: 20_000,
       options: [{ key: 'left', label: t('left') }, { key: 'right', label: t('right') }], decide: { method: 'players', tie: 'random', noVotes: 'random', counts: 'reveal' } };
+    // Each option names a minigame; addDrawGames gives each its own connected minigame scene.
+    case 'draw': return { key: 'main', kind: 'route', prompt: t('nDraw'), durationMs: null, options: DRAW_START.map(game => ({ key: game, label: gameName(game) })), decide: { method: 'draw' } };
     case 'scoreboard': return { key: 'main', kind: 'scoreboard', prompt: t('nScoreboard'), show: 'players', durationMs: null };
     case 'teams': return { key: 'main', kind: 'teams', prompt: t('nTeams'), durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players' } };
     case 'order': return { key: 'main', kind: 'collect', prompt: t('nOrder'), durationMs: 30_000,
@@ -246,8 +253,9 @@ export function uniqueKey(prefix: string, taken: Iterable<string>): string {
 }
 
 // ---------- card text ----------
-const KIND_LABEL: Record<string, keyof typeof MODEL_TEXTS.en> = { info: 'kInfo', route: 'kRoute', challenge: 'kChallenge', vote: 'kVote', scoreboard: 'kScoreboard', minigame: 'kMinigame', duel: 'kDuel', teams: 'kTeams' };
+const KIND_LABEL: Record<string, keyof typeof MODEL_TEXTS.en> = { draw: 'kDraw', info: 'kInfo', route: 'kRoute', challenge: 'kChallenge', vote: 'kVote', scoreboard: 'kScoreboard', minigame: 'kMinigame', duel: 'kDuel', teams: 'kTeams' };
 function stageLabel(stage: Stage): string {
+  if (isDrawScene(stage)) return t('kDraw');
   if (stage.kind !== 'collect') return KIND_LABEL[stage.kind] ? t(KIND_LABEL[stage.kind]!) : stage.kind;
   const input = (stage['input'] as { kind?: string } | undefined)?.kind;
   return t(input === 'choice' ? 'kQuiz' : input === 'order' ? 'kOrdering' : input === 'media' ? 'kUpload' : input === 'text' ? 'kWriting' : input === 'drawing' ? 'kDrawing' : 'kQuestion');
@@ -257,6 +265,7 @@ function stageLine(stage: Stage): string {
   const timer = seconds(stage);
   if (isWheelScene(stage)) return t('spins');
   if (stage.kind === 'info') return [seconds(stage, true), t('continues')].filter(Boolean).join(' · ');
+  if (isDrawScene(stage)) return [t('drawLine', { count: ((stage['options'] as unknown[] | undefined) ?? []).length }), timer].filter(Boolean).join(' · ');
   if (stage.kind === 'route') {
     const method = (stage['decide'] as { method?: string } | undefined)?.method;
     return [t(method === 'host' ? 'hostDecides' : method === 'captains' ? 'captainsVote' : 'everyoneVotes'), timer].filter(Boolean).join(' · ');
@@ -285,7 +294,7 @@ export function cardText(definition: Definition, node: Node) {
   const title = first.prompt ?? node.key;
   const banner = first.kind === 'info' ? String(first.title ?? '') : null;
   const line = node.stages.length > 1 ? t('partsN', { count: node.stages.length, line: stageLine(first) }) : stageLine(first);
-  return { label, title: String(title), banner, line, kind: isWheelScene(first) ? 'wheel' : first.kind, input: (first['input'] as { kind?: string } | undefined)?.kind ?? null };
+  return { label, title: String(title), banner, line, kind: isWheelScene(first) ? 'wheel' : isDrawScene(first) ? 'draw' : first.kind, input: (first['input'] as { kind?: string } | undefined)?.kind ?? null };
 }
 
 // ---------- layout and snapping ----------
@@ -392,7 +401,7 @@ export const disconnect = (definition: Definition, edgeKey: string): Definition 
 
 // ---------- scenes ----------
 export function addScene(definition: Definition, type: SceneType, variant?: string): { definition: Definition; key: string } {
-  const key = uniqueKey(type === 'route' ? 'choice' : 'scene', definition.nodes.map(node => node.key));
+  const key = uniqueKey(type === 'route' ? 'choice' : type === 'draw' ? 'draw' : 'scene', definition.nodes.map(node => node.key));
   if (type === 'wheel') {
     // Each wheel scene gets a wheel of its own (at most ten in a game; after that it shares the last).
     const wheels = (definition['wheels'] as { key: string }[] | undefined) ?? [];
@@ -402,7 +411,7 @@ export function addScene(definition: Definition, type: SceneType, variant?: stri
     return { key, definition: { ...definition, ...(wheel ? { wheels: [...wheels, wheel] } : {}), nodes: [...definition.nodes, node] } };
   }
   const node: Node = { key, stages: [newStage(type, definition, variant)] };
-  return { key, definition: { ...definition, ...(type === 'route' ? { formatVersion: 2 } : {}), nodes: [...definition.nodes, node] } };
+  return { key, definition: { ...definition, ...(type === 'route' || type === 'draw' ? { formatVersion: 2 } : {}), nodes: [...definition.nodes, node] } };
 }
 export function deleteScene(definition: Definition, key: string): Definition {
   const nodes = definition.nodes.filter(node => node.key !== key);
@@ -437,6 +446,40 @@ export function freeSpot(definition: Definition, positions: Positions, key: stri
   for (let step = 0; step < 200 && overlaps(); step++) y += GRID;
   return { x, y };
 }
+/** The minigame an option of a draw stands for: its connected minigame scene's game, else the game its label names. */
+export function drawGameOf(definition: Definition, nodeKey: string, option: Option): MinigameKey | null {
+  const to = definition.edges.find(edge => edge.from === nodeKey && edge.option === option.key)?.to;
+  const game = String(definition.nodes.find(node => node.key === to)?.stages[0]?.['game'] ?? '');
+  if (isMinigameKey(game)) return game;
+  return MINIGAME_KEYS.find(key => LANGS.some(language => translate(CATALOG_TEXTS, key, undefined, language) === option.label)) ?? null;
+}
+/**
+ * Gives every unconnected game of a draw its own minigame scene, connected to it.
+ * Returns the new scenes' keys, so the canvas can place them beside the draw.
+ */
+export function addDrawGames(definition: Definition, nodeKey: string): { definition: Definition; keys: string[] } {
+  let next = definition; const keys: string[] = [];
+  for (const option of optionsOf(definition.nodes.find(node => node.key === nodeKey))) {
+    if (next.edges.some(edge => edge.from === nodeKey && edge.option === option.key)) continue;
+    const game = drawGameOf(next, nodeKey, option); if (!game) continue;
+    const added = addConnectedScene(next, 'minigame', nodeKey, option.key, game);
+    next = added.definition; keys.push(added.key);
+  }
+  return { definition: next, keys };
+}
+/**
+ * Changes which minigame an option of a draw stands for: its label follows, and so does its
+ * connected minigame scene when only this option leads there (another scene is left alone).
+ */
+export function withDrawGame(definition: Definition, nodeKey: string, optionKey: string, game: MinigameKey): Definition {
+  const options = optionsOf(definition.nodes.find(node => node.key === nodeKey));
+  let next = setRouteOptions(definition, nodeKey, options.map(option => option.key === optionKey ? { ...option, label: gameName(game) } : option));
+  const to = next.edges.find(edge => edge.from === nodeKey && edge.option === optionKey)?.to;
+  const target = next.nodes.find(node => node.key === to);
+  if (target && target.stages.length === 1 && target.stages[0]!.kind === 'minigame' && next.edges.filter(edge => edge.to === target.key).length === 1)
+    next = updateStage(next, target.key, 0, stage => withMinigame(stage, game, next));
+  return next;
+}
 /** Adds a scene and connects an output to it in one step. */
 export function addConnectedScene(definition: Definition, type: SceneType, from: string, option: string | undefined, variant?: string): { definition: Definition; key: string } {
   const added = addScene(definition, type, variant);
@@ -458,10 +501,16 @@ export function insertTeamsBefore(definition: Definition, nodeKey: string): { de
  * scene leads on to where the arrow went (a new party choice's first route does).
  * So whatever is added (a wheel, a cutscene, a scoreboard…) plays right there.
  */
-export function insertOnEdge(definition: Definition, edgeKey: string, type: SceneType, variant?: string): { definition: Definition; key: string } | null {
+export function insertOnEdge(definition: Definition, edgeKey: string, type: SceneType, variant?: string): { definition: Definition; key: string; games?: string[] } | null {
   const edge = definition.edges.find(entry => entry.key === edgeKey); if (!edge) return null;
   const added = addScene(definition, type, variant);
   let next: Definition = { ...added.definition, edges: added.definition.edges.map(entry => entry.key === edgeKey ? { ...entry, to: added.key } : entry) };
+  if (type === 'draw') {
+    // A minigame draw: each game gets its own scene, and each of those leads on to where the arrow went.
+    const games = addDrawGames(next, added.key); next = games.definition;
+    for (const key of games.keys) next = connect(next, key, undefined, edge.to);
+    return { definition: next, key: added.key, games: games.keys };
+  }
   const node = next.nodes.find(entry => entry.key === added.key)!;
   const first = isRoute(node) ? optionsOf(node)[0] : undefined;
   next = connect(next, added.key, first?.key, edge.to);

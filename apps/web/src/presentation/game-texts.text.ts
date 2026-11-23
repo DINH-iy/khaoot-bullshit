@@ -9,6 +9,8 @@ const ENGLISH = Object.fromEntries(Object.entries(TEXT_DEFAULTS).filter(([key]) 
 export const GAME_TEXTS = defineTexts('game-texts', ENGLISH, {
   nl: {
     'explain.title': 'Zo werkt het', 'explain.ok': 'Begrepen!', 'explain.waiting': 'Wachten tot de host begint…', 'explain.ready': '{count} van {total} klaar', 'explain.start': 'Start de ronde',
+    'explain.atStake': 'Te verdienen', 'explain.points': '{points} punten', 'explain.upTo': 'Tot {points} punten', 'explain.perVote': '{points} punten per stem', 'explain.mostVotes': '+{points} voor de meeste stemmen',
+    'explain.lookUp': 'Kijk naar het scherm: de ronde begint zo.',
     'join.title': 'Doe mee', 'join.code': 'Kamercode', 'join.name': 'Je naam', 'join.button': 'Meedoen', 'join.joining': 'Meedoen…', 'join.reclaim': 'Telefoon leeg tijdens een spel?', 'join.reclaimButton': 'Mijn plek overnemen',
     'join.notFound': 'Geen open kamer met die code. Kijk naar de code op het gedeelde scherm.', 'join.codeMissing': 'Typ de kamercode van 6 tekens van het gedeelde scherm.', 'join.nameMissing': 'Typ een naam, zodat de anderen weten wie je bent.',
     'status.waiting': 'wacht op de start', 'status.playing': 'bezig', 'status.paused': 'gepauzeerd', 'status.finished': 'afgelopen',
@@ -41,6 +43,8 @@ export const GAME_TEXTS = defineTexts('game-texts', ENGLISH, {
   },
   de: {
     'explain.title': 'So geht’s', 'explain.ok': 'Verstanden!', 'explain.waiting': 'Warten, bis der Host startet…', 'explain.ready': '{count} von {total} bereit', 'explain.start': 'Die Runde starten',
+    'explain.atStake': 'Zu gewinnen', 'explain.points': '{points} Punkte', 'explain.upTo': 'Bis zu {points} Punkte', 'explain.perVote': '{points} Punkte pro Stimme', 'explain.mostVotes': '+{points} für die meisten Stimmen',
+    'explain.lookUp': 'Schau auf den Bildschirm: Die Runde beginnt gleich.',
     'join.title': 'Mitspielen', 'join.code': 'Raumcode', 'join.name': 'Dein Name', 'join.button': 'Beitreten', 'join.joining': 'Wird beigetreten…', 'join.reclaim': 'Handy während eines Spiels ausgegangen?', 'join.reclaimButton': 'Meinen Platz übernehmen',
     'join.notFound': 'Kein offener Raum hat diesen Code. Prüfe den Code auf dem gemeinsamen Bildschirm.', 'join.codeMissing': 'Gib den 6-stelligen Raumcode vom gemeinsamen Bildschirm ein.', 'join.nameMissing': 'Gib einen Namen ein, damit die anderen wissen, wer du bist.',
     'status.waiting': 'wartet auf den Start', 'status.playing': 'läuft', 'status.paused': 'pausiert', 'status.finished': 'beendet',
@@ -73,6 +77,8 @@ export const GAME_TEXTS = defineTexts('game-texts', ENGLISH, {
   },
   ro: {
     'explain.title': 'Cum funcționează', 'explain.ok': 'Am înțeles!', 'explain.waiting': 'Se așteaptă ca gazda să înceapă…', 'explain.ready': '{count} din {total} gata', 'explain.start': 'Pornește runda',
+    'explain.atStake': 'Puncte în joc', 'explain.points': '{points} puncte', 'explain.upTo': 'Până la {points} puncte', 'explain.perVote': '{points} puncte pe vot', 'explain.mostVotes': '+{points} pentru cele mai multe voturi',
+    'explain.lookUp': 'Uită-te la ecran: runda începe imediat.',
     'join.title': 'Intră în joc', 'join.code': 'Codul camerei', 'join.name': 'Numele tău', 'join.button': 'Intră', 'join.joining': 'Se intră…', 'join.reclaim': 'Ți s-a descărcat telefonul în timpul jocului?', 'join.reclaimButton': 'Preia-mi locul',
     'join.notFound': 'Nicio cameră deschisă nu are acest cod. Verifică codul de pe ecranul comun.', 'join.codeMissing': 'Scrie codul de 6 caractere al camerei de pe ecranul comun.', 'join.nameMissing': 'Scrie un nume, ca ceilalți să știe cine ești.',
     'status.waiting': 'așteaptă startul', 'status.playing': 'în joc', 'status.paused': 'pe pauză', 'status.finished': 'terminat',

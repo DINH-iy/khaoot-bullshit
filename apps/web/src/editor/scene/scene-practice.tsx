@@ -11,7 +11,9 @@ import { formatRemaining } from '../../room/stage-timer.js';
 import { Ballot } from '../../room/vote.js';
 import { PLAY_TEXTS } from '../../room/play.text.js';
 import { WheelDisc } from '../../room-extras/show-extras.js';
-import type { Definition, Stage } from '../model.js';
+import { DrawBoard } from '../../room/minigame-draw.js';
+import { translate } from '../../i18n/texts.js';
+import { isDrawScene, type Definition, type Stage } from '../model.js';
 import { SETTINGS_TEXTS } from '../shell/settings.text.js';
 import { PRACTICE_TEXTS } from './scene-practice.text.js';
 
@@ -29,6 +31,7 @@ export function ScenePractice({ definition, stage, options }: { definition: Defi
   const wheel = (definition['wheels'] as Wheel[] | undefined)?.find(entry => entry.key === wheelKey);
 
   if (wheel?.entries.length) return <WheelPractice wheel={wheel} />;
+  if (isDrawScene(stage)) return <DrawPractice options={options} />;
   if (!translated && !['vote', 'teams', 'duel', 'challenge'].includes(stage.kind) && typeof stage.durationMs !== 'number') return null;
   return <div className="scene-practice">
     {attempt === undefined ? <button className="primary" type="button" onClick={() => setAttempt(Date.now())}>{t('start')}</button>
@@ -182,4 +185,14 @@ function SampleTeams({ stage }: { stage: Stage }) {
       <span>{names[slot]}</span><button type="button" onClick={() => setPlayers(current => current.map((team, at) => at === index ? (team + 1) % total : team))}>
         {t('moveTo', { team: names[(slot + 1) % total]! })}</button></li>)}</ul>
   </fieldset>;
+}
+
+/** Trying a minigame draw: the same cards and shuffle as in the room, drawn here at random, as often as you like. */
+function DrawPractice({ options }: { options: Option[] }) {
+  const [draw, setDraw] = useState<{ index: number; at: number; seed: string } | null>(null);
+  const play = (key: keyof typeof PLAY_TEXTS.en) => translate(PLAY_TEXTS, key);
+  return <div className="scene-practice">
+    <DrawBoard key={draw?.seed ?? 'waiting'} options={options} drawn={draw?.index ?? null} at={draw?.at ?? null} seed={draw?.seed ?? ''} waiting={play('drawWho')} />
+    <button className="primary" type="button" onClick={() => setDraw({ index: Math.floor(Math.random() * options.length), at: Date.now(), seed: String(Math.random()) })}>{play('drawNow')}</button>
+  </div>;
 }

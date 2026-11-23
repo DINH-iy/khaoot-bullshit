@@ -14,9 +14,14 @@
 .room .drawing-colors button[aria-checked=true], .drawing-colors button[aria-checked=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: 2px; }
 .drawing-widths { display: flex; gap: 6px; }
 .room .drawing-widths button, .drawing-widths button { flex: 1; min-height: 40px; display: grid; place-items: center; padding: 0; }
-.drawing-widths button span { display: block; border-radius: 50%; box-shadow: 0 0 0 1px rgb(255 255 255 / .6); }
+.drawing-widths button[role=radio] span { display: block; border-radius: 50%; box-shadow: 0 0 0 1px rgb(255 255 255 / .6); }
 .room .drawing-widths button[aria-checked=true], .drawing-widths button[aria-checked=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: -1px; }
-.drawing-actions { display: flex; gap: 8px; justify-content: center; }
+.drawing-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.drawing-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+/* The eraser is a toggle: clearly on while it is the tool, and the size dots show the paper colour with an edge. */
+.room .drawing-widths .drawing-eraser, .drawing-widths .drawing-eraser { flex: 1.6; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; font-size: .875rem; white-space: nowrap; }
+.room .drawing-widths .drawing-eraser[aria-pressed=true], .drawing-widths .drawing-eraser[aria-pressed=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: -1px; }
+.drawing-pad.erasing .drawing-widths button[role=radio] span { box-shadow: 0 0 0 1px rgb(0 0 0 / .45); }
 .drawing-gallery { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 12px; }
 .drawing-gallery li { display: grid; gap: 6px; margin: 0; font-weight: 700; text-align: center; }
 .drawing-surface:focus-visible { outline: 4px solid var(--r-accent, #6d3fd6); outline-offset: 3px; }
@@ -30,7 +35,22 @@
 .blind-banner > span { grid-row: span 2; font-size: 2.4rem; line-height: 1; }
 .blind-banner strong { font-size: 1.6rem; letter-spacing: .08em; color: #ffcf4a; line-height: 1.1; }
 .blind-banner small { font-size: .9rem; opacity: .9; }
-
-.drawing-compact-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px 44px; gap: 6px; width: 100%; }
-.room .drawing-compact-tools :is(select, button) { min-width: 0; min-height: 44px; padding: 0 6px; font-size: .875rem; }
-.room .drawing-compact-tools button { font-size: 1.125rem; }
+/* Sizes and eraser in one row; undo and start over below (or, on a short screen, all in one row as icons). */
+.drawing-row { display: grid; gap: 8px; }
+.drawing-actions button .tool-label, .drawing-eraser .tool-label { margin-inline-start: 6px; }
+/* On a phone the square shrinks to the height left over, so the colours, sizes and buttons stay on screen with it,
+   above the floating menu bar. */
+.room-player :is(.drawing-answer, .mg-turn) .drawing-pad { justify-items: center; }
+.room-player :is(.drawing-answer, .mg-turn) .drawing-tools { width: 100%; }
+.room-player :is(.drawing-answer, .mg-turn) .drawing-surface { width: min(100%, max(10rem, calc(100svh - 37rem))); }
+@media (max-height: 760px) {
+  .drawing-row { display: flex; gap: 6px; }
+  .drawing-row .drawing-widths { flex: 5; }
+  .drawing-row .drawing-actions { flex: 2; flex-wrap: nowrap; gap: 6px; }
+  .drawing-row .tool-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .room .drawing-widths .drawing-eraser, .drawing-widths .drawing-eraser { flex: 1; padding: 0; }
+  .drawing-row .drawing-actions button { flex: 1; min-width: 40px; padding: 0; justify-content: center; }
+  .room-player :is(.drawing-answer, .mg-turn) .drawing-surface { width: min(100%, max(10rem, calc(100svh - 31rem))); }
+  /* Pass the pencil also has its turn line and send button: a little less room. */
+  .room-player .mg-turn .drawing-surface { width: min(100%, max(9rem, calc(100svh - 34.5rem))); }
+}

@@ -1,7 +1,7 @@
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
-import { lockRoom, recordRoomChange, type Principal } from './gateway.js';
+import { lockRoom, makeRoomCode, recordRoomChange, type Principal } from './gateway.js';
 import { readRoomState, type RoomState } from './reclaim.js';
 import { joinToken, newToken, roomAssert, tokenHash } from './security.js';
 
@@ -30,6 +30,26 @@ export async function linkNextRoom(tx: Transaction, fromId: string, toId: string
   await tx.gameSession.update({ where: { id: toId }, data: { state: { ...readRoomState(to.state), ...carried } } });
   await recordRoomChange(tx, fromId, 'room.restarted');
   return true;
+}
+
+/**
+ * Rehearsing a game again (from the start or from another scene) replaces its open rehearsal room instead of
+ * adding one more: `toId` was just opened for it, the open ones end and point at it, so phones, the shared screen
+ * and host tabs move over, and it takes the room code of the newest one so the code on the screen stays the same.
+ */
+export async function replaceRehearsal(tx: Transaction, hostId: string, gameId: string, toId: string, now = new Date()): Promise<void> {
+  await lockRoom(tx, toId);
+  const to = await tx.gameSession.findUniqueOrThrow({ where: { id: toId } });
+  await tx.gameSession.update({ where: { id: toId }, data: { state: { ...readRoomState(to.state), rehearsalOf: gameId } } });
+  const open = await tx.gameSession.findMany({ where: { id: { not: toId }, hostId, mode: 'REHEARSAL', status: { not: 'FINISHED' }, roomCode: { not: null }, state: { path: ['rehearsalOf'], equals: gameId } },
+    orderBy: { createdAt: 'asc' }, select: { id: true, roomCode: true } });
+  // Oldest first, so the settings of the newest room are the ones that carry over.
+  for (const room of open) await linkNextRoom(tx, room.id, toId, now);
+  const newest = open.at(-1);
+  if (newest?.roomCode) {
+    await tx.gameSession.update({ where: { id: newest.id }, data: { roomCode: makeRoomCode() } });
+    await tx.gameSession.update({ where: { id: toId }, data: { roomCode: newest.roomCode } });
+  }
 }
 
 /**

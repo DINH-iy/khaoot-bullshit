@@ -55,7 +55,22 @@ describe('a scene that explains itself first', () => {
     await service.execute(as(f, 0), answer(f.sessionId, stageRunId));
   });
 
-  it('a scene other than a minigame needs its own text', () => {
+  it('a scene other than a minigame needs something to show: its own text, its points or a picture', () => {
     expect(() => quiz({ explain: {} })).toThrow();
+    expect(() => quiz({ explain: { points: true } })).not.toThrow();
+    // A poll earns no points, so showing them alone is not enough.
+    expect(() => quiz({ scoring: { kind: 'none' }, explain: { points: true } })).toThrow();
+    expect(() => quiz({ explain: { picture: { id: randomUUID(), kind: 'video' } } })).toThrow();
+  });
+
+  it('the intro shows the points at stake from the scene’s scoring, its picture, and whether only the shared screen shows it', async () => {
+    const picture = { id: randomUUID(), kind: 'image' as const };
+    const f = await fixture(2, quiz({ scoring: { kind: 'correct-choice', correctChoiceKey: 'canberra', awardMilli: '10000', places: { kind: 'list', pointsMilli: ['5000'] } },
+      explain: { points: true, picture, screenOnly: true } }));
+    const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
+    expect((await readSessionView(prisma, as(f, 0), f.sessionId)).stage!.explain).toEqual({ text: null, readyIds: [],
+      points: { kind: 'round', milli: '15000', upTo: true }, picture: { ...picture, url: `/api/media/${picture.id}` }, screenOnly: true });
+    await hostCommand(f, 'stage.explained', { stageRunId });
+    expect((await readSessionView(prisma, as(f, 0), f.sessionId)).stage!.explain).toBeNull();
   });
 });

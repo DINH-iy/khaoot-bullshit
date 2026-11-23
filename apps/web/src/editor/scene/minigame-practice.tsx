@@ -214,7 +214,7 @@ function RelayPractice({ settings }: { settings: MinigameSettings<'relay-drawing
   return <>
     {settings.animation && <p>{a('draw', { word })}</p>}
     <p>{t('turn', { turn: frames.length + 1, total })} · {text('timer.left', { time: formatRemaining(Math.max(0, deadline - now)) })}</p>
-    <DrawingPad key={frames.length} value={drawing} onChange={setDrawing} under={settings.animation ? [] : frames} label={t('draw')} compactTools />
+    <DrawingPad key={frames.length} value={drawing} onChange={setDrawing} under={settings.animation ? [] : frames} label={t('draw')} />
     <button type="button" onClick={finish}>{t('nextTurn')}</button>
   </>;
 }

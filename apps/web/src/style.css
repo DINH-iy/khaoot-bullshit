@@ -101,3 +101,6 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 /* Links keep their focus indicator and use weight or button styling for recognition. */
 a, a:hover, a:focus-visible { text-decoration: none; }
 a:not([class]) { font-weight: 650; }
+/* Page buttons (ui/paged-result-list.tsx): long lists, a page at a time. */
+.result-page-actions { display: flex; justify-content: center; align-items: center; gap: 10px; margin-block-start: 8px; }
+.result-page-actions span { font-size: .875rem; font-variant-numeric: tabular-nums; opacity: .8; }

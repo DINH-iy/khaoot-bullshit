@@ -96,7 +96,7 @@ function MyTurn({ sessionId, stageRunId, team, animation, turn, turnLeft, disabl
   useEffect(() => { if (turnLeft <= 300) send(); });
   return <div className="mg-turn">
     <p className="mg-sub"><strong>{t('minigame.yourTurn')}</strong> · {Math.ceil(turnLeft / 1000)} s</p>
-    <DrawingPad value={drawing} onChange={change} onStrokeProgress={progress} under={animation ? [] : parts} disabled={disabled || sent.current} label={c('teamDrawingTurn')} compactTools />
+    <DrawingPad value={drawing} onChange={change} onStrokeProgress={progress} under={animation ? [] : parts} disabled={disabled || sent.current} label={c('teamDrawingTurn')} />
     {error && <p role="alert" className="error">{error}</p>}
     <button type="button" className="primary" disabled={disabled || sent.current} onClick={send}>{t('drawing.submit')}</button>
   </div>;

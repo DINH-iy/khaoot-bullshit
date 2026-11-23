@@ -1,6 +1,8 @@
 import { SettingToggle } from '../room-extras/setting-toggle.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PeopleListSchema, PersonGroupListSchema, PersonKeyViewSchema, type PersonGroup, type PersonRow, type RoomSnapshot } from '@party/contracts';
+import { PersonGroupListSchema, PersonKeyViewSchema, type PersonGroup, type RoomSnapshot } from '@party/contracts';
+import { usePeoplePage } from '../people/use-people-page.js';
+import { PeoplePager } from '../people/people-pager.js';
 import { newId, roomApi } from './api.js';
 import { FaIcon } from '../presentation/icons.js';
 import { CopyIcon } from './join-qr.js';
@@ -118,31 +120,30 @@ export function ExpectedPeople({ state, sessionId, onError }: { state: RoomSnaps
       <span className="expected-name">{person.name}</span>
       <code className="expected-key" aria-label={h('codeOf', { name: person.name })}>{keys[person.personId] || '…'}</code>
       <span className={`expected-state${person.joined ? ' in' : ''}`}>{h(person.joined ? 'inTheRoom' : 'notYet')}</span>
-      <button type="button" className="icon-button" disabled={busy} aria-label={h('takeOff', { name: person.name })} title={h('takeOff', { name: person.name })} onClick={() => save(expected.filter(other => other.personId !== person.personId).map(other => other.personId))}><FaIcon name="boot" /></button></li>)}</ul>}
+      <button type="button" className="icon-button danger" disabled={busy} aria-label={h('takeOff', { name: person.name })} title={h('takeOff', { name: person.name })} onClick={() => save(expected.filter(other => other.personId !== person.personId).map(other => other.personId))}><FaIcon name="boot" /></button></li>)}</ul>}
     {picking && <PeoplePicker chosen={expected.map(person => person.personId)} busy={busy} onChange={save} />}
   </div>;
 }
 
-/** All people (from the People page), to tick who is expected; a group (People → Groups) ticks all its members at once. */
+/** The people (from the People page, a page at a time), to tick who is expected; a group (People → Groups) ticks all its members at once. */
 function PeoplePicker({ chosen, busy, onChange }: { chosen: string[]; busy: boolean; onChange: (personIds: string[]) => void }) {
-  const [people, setPeople] = useState<PersonRow[]>(); const [search, setSearch] = useState(''); const [error, setError] = useState('');
+  const paging = usePeoplePage(); const { data, search, setSearch, query } = paging;
   const [groups, setGroups] = useState<PersonGroup[]>([]); const h = useTexts(HOST_TEXTS);
-  useEffect(() => { void roomApi('/api/host/people').then(data => setPeople(PeopleListSchema.parse(data).people)).catch(() => setError(h('peopleLoadFailed'))); }, []);
   // Without groups (or when they cannot be loaded) the list of people works as before.
   useEffect(() => { void roomApi('/api/host/groups').then(data => setGroups(PersonGroupListSchema.parse(data).groups.filter(group => group.personIds.length > 0))).catch(() => undefined); }, []);
   const toggleGroup = (group: PersonGroup, add: boolean) => onChange(add ? [...new Set([...chosen, ...group.personIds])] : chosen.filter(id => !group.personIds.includes(id)));
-  const shown = people?.filter(person => person.name.toLowerCase().includes(search.trim().toLowerCase()));
   return <div className="people-picker">
-    {error && <p role="alert" className="error">{error}</p>}
-    {!people && !error && <p role="status">{h('loadingPeople')}</p>}
-    {people && !people.length && <p className="hint">{h('noPeople')}</p>}
+    {paging.failed && <p role="alert" className="error">{h('peopleLoadFailed')}</p>}
+    {!data && !paging.failed && <p role="status">{h('loadingPeople')}</p>}
+    {data && !query && !data.total && <p className="hint">{h('noPeople')}</p>}
     {groups.length > 0 && <fieldset className="group-picker"><legend>{h('groups')}</legend><ul className="plain-list">{groups.map(group => {
       const all = group.personIds.every(id => chosen.includes(id)); const some = !all && group.personIds.some(id => chosen.includes(id));
       return <li key={group.id}><label className="choice"><input type="checkbox" disabled={busy} checked={all} ref={input => { if (input) input.indeterminate = some; }}
         onChange={event => toggleGroup(group, event.target.checked)} />{group.name} <span className="hint">({group.personIds.length})</span></label></li>;
     })}</ul></fieldset>}
-    {people && people.length > 6 && <label><span className="visually-hidden">{h('searchPeople')}</span><input type="search" placeholder={h('searchPerson')} value={search} onChange={event => setSearch(event.target.value)} /></label>}
-    {shown && <ul className="plain-list">{shown.map(person => <li key={person.id}><label className="choice"><input type="checkbox" disabled={busy} checked={chosen.includes(person.id)}
+    {data && (query || data.total > 6) && <label><span className="visually-hidden">{h('searchPeople')}</span><input type="search" placeholder={h('searchPerson')} maxLength={40} value={search} onChange={event => setSearch(event.target.value)} /></label>}
+    {data && <ul className="plain-list">{data.people.map(person => <li key={person.id}><label className="choice"><input type="checkbox" disabled={busy} checked={chosen.includes(person.id)}
       onChange={event => onChange(event.target.checked ? [...chosen, person.id] : chosen.filter(id => id !== person.id))} />{person.name}</label></li>)}</ul>}
+    <PeoplePager paging={paging} />
   </div>;
 }

@@ -16,6 +16,8 @@ import { SeatApprovalSetting, SeatReclaim, SeatRequests } from './seat-reclaim.j
 import { ExpectedPeople, NameRequests, NewKeyCard, PickYourName, SignupSetting, TestBenchSetting } from './room-people.js';
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
+import { MinigameDraw } from './minigame-draw.js';
+import { PLAY_TEXTS } from './play.text.js';
 import { ExplainPanel } from './explain-panel.js';
 import { HOSTED_POOL_TEXTS } from '../head-to-head/eight-ball/hosted.text.js';
 import { DuelPanel } from './duel.js';
@@ -235,7 +237,7 @@ export function RoomScreen() {
     room.send(GameCommandSchema.parse({ ...base, ...((PLAYER_COMMANDS as readonly string[]).includes(type) ? {} : { expectedRevision: state.view.revision }), ...extra }));
   };
   const graphText = useTexts(GRAPH_TEXTS);
-  const poolText = useTexts(HOSTED_POOL_TEXTS);
+  const poolText = useTexts(HOSTED_POOL_TEXTS); const playText = useTexts(PLAY_TEXTS);
   const stage = state?.view.stage; const disabled = room.saving || Boolean(room.pending) || room.connection !== 'Connected';
   const remaining = useRemaining(stage, room.clockOffset); const timeUp = remaining === 0 && stage?.pausedRemainingMs === null;
   // Time is up with an answer chosen or typed but not sent (a choice, text, an order, an upload, a route vote): send it
@@ -323,7 +325,7 @@ export function RoomScreen() {
   const myTeam = stage ? ownTeam(stage.teams) : undefined;
   // Only while the vote is actually open: a paused room makes nobody a late joiner.
   const routeBlock = stage?.route && !stage.route.canVote && !state?.view.ownSubmission && stage.status === 'ACTIVE' && state?.view.status === 'RUNNING'
-    ? stage.route.method === 'host' ? t('wait.hostRoute') : stage.teams && !stage.teams.forming && myTeam && captainAnswers(stage.teams) ? null : t('wait.lateVoter') : null;
+    ? stage.route.method === 'draw' ? null : stage.route.method === 'host' ? t('wait.hostRoute') : stage.teams && !stage.teams.forming && myTeam && captainAnswers(stage.teams) ? null : t('wait.lateVoter') : null;
   const answerBlock = routeBlock ?? (!stage?.teams ? null : stage.teams.forming ? t('wait.forming')
     : !myTeam ? t('wait.sitOut') : captainAnswers(stage.teams) && myTeam.captainId !== state?.selfPlayerId ? t('wait.captain', { captain: state?.players.find(player => player.id === myTeam.captainId)?.displayName ?? '', team: myTeam.name }) : null);
   // Scenes that ask nothing: info, scoreboard, and a Pick teams scene once its teams are confirmed.
@@ -347,7 +349,7 @@ export function RoomScreen() {
     : running && stage?.status === 'ACTIVE' && stage.teams?.forming ? { label: t('host.startTeams'), run: () => command('teams.confirm', { stageRunId: stage.id }), blocked: stage.teams.teams.every(team => team.memberIds.length === 0) }
     // A scene that explains itself first: the host starts it once everyone has read it.
     : running && stage?.status === 'ACTIVE' && stage.explain ? { label: t('explain.start'), run: () => command('stage.explained', { stageRunId: stage.id }) }
-    : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: poolDuel ? poolText('closeVotes') : t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
+    : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: poolDuel ? poolText('closeVotes') : stage.route?.method === 'draw' ? playText('drawNow') : t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
     : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
     : !state.tryout && running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId || (poolDuel && stage.revealed)) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
     : null;
@@ -356,7 +358,7 @@ export function RoomScreen() {
   // Teams are made first; then the explanation; then the round itself.
   const explaining = !forming && Boolean(stage?.explain);
   const phase = !stage || showOnly ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams') : explaining ? t('explain.title')
-    : stage.revealed ? t('phase.results') : stage.kind === 'duel' ? (stage.status === 'CLOSED' ? t('phase.duelOn') : t('phase.duel')) : stage.status === 'CLOSED' ? t('phase.locked')
+    : stage.route?.method === 'draw' ? playText('drawPhase') : stage.revealed ? t('phase.results') : stage.kind === 'duel' ? (stage.status === 'CLOSED' ? t('phase.duelOn') : t('phase.duel')) : stage.status === 'CLOSED' ? t('phase.locked')
     : stage.kind === 'challenge' ? t('phase.challenge') : stage.kind === 'minigame' ? t('phase.minigame') : stage.kind === 'route' ? t('phase.route') : stage.kind === 'vote' ? t('phase.vote')
     : stage.eligibleCount > 0 && stage.submittedCount >= stage.eligibleCount ? t('phase.allIn') : t('phase.answer');
   // Scores: the host always; phones and the shared screen when the host allows it, and always at a scoreboard scene and the end.
@@ -467,10 +469,13 @@ export function RoomScreen() {
             onResult={result => command('submission.submit', { stageRunId: stage.id, value: { kind: 'minigame', ...result } })}
             live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })}
             onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} /></div>}
-          {stage.kind === 'route' && <div ref={routeRef}><RouteChoice state={state} stage={stage} disabled={disabled} send={command} /></div>}
+          {stage.kind === 'route' && <div ref={routeRef}>{stage.route?.method === 'draw' ? <MinigameDraw state={state} stage={stage} offset={room.clockOffset} disabled={disabled} send={command} />
+            : <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />}</div>}
           {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel key={stage.id} state={state} stage={stage} disabled={disabled || (poolDuel && stage.status === 'CLOSED' && timeUp && Boolean(stage.deadlineAt))} send={command} /></div>}
           {stage.kind !== 'route' && stage.revealed && (!poolDuel || (role !== 'player' && stage.duel?.pick !== 'teams' && stage.reveal?.awards.length)) && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })}
             onGraphPlayback={action => command('stage.graphPlayback', { stageRunId: stage.id, action })} disabled={disabled} /></div>}
+          {/* A writing, upload or drawing round with host points: the host gives them under the shown answers. */}
+          {host && stage.kind === 'collect' && stage.challenge && stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>{r('shownWithoutNames')}</p>}
           {stage.kind === 'minigame' ? (role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p> : null)
             : role === 'player' && state.view.ownSubmission ? <p ref={savedRef} role="status" className="answer-in">{saved}</p>

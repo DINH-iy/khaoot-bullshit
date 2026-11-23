@@ -4,6 +4,8 @@ import { translate, useTexts } from '../../i18n/texts.js';
 import { fontCssFamily } from '../../presentation/theme-fonts.js';
 import { roomApi } from '../../room/api.js';
 import { Dropdown } from '../../ui/dropdown.js';
+import { ConfirmDialog } from '../controls/confirm-dialog.js';
+import { Icon } from '../controls/icons.js';
 import { LOOK_TEXTS } from './look.text.js';
 
 const LABELS = { system: 'fSystem', rounded: 'fRounded', serif: 'fSerif', slab: 'fSlab', mono: 'fMono', condensed: 'fCondensed', playful: 'fPlayful', elegant: 'fElegant' } as const;
@@ -35,7 +37,11 @@ export function FontFields({ theme, full, inherited, onChange }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<keyof typeof LOOK_TEXTS.en | ''>('');
   const [added, setAdded] = useState<FontUploadResult>();
+  const [managing, setManaging] = useState(false);
+  const [removing, setRemoving] = useState<UploadedFont>();
+  const [removed, setRemoved] = useState('');
   const file = useRef<HTMLInputElement>(null);
+  const manage = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -52,6 +58,7 @@ export function FontFields({ theme, full, inherited, onChange }: {
     setBusy(true);
     setError('');
     setAdded(undefined);
+    setRemoved('');
     try {
       const result = await load();
       const { id, name } = result;
@@ -62,6 +69,25 @@ export function FontFields({ theme, full, inherited, onChange }: {
       const errors: Record<string, keyof typeof LOOK_TEXTS.en> = { FILE_TOO_LARGE: 'fontTooLarge', UNSUPPORTED_MEDIA: 'fontUnsupported', INVALID_COMMAND: 'fontGoogleLink',
         FONT_IMPORT_FAILED: 'fontImportFailed', STORAGE_FULL: 'fontStorageFull', RATE_LIMITED: 'fontBusy' };
       setError(errors[code] ?? 'fontAddFailed');
+    } finally { setBusy(false); }
+  };
+
+  // Fonts this look shows (here or inherited) stay: the server refuses fonts that saved games or prefabs use.
+  const shown = new Set([full.font, full.headingFont, ...(inherited ? [inherited.font, inherited.headingFont] : [])]
+    .flatMap(font => typeof font === 'string' ? [] : [font.id]));
+  const remove = async (font: UploadedFont) => {
+    setRemoving(undefined);
+    setBusy(true); setError(''); setAdded(undefined); setRemoved('');
+    try {
+      await roomApi(`/api/host/fonts/${font.id}/remove`, {});
+      setFonts(previous => previous.filter(entry => entry.id !== font.id));
+      setRemoved(font.name);
+      // Its remove button is gone: keep keyboard focus in the font list's control.
+      requestAnimationFrame(() => manage.current?.focus());
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : '';
+      if (code === 'NOT_FOUND') setFonts(previous => previous.filter(entry => entry.id !== font.id));
+      setError(code === 'MEDIA_IN_USE' ? 'fontInUse' : code === 'NOT_FOUND' ? 'fontGone' : 'fontRemoveFailed');
     } finally { setBusy(false); }
   };
 
@@ -104,6 +130,24 @@ export function FontFields({ theme, full, inherited, onChange }: {
       <button type="submit" className="small-button" disabled={busy || !googleUrl.trim()}>{t('fontImport')}</button>
     </form>
     {busy && <p role="status" className="hint">{t('fontAdding')}</p>}
+    {fonts.length > 0 && <>
+      <button ref={manage} type="button" className="small-button with-icon theme-font-manage" aria-expanded={managing} aria-controls="theme-font-library" onClick={() => setManaging(open => !open)}>
+        <svg className="ed-chevron" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        {t('fontLibrary', { count: fonts.length })}
+      </button>
+      {managing && <ul id="theme-font-library" className="theme-font-library">{[...fonts].sort((a, b) => a.name.localeCompare(b.name)).map(font => {
+        const inLook = shown.has(font.id);
+        return <li key={font.id}>
+          <span className="theme-font-name" title={font.name}>{font.name}</span>
+          {inLook && <span className="hint">{t('fontInLook')}</span>}
+          <button type="button" className="small-button icon-only danger-icon" disabled={busy || inLook} aria-label={t('fontRemoveLabel', { name: font.name })}
+            title={t(inLook ? 'fontInLookTitle' : 'fontRemoveTitle')} onClick={() => setRemoving(font)}><Icon name="trash" size={16} /></button>
+        </li>;
+      })}</ul>}
+    </>}
+    {removing && <ConfirmDialog title={t('fontRemoveAsk', { name: removing.name })} text={t('fontRemoveText')} confirm={t('fontRemoveConfirm')}
+      onConfirm={() => void remove(removing)} onCancel={() => setRemoving(undefined)} />}
+    {removed && <p role="status" className="hint">{t('fontRemoved', { name: removed })}</p>}
     {added && <p role="status" className="hint">{t(added.alreadyPresent ? 'fontAlreadyPresent' : 'fontAdded', { name: added.name })}</p>}
     {error && <p role="alert" className="error">{t(error)}</p>}
   </>;

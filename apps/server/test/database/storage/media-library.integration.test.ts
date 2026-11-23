@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,6 +31,16 @@ const uploadFont = async (bytes: Buffer, name: string, cookie?: string) =>
 const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(200, 1)]);
 const mp3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(500, 2)]);
 const m4a = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(300, 3)]);
+
+// A minimal TrueType header. The test database outlives a run, and identical font files are
+// deduplicated, so every call makes a different file.
+function newFont() {
+  const font = Buffer.alloc(60);
+  font.writeUInt32BE(0x00010000, 0);
+  font.writeUInt16BE(2, 4);
+  randomBytes(15).copy(font, 44);
+  return font;
+}
 
 describe('the media library', () => {
   it('recognises pictures, videos and songs by their bytes, never by their name', () => {
@@ -77,9 +87,7 @@ describe('the media library', () => {
   });
 
   it('shares uploaded and imported font files with visitors while reserving uploads for editors', async () => {
-    const font = Buffer.alloc(60);
-    font.writeUInt32BE(0x00010000, 0);
-    font.writeUInt16BE(2, 4);
+    const font = newFont();
     expect((await uploadFont(font, 'House Font.ttf', '')).statusCode).toBe(401);
     expect((await uploadFont(png, 'Fake.ttf')).json().error.code).toBe('UNSUPPORTED_MEDIA');
     expect((await uploadFont(font.subarray(0, 16), 'Truncated.ttf')).json().error.code).toBe('UNSUPPORTED_MEDIA');
@@ -142,11 +150,55 @@ describe('the media library', () => {
     const saved = await json('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: draft.revision, definition: withMedia });
     expect(saved.statusCode).toBe(200);
     expect((await json('POST', `/api/host/media/${id}/remove`, {})).json().error.code).toBe('MEDIA_IN_USE');
-    // Taken out of the scene again: now it can go, file first.
+    // The library lists it under that game (to group by game), by the same rule that keeps it.
+    const listed = (await json('GET', '/api/host/media')).json().data;
+    expect(listed.items.find((entry: { id: string }) => entry.id === id).gameIds).toEqual([gameId]);
+    expect(listed.games).toContainEqual({ id: gameId, title: 'Media game', archived: false });
+    // Taken out of the scene again: no longer listed under the game, and now it can go, file first.
     expect((await json('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: saved.json().data.revision, definition: draft.definition })).statusCode).toBe(200);
+    expect((await json('GET', '/api/host/media')).json().data.items.find((entry: { id: string }) => entry.id === id).gameIds).toEqual([]);
     expect((await json('POST', `/api/host/media/${id}/remove`, {})).statusCode).toBe(200);
     expect(await readdir(join(mediaDir, 'game-media'))).not.toContain(id);
     expect((await app.inject({ method: 'GET', url: `/api/media/${id}`, headers: { host: '127.0.0.1:4173' } })).statusCode).toBe(404);
     expect((await json('GET', '/api/host/media')).json().data.items.some((entry: { id: string }) => entry.id === id)).toBe(false);
+  });
+
+  it('removes a font only once no game draft, latest version, prefab or saved style uses it', async () => {
+    const font = (await uploadFont(newFont(), 'Removable.ttf')).json().data as { id: string; name: string };
+    const picture = (await upload(png, 'not a font.png')).json().data.id;
+    // Each route removes only its own kind of file, and only for editors.
+    expect((await json('POST', `/api/host/media/${font.id}/remove`, {})).json().error.code).toBe('NOT_FOUND');
+    expect((await json('POST', `/api/host/fonts/${picture}/remove`, {})).json().error.code).toBe('NOT_FOUND');
+    expect((await json('POST', `/api/host/fonts/${font.id}/remove`, {}, '')).statusCode).toBe(401);
+
+    const gameId = randomUUID();
+    const draft = (await json('POST', '/api/host/games', { gameId, title: 'Font game', startFrom: null })).json().data;
+    const withFont = { ...draft.definition, presentation: { ...draft.definition.presentation, theme: { ...draft.definition.presentation?.theme, headingFont: font } } };
+    const saved = await json('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: draft.revision, definition: withFont });
+    expect(saved.statusCode).toBe(200);
+    expect((await json('POST', `/api/host/fonts/${font.id}/remove`, {})).json().error.code).toBe('MEDIA_IN_USE');
+    expect((await json('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: saved.json().data.revision, definition: draft.definition })).statusCode).toBe(200);
+
+    // A saved prefab carries its scenes' looks, so it keeps the font too.
+    const node = draft.definition.nodes[0];
+    const prefabId = randomUUID();
+    const prefab = await json('POST', '/api/host/prefabs', { prefabId, name: 'Font scene', content: {
+      nodes: [{ ...node, stages: [{ ...node.stages[0], presentation: { theme: { font } } }, ...node.stages.slice(1)] }],
+      edges: [], positions: { [node.key]: { x: 0, y: 0 } }, keys: [node.key] } });
+    expect(prefab.statusCode).toBe(200);
+    expect((await json('POST', `/api/host/fonts/${font.id}/remove`, {})).json().error.code).toBe('MEDIA_IN_USE');
+    expect((await json('POST', `/api/host/prefabs/${prefabId}/delete`, {})).statusCode).toBe(200);
+
+    // So does a saved style: a game that picks it later gets the font with it.
+    const styleId = randomUUID();
+    expect((await json('POST', '/api/host/styles', { styleId, name: 'Font style', theme: { preset: 'clean', font } })).statusCode).toBe(200);
+    expect((await json('POST', `/api/host/fonts/${font.id}/remove`, {})).json().error.code).toBe('MEDIA_IN_USE');
+    expect((await json('POST', `/api/host/styles/${styleId}/delete`, {})).statusCode).toBe(200);
+
+    expect((await json('POST', `/api/host/fonts/${font.id}/remove`, {})).statusCode).toBe(200);
+    expect(await readdir(join(mediaDir, 'game-media'))).not.toContain(font.id);
+    expect((await app.inject({ method: 'GET', url: `/api/fonts/${font.id}`, headers: { host: '127.0.0.1:4173' } })).statusCode).toBe(404);
+    expect((await json('GET', '/api/host/fonts')).json().data).not.toContainEqual(font);
+    expect((await json('POST', `/api/host/fonts/${font.id}/remove`, {})).json().error.code).toBe('NOT_FOUND');
   });
 });

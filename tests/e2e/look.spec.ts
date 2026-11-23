@@ -23,7 +23,7 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   await settled(page); expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
   // A style, a colour and a readability warning.
-  await page.getByRole('button', { name: /Neon night/ }).click();
+  await page.getByRole('button', { name: 'Neon night', exact: true }).click();
   await expect(page.locator('.room-preview').first()).toHaveCSS('font-family', /Arial Narrow/);
   await page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'Results', exact: true }).click();
   await expect(page.locator('.look-tv .round-results .result-answer')).toHaveText('Correct answer: Paris');
@@ -32,6 +32,10 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   await expect(page.getByLabel('Text on main buttons')).toBeHidden();
   await page.locator('summary', { hasText: /^Colours/ }).click();
   await page.getByLabel('Text on main buttons').fill('#00f0ff');
+  // The first change to a style asks what it is for; here only this game's look changes.
+  const asked = page.getByRole('dialog', { name: 'Change “Neon night”?' });
+  await asked.getByRole('button', { name: 'Only change this look' }).click();
+  await expect(asked).toHaveCount(0);
   await expect(page.getByText('Text on main buttons is hard to read')).toBeVisible();
   await page.getByLabel('Text on main buttons').fill('#001417');
   await expect(page.getByText('Text on main buttons is hard to read')).toHaveCount(0);
@@ -122,8 +126,11 @@ test('a colour palette from Canva, Figma or Coolors is imported, and the colours
   const importing = page.getByRole('dialog', { name: 'Import colours' });
   await importing.getByLabel('Colours').fill('https://coolors.co/264653-2a9d8f-e9c46a-f4a261-e76f51');
   await expect(importing.getByRole('status')).toContainText('Found 5 colours');
+  // Measure the colours once the dialog has finished fading in.
+  await settled(page);
   expect((await new AxeBuilder({ page }).include('.palette-dialog').analyze()).violations).toEqual([]);
   await importing.getByRole('button', { name: 'Use these colours' }).click();
+  await page.getByRole('dialog', { name: 'Change “MBO Utrecht”?' }).getByRole('button', { name: 'Only change this look' }).click();
   await expect(page.getByLabel('Answer A colour')).toHaveValue('#264653');
   await expect(page.getByLabel('Answer E colour')).toHaveValue('#e76f51');
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });

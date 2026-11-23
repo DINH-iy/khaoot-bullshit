@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ClaimPersonSchema, GameIdSchema, MeSchema, NewPersonSchema, PeopleListSchema, PeopleStatsSchema, PersonEditorSchema, PersonKeyViewSchema, PlayerLookSchema, RenamePersonSchema } from '@party/contracts';
+import { ClaimPersonSchema, GameIdSchema, LeaderboardQuerySchema, LeaderboardSchema, MeSchema, NewPersonSchema, PeoplePageSchema, PeopleQuerySchema, PeopleSummarySchema, PersonEditorSchema, PersonKeyViewSchema, PersonRowSchema, PersonStandingSchema, PlayerLookSchema, RenamePersonSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
@@ -7,7 +7,7 @@ import type { EditorLive } from '../authoring/live.js';
 import { allowedOrigin, newToken, RateLimiter, RoomError, roomAssert, tokenHash } from '../rooms/security.js';
 import { clearPersonCookie, personCookie, personFromCookie } from './identity.js';
 import { openPersonKey, personKeyHash } from './keys.js';
-import { peopleStats } from './stats.js';
+import { leaderboard, peoplePage, peopleSummary, personRow, standing } from './directory.js';
 import { addDevice, createPerson, keyFields, nameKey, nameTaken as taken } from './accounts.js';
 
 
@@ -56,32 +56,38 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
   const idParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { id?: string }).id); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   /** A key and its two stored forms: the hash to check it by, and the sealed copy the owner can open. */
   const activePerson = async (id: string) => roomAssert(await client.person.count({ where: { id, removedAt: null } }) === 1, 'NOT_FOUND');
+  // A page of people A–Z (directory.ts), optionally searched; only the People page asks for the keys.
   app.get('/api/host/people', async (request, reply) => {
     try {
       const { roomSecret } = owner.requireOwner(request);
-      const withKeys = (request.query as { withKeys?: unknown }).withKeys === '1';
-      const people = await client.person.findMany({ where: { removedAt: null }, orderBy: { name: 'asc' }, take: 500, select: {
-        id: true, name: true, createdAt: true, canEdit: true, keySealed: true,
-        devices: { where: { revokedAt: null }, select: { lastSeenAt: true } },
-        _count: { select: { players: true } },
-      } });
-      const sums = await client.chipEntry.groupBy({ by: ['personId', 'reason'], where: { personId: { in: people.map(person => person.id) } }, _sum: { amount: true } });
-      const total = (id: string, reasons: string[]) => sums.filter(row => row.personId === id && reasons.includes(row.reason)).reduce((sum, row) => sum + (row._sum.amount ?? 0), 0);
-      return { ok: true, data: PeopleListSchema.parse({ people: people.map(person => ({
-        id: person.id, name: person.name, createdAt: person.createdAt.toISOString(), devices: person.devices.length,
-        lastSeenAt: person.devices.reduce<Date | null>((latest, device) => !latest || device.lastSeenAt > latest ? device.lastSeenAt : latest, null)?.toISOString() ?? null,
-        games: person._count.players, chips: total(person.id, ['START', 'REFILL', 'BET', 'PAYOUT']), wagered: -total(person.id, ['BET']),
-        canEdit: person.canEdit, hasKey: person.keySealed !== null,
-        ...(withKeys ? { key: openPersonKey(roomSecret, person.keySealed) } : {}),
-      })) }) };
+      const query = PeopleQuerySchema.safeParse(request.query); roomAssert(query.success, 'INVALID_COMMAND');
+      return { ok: true, data: PeoplePageSchema.parse(await peoplePage(client, query.data, query.data.withKeys === '1' ? roomSecret : null)) };
     } catch (error) { return owner.fail(reply, error); }
   });
-  // Totals per person over every real game (stats.ts), for the People page and its leaderboard.
+  app.get('/api/host/people/summary', async (request, reply) => {
+    try { owner.requireOwner(request); return { ok: true, data: PeopleSummarySchema.parse(await peopleSummary(client)) }; } catch (error) { return owner.fail(reply, error); }
+  });
+  // Totals over every real game (stats.ts): the leaderboard, a page at a time, sorted by any ranking.
   app.get('/api/host/people/stats', async (request, reply) => {
     try {
       owner.requireOwner(request);
-      const people = await client.person.findMany({ where: { removedAt: null }, select: { id: true }, take: 500 });
-      return { ok: true, data: PeopleStatsSchema.parse({ stats: await peopleStats(client, people.map(person => person.id)) }) };
+      const query = LeaderboardQuerySchema.safeParse(request.query); roomAssert(query.success, 'INVALID_COMMAND');
+      return { ok: true, data: LeaderboardSchema.parse(await leaderboard(client, query.data)) };
+    } catch (error) { return owner.fail(reply, error); }
+  });
+  app.get('/api/host/people/:id', async (request, reply) => {
+    try {
+      const { roomSecret } = owner.requireOwner(request);
+      const person = await personRow(client, idParam(request), roomSecret); roomAssert(person, 'NOT_FOUND');
+      return { ok: true, data: PersonRowSchema.parse(person) };
+    } catch (error) { return owner.fail(reply, error); }
+  });
+  // One person's totals and their place among everyone.
+  app.get('/api/host/people/:id/stats', async (request, reply) => {
+    try {
+      owner.requireOwner(request);
+      const found = await standing(client, idParam(request)); roomAssert(found, 'NOT_FOUND');
+      return { ok: true, data: PersonStandingSchema.parse(found) };
     } catch (error) { return owner.fail(reply, error); }
   });
   app.post('/api/host/people', async (request, reply) => {

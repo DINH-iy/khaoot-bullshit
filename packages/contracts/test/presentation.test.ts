@@ -23,6 +23,15 @@ describe('game look', () => {
       expect(PresentationSchema.safeParse(bad).success).toBe(false);
     }
   });
+  it('accepts see-through colours (#rrggbbaa) and reads their contrast as mixed over what is behind', () => {
+    expect(PresentationSchema.safeParse({ theme: { colors: { surface: '#18213c80', answers: ['#ff000080', '#00ff00'] } } }).success).toBe(true);
+    for (const bad of ['#1234567', '#123456789', 'rgba(1, 2, 3, .5)']) expect(PresentationSchema.safeParse({ theme: { colors: { accent: bad } } }).success).toBe(false);
+    // Fully see-through text vanishes into the background; half see-through sits between.
+    expect(contrast('#ffffff00', '#000000')).toBeCloseTo(1);
+    expect(contrast('#ffffffff', '#000000')).toBeCloseTo(contrast('#ffffff', '#000000'));
+    const half = contrast('#ffffff80', '#000000');
+    expect(half).toBeGreaterThan(1); expect(half).toBeLessThan(contrast('#ffffff', '#000000'));
+  });
   it('has a default for every text and moment, and fills in placeholders', () => {
     expect(fillText(TEXT_DEFAULTS['timer.left'], { time: '0:10' })).toBe('0:10 left');
     expect(fillText('Hi {name}, {unknown}', { name: 'Ada' })).toBe('Hi Ada, {unknown}');

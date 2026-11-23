@@ -11,6 +11,8 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
   saved: 'Saved as “{name}”. Find it under Add a scene, in the Prefabs tab.', limit: 'There are already 200 prefabs. Delete some first.', tooLarge: 'This is too large for a prefab. Select fewer scenes.',
   saveFailed: 'Saving did not work. Try again.', prefabName: 'Prefab name', saving: 'Saving…', savePrefab: 'Save prefab', saveAsPrefab: 'Save as prefab',
   minimap: 'Overview of the whole game. Click to move the view there.',
+  colourShade: 'Saturation and brightness', colourShadeValue: 'Saturation {s}%, brightness {v}%', colourHue: 'Hue', colourOpacity: 'Opacity', colourFormat: 'Colour code format',
+  colourHex: 'Hex code', colourRed: 'Red', colourGreen: 'Green', colourBlue: 'Blue', colourFromScreen: 'Pick a colour from the screen', colourUsed: 'Colours already used',
 }, {
   nl: {
     all: 'Alles', other: 'Overig', sorts: 'Soorten', chosen: 'Gekozen', cancel: 'Annuleren', keep: 'Laten staan', choose: 'Kies…', addColour: 'Een kleur toevoegen',
@@ -22,6 +24,8 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
     saved: 'Opgeslagen als “{name}”. Je vindt hem onder Een scène toevoegen, op het tabblad Prefabs.', limit: 'Er zijn al 200 prefabs. Verwijder er eerst een paar.', tooLarge: 'Dit is te groot voor een prefab. Kies minder scènes.',
     saveFailed: 'Opslaan lukte niet. Probeer het opnieuw.', prefabName: 'Naam van de prefab', saving: 'Opslaan…', savePrefab: 'Prefab opslaan', saveAsPrefab: 'Opslaan als prefab',
     minimap: 'Overzicht van het hele spel. Klik om het beeld daarheen te verplaatsen.',
+    colourShade: 'Verzadiging en helderheid', colourShadeValue: 'Verzadiging {s}%, helderheid {v}%', colourHue: 'Kleurtoon', colourOpacity: 'Dekking', colourFormat: 'Notatie van de kleurcode',
+    colourHex: 'Hexcode', colourRed: 'Rood', colourGreen: 'Groen', colourBlue: 'Blauw', colourFromScreen: 'Een kleur van het scherm kiezen', colourUsed: 'Al gebruikte kleuren',
   },
   de: {
     all: 'Alle', other: 'Sonstige', sorts: 'Arten', chosen: 'Gewählt', cancel: 'Abbrechen', keep: 'Behalten', choose: 'Wählen…', addColour: 'Eine Farbe hinzufügen',
@@ -33,6 +37,8 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
     saved: 'Als „{name}“ gespeichert. Du findest sie unter Eine Szene hinzufügen, im Reiter Vorlagen.', limit: 'Es gibt schon 200 Vorlagen. Lösche zuerst einige.', tooLarge: 'Das ist zu groß für eine Vorlage. Wähle weniger Szenen.',
     saveFailed: 'Speichern hat nicht geklappt. Versuche es erneut.', prefabName: 'Name der Vorlage', saving: 'Wird gespeichert…', savePrefab: 'Vorlage speichern', saveAsPrefab: 'Als Vorlage speichern',
     minimap: 'Überblick über das ganze Spiel. Klicke, um die Ansicht dorthin zu bewegen.',
+    colourShade: 'Sättigung und Helligkeit', colourShadeValue: 'Sättigung {s} %, Helligkeit {v} %', colourHue: 'Farbton', colourOpacity: 'Deckkraft', colourFormat: 'Format des Farbcodes',
+    colourHex: 'Hex-Code', colourRed: 'Rot', colourGreen: 'Grün', colourBlue: 'Blau', colourFromScreen: 'Eine Farbe vom Bildschirm wählen', colourUsed: 'Bereits verwendete Farben',
   },
   ro: {
     all: 'Toate', other: 'Altele', sorts: 'Tipuri', chosen: 'Ales', cancel: 'Anulează', keep: 'Păstrează', choose: 'Alege…', addColour: 'Adaugă o culoare',
@@ -44,5 +50,7 @@ export const CONTROLS_TEXTS = defineTexts('editor-controls', {
     saved: 'Salvat ca „{name}”. Îl găsești la Adaugă o scenă, în fila Prefabricate.', limit: 'Există deja 200 de prefabricate. Șterge întâi câteva.', tooLarge: 'E prea mare pentru un prefabricat. Alege mai puține scene.',
     saveFailed: 'Salvarea nu a mers. Încearcă din nou.', prefabName: 'Numele prefabricatului', saving: 'Se salvează…', savePrefab: 'Salvează prefabricatul', saveAsPrefab: 'Salvează ca prefabricat',
     minimap: 'Privire de ansamblu asupra jocului. Apasă ca să muți vederea acolo.',
+    colourShade: 'Saturație și luminozitate', colourShadeValue: 'Saturație {s}%, luminozitate {v}%', colourHue: 'Nuanță', colourOpacity: 'Opacitate', colourFormat: 'Formatul codului de culoare',
+    colourHex: 'Cod hex', colourRed: 'Roșu', colourGreen: 'Verde', colourBlue: 'Albastru', colourFromScreen: 'Alege o culoare de pe ecran', colourUsed: 'Culori deja folosite',
   },
 });

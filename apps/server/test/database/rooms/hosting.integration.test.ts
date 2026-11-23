@@ -123,4 +123,28 @@ describe('hosting a room from the browser as the local owner', () => {
     // Without access to the old room, nobody gets into the new one this way.
     expect((await call('POST', `/api/rooms/${old.id}/follow`, {})).statusCode).toBe(400);
   });
+  it('rehearsing a game again replaces its open rehearsal room: same code, everyone follows, other games untouched', async () => {
+    const cookie = await owner();
+    const game = async (title: string) => (await call('POST', '/api/host/games', { gameId: randomUUID(), title, startFrom: 'friday-night-chaos' }, cookie)).json().data as { gameId: string; revision: number };
+    const practice = await game('Practice'); const other = await game('Other');
+    const rehearse = async (gameId: string, startNodeKey: string | null) => {
+      const ids = { sessionId: randomUUID(), commandId: randomUUID() };
+      const response = await call('POST', `/api/host/games/${gameId}/rehearse`, { expectedRevision: 0, startNodeKey, ...ids }, cookie);
+      expect(response.statusCode).toBe(200); return prisma.gameSession.findUniqueOrThrow({ where: { id: ids.sessionId } });
+    };
+    const first = await rehearse(practice.gameId, null); const elsewhere = await rehearse(other.gameId, null);
+    const phone = cookieOf(await call('POST', '/api/rooms/join', { roomCode: first.roomCode, joinId: randomUUID(), displayName: 'Ada' }));
+    const second = await rehearse(practice.gameId, 'music');
+    // The same code on the screen, now for the new room; the old one ended and points at it.
+    expect(second.roomCode).toBe(first.roomCode);
+    const ended = await prisma.gameSession.findUniqueOrThrow({ where: { id: first.id } });
+    expect(ended.status).toBe('FINISHED'); expect(ended.roomCode).not.toBe(first.roomCode);
+    expect((await call('GET', `/api/rooms/${first.id}`, undefined, phone)).json().data.nextRoom).toBe(second.id);
+    expect((await call('POST', `/api/rooms/${first.id}/follow`, {}, phone)).json().data.sessionId).toBe(second.id);
+    // Another game's rehearsal stays open; the menu lists one room per game.
+    expect((await prisma.gameSession.findUniqueOrThrow({ where: { id: elsewhere.id } })).status).not.toBe('FINISHED');
+    const listed = (await call('GET', '/api/host', undefined, cookie)).json().data.rooms as { sessionId: string }[];
+    expect(listed.map(room => room.sessionId)).toEqual(expect.arrayContaining([second.id, elsewhere.id]));
+    expect(listed.map(room => room.sessionId)).not.toContain(first.id);
+  });
 });

@@ -110,11 +110,13 @@ describe('personal keys', () => {
     const looked = await call('GET', `/api/host/people/${person.id}/key`, undefined, owner);
     expect(looked.json().data).toEqual({ id: person.id, name: expect.any(String), key: person.key });
     expect((await call('GET', `/api/host/people/${person.id}/key`)).statusCode).toBe(401);
-    const directory = '/api/host/people?withKeys=1';
+    // Searched by name, so other people in the database never push this one to another page.
+    const search = `search=${encodeURIComponent(looked.json().data.name as string)}`;
+    const directory = `/api/host/people?${search}&withKeys=1`;
     expect((await call('GET', directory)).statusCode).toBe(401);
     expect((await call('GET', directory, undefined, (await makePerson(true)).cookie)).statusCode).toBe(401);
     const member = (response: Awaited<ReturnType<typeof call>>) => response.json().data.people.find((entry: { id: string }) => entry.id === person.id);
-    expect(member(await call('GET', '/api/host/people', undefined, owner))).not.toHaveProperty('key');
+    expect(member(await call('GET', `/api/host/people?${search}`, undefined, owner))).not.toHaveProperty('key');
     const withKeys = await call('GET', directory, undefined, owner);
     expect(withKeys.headers['cache-control']).toBe('no-store');
     expect(member(withKeys)).toHaveProperty('key', person.key);
@@ -134,8 +136,7 @@ describe('personal keys', () => {
     const name = `Old ${randomUUID().slice(0, 8)}`;
     const old = await prisma.person.create({ data: { name, nameKey: name.toLowerCase(), linkHash: tokenHash(link) } });
     expect((await call('POST', '/api/people/claim', { token: link })).statusCode).toBe(200);
-    const rows = (await call('GET', '/api/host/people', undefined, owner)).json().data.people as { id: string; hasKey: boolean; canEdit: boolean }[];
-    expect(rows.find(row => row.id === old.id)).toMatchObject({ hasKey: false, canEdit: false });
+    expect((await call('GET', `/api/host/people/${old.id}`, undefined, owner)).json().data).toMatchObject({ hasKey: false, canEdit: false, key: null });
     expect((await call('GET', `/api/host/people/${old.id}/key`, undefined, owner)).statusCode).toBe(404);
   });
 });

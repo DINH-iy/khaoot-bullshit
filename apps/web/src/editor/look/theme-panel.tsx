@@ -6,6 +6,7 @@ import { DialSlider } from '../../ui/dial-slider.js';
 import '../../ui/game-slider.css';
 import { Section } from '../controls/section.js';
 import { Swatches } from '../controls/swatches.js';
+import { ColorPicker } from '../../ui/color-picker.js';
 import { useId, useState, type CSSProperties } from 'react';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
@@ -13,6 +14,19 @@ const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | num
 /** A style's name in the editor's language (an unknown preset keeps its own name). */
 const styleName = (key: string) => `s.${key}` in LOOK_TEXTS.en ? t(`s.${key}` as keyof typeof LOOK_TEXTS.en) : THEME_PRESETS[key]?.name ?? key;
 import { ExportPalette, ImportPalette } from './palette-dialog.js';
+import { NewStyleDialog, sameLook, StyleChangeDialog, useSavedStyles } from './saved-styles.js';
+import { ConfirmDialog } from '../controls/confirm-dialog.js';
+import { Icon } from '../controls/icons.js';
+import type { SavedStyle } from '@party/contracts';
+
+/** The card of a style: its backgrounds, title font, answer colours and button colour. */
+function StyleCard({ name, theme, on, onClick }: { name: string; theme: FullTheme; on: boolean; onClick: () => void }) {
+  return <button type="button" className={`preset-card${on ? ' on' : ''}`} aria-pressed={on} onClick={onClick}
+    style={{ background: `linear-gradient(160deg, ${theme.colors.background}, ${theme.colors.background2})`, color: theme.colors.text, fontFamily: fontCssFamily(theme.headingFont) }}>
+    <strong>{name}</strong>
+    <span className="swatches" aria-hidden="true">{theme.colors.answers.slice(0, 4).map((color, index) => <i key={`${color}${index}`} style={{ background: color }} />)}<i style={{ background: theme.colors.accent }} /></span>
+  </button>;
+}
 
 type Colors = FullTheme['colors'];
 type ColorName = Exclude<keyof Colors, 'answers'>;
@@ -68,39 +82,88 @@ export function contrastWarnings(theme: FullTheme): string[] {
 export function ThemePanel({ theme, below, title = '', onChange, noAnswers = false }: { theme: Theme | undefined; below: (Theme | undefined)[]; title?: string; onChange: (theme: Theme | undefined) => void; noAnswers?: boolean }) {
   const [palette, setPalette] = useState<'import' | 'export' | null>(null);
   const layer = theme ?? {}; const full = resolveTheme(...below, theme);
-  const set = (patch: Partial<Theme>) => onChange({ ...layer, ...patch });
-  const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...(layer.colors ?? {}), [name]: value } });
+  const saved = useSavedStyles();
+  // The style this look is exactly (nothing changed yet): a built-in one, or a saved one.
+  const keys = Object.entries(layer).filter(([, value]) => value !== undefined).map(([key]) => key);
+  const current: { key: string; name: string; own: SavedStyle | null } | null =
+    keys.length === 1 && layer.preset && THEME_PRESETS[layer.preset] ? { key: `preset:${layer.preset}`, name: styleName(layer.preset), own: null }
+      : (() => { const own = theme && saved.styles.find(style => sameLook(style.theme, layer)); return own ? { key: `saved:${own.id}`, name: own.name, own } : null; })();
+  // What a change to that style does, once asked: also update a saved style (its id), or only change this look (null).
+  const [decision, setDecision] = useState<{ key: string; styleId: string | null } | null>(null);
+  // A change waiting for the answer; more changes while the question is open join it.
+  const [pending, setPending] = useState<Theme | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [removing, setRemoving] = useState<SavedStyle | null>(null);
+  const [savedName, setSavedName] = useState('');
+  const apply = (next: Theme) => {
+    if (pending) { setPending(next); return; }
+    if (!current) { onChange(next); return; }
+    if (decision?.key === current.key) {
+      onChange(next);
+      if (decision.styleId && current.own) { void saved.save({ id: current.own.id, name: current.own.name, theme: next }, true); setDecision({ key: `saved:${current.own.id}`, styleId: current.own.id }); }
+      return;
+    }
+    setPending(next);
+  };
+  const set = (patch: Partial<Theme>) => apply({ ...(pending ?? layer), ...patch });
+  const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...((pending ?? layer).colors ?? {}), [name]: value } });
+  // Picking a style starts afresh: its first change asks again.
+  const chooseStyle = (next: Theme | undefined) => { setPending(null); setDecision(null); setSavedName(''); onChange(next); };
+  const createFrom = async (name: string, look: Theme) => {
+    setBusy(true);
+    const id = await saved.create(name, look);
+    setBusy(false);
+    if (!id) return false;
+    setDecision({ key: `saved:${id}`, styleId: id }); setSavedName(name);
+    return true;
+  };
   const answers = full.colors.answers;
+  // Every colour of this look, offered in the colour picker for reuse.
+  const lookColors = [...answers, ...(Object.keys(COLOR_LABELS) as ColorName[]).map(name => full.colors[name])];
   const warnings = contrastWarnings(full);
   // Small named groups (K4): only the style starts open; each group shows what is set when closed, and stays as it was left.
-  const presetName = layer.preset && THEME_PRESETS[layer.preset] ? styleName(layer.preset) : t('yourOwn');
+  const presetName = current?.name ?? (layer.preset && THEME_PRESETS[layer.preset] ? styleName(layer.preset) : t('yourOwn'));
   const fonts = fontCssFamily(full.headingFont) === fontCssFamily(full.font) ? fontLabel(full.font) : t('fontsTitles', { font: fontLabel(full.font), titles: fontLabel(full.headingFont) });
   const markName = { letters: 'A B C', numbers: '1 2 3', shapes: t('markShapes'), custom: t('markOwn'), none: t('markNone') }[full.markers];
   return <div className="look-panel">
     <Section title={t('style')} memory="look:style" open summary={presetName}>
-      <div className="preset-grid">{Object.entries(THEME_PRESETS).map(([key, preset]) => <button key={key} className={`preset-card${layer.preset === key ? ' on' : ''}`} aria-pressed={layer.preset === key}
-        onClick={() => onChange({ preset: key })} style={{ background: `linear-gradient(160deg, ${preset.theme.colors.background}, ${preset.theme.colors.background2})`, color: preset.theme.colors.text, fontFamily: fontCssFamily(preset.theme.headingFont) }}>
-        <strong>{styleName(key)}</strong>
-        <span className="swatches" aria-hidden="true">{preset.theme.colors.answers.slice(0, 4).map(color => <i key={color} style={{ background: color }} />)}<i style={{ background: preset.theme.colors.accent }} /></span>
-      </button>)}</div>
+      {saved.styles.length > 0 && <>
+        <p className="field-title">{t('yourStyles')}</p>
+        <div className="preset-grid">{saved.styles.map(style => <div key={style.id} className="saved-style">
+          <StyleCard name={style.name} theme={resolveTheme(...below, style.theme)} on={current?.own?.id === style.id} onClick={() => chooseStyle(style.theme)} />
+          <button type="button" className="small-button icon-only danger-icon" aria-label={t('styleRemoveLabel', { name: style.name })} title={t('styleRemoveLabel', { name: style.name })}
+            onClick={() => setRemoving(style)}><Icon name="trash" size={16} /></button>
+        </div>)}</div>
+        <p className="field-title">{t('builtInStyles')}</p>
+      </>}
+      <div className="preset-grid">{Object.entries(THEME_PRESETS).map(([key, preset]) =>
+        <StyleCard key={key} name={styleName(key)} theme={preset.theme} on={current?.key === `preset:${key}`} onClick={() => chooseStyle({ preset: key })} />)}</div>
+      <div className="palette-actions">
+        <button type="button" className="small-button with-icon" onClick={() => setNaming(true)}><Icon name="plus" size={16} />{t('styleSaveNew')}</button>
+      </div>
+      {savedName && <p role="status" className="hint">{t('styleSaved', { name: savedName })}</p>}
+      {saved.error && <p role="alert" className="error">{t(saved.error)}</p>}
       <p className="hint">{t('styleHint')}</p>
     </Section>
 
     {warnings.length > 0 && <div className="look-warnings" role="status"><h3>{t('readability')}</h3><ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
 
     <Section title={t('colours')} memory="look:colours" summary={noAnswers ? t('coloursSummary') : t('answerColoursN', { count: answers.length })}>
-      <div className="color-grid">{(Object.keys(COLOR_LABELS) as ColorName[]).filter(name => !noAnswers || name !== 'answerText').map(name => <label key={name} className="color-field">
-        <input type="color" value={full.colors[name]} onChange={event => setColor(name, event.target.value)} />{t(COLOR_LABELS[name])}</label>)}</div>
+      <div className="color-grid">{(Object.keys(COLOR_LABELS) as ColorName[]).filter(name => !noAnswers || name !== 'answerText').map(name =>
+        <ColorPicker key={name} className="color-field" value={full.colors[name]} label={t(COLOR_LABELS[name])} suggestions={lookColors} onChange={value => setColor(name, value)}>
+          <span className="color-field-text"><span>{t(COLOR_LABELS[name])}</span><code>{full.colors[name].toUpperCase()}</code></span>
+        </ColorPicker>)}</div>
       {!noAnswers && <><p className="field-title">{t('answerColours')}</p>
       <Swatches colors={answers} name={index => t('answerColour', { letter: String.fromCharCode(65 + index) })} removeName={index => t('removeAnswerColour', { letter: String.fromCharCode(65 + index) })}
-        onChange={next => setColor('answers', next)} />
+        suggestions={lookColors} onChange={next => setColor('answers', next)} />
       <p className="hint">{t('coloursRepeat')}</p></>}
       {/* Bringing colours in from a brand kit, or taking them out: below the colours they change. */}
       <div className="palette-actions">
         <button type="button" className="small-button" onClick={() => setPalette('import')}>{t('importColours')}</button>
         <button type="button" className="small-button" onClick={() => setPalette('export')}>{t('exportColours')}</button>
       </div>
-      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...(layer.colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
+      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...((pending ?? layer).colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
       {palette === 'export' && <ExportPalette colors={full.colors} title={title} onClose={() => setPalette(null)} />}
     </Section>
 
@@ -142,7 +205,17 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       </div>)}
       <p className="hint">{t('marksHint')}</p>
     </Section>}
-    {theme && <button className="small-button" onClick={() => onChange(undefined)}>{t('removeAll')}</button>}
+    {theme && <button type="button" className="small-button danger-outline" onClick={() => chooseStyle(undefined)}>{t('removeAll')}</button>}
+    {pending && current && <StyleChangeDialog styleName={current.name} own={Boolean(current.own)} busy={busy} error={saved.error ? t(saved.error) : ''}
+      onCreate={name => { const look = pending; void createFrom(name, look).then(done => { if (done) { setPending(null); onChange(look); } }); }}
+      onUpdate={() => { const look = pending; const own = current.own!; setPending(null); setDecision({ key: `saved:${own.id}`, styleId: own.id });
+        void saved.save({ id: own.id, name: own.name, theme: look }); onChange(look); }}
+      onOnlyHere={() => { const look = pending; setPending(null); setDecision({ key: current.key, styleId: null }); onChange(look); }}
+      onCancel={() => setPending(null)} />}
+    {naming && <NewStyleDialog error={saved.error ? t(saved.error) : ''} defaultName={current ? t('styleCopyName', { name: current.name }) : t('styleDefaultName')} busy={busy}
+      onSave={name => { void createFrom(name, layer).then(done => { if (done) setNaming(false); }); }} onCancel={() => setNaming(false)} />}
+    {removing && <ConfirmDialog title={t('styleRemoveAsk', { name: removing.name })} text={t('styleRemoveText')} confirm={t('styleRemoveConfirm')}
+      onConfirm={() => { const style = removing; setRemoving(null); void saved.remove(style.id); }} onCancel={() => setRemoving(null)} />}
   </div>;
 }
 

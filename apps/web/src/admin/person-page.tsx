@@ -1,5 +1,4 @@
-import { HEAD_TO_HEAD_GAMES, isHeadToHeadKey, type PersonRow, type PersonStats } from '@party/contracts';
-import { accuracy, rankOf, winRate } from './leaderboard.js';
+import { accuracy, HEAD_TO_HEAD_GAMES, isHeadToHeadKey, winRate, type PersonRow, type PersonStanding, type RankingKey } from '@party/contracts';
 import { fullMoment, seenThisWeek, shortMoment } from './people-time.js';
 
 /** What the owner can do with a person; the People panel runs them (with their confirmations). */
@@ -16,28 +15,29 @@ export function LastSeen({ at }: { at: string | null }) {
 }
 
 /** One person's own page: their numbers, what they may do, their key and the rest of the actions. */
-export function PersonPage({ person, busy, actions, stats, all, onOpen }: { person: PersonRow; busy: boolean; actions: PersonActions; stats: PersonStats | undefined; all: PersonStats[]; onOpen?: (id: string) => void }) {
-  /** "#2 of 16" under a number, when the person has one. */
-  const rank = (pick: (row: PersonStats) => number | null) => { const place = stats ? rankOf(all, person.id, pick) : null; return place ? `#${place} of ${all.length}` : undefined; };
+export function PersonPage({ person, busy, actions, standing, onOpen }: { person: PersonRow; busy: boolean; actions: PersonActions; standing: PersonStanding | undefined; onOpen?: (id: string) => void }) {
+  const stats = standing?.stats;
+  /** "#2 of 16" under a number, when the person has one (the place among everyone, worked out by the server). */
+  const rank = (key: RankingKey) => { const place = standing?.places[key]; return place ? `#${place.toLocaleString()} of ${standing!.of.toLocaleString()}` : undefined; };
   const percent = (value: number | null) => value === null ? '–' : `${value}%`;
   const groups: [string, [string, React.ReactNode, (string | undefined)?][]][] = stats ? [
     ['Games', [
-      ['Played', stats.games, rank(row => row.games)], ['Won', stats.wins, rank(row => row.wins)], ['Win %', percent(winRate(stats))],
-      ['Top 3', stats.podiums, rank(row => row.podiums)], ['Points', stats.points.toLocaleString(), rank(row => row.points)], ['Minigames', stats.minigames],
+      ['Played', stats.games, rank('games')], ['Won', stats.wins, rank('wins')], ['Win %', percent(winRate(stats))],
+      ['Top 3', stats.podiums, rank('podiums')], ['Points', stats.points.toLocaleString(), rank('points')], ['Minigames', stats.minigames],
     ]],
     ['Answers', [
-      ['Right', stats.right, rank(row => row.right)], ['Wrong', stats.wrong, rank(row => row.wrong)], ['Right %', percent(accuracy(stats))],
+      ['Right', stats.right, rank('right')], ['Wrong', stats.wrong, rank('wrong')], ['Right %', percent(accuracy(stats))],
     ]],
     ['Challenges', [
-      ['Played', stats.duelsWon + stats.duelsLost + stats.duelsDrawn, rank(row => row.duelsWon + row.duelsLost + row.duelsDrawn)],
-      ['Won', stats.duelsWon, rank(row => row.duelsWon)], ['Lost', stats.duelsLost, rank(row => row.duelsLost)], ['Draws', stats.duelsDrawn],
+      ['Played', stats.duelsWon + stats.duelsLost + stats.duelsDrawn, rank('duelsPlayed')],
+      ['Won', stats.duelsWon, rank('duelsWon')], ['Lost', stats.duelsLost, rank('duelsLost')], ['Draws', stats.duelsDrawn],
       ...stats.duelGames.map(game => [isHeadToHeadKey(game.game) ? HEAD_TO_HEAD_GAMES[game.game].name : game.game,
         `${game.won} won · ${game.lost} lost${game.drawn ? ` · ${game.drawn} draw` : ''}`] as [string, React.ReactNode]),
       ['Main rival', stats.rival ? <>{stats.rival.personId && onOpen ? <button type="button" className="person-link-button" onClick={() => onOpen(stats.rival!.personId!)}>{stats.rival.name}</button> : stats.rival.name}
         <small>{stats.rival.times}× played · {stats.rival.won} won, {stats.rival.lost} lost</small></> : '–'],
     ]],
     ['Arcade and side games', [
-      ['Arcade rounds', stats.arcadeRounds], ['Arcade wins', stats.arcadeWins, rank(row => row.arcadeWins)],
+      ['Arcade rounds', stats.arcadeRounds], ['Arcade wins', stats.arcadeWins, rank('arcadeWins')],
       ['Side games', stats.sideRounds], ['Biggest win', `${stats.biggestWin.toLocaleString()} chips`], ['Chips now', person.chips.toLocaleString()],
     ]],
   ] : [];

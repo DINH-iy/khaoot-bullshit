@@ -1,7 +1,7 @@
 import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
 import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from './head-to-head.js';
-import { GAME_LANGUAGES, PresentationSchema, ThemeSchema, AnimationChoiceSchema, TranslatedTextsSchema } from './presentation.js';
+import { ColorSchema, GAME_LANGUAGES, PresentationSchema, ThemeSchema, AnimationChoiceSchema, TranslatedTextsSchema } from './presentation.js';
 import { MinigameRevealSchema, MinigameValueSchema, PublicMinigameSchema } from './minigames/shared/catalog.js';
 import { GraphPlaybackActionSchema, GraphPlaybackSchema } from './minigames/draw-the-graph/graph.js';
 import { PoolBallBehaviorSchema, PoolMatchSecondsSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
@@ -44,6 +44,16 @@ export function placePoints(places: Places): string[] {
   shares[0]! += total - shares.reduce((a, b) => a + b, 0n);
   return shares.map(String);
 }
+/**
+ * What a round's intro shows about its points (pointsAtStake). `round`: the most one player (or team) can
+ * earn in the round; `upTo` when it depends on speed, place or the host. `vote`: points for every vote an
+ * answer gets, plus an extra for the most-voted answer (`bonusMilli`, null when there is none).
+ */
+export const StakePointsSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('round'), milli: AwardMilliSchema, upTo: z.boolean() }).strict(),
+  z.object({ kind: z.literal('vote'), perVoteMilli: AwardMilliSchema, bonusMilli: AwardMilliSchema.nullable() }).strict(),
+]);
+export type StakePoints = z.infer<typeof StakePointsSchema>;
 export const MediaKindSchema = z.enum(['image', 'gif', 'video']);
 export type MediaKind = z.infer<typeof MediaKindSchema>;
 export const ChoiceOptionSchema = z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(240) }).strict();
@@ -218,10 +228,12 @@ export const StageTeamsSchema = z.object({
 // scenes or the tie rules. Players see counts only as the game allows, and the
 // decision only once the host announces it; the host sees everything at once.
 export const PublicRouteSchema = z.object({
-  method: z.enum(['players', 'captains', 'host']), options: z.array(ChoiceOptionSchema).min(2).max(8), canVote: z.boolean(),
+  // `draw`: a minigame draw; nobody votes and the server draws one route at random.
+  method: z.enum(['players', 'captains', 'host', 'draw']), options: z.array(ChoiceOptionSchema).min(2).max(8), canVote: z.boolean(),
   counts: z.array(z.object({ optionKey: GameKeySchema, count: z.number().int().min(0) }).strict()).nullable(),
   pending: z.enum(['tie', 'no-votes', 'host']).nullable(), leaders: z.array(GameKeySchema).nullable(),
-  decision: z.object({ optionKey: GameKeySchema, reason: z.enum(['vote', 'host', 'tie-break', 'fallback']), resolution: z.enum(['majority', 'host', 'default', 'random']) }).strict().nullable(),
+  // `at`: when a draw was made (draws only), so all screens play its animation together.
+  decision: z.object({ optionKey: GameKeySchema, reason: z.enum(['vote', 'host', 'tie-break', 'fallback', 'draw']), resolution: z.enum(['majority', 'host', 'default', 'random', 'draw']), at: z.string().datetime().optional() }).strict().nullable(),
 }).strict();
 // A duel as screens see it: the two duelists (null until picked), the bets on each
 // (live, for everyone), the points at stake and, once decided, the winner.
@@ -260,7 +272,10 @@ export const PublicStageSchema = z.object({
   teams: StageTeamsSchema.nullable(),
   // Shown before the round starts, until the host continues: the scene's own text (null: the minigame's standard
   // “how to play” from the game's texts) and who has tapped “Got it”.
-  explain: z.object({ text: z.string().max(1000).nullable(), readyIds: z.array(GameIdSchema) }).strict().nullable(),
+  // The intro may also show the points at stake and a picture; `screenOnly`: only the shared screen shows it,
+  // phones wait without “Got it” (all optional: absent in older views).
+  explain: z.object({ text: z.string().max(1000).nullable(), readyIds: z.array(GameIdSchema),
+    points: StakePointsSchema.optional(), picture: PublicSceneMediaSchema.optional(), screenOnly: z.boolean().optional() }).strict().nullable(),
   route: PublicRouteSchema.nullable(),
   // The scene's picture, video or song from the media library (absent in older views).
   youtube: YouTubeClipSchema.optional(),
@@ -293,7 +308,7 @@ export const FinaleSlideSchema = z.object({ stat: z.enum(AWARD_RULES), title: z.
 export const WheelViewSchema = z.object({
   canSpin: z.boolean(),
   spin: z.object({ title: z.string(), entries: z.array(z.string()), index: z.number().int().min(0), label: z.string(), spunAt: z.string().datetime(), seconds: z.number().int(),
-    colors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).max(8).optional() }).strict().nullable(),
+    colors: z.array(ColorSchema).max(8).optional() }).strict().nullable(),
   current: z.object({ title: z.string(), label: z.string() }).strict().nullable(),
 }).strict();
 export const SessionViewSchema = z.object({

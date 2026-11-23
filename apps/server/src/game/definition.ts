@@ -1,4 +1,4 @@
-import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
+import { AutoRevealSecondsSchema, ColorSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, isSharedPrediction, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
@@ -13,6 +13,9 @@ const scoring = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('correct-choice'), correctChoiceKey: GameKeySchema, awardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
   // All or nothing: the award is given only for the exact order.
   z.object({ kind: z.literal('correct-order'), correctOrder: z.array(GameKeySchema).min(2).max(8), awardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
+  // Writing, upload and drawing rounds: after the reveal the host gives each player (or team) up to the
+  // maximum, or a place's points, as in a challenge. Such a round cannot also be voted on.
+  z.object({ kind: z.literal('judged'), maxAwardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
 ]);
 // How teams are made: a number of balanced teams, or exact sizes where one team
 // may take "the rest" (1 vs 3, 2 vs 2, 1 vs everyone…). Players beyond the fixed
@@ -54,15 +57,17 @@ export const WheelSchema = z.object({
   entries: z.array(z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(80) }).strict()).min(2).max(40)
     .refine(entries => new Set(entries.map(entry => entry.key)).size === entries.length, 'Wheel entries must be unique'),
   removePicked: z.boolean(), spinSeconds: z.number().int().min(2).max(15),
-  colors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).min(2).max(8).optional(),
+  colors: z.array(ColorSchema).min(2).max(8).optional(),
 }).strict();
 // Every scene may carry its own look, a wheel to spin there (`spin`), or hide the last wheel result from here on (`wheelClear`).
 // All optional, so earlier definitions keep their hash.
 // `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
 // `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
 const look = { mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
-  // An explanation shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
-  explain: z.object({ text: z.string().trim().min(1).max(1000).optional() }).strict().optional() };
+  // An intro shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
+  // `points`: also show the points at stake (worked out from the scene's scoring). `picture`: a picture from the
+  // media library. `screenOnly`: only the shared screen shows it; phones wait without “Got it”.
+  explain: z.object({ text: z.string().trim().min(1).max(1000).optional(), points: z.boolean().optional(), picture: SceneMediaSchema.optional(), screenOnly: z.boolean().optional() }).strict().optional() };
 const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), resultCards: ResultCardsSchema.optional(), countdownSeconds: z.number().int().min(0).max(15).optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
@@ -113,6 +118,8 @@ const stageSchema = z.discriminatedUnion('kind', [
       // `counts`: when phones and the shared screen see vote counts.
       z.object({ method: z.literal('players'), tie: RoutePolicySchema, noVotes: RoutePolicySchema, counts: RouteCountsSchema }).strict(),
       z.object({ method: z.literal('captains'), tie: RoutePolicySchema, noVotes: RoutePolicySchema, counts: RouteCountsSchema }).strict(),
+      // A minigame draw: nobody votes; the host draws (or the timer does) and the server picks one route at random, recorded once.
+      z.object({ method: z.literal('draw') }).strict(),
     ]),
     defaultOptionKey: GameKeySchema.optional(),
   }).strict(),
@@ -179,7 +186,8 @@ export const GameDefinitionSchema = z.object({
         if (stage.input.kind !== 'choice' || !stage.input.options.some(option => option.key === rule.correctChoiceKey)) at('Invalid correct choice', stageIndex);
       }
       // Only a minigame has a standard explanation (its “how to play”); other scenes need their own text.
-      if (stage.explain && !stage.explain.text && stage.kind !== 'minigame') ctx.addIssue({ code: 'custom', message: 'Write the explanation for this scene, or switch it off', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.explain?.picture && stage.explain.picture.kind !== 'image') ctx.addIssue({ code: 'custom', message: 'The intro can only show a picture', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.explain && !stage.explain.text && !stage.explain.picture && !(stage.explain.points && pointsAtStake(stage)) && stage.kind !== 'minigame') ctx.addIssue({ code: 'custom', message: 'Write the explanation for this scene, show its points or a picture, or switch it off', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.spin && !wheels.has(stage.spin.wheel)) ctx.addIssue({ code: 'custom', message: 'This scene spins a wheel that does not exist', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       // Pass the pencil is drawn by teams: it needs team play, from the round or the game.
       if (stage.kind === 'minigame' && TEAM_MINIGAMES.includes(stage.game as MinigameKey) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: 'This minigame needs teams', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
@@ -191,6 +199,7 @@ export const GameDefinitionSchema = z.object({
         ctx.addIssue({ code: 'custom', message: 'Clap the beat needs at least 9 seconds', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'durationMs'] });
       }
       if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
+      if (stage.kind === 'collect' && stage.scoring.kind === 'judged' && !['text', 'media', 'drawing'].includes(stage.input.kind)) at('Only open rounds are judged', stageIndex);
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-order') {
         const rule = stage.scoring; const keys = stage.input.kind === 'order' ? stage.input.items.map(item => item.key) : [];
         if (keys.length !== rule.correctOrder.length || new Set(rule.correctOrder).size !== keys.length || !keys.every(key => rule.correctOrder.includes(key))) at('Invalid correct order', stageIndex);
@@ -241,7 +250,7 @@ export function minigameRules(stage: MinigameStage): { game: MinigameKey; settin
   if (!isMinigameKey(stage.game)) throw new GameError('UNSUPPORTED_FEATURE');
   const settings = parseMinigameSettings(stage.game, stage.settings);
   if (!settings) throw new GameError('INVALID_DEFINITION');
-  return { game: stage.game, settings, placementMilli: stage.places ? placePoints(stage.places) : stage.placementMilli ?? ['10000', '6000', '3000'], teamResult: stage.teamResult ?? 'average',
+  return { game: stage.game, settings, placementMilli: stage.places ? placePoints(stage.places) : stage.placementMilli ?? [...STANDARD_PLACEMENT_MILLI], teamResult: stage.teamResult ?? 'average',
     decide: stage.decide ?? 'anyone', voteSeconds: stage.voteSeconds ?? 20 };
 }
 export { MINIGAMES };
@@ -251,6 +260,12 @@ export function effectivePlay(definition: GameDefinition, stage: StageDefinition
   return stage.play ?? definition.play ?? { kind: 'solo' };
 }
 /** Points by place for a stage that has them (fastest correct, most votes, host places), or null. */
+/** Whether the host judges this stage (a challenge, or a writing, upload or drawing round with host points), and its maximum. */
+export function judging(stage: StageDefinition): { maxAwardMilli: string } | null {
+  if (stage.kind === 'challenge') return { maxAwardMilli: stage.maxAwardMilli };
+  if (stage.kind === 'collect' && stage.scoring.kind === 'judged') return { maxAwardMilli: stage.scoring.maxAwardMilli };
+  return null;
+}
 export function stagePlaces(stage: StageDefinition): string[] | null {
   const places = stage.kind === 'collect' && stage.scoring.kind !== 'none' ? stage.scoring.places : stage.kind === 'vote' || stage.kind === 'challenge' ? stage.places : undefined;
   return places ? placePoints(places) : null;

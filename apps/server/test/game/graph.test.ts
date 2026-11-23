@@ -153,6 +153,14 @@ describe('deciding a closed route vote', () => {
     expect(resolveTally(counts(1, 1, 0), stage(players('default', 'host'), 'c'), () => 1)).toMatchObject({ optionKey: 'b', reason: 'TIE_BREAK', resolution: 'random', random: { candidates: ['a', 'b'], index: 1 } });
     expect(resolveTally(counts(3, 1, 0), stage({ method: 'host' }))).toEqual({ pending: 'host' });
   });
+  it('a minigame draw always draws, among every game, and records the draw', () => {
+    fc.assert(fc.property(fc.nat({ max: 3 }), fc.nat({ max: 3 }), fc.nat({ max: 3 }), fc.nat(), (a, b, c, seed) => {
+      // Stray votes (there are no voters) never count; nothing waits for the host.
+      const result = resolveTally(counts(a, b, c), stage({ method: 'draw' }), max => seed % max);
+      expect(result).toMatchObject({ reason: 'DRAW', resolution: 'draw', random: { candidates: ['a', 'b', 'c'], index: seed % 3 } });
+      if (!('pending' in result)) expect(result.optionKey).toBe(['a', 'b', 'c'][seed % 3]);
+    }));
+  });
   it('picks randomly only among the right candidates and records the draw', () => {
     fc.assert(fc.property(fc.nat({ max: 3 }), fc.nat({ max: 3 }), fc.nat({ max: 3 }), fc.nat(), (a, b, c, seed) => {
       const result = resolveTally(counts(a, b, c), stage(players('random', 'random')), max => seed % max);

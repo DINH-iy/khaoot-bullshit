@@ -15,7 +15,7 @@ import { personFromCookie } from '../people/identity.js';
 export const OWNER_COOKIE = 'party_owner';
 const loopback = (address: string | undefined) => address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 const digest = (value: string) => createHash('sha256').update(value).digest();
-const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422, NAME_TAKEN: 409, NOT_ENOUGH_CHIPS: 409, PREFAB_LIMIT: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, MEDIA_IN_USE: 409, FILE_TOO_LARGE: 413, UNSUPPORTED_MEDIA: 415, STORAGE_FULL: 507 };
+const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, AUTH_UNAVAILABLE: 503, RATE_LIMITED: 429, ORIGIN_REJECTED: 403, FORBIDDEN: 403, NOT_FOUND: 404, ROOM_NOT_AVAILABLE: 404, REVISION_CONFLICT: 409, INVALID_DEFINITION: 422, NAME_TAKEN: 409, NOT_ENOUGH_CHIPS: 409, PREFAB_LIMIT: 409, STYLE_LIMIT: 409, GROUP_FULL: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, MEDIA_IN_USE: 409, FILE_TOO_LARGE: 413, UNSUPPORTED_MEDIA: 415, STORAGE_FULL: 507 };
 
 export type OwnerBucket = 'menu' | 'claim' | 'edit';
 const LIMITS = { menu: 120, claim: 20, edit: 600, access: 240 };

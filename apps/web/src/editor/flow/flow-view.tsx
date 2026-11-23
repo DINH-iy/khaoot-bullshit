@@ -5,7 +5,7 @@ import { Icon, sceneIcon } from '../controls/icons.js';
 import { Inspector } from '../scene/inspector.js';
 import { Minimap } from './minimap.js';
 import {
-  addConnectedScene, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
+  addConnectedScene, addDrawGames, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
   bendsOf, insertOnEdge, insertPrefab, isBendKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
 import { ActionMenu } from '../controls/action-menu.js';
@@ -255,7 +255,12 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const target = adding.place ?? { x: adding.at.x, y: adding.at.y - 72 };
     const raw = { ...positions, [result.key]: { x: snap(target.x), y: snap(target.y) } };
     const spot = freeSpot(result.definition, raw, result.key, raw[result.key]!);
-    change(result.definition, { ...raw, [result.key]: spot }); setAdding(null); select([result.key]); requestAnimationFrame(() => reveal(spot));
+    // A minigame draw comes with a scene for each of its games, in a column to its right.
+    const inserted: string[] | undefined = 'games' in result ? (result.games as string[] | undefined) : undefined;
+    const games = inserted ? { definition: result.definition, keys: inserted } : type === 'draw' ? addDrawGames(result.definition, result.key) : { definition: result.definition, keys: [] as string[] };
+    let placed: Positions = { ...raw, [result.key]: spot };
+    games.keys.forEach((key, index) => { placed = { ...placed, [key]: freeSpot(games.definition, placed, key, { x: snap(spot.x + CARD_WIDTH + GRID * 4), y: snap(spot.y + index * (192 + GRID)) }) }; });
+    change(games.definition, placed); setAdding(null); select([result.key]); requestAnimationFrame(() => reveal(spot));
   };
   // The middle of the selected arrow, where its menu sits (add a scene on it, or remove it).
   const edgeMid = (() => {

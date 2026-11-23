@@ -1,5 +1,5 @@
-import { IdleCloseMinutesSchema } from '@party/contracts';
-import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
+import { HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
+import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -10,9 +10,9 @@ import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES,
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown, fallback = '') => typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : fallback;
-/** A wheel's own colours from the text: 2 to 8 valid "#rrggbb" values, or nothing. */
+/** A wheel's own colours from the text: 2 to 8 valid "#rrggbb" (or see-through "#rrggbbaa") values, or nothing. */
 function wheelColors(raw: unknown): { colors?: string[] } {
-  const colors = Array.isArray(raw) ? raw.map(entry => String(entry).trim().toLowerCase()).filter(entry => /^#[0-9a-f]{6}$/.test(entry)).slice(0, 8) : [];
+  const colors = Array.isArray(raw) ? raw.map(entry => String(entry).trim().toLowerCase()).filter(entry => HEX_COLOR.test(entry)).slice(0, 8) : [];
   return colors.length >= 2 ? { colors } : {};
 }
 
@@ -48,7 +48,7 @@ const findKey = (list: { key: string; label: string }[], wanted: unknown) => {
 const TYPES: Record<string, string> = { cutscene: 'info', info: 'info', text: 'info', quiz: 'quiz', question: 'quiz', choice: 'quiz', poll: 'poll', writing: 'writing', write: 'writing', joke: 'writing', caption: 'writing',
   upload: 'upload', picture: 'upload', photo: 'upload', video: 'upload', order: 'order', ordering: 'order', challenge: 'challenge', vote: 'vote', voting: 'vote',
   route: 'route', choose: 'route', 'party-choice': 'route', branch: 'route', scoreboard: 'scoreboard', results: 'scoreboard', standings: 'scoreboard', minigame: 'minigame', duel: 'duel', versus: 'duel', 'head-to-head': 'duel', drawing: 'drawing', draw: 'drawing', sketch: 'drawing',
-  teams: 'teams', 'pick-teams': 'teams', 'make-teams': 'teams' };
+  teams: 'teams', 'pick-teams': 'teams', 'make-teams': 'teams', 'minigame-draw': 'minigame-draw', 'random-minigame': 'minigame-draw', 'minigame-lottery': 'minigame-draw' };
 
 /**
  * Points by place in the simple format: `places: [10, 6, 3]` (points for 1st, 2nd, 3rd),
@@ -78,8 +78,7 @@ function stageFrom(raw: Json, key: string): Json {
   // A scene can have its own look (texts, style, animations); the definition check validates it.
   // `spin`: the name of a wheel of fortune the host spins on this scene.
   const spun = typeof raw['spin'] === 'string' && raw['spin'].trim() ? { spin: { wheel: slug(raw['spin'], 'wheel') } } : isObject(raw['spin']) ? { spin: raw['spin'] } : {};
-  // `explain`: true (a minigame's standard “how to play”) or the scene's own explanation, shown before it starts.
-  const explain = raw['explain'] === true ? { explain: {} } : typeof raw['explain'] === 'string' && raw['explain'].trim() ? { explain: { text: raw['explain'].trim().slice(0, 1000) } } : {};
+  const explain = introFrom(raw, stage);
   // `media`: a library item ({ id, kind }), including imported tracks and trimmed clips, as exported games carry it.
   // An AI cannot upload one: the author adds it in the editor afterwards. Anything else is left out.
   const media = SceneMediaSchema.safeParse(raw['media']);
@@ -87,6 +86,34 @@ function stageFrom(raw: Json, key: string): Json {
   const music = SceneMusicSchema.safeParse(typeof raw['music'] === 'string' ? { mode: raw['music'] } : raw['music']);
   const extras = { ...spun, ...explain, ...Object.fromEntries(['resultCards', 'countdownSeconds', 'voteMode', 'voteLimit'].filter(field => raw[field] !== undefined).map(field => [field, raw[field]])), ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
   return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
+}
+/**
+ * The intro before a round. `explain`: true (a minigame's standard “how to play”), the scene's own explanation,
+ * or { text, points, picture, screenOnly }. `"showPoints": true` alone makes an intro that shows the points.
+ * A round that earns points shows them in its intro unless `points` (or `showPoints`) is false.
+ */
+function introFrom(raw: Json, stage: Json): Json {
+  const given = raw['explain']; const shown = raw['showPoints'];
+  const stake = pointsAtStake(stage);
+  // `showPoints` alone on a round without points would make an empty intro: left out.
+  const written = isObject(given) ? given : typeof given === 'string' ? { text: given } : given === true || (shown === true && stake) ? {} : null;
+  if (!written) return {};
+  const intro: Json = {};
+  const words = text(written['text']).slice(0, 1000); if (words) intro['text'] = words;
+  if (written['points'] !== false && shown !== false && stake) intro['points'] = true;
+  const picture = SceneMediaSchema.safeParse(written['picture']); if (picture.success && picture.data.kind === 'image') intro['picture'] = picture.data;
+  if (written['screenOnly'] === true) intro['screenOnly'] = true;
+  return { explain: intro };
+}
+/**
+ * Points on a writing, upload or drawing round: `"maxPoints"` (and optionally `"places"`) means the host
+ * gives points after the answers are shown; without them the round gives none (it can then be voted on).
+ */
+function judgedFrom(raw: Json): Json {
+  const max = raw['maxPoints'] !== undefined ? milli(raw['maxPoints']) : undefined;
+  const placed = raw['places'] !== undefined ? placesFrom(raw) : {};
+  if ((!max || max === '0') && !('places' in placed)) return { kind: 'none' };
+  return { kind: 'judged', maxAwardMilli: max ?? '0', ...placed };
 }
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
   switch (type) {
@@ -126,11 +153,11 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
         ...(game ? { contest: { kind: 'game', game, ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}) } } : {}) };
     }
     case 'challenge': return { key, kind: 'challenge', prompt, durationMs, maxAwardMilli: milli(raw['maxPoints'] ?? raw['points'] ?? 10) ?? '10000', ...placesFrom(raw), ...play };
-    case 'drawing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'drawing', maxStrokes: 400, ...(raw['blind'] === true ? { blind: true } : {}) }, scoring: { kind: 'none' }, ...play };
-    case 'writing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'text', maxLength: Math.max(1, Math.min(2000, Number(raw['maxLength']) || 240)) }, scoring: { kind: 'none' }, ...play };
+    case 'drawing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'drawing', maxStrokes: 400, ...(raw['blind'] === true ? { blind: true } : {}) }, scoring: judgedFrom(raw), ...play };
+    case 'writing': return { key, kind: 'collect', prompt, durationMs: durationMs ?? 60_000, input: { kind: 'text', maxLength: Math.max(1, Math.min(2000, Number(raw['maxLength']) || 240)) }, scoring: judgedFrom(raw), ...play };
     case 'upload': {
       const accept = (Array.isArray(raw['accept']) ? raw['accept'] : ['image', 'gif']).map(entry => text(entry).toLowerCase().replace(/s$/, '').replace('picture', 'image').replace('photo', 'image')).filter(entry => ['image', 'gif', 'video'].includes(entry));
-      return { key, kind: 'collect', prompt, durationMs: durationMs ?? 90_000, input: { kind: 'media', accept: accept.length ? [...new Set(accept)] : ['image'] }, scoring: { kind: 'none' }, ...play };
+      return { key, kind: 'collect', prompt, durationMs: durationMs ?? 90_000, input: { kind: 'media', accept: accept.length ? [...new Set(accept)] : ['image'] }, scoring: judgedFrom(raw), ...play };
     }
     case 'order': {
       const items = options(raw['items'] ?? raw['answers'] ?? raw['options'], 'item');
@@ -139,9 +166,11 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
         scoring: points && (points !== '0' || raw['places'] !== undefined) ? { kind: 'correct-order', correctOrder: items.map(item => item.key), awardMilli: points, ...placesFrom(raw) } : { kind: 'none' }, ...play };
     }
     case 'vote': return { key, kind: 'vote', prompt, durationMs, source: raw['source'] ?? { nodeKey: text(raw['votesOn'] ?? raw['on']), stageKey: '' }, awardPerVoteMilli: milli(raw['pointsPerVote'] ?? raw['points'] ?? 5) ?? '5000', ...placesFrom(raw), ...play };
-    case 'route': {
-      const routes = options(raw['options'] ?? raw['routes'], 'route');
-      const method = ['players', 'captains', 'host'].includes(text(raw['decidedBy'] ?? raw['decide'])) ? text(raw['decidedBy'] ?? raw['decide']) : 'players';
+    case 'minigame-draw': case 'route': {
+      // A minigame draw is a party choice that a recorded random draw decides: no timer unless `seconds` is given (then it draws itself).
+      const routes = options(raw['options'] ?? raw['routes'] ?? raw['games'], 'route');
+      const method = type === 'minigame-draw' ? 'draw' : ['players', 'captains', 'host', 'draw'].includes(text(raw['decidedBy'] ?? raw['decide'])) ? text(raw['decidedBy'] ?? raw['decide']) : 'players';
+      if (method === 'draw') return { key, kind: 'route', prompt, durationMs: durationMs ?? null, options: routes, decide: { method } };
       return { key, kind: 'route', prompt, durationMs: method === 'host' ? null : durationMs ?? 20_000, options: routes,
         decide: method === 'host' ? { method } : { method, tie: text(raw['onTie']) === 'host' ? 'host' : 'random', noVotes: text(raw['whenNobodyVotes']) === 'host' ? 'host' : 'random', counts: ['live', 'reveal', 'never'].includes(text(raw['showCounts'])) ? text(raw['showCounts']) : 'reveal' } };
     }
@@ -186,6 +215,12 @@ export function importDefinition(input: string): Json | null {
     const round = target?.stages.find(candidate => candidate['kind'] === 'collect' && ['text', 'media'].includes(text((candidate['input'] as Json | undefined)?.['kind'])));
     stage['source'] = { nodeKey: target?.key ?? text((stage['source'] as Json)['nodeKey'], 'missing'), stageKey: text(round?.['key'], 'main') };
   }
+  // A team minigame not played in the game's teams (`"inTeams"`) gets teams of two for that round only, as in the editor;
+  // so a minigame draw may include team games.
+  if ((raw['play'] as Json | undefined)?.['kind'] !== 'teams') for (const node of nodes) for (const stage of node.stages) {
+    if (stage['kind'] === 'minigame' && TEAM_MINIGAMES.includes(text(stage['game']) as MinigameKey) && !stage['play'])
+      stage['play'] = { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: 2 }, formation: 'random' } }, answers: 'everyone', points: 'members' };
+  }
   let edges: Json[] = [];
   const takenEdges = new Set<string>();
   const edge = (from: string, to: string, option?: string) => edges.push({ key: unique(slug(`${from}-to-${to}`, 'edge'), takenEdges), from, to, ...(option ? { option } : {}) });
@@ -196,7 +231,8 @@ export function importDefinition(input: string): Json | null {
     nodes.forEach((node, index) => {
       const route = node.stages.length === 1 && node.stages[0]!['kind'] === 'route' ? node.stages[0]! : null;
       if (route) {
-        const given = Array.isArray(node.original['options'] ?? node.original['routes']) ? (node.original['options'] ?? node.original['routes']) as unknown[] : [];
+        const listed = node.original['options'] ?? node.original['routes'] ?? node.original['games'];
+        const given = Array.isArray(listed) ? listed as unknown[] : [];
         (route['options'] as { key: string }[]).forEach((option, position) => { const to = keyFor(isObject(given[position]) ? (given[position] as Json)['to'] ?? (given[position] as Json)['next'] : undefined); if (to) edge(node.key, to, option.key); });
         return;
       }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolBallBehavior, PoolStart } from '@party/contracts';
 import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
-import { effectivePlay, isShowOnly, isVoteSource, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
+import { effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
 import { checkBet, decideDuel, duelists, duelPlay, endTimedPool, openDuel, openPoolTryout, openTeamPool, pickDuelists, pickTimedPoolWinner, readDuel } from './duel.js';
 import { matchOutcome } from '../head-to-head/match.js';
@@ -184,8 +184,11 @@ function validateValue(value: SubmissionValue, stage: StageDefinition): void {
   }
 }
 
-/** The most a host may give one player or team in a challenge: its maximum, or its 1st place when it pays by place. */
-const challengeLimit = (stage: Extract<StageDefinition, { kind: 'challenge' }>) => { const top = stagePlaces(stage)?.[0]; const max = BigInt(stage.maxAwardMilli); return top && BigInt(top) > max ? BigInt(top) : max; };
+/**
+ * The most a host may give one player or team in a judged stage (a challenge, or a writing, upload or drawing
+ * round with host points): its maximum, or its 1st place when it pays by place. Null: the host does not judge it.
+ */
+const judgeLimit = (stage: StageDefinition) => { const rules = judging(stage); if (!rules) return null; const top = stagePlaces(stage)?.[0]; const max = BigInt(rules.maxAwardMilli); return top && BigInt(top) > max ? BigInt(top) : max; };
 
 // `now` is the server receipt time, taken before waiting for the room lock.
 export async function applyCommand(tx: Transaction, session: GameSession, definition: GameDefinition, actor: TrustedActor, command: GameCommand, now: Date, live?: LiveSignals): Promise<Effect> {
@@ -384,6 +387,8 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     if (stage.status === 'ACTIVE') await tx.stageRun.update({ where: { id: stage.id }, data: { status: 'CLOSED', closedAt: now, deadlineAt: null, pausedRemainingMs: null } });
     const { counts, voterCount } = await countsFor(tx, stage, choice);
     const tie = pendingReason(counts, choice) === 'tie' && leadersOf(counts).includes(command.optionKey);
+    // A minigame draw shows its result as it is made, so the host's own pick is announced at once too.
+    if (choice.decide.method === 'draw') await reveal(tx, { ...stage, status: 'CLOSED' }, now);
     return { ...empty, stageRunId: stage.id, decision: decisionFor(definition, stage, choice, { optionKey: command.optionKey, reason: tie ? 'TIE_BREAK' : 'HOST' },
       { voterCount, counts, leaders: leadersOf(counts), resolution: 'host', random: null, closedBy: 'decide' }) };
   }
@@ -437,7 +442,10 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       return { ...empty, stageRunId: stage.id, awards: await revealAwards(tx, stage, entry.stage) };
     }
     // A route vote tallies once as it closes; a tie or empty vote may wait for the host.
-    return { ...empty, stageRunId: stage.id, decision: choice ? await closeRoute(tx, definition, stage, choice, command.type === 'stage.timeout' ? 'timeout' : 'close') : null };
+    // A minigame draw is drawn as it closes and shown to everyone at once.
+    const decision = choice ? await closeRoute(tx, definition, stage, choice, command.type === 'stage.timeout' ? 'timeout' : 'close') : null;
+    if (choice?.decide.method === 'draw') await reveal(tx, stage, now);
+    return { ...empty, stageRunId: stage.id, decision };
   }
   const forming = readForming(stage.presentation);
   if (command.type.startsWith('teams.')) {
@@ -557,20 +565,23 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   const context = await teamContext(tx, stage);
   if (command.type === 'stage.judgeTeam') {
     // One decision per team, recorded for each member so nobody is judged twice.
-    requireGame(stage.status === 'CLOSED' && entry.stage.kind === 'challenge' && context, 'INVALID_STATE');
+    // A challenge is judged once closed; an open round with host points once its answers are shown (closed, too).
+    const limit = judgeLimit(entry.stage);
+    requireGame(stage.status === 'CLOSED' && limit !== null && context, 'INVALID_STATE');
     const members = (context.members.get(command.teamId) ?? []).filter(id => eligible.data.playerIds.includes(id));
     requireGame(members.length, 'INELIGIBLE');
     const amountMilli = BigInt(command.amountMilli);
-    requireGame(amountMilli <= challengeLimit(entry.stage), 'INVALID_SUBMISSION');
+    requireGame(amountMilli <= limit, 'INVALID_SUBMISSION');
     requireGame(await tx.stageJudgment.count({ where: { stageRunId: stage.id, playerId: { in: members } } }) === 0, 'ALREADY_JUDGED');
     return { ...empty, stageRunId: stage.id, judgments: members.map(playerId => ({ playerId, amountMilli, stageRunId: stage.id })),
       awards: route({ amountMilli, stageRunId: stage.id, awardKey: `judgment:${stage.id}:team:${command.teamId}`, reason: 'Host judgment' }, { teamId: command.teamId }, context) };
   }
   if (command.type === 'stage.judge') {
-    requireGame(stage.status === 'CLOSED' && entry.stage.kind === 'challenge' && !context, 'INVALID_STATE');
+    const limit = judgeLimit(entry.stage);
+    requireGame(stage.status === 'CLOSED' && limit !== null && !context, 'INVALID_STATE');
     requireGame(eligible.data.playerIds.includes(command.playerId), 'INELIGIBLE');
     const amountMilli = BigInt(command.amountMilli);
-    requireGame(amountMilli <= challengeLimit(entry.stage), 'INVALID_SUBMISSION');
+    requireGame(amountMilli <= limit, 'INVALID_SUBMISSION');
     const prior = await tx.stageJudgment.findUnique({ where: { stageRunId_playerId: { stageRunId: stage.id, playerId: command.playerId } } });
     requireGame(!prior, 'ALREADY_JUDGED');
     return { ...empty, stageRunId: stage.id, judgments: [{ playerId: command.playerId, amountMilli, stageRunId: stage.id }],

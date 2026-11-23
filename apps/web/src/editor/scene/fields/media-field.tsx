@@ -1,7 +1,7 @@
 import { Dropdown } from '../../../ui/dropdown.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { DEFAULT_MEDIA_LAYOUT, LIBRARY_ACCEPT, LIBRARY_LIMITS, LibraryItemSchema, MEDIA_POSITIONS, MEDIA_SIZES, MediaLibrarySchema, MediaLayoutSchema, SceneMediaSchema, sceneMediaUrl, youtubeWatchUrl, type MediaLayout, type SceneMedia, type YouTubeClip, type LibraryItem, type MediaLibrary, type SceneMediaKind } from '@party/contracts';
+import { DEFAULT_MEDIA_LAYOUT, LIBRARY_ACCEPT, LIBRARY_LIMITS, LibraryItemSchema, MEDIA_POSITIONS, MEDIA_SIZES, MediaLibrarySchema, MediaLayoutSchema, SceneMediaSchema, sceneMediaUrl, youtubeWatchUrl, type MediaLayout, type SceneMedia, type YouTubeClip, type LibraryItem, type ListedLibraryItem, type MediaLibrary, type SceneMediaKind } from '@party/contracts';
 import { roomApi } from '../../../room/api.js';
 import { StageMedia } from '../../../room/stage-media.js';
 import { Icon } from '../../controls/icons.js';
@@ -137,6 +137,9 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
   const [added, setAdded] = useState<LibraryItem>();
   const [detailIds, setDetailIds] = useState<Set<string>>(() => new Set());
   const [filter, setFilter] = useState<SceneMediaKind | 'all'>(only ?? 'all');
+  // Grouping by game: all files, those a game uses (its draft or latest published version), or those no game uses.
+  const [gameFilter, setGameFilter] = useState<string>('all');
+  const thisGame = new URLSearchParams(location.search).get('edit') ?? undefined;
   const id = useId(); const box = useRef<HTMLDivElement>(null); const input = useRef<HTMLInputElement>(null);
   const load = () => roomApi('/api/host/media').then(data => setLibrary(MediaLibrarySchema.parse(data))).catch(cause => setError(explain(cause)));
   useEffect(() => { void load(); const previous = document.activeElement as HTMLElement | null; box.current?.querySelector<HTMLElement>('button')?.focus(); return () => previous?.focus?.(); }, []);
@@ -191,7 +194,11 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
     if (!confirm(t('removeAsk', { name: item.name }))) return;
     setBusy(true); setError(''); void roomApi(`/api/host/media/${item.id}/remove`, {}).then(load).catch(cause => setError(explain(cause))).finally(() => setBusy(false));
   };
-  const shown = library?.items.filter(item => filter === 'all' || item.kind === filter) ?? [];
+  const inGame = (item: ListedLibraryItem) => gameFilter === 'all' || (gameFilter === 'none' ? !item.gameIds.length : item.gameIds.includes(gameFilter));
+  const shown = library?.items.filter(item => (filter === 'all' || item.kind === filter) && inGame(item)) ?? [];
+  const gameTitle = (gameId: string) => { const game = library?.games.find(entry => entry.id === gameId); return game ? game.archived ? t('archivedGame', { title: game.title }) : game.title : ''; };
+  const gameOptions = [{ value: 'all', label: t('allGames') }, ...(thisGame ? [{ value: thisGame, label: t('thisGame') }] : []), { value: 'none', label: t('noGame') },
+    ...(library?.games ?? []).filter(game => game.id !== thisGame).map(game => ({ value: game.id, label: gameTitle(game.id), group: t('otherGames') }))];
   return createPortal(<div className="ed-dialog-backdrop media-library-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) close(); }}>
     <div ref={box} className={`ed-dialog media-library${editorOpen ? ' editing-audio' : ''}`} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={event => {
       if (event.key === 'Escape') { event.stopPropagation(); if (editorOpen && !busy) back(); else close(); }
@@ -212,8 +219,11 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
         </>}
       </div>
       {added && <p role="status" className="hint">{audioText('added', { name: added.name })}</p>}
-      {library && !only && <div className="choice-tabs" role="tablist" aria-label={t('kindOfFile')}>{(['all', 'image', 'video', 'audio'] as const).map(kind =>
-        <button key={kind} type="button" role="tab" aria-selected={filter === kind} onClick={() => setFilter(kind)}>{kind === 'all' ? t('all') : kindsName(kind)}</button>)}</div>}
+      {library && <div className="media-filters">
+        {!only && <div className="choice-tabs" role="tablist" aria-label={t('kindOfFile')}>{(['all', 'image', 'video', 'audio'] as const).map(kind =>
+          <button key={kind} type="button" role="tab" aria-selected={filter === kind} onClick={() => setFilter(kind)}>{kind === 'all' ? t('all') : kindsName(kind)}</button>)}</div>}
+        <Dropdown className="media-game-filter" label={t('gameFilter')} title={t('gameFilter')} value={gameFilter} onChange={setGameFilter} options={gameOptions} />
+      </div>}
       {!library && !error && <p role="status">{t('loading')}</p>}
       {library && !shown.length && <div className="media-empty">{mediaText(only === 'audio' ? 'noSongs' : 'noFiles')}</div>}
       {shown.length > 0 && <ul className="media-items">{shown.map(item => {
@@ -226,13 +236,14 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
             <div className="media-item-meta"><span className="hint">{kindName(item.kind)} · {size(item.byteSize)}</span>
               {active && <span className="media-current"><Icon name="check" size={14} />{t('inThisScene')}</span>}
             </div>
+            <span className="hint media-item-games">{item.gameIds.length ? t('usedIn', { games: item.gameIds.map(gameId => gameId === thisGame ? t('thisGame') : gameTitle(gameId)).join(', ') }) : t('noGame')}</span>
           </div>
           <div className="media-item-actions">
             {!readOnly && <>
               {(onPick || scene) && !active && <button type="button" className="small-button" disabled={busy} onClick={() => useItem(item)}>{t('useThis')}</button>}
               {scene && <button type="button" className="small-button" disabled={busy} onClick={() => setSceneFile(active && scene.media ? scene.media : { id: item.id, kind: item.kind })}>{sceneText(item.kind === 'image' ? 'crop' : 'cut')}</button>}
               {item.kind === 'audio' && <button type="button" className="small-button" disabled={busy} onClick={() => openAudio({ kind: 'trim', item })}>{audioText('trim')}</button>}
-              <button type="button" className="small-button icon-only" disabled={busy} aria-label={t('removeLabel', { name: item.name })} title={t('removeTitle')} onClick={() => remove(item)}><Icon name="trash" size={16} /></button>
+              <button type="button" className="small-button icon-only danger-icon" disabled={busy} aria-label={t('removeLabel', { name: item.name })} title={t('removeTitle')} onClick={() => remove(item)}><Icon name="trash" size={16} /></button>
             </>}
           </div>
           {(item.kind !== 'image' || !readOnly || item.credit) && <details className="media-item-details" onToggle={event => {

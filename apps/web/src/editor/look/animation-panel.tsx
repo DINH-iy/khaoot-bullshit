@@ -85,7 +85,7 @@ function Builder({ start, name: startName, list, onSave }: { start: CustomAnimat
     <ol className="frame-list">{frames.map((frame, index) => <li key={index} className="frame-block">
       <div className="frame-head"><strong>{index === 0 ? t('start') : index === frames.length - 1 ? t('end') : t('stepN', { number: index })}</strong>
         {index > 0 && index < frames.length - 1 && <label>{t('atPercent', { percent: Math.round(frame.at * 100) })}<input type="range" min={1} max={99} value={Math.round(frame.at * 100)} onChange={event => setFrame(index, { ...frame, at: Number(event.target.value) / 100 })} /></label>}
-        {index > 0 && index < frames.length - 1 && <button className="small-button" onClick={() => setDraft({ ...draft, keyframes: frames.filter((_, at) => at !== index) })}>{t('remove')}</button>}</div>
+        {index > 0 && index < frames.length - 1 && <button type="button" className="small-button danger-outline" onClick={() => setDraft({ ...draft, keyframes: frames.filter((_, at) => at !== index) })}>{t('remove')}</button>}</div>
       <div className="frame-props">{PROPERTIES.map(property => {
         const value = frame[property.key]; const used = value !== undefined;
         return <div key={property.key} className={`frame-prop${used ? '' : ' unused'}`}>
