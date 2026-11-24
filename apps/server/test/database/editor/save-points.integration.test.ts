@@ -54,19 +54,30 @@ describe('save points', () => {
     expect((await call('GET', `/api/host/games/${gameId}/save-points`)).json().data.savePoints).toEqual([]);
   });
 
-  it('stop at the limit, except that an automatic one replaces the oldest automatic one', async () => {
-    const { gameId } = await game();
-    const auto = await point(gameId, { name: 'First automatic', automatic: true });
-    for (let index = 1; index < MAX_SAVE_POINTS; index++) expect((await point(gameId, { name: `Mine ${index}` })).statusCode).toBe(200);
-    const full = await point(gameId, { name: 'One too many' });
+  it('keep one automatic copy at most, made only when the game holds work no save point has, and stop at the limit', async () => {
+    const { gameId, definition } = await game();
+    let revision = 0;
+    const edit = async (title: string) => { const saved = await call('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: revision, definition: { ...definition, title } }); expect(saved.statusCode).toBe(200); revision = saved.json().data.revision; };
+    const list = async () => (await call('GET', `/api/host/games/${gameId}/save-points`)).json().data.savePoints as { id: string; name: string; automatic: boolean }[];
+    const mine = (await point(gameId, { name: 'Mine' })).json().data;
+    // Going back with nothing new since "Mine": that save point is returned, nothing is made.
+    expect((await point(gameId, { name: 'Before going back', automatic: true })).json().data.id).toBe(mine.id);
+    expect(await list()).toHaveLength(1);
+    // New work: kept once, and the next copy (of newer work) replaces it instead of piling up.
+    await edit('Work one');
+    const first = (await point(gameId, { name: 'Before going back', automatic: true, expectedRevision: revision })).json().data;
+    expect(first).toMatchObject({ automatic: true });
+    await edit('Work two');
+    const second = (await point(gameId, { name: 'Before going back', automatic: true, expectedRevision: revision })).json().data;
+    expect((await list()).map(entry => entry.id).sort()).toEqual([mine.id, second.id].sort());
+    expect(second.id).not.toBe(first.id);
+    // Full of save points people made: one more is refused, and so is an automatic copy of new work.
+    for (let index = 2; index < MAX_SAVE_POINTS; index++) expect((await point(gameId, { name: `Mine ${index}`, expectedRevision: revision })).statusCode).toBe(200);
+    const full = await point(gameId, { name: 'One too many', expectedRevision: revision });
     expect(full.statusCode).toBe(409); expect(full.json().error.code).toBe('SAVE_POINT_LIMIT');
-    expect((await point(gameId, { name: 'Second automatic', automatic: true })).statusCode).toBe(200);
-    const names = ((await call('GET', `/api/host/games/${gameId}/save-points`)).json().data.savePoints as { id: string; name: string }[]);
-    expect(names).toHaveLength(MAX_SAVE_POINTS);
-    expect(names.some(entry => entry.id === auto.json().data.id)).toBe(false);
-    // Only save points people made are left besides the new one: a full game of those refuses an automatic one too.
     await prisma.gameSavePoint.updateMany({ where: { gameId }, data: { automatic: false } });
-    expect((await point(gameId, { name: 'Third automatic', automatic: true })).json().error.code).toBe('SAVE_POINT_LIMIT');
+    await edit('Work three');
+    expect((await point(gameId, { name: 'Before going back', automatic: true, expectedRevision: revision })).json().error.code).toBe('SAVE_POINT_LIMIT');
   });
 
   it('are deleted only within their own game', async () => {

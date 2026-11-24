@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { PoolBallBehavior, PoolStart } from '@party/contracts';
 import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
-import { effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
+import { drawnStage, effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
 import { checkBet, decideDuel, duelists, duelPlay, endTimedPool, openDuel, openPoolTryout, openTeamPool, pickDuelists, pickTimedPoolWinner, readDuel } from './duel.js';
 import { matchOutcome } from '../head-to-head/match.js';
@@ -14,7 +14,7 @@ import { relayPlan, TURN_GRACE_MS } from '../minigames/relay-drawing/relay.js';
 import { stepDecide, stepMove } from '../minigames/shared/steps/engine.js';
 import type { LiveSignals } from '../minigames/tap-race/live.js';
 import { spinWheel } from './show/wheel.js';
-import { firstStage, locateStage, nextStage, type Located } from './graph.js';
+import { firstStage, locateStage, nextStage, type Located, locateRunStage } from './graph.js';
 import { closeRoute, countsFor, decisionFor, leadersOf, pendingReason, openRoute, readRoute, type RouteDecisionEffect } from './routes/routes.js';
 import { GameError, requireGame } from './errors.js';
 import { actorKey, EligibilitySchema, requireHost, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
@@ -35,6 +35,13 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   poolTryout?: { players: [string] | [string, string] | undefined; seconds: number | undefined; ballBehavior: PoolBallBehavior | undefined; start: PoolStart | undefined }): Promise<StageRun> {
   const players = await tx.sessionPlayer.findMany({ where: { sessionId, leftAt: null }, select: { id: true }, orderBy: { id: 'asc' } });
   let presentation = {};
+  // A minigame draw in one scene: one of its games is drawn now, once, and kept with the run; from here on the scene
+  // is that game (with its own settings and time), here and wherever the run is read (locateRunStage).
+  if (entry.stage.kind === 'minigame' && entry.stage.draw) {
+    const index = randomInt(entry.stage.draw.length);
+    entry = { ...entry, stage: drawnStage(entry.stage, index) };
+    presentation = { minigameDraw: { index } };
+  }
   if (entry.stage.kind === 'vote') {
     const source = await tx.stageRun.findFirst({ where: { sessionId, nodeKey: entry.stage.source.nodeKey, stageKey: entry.stage.source.stageKey }, orderBy: { number: 'desc' }, select: { id: true } });
     requireGame(source, 'INVALID_STATE'); presentation = { sourceStageRunId: source.id };
@@ -271,7 +278,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     if (active) {
       // A pause stops a running minigame on every phone (they stop playing while the room is paused);
       // resuming gives everyone who has not finished a fresh countdown. Lucky doors keep their secret order.
-      const entry = locateStage(definition, active.nodeKey, active.stageKey); const run = readMinigameRun(active.presentation);
+      const entry = locateRunStage(definition, active); const run = readMinigameRun(active.presentation);
       let restart = {};
       const startsAt = drawingStartsAt(active.presentation);
       if (startsAt) {
@@ -330,7 +337,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   const latest = await tx.stageRun.findFirst({ where: { sessionId: session.id }, orderBy: { number: 'desc' }, select: { id: true } });
   requireGame(latest?.id === stage.id, 'INVALID_STATE');
   // The run names its node and stage; the definition (immutable for the session) supplies the rules.
-  const entry = locateStage(definition, stage.nodeKey, stage.stageKey);
+  const entry = locateRunStage(definition, stage);
   requireGame(entry, 'INVALID_STATE');
   const choice = entry.stage.kind === 'route' ? entry.stage : null;
   const decided = choice ? await tx.routeDecision.findUnique({ where: { stageRunId: stage.id } }) : null;

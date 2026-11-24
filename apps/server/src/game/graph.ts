@@ -1,4 +1,4 @@
-import type { GameDefinition, StageDefinition } from './definition.js';
+import { drawnStage, type GameDefinition, type StageDefinition } from './definition.js';
 import { GameError } from './errors.js';
 
 // The game's flow as a graph. Format 1 is a single line of nodes. Format 2 adds
@@ -20,6 +20,16 @@ export const allStages = (definition: GameDefinition) => definition.nodes.flatMa
 export function locateStage(definition: GameDefinition, nodeKey: string, stageKey: string): Located | null {
   const node = nodeOf(definition, nodeKey); const index = node ? node.stages.findIndex(stage => stage.key === stageKey) : -1;
   return node && index >= 0 ? { nodeKey, stage: node.stages[index]!, index } : null;
+}
+/**
+ * The stage a run plays: as `locateStage`, except that a minigame draw in one scene is the game drawn for this run
+ * (kept in the run's presentation when it opened). Everything that reads a running stage's rules uses this.
+ */
+export function locateRunStage(definition: GameDefinition, run: { nodeKey: string; stageKey: string; presentation: unknown }): Located | null {
+  const located = locateStage(definition, run.nodeKey, run.stageKey);
+  if (!located || located.stage.kind !== 'minigame' || !located.stage.draw) return located;
+  const drawn = (run.presentation as { minigameDraw?: { index?: unknown } } | null)?.minigameDraw?.index;
+  return typeof drawn === 'number' ? { ...located, stage: drawnStage(located.stage, drawn) } : located;
 }
 export function firstStage(definition: GameDefinition): Located {
   const node = nodeOf(definition, definition.startNodeKey); if (!node) throw new GameError('INVALID_DEFINITION');

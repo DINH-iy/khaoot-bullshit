@@ -12,9 +12,19 @@
 .look-panel .hint.warn { color: light-dark(#9a3412, #ffb38a); }
 .field-title { margin: 4px 0 0; font-weight: 600; }
 
-.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-.preset-card { display: grid; gap: 8px; text-align: left; padding: 12px; min-height: 76px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; }
-.preset-card.on { border-color: #6d3fd6; outline: 2px solid #fff; outline-offset: -4px; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 10px; }
+/* A card never grows past its column: long names wrap, and the swatches wrap instead of running under the next card. */
+.preset-grid .preset-card { min-width: 0; width: 100%; box-sizing: border-box; }
+.preset-card .swatches { flex-wrap: wrap; }
+.preset-card { position: relative; display: grid; gap: 8px; text-align: left; padding: 12px; min-height: 76px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; }
+/* The style in use: the editor's accent edge with a glow, and an "In use" badge (on every style's own colours). */
+.preset-card.on { border-color: var(--e-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--e-accent) 45%, transparent); }
+.style-in-use { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 6px; border-radius: 999px;
+  background: var(--e-accent); color: light-dark(#fff, #1d1730); font-family: var(--e-font, inherit); font-size: .72rem; font-weight: 800; letter-spacing: .02em; }
+.preset-card:has(.style-in-use) { padding-bottom: 32px; }
+.style-current { margin: 0; color: var(--e-muted); font-size: .88rem; } .style-current strong { color: var(--e-text); }
+.style-groups button { position: relative; }
+.group-in-use { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--e-accent); vertical-align: middle; }
 /* The new-style tile: the size of a style card, empty, with a dashed edge and a plus. */
 .preset-card.new-style-card { place-content: center; justify-items: center; gap: 4px; text-align: center; background: transparent; color: var(--e-muted); border: 2px dashed var(--e-border); font-weight: 600; }
 .preset-card.new-style-card:hover, .preset-card.new-style-card:focus-visible { color: var(--e-text); border-color: var(--e-accent); background: var(--e-accent-soft); }
@@ -67,6 +77,16 @@
 .room-preview .tile { min-height: 64px; display: flex; gap: 8px; align-items: center; padding: 8px 10px; }
 .room-preview .big-code { font-size: 2.4rem; margin: 0; }
 @media (max-width: 900px) { .look-editor { grid-template-columns: 1fr; } .look-devices { grid-template-columns: 1fr; } .look-controls { border-right: 0; } }
+/* Wide screens: the preview fits the space it has instead of scrolling (room left for the floating editor tabs).
+   Only a moment taller than the screen preview scrolls inside that preview. */
+@media (min-width: 901px) {
+  .look-preview-area { overflow: hidden; display: grid; padding-bottom: 76px; }
+  .look-preview { min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
+  .look-devices, .look-scene { min-height: 0; height: 100%; align-items: stretch; }
+  .look-devices > figure { min-height: 0; grid-template-rows: auto minmax(0, 1fr); align-content: start; }
+  .look-tv .room-preview { min-height: 0; max-height: 100%; overflow: auto; }
+  .look-phone { --phone-max-h: 100%; }
+}
 .room.room-preview .stage-card h2, .room.room-preview .lobby h2 { font-size: 1.7em; }
 .look-phone .room.room-preview .stage-card h2 { font-size: 1.3em; }
 .room.room-preview .stage-card, .room.room-preview .tiles { min-width: 0; }
@@ -179,8 +199,9 @@
 @media (prefers-reduced-motion: reduce) { .theme-font-manage .ed-chevron { transition: none; } }
 /* Saved styles: the card, with its delete button in the corner (a sibling, never inside the card's button). */
 .saved-style { position: relative; display: grid; min-width: 0; }
-.saved-style .preset-card { padding-right: 52px; overflow-wrap: anywhere; }
-.saved-style .danger-icon { position: absolute; top: 4px; right: 4px; width: 44px; min-height: 44px; }
+.saved-style .preset-card { padding-right: 40px; overflow-wrap: anywhere; }
+/* Delete: a small round button in the card's corner, clear of the name and swatches. */
+.editor .saved-style .danger-icon { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
 /* On the card's own colours the outline needs the panel behind it to read. */
 .editor .saved-style button.danger-icon.danger-icon { background: var(--e-panel); }
 .editor .saved-style button.danger-icon.danger-icon:hover:not(:disabled), .editor .saved-style button.danger-icon.danger-icon:focus-visible { background: color-mix(in srgb, var(--e-danger) 12%, var(--e-panel)); }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ArcadeActSchema, StartArcadeRoundSchema, isArcadeGame, isHeadToHeadKey, isMinigameKey, type ArcadeAction } from '@party/contracts';
+import { ArcadeActSchema, ArcadeAgainSchema, ArcadePickSchema, GraphSettingsSchema, StartArcadeRoundSchema, isArcadeGame, isHeadToHeadKey, isMinigameKey, type ArcadeAction } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient, ArcadeMember } from '../generated/prisma/client.js';
 import { contentHash, type GameDefinition } from '../game/definition.js';
@@ -12,6 +12,7 @@ import { joinToken, newToken, roomAssert, tokenHash } from '../rooms/security.js
 import { arcadeDefinition, arcadeRoundFits } from './definition.js';
 import { ensureLeader, lockLobby, present, QUIET_MS, type Lobbies } from './lobbies.js';
 import { recordResults, roundResults } from './results.js';
+import { chooseGraph, libraryIdOf } from '../minigames/draw-the-graph/library.js';
 
 // Rounds: each is an ordinary room with one game scene, hosted by the
 // arcade's own creator. Every present member gets a seat (and a player key the
@@ -96,7 +97,7 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
   return {
     end,
     /** The leader starts a round for everyone present. A retry with the same round id is the same round. */
-    async start(member: ArcadeMember, input: unknown, now = new Date()) {
+    async start(member: ArcadeMember, input: unknown, now = new Date(), avoidGraph?: string) {
       const parsed = StartArcadeRoundSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE'); const secret = config.ROOM_TOKEN_SECRET;
       const { roundId, game, teams } = parsed.data; const lobbyId = member.lobbyId;
@@ -114,7 +115,9 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
       };
       await client.$transaction(async tx => { await lockLobby(tx, lobbyId); await check(tx); });
       const host = await creator();
-      const gameVersionId = await versionFor(host.id, arcadeDefinition(game, teams));
+      // Draw the Graph plays a chart of the graph library: the one picked, or a random one (another than `avoidGraph`).
+      const chart = game === 'draw-the-graph' ? await chooseGraph(client, parsed.data.graph, avoidGraph) : undefined;
+      const gameVersionId = await versionFor(host.id, arcadeDefinition(game, teams, chart && { ...(chart.graph ? { graph: chart.graph } : {}), question: chart.entry.question }));
       await service.execute({ role: 'host', creatorId: host.id }, { formatVersion: 1, type: 'session.create', sessionId: roundId, commandId: roundId, expectedRevision: 0, mode: 'REHEARSAL', gameVersionId });
       await client.$transaction(async tx => {
         await lockLobby(tx, lobbyId); await lockRoom(tx, roundId);
@@ -134,6 +137,27 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
       // Teams are made, or the minigame explains itself; the leader continues from the room. If this step fails, the leader can begin from there.
       await hostStep(roundId, host.id, 'session.start').catch(error => { if (!(error instanceof GameError)) throw error; });
       return { roundId };
+    },
+    /**
+     * The leader plays the round just played again: the same game and teams (made the way the lobby's choice says),
+     * with new values. A round still on is ended first (its results count); a graph round gets a different graph.
+     */
+    async again(member: ArcadeMember, input: unknown, now = new Date()) {
+      const parsed = ArcadeAgainSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
+      if (await client.arcadeRound.findUnique({ where: { id: parsed.data.roundId } })) return this.start(member, { ...parsed.data, game: 'reaction', teams: null }, now);
+      const lobbyId = member.lobbyId;
+      roomAssert(await client.$transaction(async tx => { await lockLobby(tx, lobbyId); return ensureLeader(tx, lobbyId, now); }) === member.id, 'FORBIDDEN');
+      const last = await client.arcadeRound.findFirst({ where: { lobbyId }, orderBy: { number: 'desc' }, include: { session: { select: { gameVersion: { select: { definition: true } } } } } });
+      roomAssert(last && isArcadeGame(last.game), 'INVALID_STATE');
+      if (!last.endedAt) await this.end(last.id, now);
+      const pick = ArcadePickSchema.safeParse((await client.arcadeLobby.findUniqueOrThrow({ where: { id: lobbyId }, select: { pick: true } })).pick).data;
+      const teams = last.teams ? { count: last.teams, formation: pick?.teams?.formation ?? 'random' } : null;
+      let avoid: string | undefined;
+      if (last.game === 'draw-the-graph') {
+        const stage = (last.session.gameVersion.definition as { nodes?: { stages?: { settings?: unknown }[] }[] }).nodes?.[0]?.stages?.[0];
+        avoid = libraryIdOf(GraphSettingsSchema.safeParse(stage?.settings ?? {}).data?.graph);
+      }
+      return this.start(member, { roundId: parsed.data.roundId, game: last.game, teams }, now, avoid);
     },
     /** A seated member's access to the room of the round being played. */
     async enter(member: ArcadeMember) {

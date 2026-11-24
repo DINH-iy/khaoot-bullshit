@@ -75,7 +75,9 @@ function useFit(body: React.RefObject<HTMLDivElement | null>) {
         // popup (buttons, notes) stays on screen too.
         bottom -= 12 + Math.max(0, dialog.getBoundingClientRect().bottom - box.bottom);
       } else for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-        if (/(auto|scroll|hidden)/.test(getComputedStyle(parent).overflowY)) { bottom = Math.min(bottom, parent.getBoundingClientRect().bottom); break; }
+        // Inside the container's padding (a preview area keeps room at its bottom for the floating tabs).
+        const style = getComputedStyle(parent);
+        if (/(auto|scroll|hidden)/.test(style.overflowY)) { bottom = Math.min(bottom, parent.getBoundingClientRect().bottom - parseFloat(style.paddingBottom)); break; }
       }
       // The floating editor tabs sit over the bottom of the page (not over a popup, which is above them).
       const tabs = dialog ? null : document.querySelector('.editor-tabs')?.getBoundingClientRect();

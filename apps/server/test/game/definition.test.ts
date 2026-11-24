@@ -24,6 +24,18 @@ describe('server-only game definitions', () => {
     expect(withMinigame({ game: 'cut-the-line', scoring: { kind: 'within', distance: 101, pointsMilli: '10000' } })).toThrow('INVALID_DEFINITION');
     expect(withMinigame({ game: 'tap-race', settings: { seconds: 10 }, scoring: { kind: 'within', distance: 5, pointsMilli: '10000' } })).toThrow('INVALID_DEFINITION');
   });
+  it('accepts a minigame draw in one scene only when every game in it can be played there', () => {
+    const withMinigame = (stage: Record<string, unknown>) => { const game = structuredClone(preparedGame) as unknown as { nodes: { stages: Record<string, unknown>[] }[] };
+      game.nodes[0]!.stages[0] = { key: 'play', kind: 'minigame', prompt: 'Play', durationMs: 20_000, game: 'reaction', ...stage }; return () => parseDefinition(game); };
+    expect(withMinigame({ draw: [{ game: 'reaction' }, { game: 'tap-race', settings: { seconds: 10 }, durationMs: 30_000 }] })).not.toThrow();
+    expect(withMinigame({ draw: [{ game: 'reaction' }] })).toThrow('INVALID_DEFINITION'); // a draw needs two games
+    expect(withMinigame({ draw: [{ game: 'reaction' }, { game: 'reaction' }] })).toThrow('INVALID_DEFINITION'); // each once
+    expect(withMinigame({ draw: [{ game: 'reaction' }, { game: 'quidditch' }] })).toThrow('INVALID_DEFINITION');
+    expect(withMinigame({ draw: [{ game: 'reaction' }, { game: 'tap-race', settings: { seconds: 999 } }] })).toThrow('INVALID_DEFINITION');
+    expect(withMinigame({ draw: [{ game: 'reaction' }, { game: 'bus' }] })).toThrow('INVALID_DEFINITION'); // a team game, solo scene
+    expect(withMinigame({ draw: [{ game: 'reaction' }, { game: 'clap-beat', durationMs: 2000 }] })).toThrow('INVALID_DEFINITION');
+  });
+
   it('validates secret scoring, runs timed stages and drawing rounds, and fails closed on an unchosen minigame', () => {
     const game = structuredClone(preparedGame);
     const stage = game.nodes[0]!.stages[0]!;

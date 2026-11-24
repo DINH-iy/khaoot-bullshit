@@ -15,7 +15,7 @@ const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | num
 /** A style's name in the editor's language (an unknown preset keeps its own name). */
 const styleName = (key: string) => `s.${key}` in LOOK_TEXTS.en ? t(`s.${key}` as keyof typeof LOOK_TEXTS.en) : THEME_PRESETS[key]?.name ?? key;
 import { ExportPalette, ImportPalette } from './palette-dialog.js';
-import { NewStyleDialog, sameLook, StyleChangeDialog, useSavedStyles } from './saved-styles.js';
+import { NewStyleDialog, sameLook, useSavedStyles } from './saved-styles.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { Icon } from '../controls/icons.js';
 import type { SavedStyle } from '@party/contracts';
@@ -32,6 +32,8 @@ function StyleCard({ name, theme, on, onClick }: { name: string; theme: FullThem
   return <button type="button" className={`preset-card${on ? ' on' : ''}`} aria-pressed={on} onClick={onClick}
     style={{ background: `linear-gradient(160deg, ${theme.colors.background}, ${theme.colors.background2})`, color: theme.colors.text, fontFamily: fontCssFamily(theme.headingFont) }}>
     <strong>{name}</strong>
+    {/* The style in use: a check badge on top of the accent edge, readable on any style's colours. */}
+    {on && <span className="style-in-use" aria-hidden="true"><Icon name="check" size={12} />{t('styleInUse')}</span>}
     <span className="swatches" aria-hidden="true">{theme.colors.answers.slice(0, 4).map((color, index) => <i key={`${color}${index}`} style={{ background: color }} />)}<i style={{ background: theme.colors.accent }} /></span>
   </button>;
 }
@@ -98,20 +100,18 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       : (() => { const own = theme && saved.styles.find(style => sameLook(style.theme, layer)); return own ? { key: `saved:${own.id}`, name: own.name, own } : null; })();
   // What a change to that style does, once asked: also update a saved style (its id), or only change this look (null).
   const [decision, setDecision] = useState<{ key: string; styleId: string | null } | null>(null);
-  // A change waiting for the answer; more changes while the question is open join it.
-  const [pending, setPending] = useState<Theme | null>(null);
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(false);
   const [removing, setRemoving] = useState<SavedStyle | null>(null);
   const [savedName, setSavedName] = useState(''); const [forked, setForked] = useState('');
   // The group shown: the one picked, else the one holding this look's style (your own styles when it is yours).
   const [group, setGroup] = useState<StyleGroup | null>(null);
+  const currentGroup: StyleGroup | null = current?.own ? 'yours' : layer.preset && THEME_PRESETS[layer.preset] ? groupOf(layer.preset) : null;
   const shownGroup: StyleGroup = group ?? (current?.own ? 'yours' : layer.preset && THEME_PRESETS[layer.preset] ? groupOf(layer.preset) : saved.styles.length ? 'yours' : 'everyday');
   // A change to a built-in style while it becomes a new style of yours: the newest look, applied once it exists.
   const forking = useRef<Theme | null>(null);
   const apply = (next: Theme) => {
     if (forking.current) { forking.current = next; return; }
-    if (pending) { setPending(next); return; }
     if (!current) { onChange(next); return; }
     // Built-in styles are never changed: the first change makes a new style of yours (“My Neon night”), and the
     // look follows it. If saving fails (the list is full), this look still changes and the error shows.
@@ -131,12 +131,14 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       if (decision.styleId && current.own) { void saved.save({ id: current.own.id, name: current.own.name, theme: next }, true); setDecision({ key: `saved:${current.own.id}`, styleId: current.own.id }); }
       return;
     }
-    setPending(next);
+    // Your own style: the change updates it right away (games that use it keep their own copy of the look).
+    onChange(next);
+    if (current.own) { void saved.save({ id: current.own.id, name: current.own.name, theme: next }, true); setDecision({ key: `saved:${current.own.id}`, styleId: current.own.id }); }
   };
-  const set = (patch: Partial<Theme>) => apply({ ...(pending ?? layer), ...patch });
-  const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...((pending ?? layer).colors ?? {}), [name]: value } });
+  const set = (patch: Partial<Theme>) => apply({ ...layer, ...patch });
+  const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...(layer.colors ?? {}), [name]: value } });
   // Picking a style starts afresh: its first change asks again.
-  const chooseStyle = (next: Theme | undefined) => { setPending(null); setDecision(null); setSavedName(''); setForked(''); onChange(next); };
+  const chooseStyle = (next: Theme | undefined) => { setDecision(null); setSavedName(''); setForked(''); onChange(next); };
   const createFrom = async (name: string, look: Theme) => {
     setBusy(true);
     const id = await saved.create(name, look);
@@ -156,8 +158,11 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
   return <div className="look-panel">
     <Section title={t('style')} memory="look:style" open summary={presetName}>
       {/* One group at a time (your own styles, then the built-in ones by kind), so the list stays short. */}
+      {/* Which style is in use, also while another group is shown; that group's button carries a dot. */}
+      <p className="style-current">{t('styleInUse')}: <strong>{presetName}</strong></p>
       <div className="segmented style-groups" role="group" aria-label={t('styleGroups')}>{(['yours', ...Object.keys(STYLE_GROUPS)] as StyleGroup[]).map(key =>
-        <button key={key} type="button" aria-pressed={shownGroup === key} onClick={() => setGroup(key)}>{t(GROUP_NAMES[key])}</button>)}</div>
+        <button key={key} type="button" aria-pressed={shownGroup === key} onClick={() => setGroup(key)}>{t(GROUP_NAMES[key])}
+          {key === currentGroup && <><span className="group-in-use" aria-hidden="true" /><span className="visually-hidden"> ({t('styleInUse')})</span></>}</button>)}</div>
       {shownGroup === 'yours' ? <div className="preset-grid">
         {saved.styles.map(style => <div key={style.id} className="saved-style">
           <StyleCard name={style.name} theme={resolveTheme(...below, style.theme)} on={current?.own?.id === style.id} onClick={() => chooseStyle(style.theme)} />
@@ -190,7 +195,7 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
         <button type="button" className="small-button" onClick={() => setPalette('import')}>{t('importColours')}</button>
         <button type="button" className="small-button" onClick={() => setPalette('export')}>{t('exportColours')}</button>
       </div>
-      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...((pending ?? layer).colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
+      {palette === 'import' && <ImportPalette onApply={patch => set({ colors: { ...(layer.colors ?? {}), ...patch } })} onClose={() => setPalette(null)} />}
       {palette === 'export' && <ExportPalette colors={full.colors} title={title} onClose={() => setPalette(null)} />}
     </Section>
 
@@ -245,11 +250,6 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       <p className="hint">{t('marksHint')}</p>
     </Section>}
     {theme && <button type="button" className="small-button danger-outline" onClick={() => chooseStyle(undefined)}>{t('removeAll')}</button>}
-    {pending && current?.own && <StyleChangeDialog styleName={current.name} busy={busy} error={saved.error ? t(saved.error) : ''}
-      onCreate={name => { const look = pending; void createFrom(name, look).then(done => { if (done) { setPending(null); onChange(look); } }); }}
-      onUpdate={() => { const look = pending; const own = current.own!; setPending(null); setDecision({ key: `saved:${own.id}`, styleId: own.id });
-        void saved.save({ id: own.id, name: own.name, theme: look }); onChange(look); }}
-      onCancel={() => setPending(null)} />}
     {naming && <NewStyleDialog error={saved.error ? t(saved.error) : ''} defaultName={current ? t('styleCopyName', { name: current.name }) : t('styleDefaultName')} busy={busy}
       onSave={name => { void createFrom(name, layer).then(done => { if (done) setNaming(false); }); }} onCancel={() => setNaming(false)} />}
     {removing && <ConfirmDialog title={t('styleRemoveAsk', { name: removing.name })} text={t('styleRemoveText')} confirm={t('styleRemoveConfirm')}

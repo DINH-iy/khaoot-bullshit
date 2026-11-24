@@ -1,4 +1,5 @@
 import { gameName } from '../presentation/catalog.text.js';
+import { Loader } from '../ui/loader.js';
 import { useEffect, useState } from 'react';
 import { navigate } from '../navigation.js';
 import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ArcadeLeaderboardSchema, ArcadeListSchema, MINIGAMES, type ArcadeLeaderboard, type ArcadeList } from '@party/contracts';
@@ -59,7 +60,7 @@ export function ArcadeHome() {
       </section>
       <section className="arcade-card" aria-labelledby="lobbies-heading">
         <h2 id="lobbies-heading">Open lobbies</h2>
-        {!list ? <p role="status">Loading…</p> : !list.lobbies.length ? <p>No open lobbies right now. Open one!</p>
+        {!list ? <Loader label="Loading lobbies…" /> : !list.lobbies.length ? <p>No open lobbies right now. Open one!</p>
           : <ul className="arcade-lobbies">{list.lobbies.map(lobby => <li key={lobby.id}>
             <div><strong>{lobby.title}</strong>
               <p className="arcade-meta">{lobby.players} {lobby.players === 1 ? 'player' : 'players'}{lobby.leaderName ? ` · led by ${lobby.leaderName}` : ''}{lobby.playing ? ` · playing ${gameName(lobby.playing)}` : ''}{lobby.locked ? ' · locked' : lobby.protected ? ' · password required' : ''}</p></div>
@@ -78,7 +79,7 @@ function Leaderboards({ board, signedIn }: { board: ArcadeLeaderboard | null; si
   return <section className="arcade-card" aria-labelledby="boards-heading">
     <h2 id="boards-heading"><FaIcon name="trophy" /> Leaderboards</h2>
     <p className="arcade-meta">{signedIn ? 'Your results count here because this phone plays as you.' : 'Only people with a personal key are on these boards. Sign in with your key on the start page to be on them.'}</p>
-    {!board ? <p role="status">Loading…</p> : !board.wins.length ? <p>No results yet.</p> : <>
+    {!board ? <Loader label="Loading leaderboards…" /> : !board.wins.length ? <p>No results yet.</p> : <>
       <h3>Most wins</h3>
       <ol className="arcade-board">{board.wins.map(row => <li key={row.name}><span>{row.name}</span><span>{row.wins} {row.wins === 1 ? 'win' : 'wins'} · {row.rounds} played · {points(row.pointsMilli)}</span></li>)}</ol>
       {shown && <>

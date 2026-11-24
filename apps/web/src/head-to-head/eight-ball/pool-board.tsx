@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, poolLegalTarget, POOL_AIM_STEP, shootPool, type HeadToHeadMove, type HeadToHeadView, type PoolFrame, type PoolSpin } from '@party/contracts';
+import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, poolAngle, poolLegalTarget, shootPool, type HeadToHeadMove, type HeadToHeadView, type PoolFrame, type PoolSpin } from '@party/contracts';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { usePoolLandscape } from './landscape.js';
 import { paintPool, POOL_CANVAS_HEIGHT, POOL_CANVAS_WIDTH, POOL_RAIL } from './table.js';
@@ -32,11 +32,11 @@ const TEXTS = defineTexts('eight-ball', {
 });
 
 const TARGET_TEXTS = defineTexts('pool-target', {
-  break: 'Break shot', open: 'Open table', solid: 'Play solids', stripe: 'Play stripes', eight: 'Play the 8', assist: 'Aim assist', shortAssist: 'Assist',
+  break: 'Break shot', open: 'Open table', solid: 'Play solids', stripe: 'Play stripes', eight: 'Play the 8', swap: 'Swap the power bar and the aim wheel', shortSwap: 'Swap', assist: 'Aim assist', shortAssist: 'Assist',
 }, {
-  nl: { break: 'Breakstoot', open: 'Open tafel', solid: 'Speel hele', stripe: 'Speel halve', eight: 'Speel de 8', assist: 'Richthulp', shortAssist: 'Hulp' },
-  de: { break: 'Anstoß', open: 'Offener Tisch', solid: 'Volle spielen', stripe: 'Halbe spielen', eight: 'Auf die Acht', assist: 'Zielhilfe', shortAssist: 'Zielhilfe' },
-  ro: { break: 'Spargere', open: 'Masă deschisă', solid: 'Joacă plinele', stripe: 'Joacă dungatele', eight: 'Joacă bila 8', assist: 'Asistență la țintire', shortAssist: 'Asistare' },
+  nl: { break: 'Breakstoot', open: 'Open tafel', solid: 'Speel hele', stripe: 'Speel halve', eight: 'Speel de 8', swap: 'Wissel de krachtbalk en het richtwiel', shortSwap: 'Wissel', assist: 'Richthulp', shortAssist: 'Hulp' },
+  de: { break: 'Anstoß', open: 'Offener Tisch', solid: 'Volle spielen', stripe: 'Halbe spielen', eight: 'Auf die Acht', swap: 'Kraftleiste und Zielrad tauschen', shortSwap: 'Tauschen', assist: 'Zielhilfe', shortAssist: 'Zielhilfe' },
+  ro: { break: 'Spargere', swap: 'Schimbă bara de putere și roata de țintire', shortSwap: 'Schimbă', open: 'Masă deschisă', solid: 'Joacă plinele', stripe: 'Joacă dungatele', eight: 'Joacă bila 8', assist: 'Asistență la țintire', shortAssist: 'Asistare' },
 });
 
 const RESPOT_TEXT = defineTexts('pool-respot', { eight: '8 ball returned to the table' }, {
@@ -52,9 +52,11 @@ type CueDrag = { pointerId: number; x: number; y: number; angle: number; offset:
 type AimDrag = { pointerId: number; x: number; y: number; pointer: number; angle: number; moved: boolean };
 const STRIKE_MS = 65;
 const POCKET_NAMES = ['topLeft', 'topMiddle', 'topRight', 'bottomLeft', 'bottomMiddle', 'bottomRight'] as const;
-const angleOf = (angle: number) => (Math.round(angle / POOL_AIM_STEP) * POOL_AIM_STEP + 360) % 360;
+const angleOf = poolAngle;
 const powerFromPull = (distance: number) => Math.max(1, Math.min(100, Math.round(distance / 1.45)));
 const AIM_ASSIST_KEY = 'party_pool_aim_assist';
+/** Which side the power bar is on (the aim wheel on the other), as this phone's player likes it. */
+const CONTROLS_KEY = 'party_pool_controls';
 
 export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, live }: {
   view: HeadToHeadView; board: PoolView; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void; statusLabel?: string | undefined;
@@ -73,6 +75,7 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, li
   const startArea = board.start ?? DEFAULT_POOL_START;
   const [angle, setAngle] = useState(startArea.side === 'right' ? 180 : 0);
   const [power, setPower] = useState(75);
+  const [powerRight, setPowerRight] = useState(() => { try { return localStorage.getItem(CONTROLS_KEY) === 'power-right'; } catch { return false; } });
   const [objectGuide, setObjectGuide] = useState(() => {
     try { return localStorage.getItem(AIM_ASSIST_KEY) !== 'off'; } catch { return true; }
   });
@@ -243,15 +246,22 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, li
         setObjectGuide(!objectGuide);
         try { localStorage.setItem(AIM_ASSIST_KEY, objectGuide ? 'off' : 'on'); } catch { /* optional preference */ }
       }}><span aria-hidden="true" />{targetText('shortAssist')}</button>}
+      {!view.outcome && view.seat !== null && <button type="button" className="pool-aim-assist pool-swap" aria-label={targetText('swap')} title={targetText('swap')} aria-pressed={powerRight} onClick={() => {
+        setPowerRight(!powerRight);
+        try { localStorage.setItem(CONTROLS_KEY, powerRight ? 'power-left' : 'power-right'); } catch { /* optional preference */ }
+      }}><span aria-hidden="true">⇄</span>{targetText('shortSwap')}</button>}
       {view.seat !== null && !orientation.landscape && <button type="button" className="pool-landscape-button" onClick={() => void orientation.open()}><FaIcon name="rotate" />{t('rotate')}</button>}
       {orientation.landscape && <button type="button" className="ghost pool-landscape-exit" aria-label={t('exitLandscape')} autoFocus onClick={orientation.close}>
         <FaIcon name="xmark" />
       </button>}
     </div>;
-  const playfield = <div className="pool-playfield">
-      {view.seat !== null && !view.outcome && <PoolPowerBar power={pulledDistance === undefined ? power : powerFromPull(pulledDistance)}
+  // The power bar and the aim wheel sit either side of the table; the player chooses which goes where.
+  const powerBar = view.seat !== null && !view.outcome && <PoolPowerBar power={pulledDistance === undefined ? power : powerFromPull(pulledDistance)}
         disabled={!ready || placing || editingSpin} sideways={sideways} onPull={setBarPull} onPower={setPower}
-        onShoot={value => sendShot(angle, value, poolCueOffset(value))} />}
+        onShoot={value => sendShot(angle, value, poolCueOffset(value))} />;
+  const aimWheel = view.seat !== null && !view.outcome && <PoolFineTune angle={angle} disabled={!ready || placing || editingSpin} sideways={sideways} onChange={setAngle} />;
+  const playfield = <div className="pool-playfield">
+      {powerRight ? aimWheel : powerBar}
       <canvas className="pool-table" ref={canvas} width={POOL_CANVAS_WIDTH} height={POOL_CANVAS_HEIGHT} role="img" aria-label={t('table')}
         data-shot={board.shot} data-rolling={rolling} data-ghost-angle={ghost?.angle} data-aiming={ready} data-striking={Boolean(striking)} onPointerDown={down}
         onPointerMove={event => {
@@ -290,7 +300,7 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, li
           }
         }} onPointerCancel={event => { aimDrag.current = undefined; cancelCueDrag(event.pointerId); }}
         onLostPointerCapture={event => { if (aimDrag.current?.pointerId === event.pointerId) aimDrag.current = undefined; cancelCueDrag(event.pointerId); }} />
-      {view.seat !== null && !view.outcome && <PoolFineTune angle={angle} disabled={!ready || placing || editingSpin} sideways={sideways} onChange={setAngle} />}
+      {powerRight ? powerBar : aimWheel}
     </div>;
   const trays = <PotTrays names={names} pots={shownPots ?? [[], []]} turn={view.turn === 'both' ? null : view.turn} clock={rolling ? undefined : shownClock} />;
   const controls = <>

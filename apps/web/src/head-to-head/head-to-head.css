@@ -3,6 +3,9 @@
 .h2h p { margin: 0; }
 .h2h-title { font-size: .95rem; opacity: .85; }
 .h2h-turn { font-weight: 700; }
+.h2h-turn.mine { justify-self: start; margin: 0; padding: 4px 14px; border-radius: 999px; background: var(--r-accent, #ffcf4a); color: var(--r-accent-ink, #2a1d00); font-weight: 800; animation: h2h-your-turn 1.6s ease-in-out infinite; }
+@keyframes h2h-your-turn { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--r-accent, #ffcf4a) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .h2h-turn.mine { animation: none; } }
 .h2h-result { font-size: 1.3rem; font-weight: 800; }
 .h2h-check { color: #ff8a8a; font-weight: 800; }
 .h2h-score { font-size: 1.1rem; }
@@ -16,15 +19,18 @@
 .h2h-ttt button { aspect-ratio: 1; min-height: 0; padding: 0; font-size: 2.4rem; font-weight: 800; border-radius: 12px; }
 .h2h-ttt button.line { background: #ffcf4a; color: #2a1d00; }
 /* Eight equal columns and rows whatever stands on them: minmax(0, 1fr) stops a piece's glyph from widening its file. */
-.h2h-chess-board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); width: min(100%, 400px); aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 2px solid #3a3550; box-sizing: border-box; }
+.h2h-chess-board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); width: min(100%, 400px, calc(100svh - 330px)); min-width: min(100%, 240px); aspect-ratio: 1; border-radius: 14px; overflow: hidden; border: 2px solid color-mix(in srgb, var(--r-accent, #ffcf4a) 40%, var(--r-line, #3a3550)); box-sizing: border-box; }
 .h2h-chess-board .sq { min-width: 0; min-height: 0; width: 100%; height: 100%; aspect-ratio: 1; margin: 0; padding: 0; border: 0; border-radius: 0; display: grid; place-items: center; overflow: hidden; font-size: clamp(1rem, 6vw, 2.1rem); line-height: 1; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.h2h-chess-board .sq.light { background: #ede6d6; } .h2h-chess-board .sq.dark { background: #7b6aa8; }
+/* The board in the room's colours: light and dark squares mixed from the text colour and the card. */
+.h2h-chess-board .sq.light { background: color-mix(in srgb, var(--r-text, #f6f3ff) 82%, var(--r-card-strong, #3d3566)); } .h2h-chess-board .sq.dark { background: color-mix(in srgb, var(--r-text, #f6f3ff) 34%, var(--r-card-strong, #3d3566)); }
 .h2h-chess-board .sq.last { box-shadow: inset 0 0 0 100px rgb(255 207 74 / .45); }
 .h2h-chess-board .sq.from { box-shadow: inset 0 0 0 3px #ffcf4a, inset 0 0 0 100px rgb(255 207 74 / .35); }
 .h2h-chess-board .sq.target::after { content: ''; width: 28%; height: 28%; border-radius: 50%; background: rgb(30 30 30 / .45); position: absolute; }
 .h2h-chess-board .sq { position: relative; }
 .h2h-chess-board .sq:focus-visible { outline: 3px solid #ffcf4a; outline-offset: -3px; }
-.h2h-chess-board .white { color: #fff; text-shadow: 0 0 2px #000, 0 0 1px #000; } .h2h-chess-board .black { color: #111; text-shadow: 0 0 1px #fff; }
+/* Filled pieces for both sides, told apart by colour with an edge that reads on light and dark squares. */
+.h2h-chess-board .white, .h2h-chess-board .black { font-size: 1.3em; paint-order: stroke fill; -webkit-text-stroke: .09em; filter: drop-shadow(0 2px 1px rgb(0 0 0 / .35)); }
+.h2h-chess-board .white { color: #fff; -webkit-text-stroke-color: #1b1830; } .h2h-chess-board .black { color: #1b1830; -webkit-text-stroke-color: #f4f1ff; }
 .h2h-promote { display: flex; flex-wrap: wrap; gap: 6px; } .h2h-promote button { min-width: 52px; font-size: 1.6rem; }
 .h2h-replay { display: grid; gap: 8px; justify-items: start; }
 .h2h-replay canvas { width: min(100%, 320px); height: auto; border-radius: 12px; }
@@ -53,3 +59,13 @@
 .creature-card.active { border-color: var(--r-accent); }
 .creature-card meter { max-width: 100%; width: 100%; }
 .creature-moves { flex-wrap: wrap; }
+
+/* The chess board fits the height left on a phone (header above, the floating buttons below), so no piece is hidden. */
+.h2h-chess-board { justify-self: center; }
+/* Duel buttons line up with what is above them (no small-button indent); in pool, Give up spans the width of Spin and Shoot. */
+.h2h .h2h-give-up, .h2h-replay-toggle .small-button { margin-left: 0; }
+.h2h-eight-ball .h2h-give-up { width: 100%; justify-self: stretch; }
+.h2h-replay-toggle { display: grid; gap: 10px; justify-items: start; }
+
+/* Your move: the pieces you can move glow in the style's accent colour. */
+.h2h-chess-board .movable { filter: drop-shadow(0 0 3px var(--r-accent, #ffcf4a)) drop-shadow(0 0 1px var(--r-accent, #ffcf4a)); }

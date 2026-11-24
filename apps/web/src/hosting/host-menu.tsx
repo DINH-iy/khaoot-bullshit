@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Loader } from '../ui/loader.js';
 import { formatRoomCode, HostMenuSchema, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { MyGames } from './my-games.js';
@@ -90,7 +91,7 @@ export function HostMenu() {
     <p role="alert" className="error">{error}</p>
     <button type="button" className="primary" onClick={() => location.reload()}>{t('retryLoading')}</button>
     <p><a href="/">{t('joinAsPlayer')}</a></p>
-  </main> : <main className="host-page" aria-busy="true"><p role="status">{t('loadingGames')}</p></main>;
+  </main> : <Loader full label={t('loadingGames')} />;
   const owner = menu.role === 'owner';
   return <><OwnerNav current={hash === '#my-games' || !owner ? 'editor' : 'host'} role={menu.role}
     mainAction={<button type="button" disabled={busy}

@@ -4,6 +4,7 @@ import { Prisma, type PrismaClient } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
 import { ownerCreator } from '../hosting/owner-creator.js';
 import { RoomError, roomAssert } from '../rooms/security.js';
+import { canonicalJson } from '../game/definition.js';
 
 // Save points: copies of a game's whole draft, made on purpose in the editor, to go back to "in case something
 // happens". A copy is taken from the saved draft on the server (never sent by the browser), and only when the
@@ -52,6 +53,16 @@ export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClie
         const draft = await tx.gameDraft.findUnique({ where: { gameId }, select: { revision: true, definition: true } }); roomAssert(draft, 'NOT_FOUND');
         // The draft changed since the person last saw it: they get the newer one first, then try again.
         roomAssert(draft.revision === expectedRevision, 'REVISION_CONFLICT');
+        if (automatic) {
+          // The copy kept before going back: only when the game holds work no save point has (else that save point is
+          // returned, and nothing new is made), and only one at a time (it replaces the previous one), so going back
+          // and forth never piles up save points.
+          const now = canonicalJson(draft.definition);
+          const points = await tx.gameSavePoint.findMany({ where: { gameId }, select: { ...fields, definition: true } });
+          const same = points.find(point => canonicalJson(point.definition) === now);
+          if (same) { const { definition: _definition, ...found } = same; return found; }
+          await tx.gameSavePoint.deleteMany({ where: { gameId, automatic: true } });
+        }
         if (await tx.gameSavePoint.count({ where: { gameId } }) >= MAX_SAVE_POINTS) {
           // Full: the oldest automatic one makes room for a new automatic one; save points people made are never removed by themselves.
           const oldest = automatic ? await tx.gameSavePoint.findFirst({ where: { gameId, automatic: true }, orderBy: { createdAt: 'asc' }, select: { id: true } }) : null;

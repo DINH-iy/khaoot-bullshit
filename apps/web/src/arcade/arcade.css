@@ -141,3 +141,13 @@
 .arcade-invite img { width: min(240px, 100%); height: auto; padding: 8px; border-radius: 12px; background: #fff; }
 .arcade-invite a { color: var(--r-muted); font-size: .9rem; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .arcade-switch-track, .arcade-switch-track > span { transition: none; } }
+
+/* Draw the Graph: the chosen chart (or random), and the list to choose from. */
+.room .arcade-graph-choice { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 48px; margin: 0; padding: 8px 8px 8px 14px; box-sizing: border-box;
+  border-radius: 14px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font: inherit; font-weight: 700; text-align: left; }
+.arcade-graph-choice > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arcade-graph-choice.static { padding: 12px 14px; }
+.arcade-graph-list { display: grid; gap: 6px; }
+.room .arcade-graph-option { display: grid; gap: 2px; width: 100%; margin: 0; padding: 10px 14px; border-radius: 12px; border: 2px solid transparent; background: var(--r-card-strong); color: var(--r-text); font: inherit; text-align: left; }
+.room .arcade-graph-option[aria-pressed=true] { border-color: var(--r-accent); }
+.arcade-graph-option small { color: var(--r-muted); font-size: .85rem; }

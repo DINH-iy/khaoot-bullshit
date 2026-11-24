@@ -1,6 +1,6 @@
 import type { GameSession } from '../generated/prisma/client.js';
 import type { GameDefinition } from './definition.js';
-import { locateStage } from './graph.js';
+import { locateRunStage } from './graph.js';
 import { EligibilitySchema, type Transaction } from './model.js';
 import { readRoute } from './routes/routes.js';
 import { readForming, teamContext } from './teams/teams.js';
@@ -24,7 +24,7 @@ export async function closeSoonWhenAllIn(tx: Transaction, session: GameSession, 
   const seconds = settings?.autoCloseSeconds; const delay = typeof seconds === 'number' && Number.isInteger(seconds) && seconds >= 1 && seconds <= 30 ? seconds * 1000 : ALL_IN_CLOSE_MS;
   const stage = await tx.stageRun.findUnique({ where: { id: stageRunId } });
   if (!stage || stage.status !== 'ACTIVE' || readForming(stage.presentation)) return;
-  const entry = locateStage(definition, stage.nodeKey, stage.stageKey);
+  const entry = locateRunStage(definition, stage);
   if (!entry || ['info', 'scoreboard', 'challenge', 'teams'].includes(entry.stage.kind)) return;
   // Who still has to answer: each eligible player, or each team when its captain answers for it, or the route's voters.
   const eligible = EligibilitySchema.safeParse(stage.eligibility); if (!eligible.success) return;

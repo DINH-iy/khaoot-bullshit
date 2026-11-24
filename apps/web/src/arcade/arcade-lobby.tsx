@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeLobbyView, type ArcadePick, type ArcadeTeams } from '@party/contracts';
+import { Loader } from '../ui/loader.js';
+import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeLobbyView, type ArcadePick, type ArcadeTeams, type GraphLibraryEntry, ArcadeGraphsSchema } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { isUnavailablePageError, navigate, replaceWithHome } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
@@ -61,7 +62,7 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
     <header className="room-bar"><div className="room-id"><p className="brand">party<span>.</span></p><p className="room-game">Arcade{lobby ? ` · ${lobby.title}` : ''}</p></div>
       <a className="arcade-nav-button" href="/?arcade">All lobbies</a></header>
     <div className="arcade-page">{error && <p role="alert" className="join-error">{error}</p>}
-      {lobby ? <JoinLobby lobby={lobby} onJoined={refresh} /> : <p role="status">Opening the lobby…</p>}</div></main>;
+      {lobby ? <JoinLobby lobby={lobby} onJoined={refresh} /> : <Loader label="Opening the lobby…" />}</div></main>;
 
   const me = lobby.me; const leader = lobby.members.find(member => member.leader);
   const rounds = lobby.rounds.length ? lobby.rounds : lobby.lastRound ? [lobby.lastRound] : [];
@@ -89,8 +90,8 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
         <div className="arcade-game-tile static"><span className="arcade-game-symbol" aria-hidden="true"><GameSymbol game={lobby.round.game} /></span>
           <span><strong id="round-heading">{gameName(lobby.round.game)}</strong><small>{lobby.round.seated ? 'Going to the round…' : 'It started before you came in. You play in the next one.'}</small></span></div>
       </section>
-        : <PickRound players={lobby.members.length} pick={lobby.pick}
-          {...(me.leader ? { onPick: (pick: ArcadePick) => act('pick', pick), onStart: (game: ArcadeGame, teams: ArcadeTeams | null) => act('rounds', { roundId: newId(), game, teams }) }
+        : <PickRound lobbyId={lobby.id} players={lobby.members.length} pick={lobby.pick}
+          {...(me.leader ? { onPick: (pick: ArcadePick) => act('pick', pick), onStart: (game: ArcadeGame, teams: ArcadeTeams | null, graph?: string) => act('rounds', { roundId: newId(), game, teams, ...(graph ? { graph } : {}) }) }
             : { chooser: leader?.displayName ?? 'The leader' })} />}
 
       {rounds.length > 0 && <RoundHistory rounds={rounds} me={me.memberId} index={shownIndex} onIndex={setRoundIndex} onScores={() => setSheet('scores')} />}
@@ -130,6 +131,30 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
 }
 
 type Sheet = 'players' | 'invite' | 'settings' | 'scores';
+
+/**
+ * Draw the Graph: which chart. "Random" takes one from all collections (every graph in the games authors made, and the
+ * built-in sample); or one chart, picked from the list grouped by collection. Only questions and labels come here.
+ */
+function GraphChoice({ lobbyId, value, disabled, onChange }: { lobbyId: string; value: string | undefined; disabled: boolean; onChange: (value: string | undefined) => void }) {
+  const [graphs, setGraphs] = useState<GraphLibraryEntry[] | null>(null); const [open, setOpen] = useState(false);
+  useEffect(() => { void roomApi(`/api/arcade/lobbies/${lobbyId}/graphs`).then(data => setGraphs(ArcadeGraphsSchema.parse(data).graphs)).catch(() => setGraphs([])); }, [lobbyId]);
+  const chosen = value ? graphs?.find(entry => entry.id === value) : undefined;
+  const collections = [...new Set((graphs ?? []).map(entry => entry.collection))];
+  const label = chosen ? chosen.question : value && !graphs ? 'Loading…' : 'Random from all collections';
+  return <div className="arcade-segment-row"><span className="arcade-segment-label" aria-hidden="true">Graph</span>
+    {disabled ? <p className="arcade-graph-choice static">{label}</p>
+      : <button type="button" className="arcade-graph-choice" aria-haspopup="dialog" onClick={() => setOpen(true)}><span><span className="visually-hidden">Graph: </span>{label}</span><span className="arcade-change">Change</span></button>}
+    {open && <BottomSheet title="Choose a graph" onClose={() => setOpen(false)} resizable>
+      <button type="button" className="arcade-graph-option" aria-pressed={!value} onClick={() => { onChange(undefined); setOpen(false); }}>
+        <strong>Random from all collections</strong><small>{graphs ? `${graphs.length} ${graphs.length === 1 ? 'graph' : 'graphs'} to draw from` : 'Loading…'}</small></button>
+      {collections.map(collection => <div key={collection} role="group" aria-label={collection} className="arcade-game-group"><h3>{collection}</h3>
+        <div className="arcade-graph-list">{graphs!.filter(entry => entry.collection === collection).map(entry => <button key={entry.id} type="button" className="arcade-graph-option" aria-pressed={entry.id === value}
+          onClick={() => { onChange(entry.id); setOpen(false); }}><strong>{entry.question}</strong>
+          {(entry.yLabel || entry.startLabel) && <small>{[entry.yLabel, entry.startLabel && entry.endLabel ? `${entry.startLabel}–${entry.endLabel}` : entry.startLabel].filter(Boolean).join(' · ')}</small>}</button>)}</div></div>)}
+    </BottomSheet>}
+  </div>;
+}
 
 type RoundResults = ArcadeLobbyView['rounds'][number];
 
@@ -197,19 +222,19 @@ function SettingSwitch({ label, hint, on, onChange }: { label: string; hint: str
  * The next round: the game as a big tile, and alone or in teams as chips. The leader changes them (each change is
  * sent to the lobby) and starts with the pinned Play button; everyone else sees the same card read-only, following along.
  */
-function PickRound({ players, pick, chooser, onPick, onStart }: {
-  players: number; pick: ArcadePick | null; chooser?: string;
-  onPick?: (pick: ArcadePick) => void; onStart?: (game: ArcadeGame, teams: ArcadeTeams | null) => void;
+function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
+  lobbyId: string; players: number; pick: ArcadePick | null; chooser?: string;
+  onPick?: (pick: ArcadePick) => void; onStart?: (game: ArcadeGame, teams: ArcadeTeams | null, graph?: string) => void;
 }) {
   const watching = chooser !== undefined;
   const [choosing, setChoosing] = useState(false);
-  const fromPick = () => ({ game: pick?.game ?? 'reaction' as ArcadeGame, teamCount: pick?.teams?.count ?? 0, formation: pick?.teams?.formation ?? 'random' as ArcadeTeams['formation'] });
+  const fromPick = () => ({ game: pick?.game ?? 'reaction' as ArcadeGame, teamCount: pick?.teams?.count ?? 0, formation: pick?.teams?.formation ?? 'random' as ArcadeTeams['formation'], graph: pick?.graph });
   // The leader starts from the stored choice (also after taking over) and then keeps their own; watchers always show the stored one.
   const [own, setOwn] = useState(fromPick);
-  const { game, teamCount, formation } = watching ? fromPick() : own;
+  const { game, teamCount, formation, graph } = watching ? fromPick() : own;
   const choose = (next: Partial<typeof own>) => {
     const value = { ...own, ...next }; setOwn(value);
-    onPick?.({ game: value.game, teams: value.teamCount >= 2 ? { count: value.teamCount, formation: value.formation } : null });
+    onPick?.({ game: value.game, teams: value.teamCount >= 2 ? { count: value.teamCount, formation: value.formation } : null, ...(value.graph ? { graph: value.graph } : {}) });
   };
   const duel = isHeadToHeadKey(game);
   const teamOnly = !duel && TEAM_MINIGAMES.includes(game);
@@ -223,7 +248,7 @@ function PickRound({ players, pick, chooser, onPick, onStart }: {
   const tile = <><span className="arcade-game-symbol" aria-hidden="true"><GameSymbol game={game} /></span>
     <span><strong>{gameName(game)}{duel ? ' · duel' : ''}</strong><small>{gameDescription(game)}</small></span></>;
   return <form id="arcade-pick" className="arcade-next" aria-labelledby="pick-heading"
-    onSubmit={event => { event.preventDefault(); if (enough) onStart?.(game, count ? { count, formation } : null); }}>
+    onSubmit={event => { event.preventDefault(); if (enough) onStart?.(game, count ? { count, formation } : null, game === 'draw-the-graph' ? graph : undefined); }}>
     <h2 id="pick-heading" className="arcade-kicker">Next round</h2>
     {watching && <p className="arcade-meta" role="status"><FaIcon name="star" /> {chooser} is choosing</p>}
     {watching ? <div className="arcade-game-tile static">{tile}</div>
@@ -239,6 +264,7 @@ function PickRound({ players, pick, chooser, onPick, onStart }: {
       <Segments label="Teams made" value={formation} onChange={value => choose({ formation: value })} disabled={watching}
         options={[{ value: 'random' as const, text: 'Random', name: 'Random teams' }, { value: 'players' as const, text: 'Players pick', name: 'Players pick teams' }]} />
     </div>}
+    {game === 'draw-the-graph' && <GraphChoice lobbyId={lobbyId} value={graph} disabled={watching} onChange={value => choose({ graph: value })} />}
     {isMinigameKey(game) && SHARED_SCREEN_MINIGAMES.includes(game) && <p className="arcade-meta">No TV needed: the phones show the game too.</p>}
     {!enough && <p className="arcade-meta">{duel ? 'A duel needs two players.' : `${count} teams need at least ${count} players.`}</p>}
     {/* The leader's Play: pinned at the bottom of the screen (see .arcade-lobby-action). */}

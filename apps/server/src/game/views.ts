@@ -13,7 +13,7 @@ import { relayPlan } from '../minigames/relay-drawing/relay.js';
 import { wheelView } from './show/wheel.js';
 import { finaleSlides } from './show/finale.js';
 import { minigameOutcome } from '../minigames/shared/outcome.js';
-import { locateStage } from './graph.js';
+import { locateRunStage } from './graph.js';
 import { routeView } from './routes/route-views.js';
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
@@ -62,7 +62,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       await authorize(tx, session, actor.data);
       const definition = parseDefinition(session.gameVersion.definition);
       const current = session.status === 'LOBBY' || session.status === 'FINISHED' ? null : await tx.stageRun.findFirst({ where: { sessionId: session.id }, orderBy: { number: 'desc' } });
-      const entry = current ? locateStage(definition, current.nodeKey, current.stageKey) : null;
+      const entry = current ? locateRunStage(definition, current) : null;
       requireGame(!current || entry, 'INVALID_STATE');
       const context = current ? await teamContext(tx, current) : null;
       const viewer = actor.data.role === 'player' ? actor.data.playerId : null;

@@ -189,12 +189,27 @@
 .duel-vs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .duel-side { position: relative; display: grid; gap: 6px; justify-items: center; padding: 14px 10px; border-radius: 18px; background: var(--r-card-strong); text-align: center; }
 .duel-side.winner { outline: 3px solid var(--r-accent); } .duel-side.loser { opacity: .6; }
+.duel-compact .duel-side { grid-template-columns: auto minmax(0, 1fr); justify-items: start; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 14px; text-align: left; }
+.duel-compact .duel-side strong { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.duel-compact :is(.duel-bets, .duel-bar) { display: none; }
+.duel-compact .duel-vs-mark { top: 50%; translate: 0 -50%; }
 .duel-side strong { font-size: 1.15rem; }
 .duel-bets { font-size: .9rem; opacity: .85; }
 .duel-bar { width: 100%; height: 8px; border-radius: 999px; background: rgb(0 0 0 / .2); overflow: hidden; } .duel-bar span { display: block; height: 100%; background: var(--r-accent); transition: width .3s; }
 .duel-side button { width: 100%; }
 .duel-vs-mark { position: absolute; right: -22px; top: 40%; z-index: 1; padding: 4px 8px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 900; font-size: .85rem; }
-.duel-result { font-size: 1.3rem; font-weight: 800; margin: 0; } .duel-note { margin: 0; font-weight: 600; }
+/* The duel's one winner banner: trophy, who won, and below it who gave up and this phone's own news. */
+.duel-result { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center; margin: 0; padding: 12px 16px; border-radius: 16px;
+  background: color-mix(in srgb, var(--r-accent) 16%, var(--r-card)); border: 1px solid color-mix(in srgb, var(--r-accent) 45%, transparent); }
+.duel-result-icon { grid-row: span 3; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--r-accent); color: var(--r-accent-ink); }
+.duel-result strong { font-size: 1.2rem; font-weight: 800; line-height: 1.2; }
+.duel-result small { color: var(--r-muted); font-size: .9rem; font-weight: 600; }
+.duel-result .duel-result-mine { color: var(--r-text); }
+.duel-note { margin: 0; font-weight: 600; }
+.duel-stakes-row { display: grid; gap: 6px; }
+.duel-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.duel-chips li { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 10px; border-radius: 999px; background: var(--r-card-strong); color: var(--r-text); font-size: .85rem; font-weight: 700; }
+.duel-chips .fa-icon { width: .9em; height: .9em; color: var(--r-accent); }
 .duel-pick { display: grid; gap: 10px; } .duel-pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .duel-pick select { min-height: 44px; border-radius: 8px; padding: 8px; font: inherit; }
 
@@ -577,21 +592,23 @@
   .invite-display > :is(a, button, .invite-display-open) { grid-column: 2; justify-self: start; }
 }
 
-.room .round-results { --results-gap: clamp(10px, 2vw, 19px); display: grid; gap: var(--results-gap); padding: clamp(12px, 3vw, 28px); background: var(--r-card); border: 1px solid var(--r-line); border-radius: var(--r-radius); overflow-wrap: anywhere; }
+.room .round-results { --results-gap: clamp(10px, 2vw, 16px); display: grid; gap: var(--results-gap); container-type: inline-size; padding: 0; background: none; border: 0; }
+/* The results sit straight in the round's card (no box in a box). Words never break in the middle; long ones may wrap whole. */
 .round-results > p { margin: 0; }
-.round-results .results-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--r-line); }
-.round-results .results-head > span { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--r-accent-ink); background: var(--r-accent); }
-.room .round-results .results-head h3 { margin: 0; font-size: clamp(1rem, 3vw, 1.55rem); color: var(--r-text); letter-spacing: .02em; }
-.round-results .results-own { display: grid; gap: 4px; margin: 0; padding: 12px; border: 1px solid var(--r-line); border-radius: 12px; background: var(--r-surface); text-align: center; font-size: .9rem; }
-.round-results .results-own.earned { border-color: color-mix(in srgb, var(--r-ok) 65%, transparent); color: var(--r-text); }
-.round-results .results-points-large { color: var(--r-ok); font-size: clamp(1.75rem, 9vw, 3rem); font-weight: 850; line-height: 1.12; }
+.round-results .results-head { display: flex; align-items: center; gap: 8px; }
+.round-results .results-head > span { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; color: var(--r-accent-ink); background: var(--r-accent); font-size: .8rem; }
+.room .round-results .results-head h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: inherit; font-size: .85rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--r-muted); }
+.round-results .results-own { display: grid; gap: 2px; justify-items: center; margin: 0; padding: 14px 12px; border-radius: 14px; background: color-mix(in srgb, var(--r-text) 6%, transparent); text-align: center; font-size: .95rem; overflow-wrap: normal; }
+.round-results .results-own.earned { background: color-mix(in srgb, var(--r-ok) 14%, transparent); color: var(--r-text); }
+/* The big number: one line, sized to the card's width. */
+.round-results .results-points-large { color: var(--r-ok); font-size: clamp(2rem, 22cqi, 3.6rem); font-weight: 850; line-height: 1.05; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .round-results .result-answer { display: flex; align-items: center; gap: 8px; border-inline-start: 4px solid var(--r-ok); border-radius: 6px; padding: 10px 12px; background: color-mix(in srgb, var(--r-ok) 15%, var(--r-surface)); font-weight: 750; }
 .round-results .answer-bars { display: grid; gap: 5px; }
 .round-results .answer-bars > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px; }
 .results-bar-label, .results-bar-count { position: relative; }
 .results-bar-count { font-size: .84em; font-variant-numeric: tabular-nums; }
 .round-results .round-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 6px; }
-.round-awards > li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; margin: 0; border: 1px solid var(--r-line); border-radius: 10px; background: var(--r-surface); }
+.round-awards > li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; margin: 0; border-radius: 10px; background: color-mix(in srgb, var(--r-text) 6%, transparent); overflow-wrap: anywhere; }
 .round-awards strong { color: var(--r-text); font-variant-numeric: tabular-nums; }
 
 @keyframes room-panel-enter {

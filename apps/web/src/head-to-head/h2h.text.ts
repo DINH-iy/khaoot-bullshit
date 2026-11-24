@@ -8,11 +8,11 @@ export const H2H_TEXTS = defineTexts('head-to-head', {
   youPicked: 'You picked {pick}. Waiting for {name}…', pickOne: 'Round {round}: pick one', yourPick: 'Your pick', picks: 'rock|paper|scissors', picked: 'picked', thinking: 'thinking…',
   ttt: 'Tic-tac-toe: {first} ✕, {second} ◯', cell: 'Row {row}, column {column}: {owner}', empty: 'empty',
   piece: '{color} {piece}', check: 'Check!', chessBoard: 'Chess board', white: 'white', black: 'black', pieces: 'king|queen|rook|bishop|knight|pawn', promoteTo: 'Promote to', cancel: 'Cancel',
-  bothPick: 'Both pick at once', yourMove: 'Your move', theirMove: '{name}’s move', draw: 'A draw!', wins: '{name} wins!', winsGaveUp: '{name} wins ({other} gave up)!', versus: '{first} vs {second}',
+  bothPick: 'Both pick at once', yourMove: 'Your move', theirMove: '{name}’s move', draw: 'A draw!', wins: '{name} wins!', winsGaveUp: '{name} wins ({other} gave up)!', gaveUp: '{name} gave up.', watchReplay: 'Watch the replay', hideReplay: 'Hide the replay', versus: '{first} vs {second}',
   yesGiveUp: 'Yes, give up', keepPlaying: 'Keep playing', giveUp: 'Give up',
   tie: 'Tie', recording: 'Recording…', saved: 'Saved.', replayLabel: 'Replay, move {move} of {total}: {result}', replay: 'Replay', saveVideo: 'Save as video', replayGone: 'The replay disappears when the room ends.',
 }, {
-  nl: {
+  nl: { watchReplay: 'Bekijk de herhaling', hideReplay: 'Verberg de herhaling', gaveUp: '{name} gaf op.',
     score: 'Stand: {first} {firstWins}, {second} {secondWins}, eerst tot {target}', you: ' (jij)', firstTo: 'eerst tot {target}',
     lastRound: 'Vorige ronde', lastRoundLabel: 'Vorige ronde: {firstPick} tegen {secondPick}, {result}', aTie: 'gelijk', winsRound: '{name} wint de ronde', tieAgain: 'Weer gelijk!',
     youPicked: 'Je koos {pick}. Wachten op {name}…', pickOne: 'Ronde {round}: kies er één', yourPick: 'Jouw keuze', picks: 'steen|papier|schaar', picked: 'gekozen', thinking: 'denkt na…',
@@ -22,7 +22,7 @@ export const H2H_TEXTS = defineTexts('head-to-head', {
     yesGiveUp: 'Ja, opgeven', keepPlaying: 'Verder spelen', giveUp: 'Opgeven',
     tie: 'Gelijk', recording: 'Opnemen…', saved: 'Opgeslagen.', replayLabel: 'Herhaling, zet {move} van {total}: {result}', replay: 'Herhaling', saveVideo: 'Opslaan als video', replayGone: 'De herhaling verdwijnt als de room eindigt.',
   },
-  de: {
+  de: { watchReplay: 'Wiederholung ansehen', hideReplay: 'Wiederholung ausblenden', gaveUp: '{name} hat aufgegeben.',
     score: 'Stand: {first} {firstWins}, {second} {secondWins}, wer zuerst {target}', you: ' (du)', firstTo: 'wer zuerst {target}',
     lastRound: 'Letzte Runde', lastRoundLabel: 'Letzte Runde: {firstPick} gegen {secondPick}, {result}', aTie: 'unentschieden', winsRound: '{name} gewinnt die Runde', tieAgain: 'Wieder unentschieden!',
     youPicked: 'Du hast {pick} gewählt. Warten auf {name}…', pickOne: 'Runde {round}: wähle eins', yourPick: 'Deine Wahl', picks: 'Stein|Papier|Schere', picked: 'gewählt', thinking: 'überlegt…',
@@ -32,7 +32,7 @@ export const H2H_TEXTS = defineTexts('head-to-head', {
     yesGiveUp: 'Ja, aufgeben', keepPlaying: 'Weiterspielen', giveUp: 'Aufgeben',
     tie: 'Unentschieden', recording: 'Wird aufgenommen…', saved: 'Gespeichert.', replayLabel: 'Wiederholung, Zug {move} von {total}: {result}', replay: 'Wiederholung', saveVideo: 'Als Video speichern', replayGone: 'Die Wiederholung verschwindet, wenn der Raum endet.',
   },
-  ro: {
+  ro: { watchReplay: 'Vezi reluarea', hideReplay: 'Ascunde reluarea', gaveUp: '{name} a renunțat.',
     score: 'Scor: {first} {firstWins}, {second} {secondWins}, primul la {target}', you: ' (tu)', firstTo: 'primul la {target}',
     lastRound: 'Runda trecută', lastRoundLabel: 'Runda trecută: {firstPick} contra {secondPick}, {result}', aTie: 'egalitate', winsRound: '{name} câștigă runda', tieAgain: 'Iar egalitate!',
     youPicked: 'Ai ales {pick}. Se așteaptă {name}…', pickOne: 'Runda {round}: alege unul', yourPick: 'Alegerea ta', picks: 'piatră|hârtie|foarfecă', picked: 'a ales', thinking: 'se gândește…',

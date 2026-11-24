@@ -223,3 +223,39 @@ test('Arcade publishes the full game catalog and plays a pool duel and a TV-only
     await expect(friend.getByText(/Guess saved/)).toBeVisible();
   } finally { await Promise.all([guest.close(), tvContext.close()]); }
 });
+
+test('the leader picks a graph from the library, and Play again starts the same game anew for everyone', async ({ browser, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'Two phones are emulated in separate contexts below.');
+  test.setTimeout(120_000);
+  const phone = async () => (await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })).newPage();
+  const ann = await phone(); const bo = await phone();
+  try {
+    await ann.goto(`${baseURL}/?arcade`); await ann.getByLabel('Your name').fill('Ann');
+    await ann.getByRole('button', { name: 'Open a lobby' }).click();
+    await bo.goto(await inviteLink(ann)); await bo.getByLabel('Your name').fill('Bo'); await bo.getByRole('button', { name: 'Join the lobby' }).click();
+    await expect(ann.getByRole('button', { name: 'Players 2' })).toBeVisible({ timeout: 10_000 });
+
+    // Draw the Graph: random from all collections, or one chart (questions only; the answers stay on the server).
+    await pickGame(ann, 'Draw the Graph');
+    await ann.getByRole('button', { name: /^Graph: Random from all collections/ }).click();
+    const sheet = ann.getByRole('dialog', { name: 'Choose a graph' });
+    await expect(sheet.getByRole('group', { name: 'Built in' }).getByRole('button', { name: /fictional library/ })).toBeVisible();
+    await sheet.getByRole('button', { name: /^Random from all collections/ }).click();
+    await expect(bo.getByRole('form', { name: 'Next round' })).toContainText('Random from all collections', { timeout: 10_000 });
+
+    await ann.getByRole('button', { name: 'Play Draw the Graph' }).click();
+    for (const page of [ann, bo]) await page.getByRole('button', { name: 'Got it!' }).click({ timeout: 15_000 });
+    await ann.getByRole('button', { name: /^Start \(2 of 2 ready\)$/ }).click();
+    await ann.getByRole('button', { name: 'Leader tools' }).click();
+    await ann.getByRole('button', { name: 'End now and count the results' }).click({ timeout: 15_000 });
+    await ann.getByRole('button', { name: 'Show the results' }).click();
+
+    // Play again: both phones go through the lobby straight into round 2, a new room.
+    const first = new URL(ann.url()).searchParams.get('room');
+    await ann.getByRole('button', { name: 'Play again' }).click();
+    for (const page of [ann, bo]) {
+      await expect(page.getByRole('button', { name: 'Got it!' })).toBeVisible({ timeout: 20_000 });
+      expect(new URL(page.url()).searchParams.get('room')).not.toBe(first);
+    }
+  } finally { await Promise.all([ann.context().close(), bo.context().close()]); }
+});

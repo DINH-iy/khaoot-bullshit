@@ -95,7 +95,10 @@ const stageSchema = z.discriminatedUnion('kind', [
     // `scoring`: points by closeness (close enough, or a sliding scale) instead of by place, for target minigames.
     scoring: MinigameScoringSchema.optional(),
     // Step games in a team round: how a team decides each move, and the seconds for a team vote.
-    decide: z.enum(TEAM_DECIDES).optional(), voteSeconds: z.number().int().min(5).max(120).optional() }).strict(),
+    decide: z.enum(TEAM_DECIDES).optional(), voteSeconds: z.number().int().min(5).max(120).optional(),
+    // `draw`: a minigame draw in one scene. When the scene opens the server draws one of these games (with its own
+    // settings and time) and the scene plays it; `game` is then the first of them. Left out: the scene plays `game`.
+    draw: z.array(z.object({ game: z.string().trim().min(1).max(64), settings: z.record(z.string(), z.json()).optional(), durationMs: StageDurationSchema.nullable().optional() }).strict()).min(2).max(8).optional() }).strict(),
   // A duel: two players (picked at random or by the host) face off in the room while everyone
   // else bets on the winner; the host taps the winner. `places`: 1st for the winner, 2nd for the
   // loser (left out: 10 points for the winner). `betMilli`: for every right bet. The timer is the
@@ -200,6 +203,19 @@ export const GameDefinitionSchema = z.object({
       if (stage.kind === 'duel' && stage.contest?.kind === 'game' && !parseHeadToHeadSettings(stage.contest.game, stage.contest.settings)) ctx.addIssue({ code: 'custom', message: 'Duel game settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'duel' && stage.pick === 'teams' && (stage.contest?.kind !== 'game' || stage.contest.game !== 'eight-ball')) ctx.addIssue({ code: 'custom', message: 'Team representatives are available for 8-ball pool', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'duel' && stage.matchSeconds !== undefined && (stage.contest?.kind !== 'game' || stage.contest.game !== 'eight-ball')) ctx.addIssue({ code: 'custom', message: 'The match clock is available for 8-ball pool', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'matchSeconds'] });
+      // A draw in one scene: every game in it must be playable here, as if the scene were that game.
+      if (stage.kind === 'minigame' && stage.draw) {
+        const games = stage.draw.map(entry => entry.game);
+        if (new Set(games).size !== games.length) ctx.addIssue({ code: 'custom', message: 'A game is in the draw more than once', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'draw'] });
+        stage.draw.forEach((entry, position) => {
+          const at = ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'draw', position];
+          if (!isMinigameKey(entry.game)) { ctx.addIssue({ code: 'custom', message: `“${entry.game}” is not a minigame`, path: at }); return; }
+          if (!parseMinigameSettings(entry.game, entry.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: at });
+          if (TEAM_MINIGAMES.includes(entry.game) && (stage.play ?? definition.play ?? { kind: 'solo' }).kind !== 'teams') ctx.addIssue({ code: 'custom', message: `${MINIGAMES[entry.game].name} needs teams: play this scene in teams, or take it out of the draw`, path: at });
+          const ms = entry.durationMs === undefined ? stage.durationMs : entry.durationMs;
+          if (entry.game === 'clap-beat' && ms !== null && ms < CLAP_END_MS) ctx.addIssue({ code: 'custom', message: `Clap the beat needs at least ${Math.ceil(CLAP_END_MS / 1000)} seconds`, path: at });
+        });
+      }
       if (stage.kind === 'minigame' && stage.places && stage.placementMilli) ctx.addIssue({ code: 'custom', message: 'Give the minigame either points per place or places, not both', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'minigame' && stage.game === 'clap-beat' && stage.durationMs !== null && stage.durationMs < CLAP_END_MS) {
         ctx.addIssue({ code: 'custom', message: 'Clap the beat needs at least 9 seconds', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'durationMs'] });
@@ -252,6 +268,16 @@ export const isShowOnly = (stage: StageDefinition) => stage.kind === 'info' || s
 /** Stages that can be authored but not played yet, with where they are. */
 export const unplayable = (definition: GameDefinition) => allStages(definition).filter(({ stage }) => stage.kind === 'minigame' && !isMinigameKey(stage.game));
 export type MinigameStage = Extract<StageDefinition, { kind: 'minigame' }>;
+/**
+ * A minigame draw's scene as drawn: the drawn game with its own settings and time (the scene's time when it has none),
+ * everything else (points, teams, look) from the scene. Every rule of a running stage reads this, never the draw itself.
+ */
+export function drawnStage(stage: MinigameStage, index: number): MinigameStage {
+  const entry = stage.draw?.[index];
+  if (!entry) return stage;
+  const { draw: _draw, settings: _settings, ...rest } = stage;
+  return { ...rest, game: entry.game, ...(entry.settings ? { settings: entry.settings } : {}), durationMs: entry.durationMs === undefined ? stage.durationMs : entry.durationMs };
+}
 /** A playable minigame scene's rules, with defaults filled in. */
 export function minigameRules(stage: MinigameStage): { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total'; tiebreak: MinigameTiebreak; scoring: MinigameScoring | null; decide: TeamDecides; voteSeconds: number } {
   if (!isMinigameKey(stage.game)) throw new GameError('UNSUPPORTED_FEATURE');

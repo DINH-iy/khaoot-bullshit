@@ -31,6 +31,18 @@ export const GrapherImportResultSchema = z.object({
 });
 export type GrapherImportResult = z.infer<typeof GrapherImportResultSchema>;
 
+/**
+ * One chart of the graph library: every Draw the Graph chart authors have put in a game (its "collection"), and the
+ * built-in sample. Only what a picker shows; the hidden half never leaves the server.
+ */
+export const GRAPH_SAMPLE_ID = 'sample';
+export const GraphLibraryIdSchema = z.string().regex(/^(sample|[0-9a-f]{24})$/);
+export const GraphLibraryEntrySchema = z.object({
+  id: GraphLibraryIdSchema, collection: z.string().max(160), question: z.string().max(500),
+  startLabel: label, endLabel: label, yLabel: label,
+}).strict();
+export type GraphLibraryEntry = z.infer<typeof GraphLibraryEntrySchema>;
+
 export const GraphSettingsSchema = z.object({ graph: GraphDataSchema.optional(), revealEasing: RevealEasingSchema.optional() }).strict();
 export type GraphView = z.infer<typeof GraphViewSchema>;
 export type GraphData = z.infer<typeof GraphDataSchema>;

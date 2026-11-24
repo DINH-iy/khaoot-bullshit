@@ -119,7 +119,9 @@ describe('hosted 8-ball pool', () => {
       return contestView.kind === 'game' ? contestView.view?.board : null;
     });
     for (const board of boards) expect(board).toMatchObject({ game: 'eight-ball', shot: 1, motion: expect.any(Array) });
-    expect(boards.every(board => JSON.stringify(board) === JSON.stringify(boards[0]))).toBe(true);
+    // The same board for everyone (the shot clock's milliseconds left move on between the reads).
+    const steady = (board: unknown) => JSON.stringify({ ...(board as Record<string, unknown>), shotClock: null });
+    expect(boards.every(board => steady(board) === steady(boards[0]))).toBe(true);
     await player(f, b!, 'duel.resign', { stageRunId: stage });
     expect(await totals(f)).toEqual(f.players.map((_, index) => index === a ? '10000' : index === correct ? '1000' : '0'));
   });

@@ -27,14 +27,9 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
 
-  const tour = page.getByRole('region', { name: 'Editor tour' });
-  await expect(tour).toBeVisible();
-  await tour.getByRole('button', { name: 'Next tip' }).click();
-  await expect(tour).toContainText('Phone');
-  await tour.getByRole('button', { name: 'Skip tour' }).click();
-  await page.reload();
+  // No tour: the editor opens straight on the game flow.
   await expect(page.getByRole('application', { name: 'Game flow' })).toBeVisible();
-  await expect(tour).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Editor tour' })).toHaveCount(0);
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
   await chooseOption(help.getByLabel('Show the whole game.'), '3');

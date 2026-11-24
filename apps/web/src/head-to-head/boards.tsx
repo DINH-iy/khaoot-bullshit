@@ -65,7 +65,7 @@ function ChessBoard({ view, board, canMove, onMove }: BoardProps<'chess'>) {
       {ordered.map(({ square, piece }) => <button key={square} type="button" role="gridcell" onClick={() => tap(square)}
         className={['sq', dark(square) ? 'dark' : 'light', from === square ? 'from' : '', targets.some(move => move.to === square) ? 'target' : '', board.lastMove && (board.lastMove.from === square || board.lastMove.to === square) ? 'last' : ''].join(' ')}
         aria-label={`${square}${piece ? `: ${h('piece', { color: h(piece === piece.toUpperCase() ? 'white' : 'black'), piece: pieceName(piece) })}` : ''}`}>
-        <span className={piece && piece === piece.toUpperCase() ? 'white' : 'black'} aria-hidden="true">{piece ? `${PIECES[piece]}︎` : ''}</span></button>)}
+        <span className={`${piece && piece === piece.toUpperCase() ? 'white' : 'black'}${canMove && piece && board.legal.some(move => move.from === square) ? ' movable' : ''}`} aria-hidden="true">{piece ? `${PIECES[piece]}︎` : ''}</span></button>)}
     </div>
     {promoting && <div className="h2h-promote" role="group" aria-label={h('promoteTo')}>
       {(['q', 'r', 'b', 'n'] as const).map(piece => <button key={piece} type="button" onClick={() => { onMove({ game: 'chess', from: promoting.from, to: promoting.to, promotion: piece }); setPromoting(null); setFrom(null); }}>
@@ -81,20 +81,28 @@ const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { 
  * A head-to-head game as one phone (or screen) sees it: whose turn, the board,
  * resigning, and once it is over the result and its replay.
  */
-export function HeadToHead({ view, names, busy, onMove, onResign, showTurnName = false, live }: { view: HeadToHeadView; names: [string, string]; busy: boolean; onMove: (move: HeadToHeadMove) => void; onResign?: () => void; showTurnName?: boolean; live?: PoolLive | undefined }) {
-  const [confirm, setConfirm] = useState(false);
+export function HeadToHead({ view, names, busy, onMove, onResign, showTurnName = false, live, resultElsewhere = false, titleElsewhere = false }: { view: HeadToHeadView; names: [string, string]; busy: boolean; onMove: (move: HeadToHeadMove) => void; onResign?: () => void; showTurnName?: boolean; resultElsewhere?: boolean; titleElsewhere?: boolean; live?: PoolLive | undefined }) {
+  const [confirm, setConfirm] = useState(false); const [showReplay, setShowReplay] = useState(false);
   const Board = BOARDS[view.game] as (props: BoardProps<HeadToHeadKey>) => ReactNode;
   const turnText = view.outcome ? null : view.turn === 'both' ? h('bothPick') : view.turn === null ? null
     : view.turn === view.seat && !showTurnName ? h('yourMove') : h('theirMove', { name: names[view.turn] });
   const result = !view.outcome ? null : view.outcome.kind === 'draw' ? h('draw') : view.outcome.reason === 'resigned' ? h('winsGaveUp', { name: names[view.outcome.seat], other: names[view.outcome.seat === 0 ? 1 : 0] }) : h('wins', { name: names[view.outcome.seat] });
   return <div className={`h2h h2h-${view.game}`}>
-    {view.game !== 'eight-ball' && <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong><span className="h2h-title-dot" aria-hidden="true"> · </span>{h('versus', { first: names[0], second: names[1] })}</p>}
-    {view.game !== 'eight-ball' && turnText && <p className="h2h-turn" role="status">{turnText}</p>}
-    {result && <p className="h2h-result" role="status">{result}</p>}
+    {/* In a duel the room already shows the game and both players: no second title line. */}
+    {view.game !== 'eight-ball' && !titleElsewhere && <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong><span className="h2h-title-dot" aria-hidden="true"> · </span>{h('versus', { first: names[0], second: names[1] })}</p>}
+    {/* Your turn stands out (a pill in the style's accent); the other player's turn stays plain. */}
+    {view.game !== 'eight-ball' && turnText && <p className={`h2h-turn${!view.outcome && view.turn === view.seat && view.seat !== null ? ' mine' : ''}`} role="status">{turnText}</p>}
+    {/* In a duel the room names the winner (once, in its banner): the board keeps its result only for layout. */}
+    {result && (resultElsewhere ? <p className="h2h-result visually-hidden">{result}</p> : <p className="h2h-result" role="status">{result}</p>)}
     <Board view={view} board={view.board} names={names} canMove={!busy && view.seat !== null && !view.outcome} onMove={onMove} statusLabel={result ?? turnText ?? undefined} live={live} />
     {view.seat !== null && !view.outcome && onResign && (confirm
       ? <div className="actions"><button type="button" className="danger-outline" disabled={busy} onClick={() => { setConfirm(false); onResign(); }}>{h('yesGiveUp')}</button><button type="button" className="ghost" onClick={() => setConfirm(false)}>{h('keepPlaying')}</button></div>
-      : <button type="button" className="ghost small-button" onClick={() => setConfirm(true)}>{h('giveUp')}</button>)}
-    {view.outcome && view.replay && <Replay replay={view.replay} names={names} result={result ?? ''} />}
+      : <button type="button" className="ghost small-button h2h-give-up" onClick={() => setConfirm(true)}>{h('giveUp')}</button>)}
+    {/* The replay opens only when a player asks for it. */}
+    {view.outcome && view.replay && <div className="h2h-replay-toggle">
+      <button type="button" className="small-button" aria-expanded={showReplay} onClick={() => setShowReplay(open => !open)}>
+        <span aria-hidden="true">{showReplay ? '▾' : '▶'}</span> {h(showReplay ? 'hideReplay' : 'watchReplay')}</button>
+      {showReplay && <Replay replay={view.replay} names={names} result={result ?? ''} />}
+    </div>}
   </div>;
 }

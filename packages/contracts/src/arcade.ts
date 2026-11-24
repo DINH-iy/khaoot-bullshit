@@ -3,6 +3,7 @@ import { GameIdSchema } from './game.js';
 import { MINIGAME_KEYS, isMinigameKey, type MinigameKey } from './minigames/shared/catalog.js';
 import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, type HeadToHeadKey } from './head-to-head.js';
 import { PlayerLookSchema } from './players.js';
+import { GraphLibraryEntrySchema, GraphLibraryIdSchema } from './minigames/draw-the-graph/graph.js';
 
 /**
  * The arcade: lobbies anyone opens to play minigames and duels together, outside a game.
@@ -31,9 +32,13 @@ export const JoinArcadeSchema = z.object({ displayName: NameSchema, look: Player
 export const ArcadePasswordUpdateSchema = z.object({ password: PasswordSchema.nullable() }).strict();
 export const ArcadeLockSchema = z.object({ locked: z.boolean() }).strict();
 /** What the leader has chosen so far for the next round; everyone else watches it (read-only) until the round starts. */
-export const ArcadePickSchema = z.object({ game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable() }).strict();
+export const ArcadePickSchema = z.object({ game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable(), graph: GraphLibraryIdSchema.optional() }).strict();
 export type ArcadePick = z.infer<typeof ArcadePickSchema>;
-export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable() }).strict();
+// `graph`: for Draw the Graph, one chart of the graph library; left out, a random one.
+export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable(), graph: GraphLibraryIdSchema.optional() }).strict();
+/** Play the round just played again (same game and teams), with new values: another graph, new dots, a new target. */
+export const ArcadeAgainSchema = z.object({ roundId: GameIdSchema }).strict();
+export const ArcadeGraphsSchema = z.object({ graphs: z.array(GraphLibraryEntrySchema) }).strict();
 /** What the leader does in a round's room. `stageRunId` binds the action to the round step the leader saw. */
 export const ARCADE_ACTIONS = ['begin', 'resume', 'confirm-teams', 'shuffle-teams', 'start', 'close', 'reveal', 'end'] as const;
 export type ArcadeAction = typeof ARCADE_ACTIONS[number];

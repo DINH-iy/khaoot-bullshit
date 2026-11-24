@@ -368,6 +368,30 @@ describe('minigames', () => {
     ]));
   });
 
+  it('draws one game in a single scene, plays it with its own time and keeps it through pause and reveal', async () => {
+    const w = world();
+    const f = await fixture(2, game({ game: 'cut-the-line', draw: [{ game: 'cut-the-line', durationMs: 20_000 }, { game: 'match-the-angle', durationMs: 40_000 }] }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+    const display = { role: 'display' as const, sessionId: f.sessionId };
+    const view = () => readSessionView(prisma, display, f.sessionId);
+    const started = (await view()).stage!;
+    const drawn = started.minigame!.game;
+    expect(['cut-the-line', 'match-the-angle']).toContain(drawn);
+    // The drawn game's own time (plus the countdown), and its own target.
+    expect(started.deadlineAt).toBe(new Date(w.now() + (drawn === 'cut-the-line' ? 20_000 : 40_000) + 3000).toISOString());
+    const exact = drawn === 'cut-the-line' ? started.minigame!.cutTarget! * 10 : started.minigame!.angleTarget! * 10;
+    expect(Number.isInteger(exact)).toBe(true);
+    w.advance(3500);
+    await play(w, f, 0, stageRunId, exact);
+    await play(w, f, 1, stageRunId, exact + 50);
+    await host(w, f, 'session.pause'); await host(w, f, 'session.resume');
+    expect((await view()).stage!.minigame!.game).toBe(drawn);
+    await host(w, f, 'stage.close', { stageRunId });
+    await host(w, f, 'stage.reveal', { stageRunId });
+    expect((await view()).stage!.reveal!.answer).toMatchObject({ game: drawn, entries: expect.arrayContaining([
+      expect.objectContaining({ playerId: f.players[0]!.id, value: 0, place: 1 }), expect.objectContaining({ playerId: f.players[1]!.id, value: 50, place: 2 })]) });
+  });
+
   it('uses one Cut the Line target, keeps it on recovery and awards places by absolute error', async () => {
     const w = world();
     const f = await fixture(4, game({ game: 'cut-the-line', durationMs: 20_000 }));

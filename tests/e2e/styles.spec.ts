@@ -25,7 +25,8 @@ async function setColour(page: Page, name: string, code: string) {
   await picker.getByLabel('Hex code').press('Enter');
 }
 // The style list shows one group at a time.
-const styleGroup = (page: Page, name: string) => page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name, exact: true }).click();
+// A group button's name gets " (In use)" while it holds the style in use.
+const styleGroup = (page: Page, name: string) => page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: new RegExp(`^${name}( \\(In use\\))?$`) }).click();
 const group = (page: Page, title: RegExp) => page.locator('.look-panel summary').filter({ has: page.locator('.ed-section-title', { hasText: title }) });
 
 const savedStyle = async (page: Page, baseURL: string, name: string) => ((await (await page.request.get(`${baseURL}/api/host/styles`, { headers: headers(baseURL) })).json()).data as { name: string; theme: unknown }[]).find(style => style.name === name)?.theme;
@@ -75,13 +76,17 @@ test('changing your own style asks: update it or save the change as a new style;
   await card.click();
   await expect.poll(theme).toEqual({ preset: 'elegant', font: 'mono' });
 
-  // An own style asks first: update it, or keep it and save the change as a new style. Never only here.
+  // Your own style is updated right away, without asking (games keep their own copy of a look).
+  await expect(card).toContainText('In use');
+  await expect(page.getByText(`In use: ${name}`, { exact: true })).toBeVisible();
   await chooseOption(page.getByRole('combobox', { name: 'Font', exact: true }), 'serif');
-  const own = page.getByRole('dialog', { name: `Change “${name}”?` });
-  await expect(own.getByRole('button', { name: 'Only change this look' })).toHaveCount(0);
-  await own.getByRole('button', { name: `Update “${name}”` }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(() => savedStyle(page, baseURL!, name)).toEqual({ preset: 'elegant', font: 'serif' });
-  // Asked once: later changes follow the style.
+  // Shown from another group, the style in use is still named, and its group is marked.
+  await styleGroup(page, 'Everyday');
+  await expect(page.getByText(`In use: ${name}`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: /Yours \(In use\)/ })).toBeVisible();
+  await styleGroup(page, 'Yours');
   await chooseOption(page.getByRole('combobox', { name: 'Font for titles', exact: true }), 'slab');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(() => savedStyle(page, baseURL!, name)).toEqual({ preset: 'elegant', font: 'serif', headingFont: 'slab' });

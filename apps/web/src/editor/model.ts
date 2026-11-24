@@ -279,7 +279,12 @@ function stageLine(stage: Stage): string {
     return [count, t(form?.formation === 'players' ? 'playersChoose' : form?.formation === 'host' ? 'hostDecidesLower' : 'atRandom')].join(' · ');
   }
   if (stage.kind === 'scoreboard') return t('scoreboard');
-  if (stage.kind === 'minigame') { const game = String(stage['game']); return [isMinigameKey(game) ? gameName(game) : t('chooseMinigame'), timer].filter(Boolean).join(' · '); }
+  if (stage.kind === 'minigame') {
+    // A draw in one scene names its games ("Draw: Tap race, Cut the Line"), each with its own time.
+    const draw = Array.isArray(stage['draw']) ? (stage['draw'] as { game?: unknown }[]).map(entry => String(entry.game)).filter(isMinigameKey) : null;
+    if (draw?.length) return t('drawOf', { games: draw.map(gameName).join(', ') });
+    const game = String(stage['game']); return [isMinigameKey(game) ? gameName(game) : t('chooseMinigame'), timer].filter(Boolean).join(' · ');
+  }
   if (stage.kind === 'vote') return [t('voteOnAnswers'), timer].filter(Boolean).join(' · ');
   if (stage.kind === 'duel') { const contest = stage['contest'] as { kind?: string; game?: string } | undefined; return [contest?.kind === 'game' && isHeadToHeadKey(contest.game) ? gameName(contest.game) : t('hostNamesWinner'), stage['pick'] === 'teams' ? translate(HOSTED_POOL_TEXTS, 'teams') : t(stage['pick'] === 'host' ? 'hostPicks' : 'randomPair'), timer && stage['pick'] !== 'teams' ? t('toBet', { time: timer }) : null].filter(Boolean).join(' · '); }
   const input = stage['input'] as { kind?: string; options?: unknown[] } | undefined;

@@ -1,4 +1,4 @@
-import { HEAD_TO_HEAD_GAMES, MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, type ArcadeGame, type ArcadeTeams } from '@party/contracts';
+import { HEAD_TO_HEAD_GAMES, MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, type ArcadeGame, type ArcadeTeams, type GraphData } from '@party/contracts';
 import { parseDefinition, type GameDefinition } from '../game/definition.js';
 
 // The room's standard texts speak of a host; in the arcade the leader runs the round.
@@ -16,7 +16,7 @@ export const arcadeRoundFits = (game: ArcadeGame, teams: ArcadeTeams | null) => 
  * "how to play" (the round waits until the leader starts it, so every phone has
  * arrived and read it), alone or in teams made for this round.
  */
-export function arcadeDefinition(game: ArcadeGame, teams: ArcadeTeams | null): GameDefinition {
+export function arcadeDefinition(game: ArcadeGame, teams: ArcadeTeams | null, chart?: { graph?: GraphData; question: string }): GameDefinition {
   if (isHeadToHeadKey(game)) {
     const name = HEAD_TO_HEAD_GAMES[game].name;
     return parseDefinition({
@@ -31,7 +31,9 @@ export function arcadeDefinition(game: ArcadeGame, teams: ArcadeTeams | null): G
   return parseDefinition({
     formatVersion: 2, title: `Arcade: ${info.name}`, startNodeKey: 'play', presentation: { texts: LEADER_TEXTS },
     nodes: [{ key: 'play', stages: [{
-      key: 'play', kind: 'minigame', prompt: info.name, game, durationMs: info.defaultSeconds * 1000, explain: {},
+      // Draw the Graph: a chart of the graph library (its own question); the stock sample has none of its own.
+      key: 'play', kind: 'minigame', prompt: chart?.graph ? chart.question : info.name, game, durationMs: info.defaultSeconds * 1000, explain: {},
+      ...(chart?.graph ? { settings: { graph: chart.graph } } : {}),
       ...(game === 'bus' ? { decide: 'vote', voteSeconds: 20 } : {}),
       ...(teams ? { play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: teams.count }, formation: teams.formation } }, answers: 'everyone', points: 'members' } } : {}),
     }] }],

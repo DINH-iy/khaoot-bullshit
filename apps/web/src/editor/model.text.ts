@@ -27,10 +27,10 @@ export const MODEL_TEXTS = defineTexts('editor-model', {
   kQuiz: 'Quiz', kOrdering: 'Ordering', kUpload: 'Upload', kWriting: 'Writing', kDrawing: 'Drawing', kQuestion: 'Question',
   seconds: '{count} seconds', sec: '{count} sec', spins: 'The host spins the wheel', continues: 'Host continues', hostDecides: 'Host decides', captainsVote: 'Captains vote', everyoneVotes: 'Everyone votes',
   hostJudges: 'Challenge · Host judges', teamsN: '{count} teams', playersChoose: 'players choose', hostDecidesLower: 'host decides', atRandom: 'at random', scoreboard: 'Scoreboard',
-  chooseMinigame: 'Choose a minigame', voteOnAnswers: 'Vote on answers', hostNamesWinner: 'Host names the winner', hostPicks: 'host picks', randomPair: 'random pair', toBet: '{time} to bet',
+  chooseMinigame: 'Choose a minigame', drawOf: 'Draw: {games}', voteOnAnswers: 'Vote on answers', hostNamesWinner: 'Host names the winner', hostPicks: 'host picks', randomPair: 'random pair', toBet: '{time} to bet',
   optionsN: '{count} options', routeLabel: '{option} route', rejoin: 'Rejoin · {kind}', partsN: '{count} parts · {line}',
 }, {
-  nl: {
+  nl: { drawOf: 'Loting: {games}',
     tInfo: 'Tussenscène of info', hInfo: 'Tekst op elk scherm', tQuiz: 'Quizvraag', hQuiz: 'Eén goed antwoord; tegels, een lijst of waar/niet waar',
     tIntro: 'Intro', hIntro: 'Verwelkom spelers voor de eerste ronde', nIntro: 'Welkom! Maak je klaar om te spelen.',
     tWriting: 'Schrijfronde', hWriting: 'Grappen, onderschriften, smoesjes', tUpload: 'Foto- of videoronde', hUpload: 'Foto’s, GIF’s, korte video’s',
@@ -57,7 +57,7 @@ export const MODEL_TEXTS = defineTexts('editor-model', {
     chooseMinigame: 'Kies een minigame', voteOnAnswers: 'Stemmen op antwoorden', hostNamesWinner: 'De host wijst de winnaar aan', hostPicks: 'host kiest', randomPair: 'willekeurig tweetal', toBet: '{time} om te wedden',
     optionsN: '{count} opties', routeLabel: 'Route {option}', rejoin: 'Samenkomst · {kind}', partsN: '{count} delen · {line}',
   },
-  de: {
+  de: { drawOf: 'Auslosung: {games}',
     tInfo: 'Zwischenszene oder Info', hInfo: 'Text auf jedem Bildschirm', tQuiz: 'Quizfrage', hQuiz: 'Eine richtige Antwort; Kacheln, eine Liste oder wahr/falsch',
     tIntro: 'Intro', hIntro: 'Begrüße die Spieler vor der ersten Runde', nIntro: 'Willkommen! Gleich geht’s los.',
     tWriting: 'Schreibrunde', hWriting: 'Witze, Bildunterschriften, Ausreden', tUpload: 'Foto- oder Videorunde', hUpload: 'Fotos, GIFs, kurze Videos',
@@ -84,7 +84,7 @@ export const MODEL_TEXTS = defineTexts('editor-model', {
     chooseMinigame: 'Wähle ein Minispiel', voteOnAnswers: 'Über Antworten abstimmen', hostNamesWinner: 'Der Host nennt den Sieger', hostPicks: 'Host wählt', randomPair: 'zufälliges Paar', toBet: '{time} zum Wetten',
     optionsN: '{count} Optionen', routeLabel: 'Weg {option}', rejoin: 'Zusammenführung · {kind}', partsN: '{count} Teile · {line}',
   },
-  ro: {
+  ro: { drawOf: 'Tragere: {games}',
     tInfo: 'Scenă intermediară sau info', hInfo: 'Text pe fiecare ecran', tQuiz: 'Întrebare de quiz', hQuiz: 'Un singur răspuns corect; plăci, o listă sau adevărat/fals',
     tIntro: 'Introducere', hIntro: 'Întâmpină jucătorii înainte de prima rundă', nIntro: 'Bun venit! Pregătiți-vă de joc.',
     tWriting: 'Rundă de scris', hWriting: 'Glume, descrieri, scuze', tUpload: 'Rundă cu poze sau video', hUpload: 'Poze, GIF-uri, videoclipuri scurte',

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader } from '../ui/loader.js';
 import qrcode from 'qrcode-generator';
 import { PeopleSummarySchema, PersonKeyViewSchema, PersonRowSchema, PersonStandingSchema, type PeopleSummary as Summary, type PersonKeyView, type PersonRow, type PersonStanding } from '@party/contracts';
 import { roomApi } from '../room/api.js';
@@ -153,7 +154,7 @@ function PersonView({ id, changes, busy, actions, onOpen }: { id: string; change
   // Nobody by that id (removed, or an old link): back to the start page.
   useEffect(() => { if (person === null) replaceWithHome(); }, [person]);
   if (failed) return <p role="alert" className="error">{explain(undefined)}</p>;
-  if (!person) return person === undefined ? <p role="status">Loading…</p> : null;
+  if (!person) return person === undefined ? <Loader label="Loading…" /> : null;
   return <PersonPage person={person} busy={busy} actions={actions} standing={standing} onOpen={onOpen} />;
 }
 

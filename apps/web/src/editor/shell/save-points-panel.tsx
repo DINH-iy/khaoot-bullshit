@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader } from '../../ui/loader.js';
 import { SavePointListSchema, SavePointSchema, SavePointSummarySchema, type SavePointSummary } from '@party/contracts';
 import { newId, roomApi } from '../../room/api.js';
 import { useTexts } from '../../i18n/texts.js';
@@ -48,13 +49,14 @@ export function SavePointsPanel({ gameId, d, onClose }: { gameId: string; d: Dra
   };
   const goBack = (point: SavePointSummary) => {
     setBusy(true); setMessage(null);
-    const before = t('before', { name: point.name }).slice(0, 80);
-    // Nothing changes until both the copy of now and the save point's content are in hand.
-    void Promise.all([make(before, newId(), true), roomApi(`/api/host/games/${gameId}/save-points/${point.id}`).then(data => SavePointSchema.parse(data))])
+    // Nothing changes until both the copy of now and the save point's content are in hand. The server keeps one such
+    // copy at most, and none when a save point already holds the game as it is now (it returns that one instead).
+    const copy = newId();
+    void Promise.all([make(t('before'), copy, true), roomApi(`/api/host/games/${gameId}/save-points/${point.id}`).then(data => SavePointSchema.parse(data))])
       .then(([kept, chosen]) => {
         const { definition, positions } = fromDoc(chosen.definition as Doc);
         d.change(definition, positions);
-        setMessage({ text: t('back', { name: point.name, before: kept.name }), error: false }); load();
+        setMessage({ text: kept.id === copy ? t('back', { name: point.name, before: kept.name }) : t('backSame', { name: point.name, same: kept.name }), error: false }); load();
       }, cause => setMessage(failure(cause, 'backFailed'))).finally(() => setBusy(false));
   };
   const remove = (point: SavePointSummary) => {
@@ -73,7 +75,7 @@ export function SavePointsPanel({ gameId, d, onClose }: { gameId: string; d: Dra
     </form>
     {message && <p role={message.error ? 'alert' : 'status'} className={message.error ? 'hint warn' : 'hint'}>{message.text}</p>}
     {loadFailed ? <div className="save-point-empty"><p role="alert" className="hint warn">{t('loadFailed')}</p><button type="button" className="small-button" onClick={load}><Icon name="restart" size={16} />{t('retry')}</button></div>
-      : !list ? <p role="status" className="hint">{t('loading')}</p>
+      : !list ? <Loader label={t('loading')} />
       : !points.length ? <p className="hint save-point-empty">{t('empty')}</p>
       : <>
         <p className="hint save-point-count">{t('count', { count: points.length, limit: list.limit })}</p>

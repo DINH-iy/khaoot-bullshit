@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import type { GameDefinition, StageDefinition } from '../definition.js';
-import { locateStage } from '../graph.js';
+import { locateRunStage } from '../graph.js';
 import { requireGame } from '../errors.js';
 import type { Transaction } from '../model.js';
 
@@ -44,12 +44,12 @@ export async function wheelView(tx: Transaction, sessionId: string, definition: 
   const runs = await runsOf(tx, sessionId);
   let last: { title: string; label: string } | null = null;
   for (const run of runs) {
-    const entry = locateStage(definition, run.nodeKey, run.stageKey); const spin = readSpin(run.presentation); const wheel = spin ? wheelOf(definition, spin.wheel) : null;
+    const entry = locateRunStage(definition, run); const spin = readSpin(run.presentation); const wheel = spin ? wheelOf(definition, spin.wheel) : null;
     if (entry?.stage.wheelClear) last = null;
     const picked = wheel?.entries.find(candidate => candidate.key === spin?.entryKey);
     if (wheel && picked) last = { title: wheel.title, label: picked.label };
   }
-  const stage = current ? locateStage(definition, current.nodeKey, current.stageKey)?.stage : null;
+  const stage = current ? locateRunStage(definition, current)?.stage : null;
   const here = stage?.spin ? wheelOf(definition, stage.spin.wheel) : null; const spin = current ? readSpin(current.presentation) : null;
   return {
     canSpin: Boolean(host && here),

@@ -1,4 +1,5 @@
 import { Dropdown } from '../../../ui/dropdown.js';
+import { Loader } from '../../../ui/loader.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DEFAULT_MEDIA_LAYOUT, LIBRARY_ACCEPT, LIBRARY_LIMITS, LibraryItemSchema, MEDIA_POSITIONS, MEDIA_SIZES, MediaLibrarySchema, MediaLayoutSchema, SceneMediaSchema, sceneMediaUrl, youtubeWatchUrl, type MediaLayout, type SceneMedia, type YouTubeClip, type LibraryItem, type ListedLibraryItem, type MediaLibrary, type SceneMediaKind } from '@party/contracts';
@@ -224,7 +225,7 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
           <button key={kind} type="button" role="tab" aria-selected={filter === kind} onClick={() => setFilter(kind)}>{kind === 'all' ? t('all') : kindsName(kind)}</button>)}</div>}
         <Dropdown className="media-game-filter" label={t('gameFilter')} title={t('gameFilter')} value={gameFilter} onChange={setGameFilter} options={gameOptions} />
       </div>}
-      {!library && !error && <p role="status">{t('loading')}</p>}
+      {!library && !error && <Loader label={t('loading')} />}
       {library && !shown.length && <div className="media-empty">{mediaText(only === 'audio' ? 'noSongs' : 'noFiles')}</div>}
       {shown.length > 0 && <ul className="media-items">{shown.map(item => {
         const active = item.id === current;

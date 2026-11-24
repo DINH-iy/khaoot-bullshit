@@ -34,7 +34,10 @@ export const oppositePoolPocket = (pocket: number) => POOL_POCKETS.length - 1 - 
 export const POOL_MAX_SHOTS = 160;
 export const POOL_MAX_MOTION_FRAMES = 181;
 export const POOL_STEPS_PER_FRAME = 8;
-export const POOL_AIM_STEP = .25;
+/** Aim in hundredths of a degree: fine enough that turning the cue is smooth, not a series of jumps. */
+export const POOL_AIM_STEP = .01;
+/** An angle rounded to the aim step, without floating-point dust (12.34, never 12.340000000000002). */
+export const poolAngle = (angle: number) => (Math.round((((angle % 360) + 360) % 360) * 100) / 100) % 360;
 export const POOL_MATCH_MAX_SECONDS = 3600;
 /** Seconds each player has per shot; 0 turns the shot clock off. */
 export const POOL_SHOT_SECONDS = [0, 15, 30, 45, 60] as const;

@@ -1,7 +1,7 @@
 import { isSharedPrediction, voteChoices } from '@party/contracts';
 import { FINALE_STATS, SubmissionValueSchema, type AwardRule, type FinaleStat } from '@party/contracts';
 import { minigameRules, type GameDefinition } from '../definition.js';
-import { locateStage } from '../graph.js';
+import { locateRunStage } from '../graph.js';
 import type { Transaction } from '../model.js';
 import { minigameOutcome } from '../../minigames/shared/outcome.js';
 import { readMinigameRun } from '../../minigames/shared/rules.js';
@@ -31,7 +31,7 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
   const runs = await tx.stageRun.findMany({ where: { sessionId }, select: { id: true, nodeKey: true, stageKey: true, openedAt: true, lineupId: true, presentation: true } });
   const submissions = await tx.submission.findMany({ where: { sessionId, slotKey: 'answer' }, select: { id: true, stageRunId: true, playerId: true, teamId: true, value: true, receivedAt: true } });
   const scores = await tx.scoreEntry.findMany({ where: { sessionId, recipientPlayerId: { not: null } }, select: { recipientPlayerId: true, amountMilli: true, reason: true, stageRunId: true } });
-  const stageOf = new Map(runs.map(run => [run.id, { run, stage: locateStage(definition, run.nodeKey, run.stageKey)?.stage }]));
+  const stageOf = new Map(runs.map(run => [run.id, { run, stage: locateRunStage(definition, run)?.stage }]));
   const author = new Map(submissions.map(submission => [submission.id, submission.playerId]));
 
   const totals = new Map<string, bigint>(); const lucky = new Map<string, bigint>();

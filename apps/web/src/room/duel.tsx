@@ -10,6 +10,8 @@ import { PLAY_TEXTS } from './play.text.js';
 import { gameName } from '../presentation/catalog.text.js';
 const p = (key: keyof typeof PLAY_TEXTS.en, values?: Record<string, string | number>) => translate(PLAY_TEXTS, key, values);
 import { formatPoints } from './results.js';
+import { FaIcon } from '../presentation/icons.js';
+import { h } from '../head-to-head/h2h.text.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Send = (type: string, extra: Record<string, unknown>) => void;
@@ -30,6 +32,9 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
   const player = (id: string) => state.players.find(entry => entry.id === id);
   const name = (id: string) => player(id)?.displayName ?? '…';
   const pair = duel.duelistIds; const winner = duel.winnerId;
+  // A game someone gave up: the banner says who.
+  const outcome = duel.contest.kind === 'game' ? duel.contest.view?.outcome : undefined;
+  const gaveUp = outcome && outcome.kind !== 'draw' && outcome.reason === 'resigned' ? name(pair?.[outcome.seat === 0 ? 1 : 0] ?? '') : null;
   const pool = duel.contest.kind === 'game' && duel.contest.game === 'eight-ball';
   if (duel.practicePlayerId && duel.contest.kind === 'game' && duel.contest.view) return <div className="duel duel-pool-playing" role="region" aria-label={p('duel')}>
     {(state.role !== 'player' || me === duel.practicePlayerId) ? <Suspense fallback={<p role="status">{p('opening')}</p>}>
@@ -43,8 +48,15 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
   const votePoints = formatPoints(duel.betMilli);
   const stakes = pool ? <p className="hint duel-stakes">{poolText(teamPool ? 'teamPoints' : 'winnerPoints', { points: winnerPoints })}
     {!teamPool && duel.betMilli !== '0' && <> · {poolText('votePoints', { points: votePoints })}</>}</p>
-    : <p className="hint">{p('stakes', { points: winnerPoints })}{duel.placesMilli[1] && duel.placesMilli[1] !== '0' ? p('runnerUp', { points: formatPoints(duel.placesMilli[1]) }) : ''}{p('rightBet', { points: votePoints })}
-    {duel.contest.kind === 'game' ? p('playedAs', { game: gameName(duel.contest.game) || HEAD_TO_HEAD_GAMES[duel.contest.game].name }) : ''}</p>;
+    : <div className="duel-stakes-row">
+      {/* What is at stake, as small chips; how the game is played only while bets are still open. */}
+      <ul className="duel-chips" aria-label={p('stakesLabel')}>
+        <li><FaIcon name="trophy" /> {p('chipWinner', { points: winnerPoints })}</li>
+        {duel.placesMilli[1] && duel.placesMilli[1] !== '0' && <li>{p('chipRunnerUp', { points: formatPoints(duel.placesMilli[1]) })}</li>}
+        {duel.betMilli !== '0' && <li><FaIcon name="check" /> {p('chipBet', { points: votePoints })}</li>}
+      </ul>
+      {duel.contest.kind === 'game' && stage.status === 'ACTIVE' && <p className="hint">{p('playedAs', { game: gameName(duel.contest.game) || HEAD_TO_HEAD_GAMES[duel.contest.game].name }).trim()}</p>}
+    </div>;
   if (!pair || repicking) return <div className="duel" role="region" aria-label={p('duel')}>
     {teamPool ? <p role="status">{poolText('needTeams')}</p>
       : host ? <PickPair players={state.players} disabled={disabled} onPick={playerIds => { send('duel.pick', { stageRunId: stage.id, playerIds }); setRepicking(false); }} onCancel={pair ? () => setRepicking(false) : undefined} pool={pool} />
@@ -59,10 +71,12 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
   const poolPlaying = pool && Boolean(playing) && stage.status === 'CLOSED';
   // Pool is watched on the screen; with none watching (the arcade, a room without a host screen) every phone shows the table.
   const showBoard = !pool || duelist || Boolean(state.arcade) || !state.screenConnected || state.role !== 'player';
+  // While a board game is being played (chess, tic-tac-toe…): the two players as one compact line, so the board fits.
+  const boardUp = Boolean(playing) && showBoard && stage.status === 'CLOSED' && !winner && !pool;
   return <div className={`duel${poolPlaying ? ' duel-pool-playing' : ''}`} role="region" aria-label={p('duel')}>
-    <div className="duel-vs">{[a, b].map((id, index) => { const bets = duel.bets.find(entry => entry.playerId === id)?.count ?? 0;
+    <div className={`duel-vs${boardUp ? ' duel-compact' : ''}`}>{[a, b].map((id, index) => { const bets = duel.bets.find(entry => entry.playerId === id)?.count ?? 0;
       return <div key={id} className={`duel-side${winner === id ? ' winner' : winner ? ' loser' : ''}`}>
-        {player(id) && <Avatar look={player(id)!.look} size={72} />}<strong>{name(id)}</strong>
+        {player(id) && <Avatar look={player(id)!.look} size={boardUp ? 32 : 72} />}<strong>{name(id)}</strong>
         <span className="duel-bets">{pool ? poolText('votes', { count: bets }) : p(bets === 1 ? 'betOne' : 'betMany', { count: bets })}</span>
         <span className="duel-bar" aria-hidden="true"><span style={{ width: `${total ? Math.round(bets / total * 100) : 0}%` }} /></span>
         {canBet && <button type="button" className="primary" disabled={disabled} onClick={() => send('submission.submit', { stageRunId: stage.id, value: { kind: 'bet', playerId: id } })}>{pool ? poolText('vote', { name: name(id) }) : p('betOn', { name: name(id) })}</button>}
@@ -74,14 +88,20 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
       <p className="duel-note" role="status">{poolText('timeTie')}</p>
       {host && <div className="actions">{pair.map(id => <button type="button" key={id} disabled={disabled}
         onClick={() => send('duel.decide', { stageRunId: stage.id, winnerId: id })}>{p('wins', { name: name(id) })}</button>)}</div>}
-    </div> : winner ? <p className="duel-result" role="status">{duel.teamIds ? poolText('wonTeam', { team: teamName(state, duel.teamIds[winner === b ? 1 : 0]), points: winnerPoints })
-      : t('duel.won', { name: name(winner) })}{pool && !teamPool && me === winner && winnerPoints !== '0' ? ` · +${winnerPoints}` : ''}{own && state.role === 'player' ? ` ${own === winner ? t('duel.betRight', { points: votePoints }) : t('duel.betWrong')}` : ''}</p>
+    </div> : winner ? <div className="duel-result" role="status">
+      {/* One winner banner: who won (and who gave up), then this phone's own news (points, a bet). */}
+      <span className="duel-result-icon" aria-hidden="true"><FaIcon name="trophy" /></span>
+      <strong>{duel.teamIds ? poolText('wonTeam', { team: teamName(state, duel.teamIds[winner === b ? 1 : 0]), points: winnerPoints }) : t('duel.won', { name: name(winner) })}</strong>
+      {gaveUp && <small>{h('gaveUp', { name: gaveUp })}</small>}
+      {((pool && !teamPool && me === winner && winnerPoints !== '0') || (own && state.role === 'player')) && <small className="duel-result-mine">
+        {pool && !teamPool && me === winner && winnerPoints !== '0' ? `+${winnerPoints} ` : ''}{own && state.role === 'player' ? (own === winner ? t('duel.betRight', { points: votePoints }) : t('duel.betWrong')) : ''}</small>}
+    </div>
       : poolPlaying ? (!showBoard && !stage.revealed ? <p className="duel-note">{poolText('watch')}</p> : null)
-      : duelist ? <p className="duel-note">{t('duel.youDuel', { name: name(pair.find(id => id !== me)!) })}{duel.contest.kind === 'game' && stage.status === 'ACTIVE' ? p('startsWhenClosed') : ''}</p>
+      : duelist && !boardUp ? <p className="duel-note">{t('duel.youDuel', { name: name(pair.find(id => id !== me)!) })}{duel.contest.kind === 'game' && stage.status === 'ACTIVE' ? p('startsWhenClosed') : ''}</p>
       : own ? <p className="duel-note">{t('duel.youBet', { name: name(own) })}</p>
       : canBet ? <p className="duel-note">{t('duel.bet')}</p> : null}
     {playing && showBoard && (stage.status === 'CLOSED' || winner) && <Suspense fallback={<p role="status">{p('opening')}</p>}>
-      <HeadToHead view={playing} names={[name(a), name(b)]} live={a && b ? { match: stage.id, seats: [a, b] } : undefined} busy={disabled || Boolean(winner) || state.view.status !== 'RUNNING'}
+      <HeadToHead view={playing} names={[name(a), name(b)]} resultElsewhere={Boolean(winner)} titleElsewhere live={a && b ? { match: stage.id, seats: [a, b] } : undefined} busy={disabled || Boolean(winner) || state.view.status !== 'RUNNING'}
         onMove={(move: HeadToHeadMove) => send('duel.move', { stageRunId: stage.id, move })} onResign={() => send('duel.resign', { stageRunId: stage.id })} />
     </Suspense>}
     {host && !pool && !winner && duel.contest.kind === 'game' && duel.contest.view?.outcome?.kind === 'draw' && <p className="hint">{p('draw')}</p>}

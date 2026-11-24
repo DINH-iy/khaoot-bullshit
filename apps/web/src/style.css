@@ -120,6 +120,11 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 /* The loader while a part of the app downloads (lazy-page.tsx): appears only after a moment, then fades in. */
 .page-loader { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px; opacity: 0; transition: opacity .25s; }
 .page-loader.shown { opacity: 1; }
+/* The inline loader: dots and a short label, in a list or a panel. */
+.loader-inline { display: flex; align-items: center; gap: 10px; min-height: 32px; opacity: 0; transition: opacity .25s; }
+.loader-inline.shown { opacity: 1; }
+.loader-inline .page-loader-dots i { width: 7px; height: 7px; }
+.loader-label { margin: 0; opacity: .75; }
 .page-loader-mark { margin: 0; font-weight: 900; font-size: 2.6rem; letter-spacing: -.03em; animation: loader-pulse 1.4s ease-in-out infinite; }
 .page-loader-mark span { color: #ffb400; }
 .page-loader-dots { display: flex; gap: 8px; margin: 0; }

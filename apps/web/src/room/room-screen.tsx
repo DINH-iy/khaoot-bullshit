@@ -1,4 +1,5 @@
 import { Countdown } from '../minigames/shared/countdown.js';
+import { Loader } from '../ui/loader.js';
 import { PoolAimContext } from '../head-to-head/eight-ball/live-aim.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
@@ -314,8 +315,8 @@ export function RoomScreen() {
 
   const waitingForRoomLook = firstCode.current === roomCode && roomLook?.code !== roomCode;
   if (roomUnavailable) return null;
-  if (sessionId && !state && !error && !room.message) return <main className="join-startup" aria-busy="true"><p role="status">{r('connecting')}</p></main>;
-  if (!sessionId && (waitingForRoomLook || (!joinLook && !siteLook))) return <main className="join-startup" aria-busy="true"><p role="status">{r('connecting')}</p></main>;
+  if (sessionId && !state && !error && !room.message) return <Loader full className="join-startup" label={r('connecting')} />;
+  if (!sessionId && (waitingForRoomLook || (!joinLook && !siteLook))) return <Loader full className="join-startup" label={r('connecting')} />;
   if (!sessionId && reclaiming) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">{r('joinGame')}</h1><div className="join-card"><SeatReclaim roomCode={roomCode.trim().toUpperCase()} onCancel={() => setReclaiming(false)} onJoined={id => { history.replaceState(null, '', `/?room=${id}`); setReady(true); setSessionId(id); }} /></div></main>;
   if (!sessionId && newKey) return <main className={`room room-join ${lookClass}`} style={lookStyle}><h1 className="visually-hidden">{r('yourCode')}</h1><div className="join-card"><NewKeyCard name={newKey.name} personalKey={newKey.key} busy={busy} onContinue={() => { void join(newKey.name); }} />{error && <p role="alert" className="join-error">{error}</p>}</div></main>;
   if (!sessionId) return <LookContext.Provider value={look}><JoinScreen style={lookStyle} className={lookClass} title={joinLook?.title ?? null} roomCode={roomCode} setRoomCode={setRoomCode} name={name} setName={setName} busy={busy} error={error} onJoin={() => { void join(); }} onReclaim={() => { setError(''); setReclaiming(true); }}

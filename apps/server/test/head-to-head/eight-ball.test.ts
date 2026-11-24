@@ -34,7 +34,7 @@ describe('8-ball pool', () => {
     expect(eightBall.board(opening, null).potsBySeat).toEqual([[1], []]);
     expect(eightBall.board(opening, null).balls.some(([id]) => id === 1)).toBe(false);
 
-    const scratched = eightBall.apply(shotAfterBreak([[0, 360, 55], [1, 399, 24], [9, 600, 160]]), 0, shot(306));
+    const scratched = eightBall.apply(shotAfterBreak([[0, 380, 60], [1, 399, 24], [9, 600, 160]]), 0, shot(318));
     expect(scratched).toMatchObject({ solids: null, ballInHand: true, turn: 1, pots: [0, 0], scratches: [1, 0] });
     expect(eightBall.board(scratched, null).balls.some(([id]) => id === 1)).toBe(false);
     expect(() => eightBall.apply(scratched, 1, { ...shot(0, 2), cue: [201, 200] })).toThrow('cannot be placed');
@@ -116,8 +116,16 @@ describe('8-ball pool', () => {
   });
 
   it('sends balls through pocket openings without letting any leave the table another way', () => {
-    // Along the top cushion straight through the side-pocket opening.
-    expect(shootPool([[0, 200, 12], [3, 700, 300]], 0, 60).pocketed[0]).toEqual({ id: 0, pocket: 1 });
+    // Along the top cushion past the side-pocket opening: grazing it, the ball rolls on (less than half over the edge).
+    expect(shootPool([[0, 200, 12], [3, 700, 300]], 0, 60).pocketed.some(ball => ball.pocket === 1)).toBe(false);
+    // Into the side pocket: once its centre is past the edge of the cloth, it drops.
+    expect(shootPool([[0, 400, 120], [3, 700, 300]], 270, 40).pocketed[0]).toEqual({ id: 0, pocket: 1 });
+    // At an angle: caught on the edge of the side pocket, the ball reflects out off the jaw; aimed into the opening, it drops.
+    const at = (x: number) => Math.round((Math.atan2(-150, x - 250) * 180 / Math.PI + 360) * 4) / 4;
+    expect(shootPool([[0, 250, 150], [3, 700, 330]], at(382), 45).pocketed.some(ball => ball.id === 0)).toBe(false);
+    expect(shootPool([[0, 250, 150], [3, 700, 330]], at(400), 45).pocketed).toEqual([{ id: 0, pocket: 1 }]);
+    // Into a corner along the diagonal.
+    expect(shootPool([[0, 200, 200], [3, 700, 300]], 225, 60).pocketed[0]).toEqual({ id: 0, pocket: 0 });
     // Straight at a jaw tip: the ball comes back out instead of dropping.
     expect(shootPool([[0, 377, 200]], 270, 50).pocketed).toEqual([]);
     for (let angle = 0; angle < 360; angle += 7.25) {
@@ -207,7 +215,7 @@ describe('8-ball pool', () => {
     expect(eightBall.outcome(eightBall.apply({ ...ready, lastPocket: { solid: 3, stripe: null } }, 0, shot()))).toMatchObject({ kind: 'win', seat: 1 });
     const early = { ...ready, frames: [...ready.frames, [...straightPot(8), [1, 550, 100]] as PoolFrame] };
     expect(eightBall.outcome(eightBall.apply(early, 0, shot(270, 2)))).toMatchObject({ kind: 'win', seat: 1 });
-    const scratched = { ...shotAfterBreak([[0, 360, 55], [8, 399, 24], [9, 600, 160]]), solids: 0 as const, lastPocket: { solid: 3, stripe: null } };
-    expect(eightBall.outcome(eightBall.apply(scratched, 0, shot(306)))).toMatchObject({ kind: 'win', seat: 1 });
+    const scratched = { ...shotAfterBreak([[0, 380, 60], [8, 399, 24], [9, 600, 160]]), solids: 0 as const, lastPocket: { solid: 3, stripe: null } };
+    expect(eightBall.outcome(eightBall.apply(scratched, 0, shot(318)))).toMatchObject({ kind: 'win', seat: 1 });
   });
 });

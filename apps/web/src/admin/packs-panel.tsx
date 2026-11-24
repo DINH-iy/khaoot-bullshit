@@ -1,4 +1,5 @@
 import { Dropdown } from '../ui/dropdown.js';
+import { Loader } from '../ui/loader.js';
 import { useEffect, useState } from 'react';
 import { PACK_PICTURE_SIDE, PackAdminSchema, packPrice, RARITY_KEYS, RARITY_NAMES, type Chances, type Economy, type PackAdmin, type PackItemView, type PackSetAdmin, type RarityKey } from '@party/contracts';
 import { roomApi } from '../room/api.js';
@@ -29,7 +30,7 @@ export function PacksPanel() {
       setData(PackAdminSchema.parse(reply.data)); setSaved(done);
     } catch (cause) { setError(cause instanceof Error && cause.message === 'NOT_A_PICTURE' ? 'That file is not a picture this browser can open. Try a PNG or JPG.' : problem(cause)); }
   };
-  if (!data) return error ? <p role="alert" className="error">{error}</p> : <p role="status">Loading…</p>;
+  if (!data) return error ? <p role="alert" className="error">{error}</p> : <Loader label="Loading…" />;
   return <div className="packs-admin">
     <p className="admin-intro">Players earn chips by playing in rooms with chips on, and spend them on packs. Changes count from the next pack or game.</p>
     {error && <p role="alert" className="error">{error}</p>}

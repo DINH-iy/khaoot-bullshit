@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Loader } from '../ui/loader.js';
 import { resolveTheme, SiteLookSchema, type SiteLook, type Theme } from '@party/contracts';
 import { roomApi } from '../room/api.js';
 import { SIGNED_OUT_TEXT } from '../owner/owner-session.js';
@@ -19,7 +20,7 @@ export function JoinLookPanel() {
   useEffect(() => { void roomApi('/api/host/site-look').then(data => { const look = SiteLookSchema.parse(data); setStored(look); setDraft(look); }).catch(cause => setError(problem(cause))); }, []);
   const theme = resolveTheme(draft.theme);
   const style = useThemeStyle(theme);
-  if (!stored) return error ? <p role="alert" className="error">{error}</p> : <p role="status">Loading…</p>;
+  if (!stored) return error ? <p role="alert" className="error">{error}</p> : <Loader label="Loading…" />;
   const changed = JSON.stringify(draft) !== JSON.stringify(stored);
   const save = () => { setError(''); setSaved(false); void roomApi('/api/host/site-look', draft).then(data => { const look = SiteLookSchema.parse(data); setStored(look); setDraft(look); setSaved(true); }).catch(cause => setError(problem(cause))); };
   return <div className="join-look">

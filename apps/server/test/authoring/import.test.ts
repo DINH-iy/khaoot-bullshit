@@ -213,6 +213,15 @@ describe('importing a game from text', () => {
     // An unknown minigame stays a scene to choose in the editor.
     expect(issues).toEqual([expect.objectContaining({ code: 'Choose a minigame', nodeKey: 'later' })]);
   });
+  it('imports a minigame draw in one scene: games by key or name, each with its own time and settings', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Lucky', scenes: [
+      { id: 'lucky', type: 'minigame', question: 'Which minigame will it be?', draw: ['Tap race', { game: 'cut-the-line', seconds: 25, settings: { target: { mode: 'exact', value: 37 } } }, 'not a game'] },
+    ] }));
+    expect(issues).toEqual([]);
+    const stage = (definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]!;
+    expect(stage).toMatchObject({ kind: 'minigame', game: 'tap-race', draw: [{ game: 'tap-race', durationMs: 20_000 },
+      { game: 'cut-the-line', durationMs: 25_000, settings: { target: { mode: 'exact', value: 37 } } }] });
+  });
 });
 
 describe('wheel colours', () => {

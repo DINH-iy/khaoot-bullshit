@@ -54,12 +54,15 @@ export function Ballot({ sessionId, ballot, mode, limit, saved, canVote, disable
   return <form className="ballot-form" onSubmit={event => { event.preventDefault(); if (choices.length && !disabled) onVote(mode === 'single' ? { kind: 'vote', submissionId: choices[0]! } : { kind: 'vote-list', submissionIds: choices }); }}>
     <fieldset className="ballot-fieldset"><legend className="ballot-legend">{t('vote.legend')}</legend>{mode === 'ranked' && <p className="ballot-hint">{controls('ranking')}</p>}<div className={layout}>{entries.map(({ entry, name }, index) => {
       const chosen = choices.indexOf(entry.submissionId);
-      const nameId = `${ids}-${index}`; const textId = `${nameId}-text`;
+      const nameId = `${ids}-${index}`; const textId = `${nameId}-text`; const rankId = `${nameId}-rank`;
+      // Ranked: the place in the order is part of the choice's name ("1. Entry 2: …"), not only the number on the mark.
+      const ranked = mode === 'ranked' && chosen >= 0;
       // The whole card is the choice; the radio or checkbox lies over the round mark, which shows ✓ (or the rank).
       return <label key={entry.submissionId} className={`ballot-entry ballot-option${chosen >= 0 ? ' chosen' : ''}${entry.own ? ' own-entry' : ''}`}>
         <span className="ballot-mark" aria-hidden="true">{chosen >= 0 ? mode === 'ranked' ? chosen + 1 : '✓' : null}</span>
-        <input type={mode === 'single' ? 'radio' : 'checkbox'} name="vote" value={entry.submissionId} aria-labelledby={entry.content.kind === 'text' ? `${nameId} ${textId}` : nameId}
+        <input type={mode === 'single' ? 'radio' : 'checkbox'} name="vote" value={entry.submissionId} aria-labelledby={`${ranked ? `${rankId} ` : ''}${entry.content.kind === 'text' ? `${nameId} ${textId}` : nameId}`}
           disabled={disabled || entry.own || (mode !== 'single' && choices.length >= limit && chosen < 0)} checked={chosen >= 0} onChange={() => toggle(entry.submissionId)} />
+        {ranked && <span className="visually-hidden" id={rankId}>{chosen + 1}.</span>}
         <span className="ballot-name" id={nameId}>{name}{entry.own ? ' (yours)' : ''}</span>
         {entry.content.kind === 'text' ? <span className="ballot-text" id={textId}>{entry.content.text}</span> : <BallotContent sessionId={sessionId} entry={entry} label={name} />}
       </label>;

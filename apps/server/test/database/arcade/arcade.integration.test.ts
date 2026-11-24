@@ -99,7 +99,8 @@ describe('arcade lobbies', () => {
   });
 
   it('plays a round: every member seated, only the leader runs it, results count once for the lobby and people', async () => {
-    const ann = await person(`Ann${randomUUID().slice(0, 8)}`);
+    const annName = `Ann${randomUUID().slice(0, 8)}`;
+    const ann = await person(annName);
     const lobbyId = randomUUID();
     const leader = cookieOf(await call('POST', '/api/arcade', { lobbyId, displayName: 'ignored' }, ann.cookie));
     const bob = cookieOf(await join(lobbyId, 'Bob')); const cleo = cookieOf(await join(lobbyId, 'Cleo'));
@@ -157,7 +158,7 @@ describe('arcade lobbies', () => {
     expect(after.totals[0].pointsMilli).toBe('10000');
     // The all-time board counts people only: Ann, not the guests.
     const board = (await call('GET', '/api/arcade/leaderboard')).json().data;
-    expect(board.wins.find((row: { name: string }) => row.name.startsWith('Ann'))).toMatchObject({ wins: 1, rounds: 1, pointsMilli: '10000' });
+    expect(board.wins.find((row: { name: string }) => row.name === annName)).toMatchObject({ wins: 1, rounds: 1, pointsMilli: '10000' });
     expect(board.wins.some((row: { name: string }) => row.name === 'Bob')).toBe(false);
 
     // A second round: Ann and Cleo win it. The history shows it first, with each player's total so far.
@@ -174,13 +175,22 @@ describe('arcade lobbies', () => {
     }
     expect((await call('POST', `/api/arcade/rounds/${second}/act`, { action: 'end', stageRunId: null }, again[0])).statusCode).toBe(200);
     const later = await view(lobbyId, bob);
-    expect(later.rounds.map(round => round.number)).toEqual([2, 1]);
-    const totalOf = (round: number, name: RegExp) => later.rounds.find(entry => entry.number === round)!.results.find(row => name.test(row.displayName))!;
+    expect(later.rounds.map((round: { number: number }) => round.number)).toEqual([2, 1]);
+    type Row = { displayName: string; pointsMilli: string; totalMilli?: string };
+    const totalOf = (round: number, name: RegExp) => (later.rounds as { number: number; results: Row[] }[]).find(entry => entry.number === round)!.results.find(row => name.test(row.displayName))!;
     expect(totalOf(2, /^Ann/)).toMatchObject({ pointsMilli: '10000', totalMilli: '20000' });
     expect(totalOf(2, /^Bob$/)).toMatchObject({ pointsMilli: '0', totalMilli: '10000' });
     expect(totalOf(2, /^Cleo$/)).toMatchObject({ pointsMilli: '10000', totalMilli: '10000' });
     // The earlier round keeps the totals as they were then.
     expect(totalOf(1, /^Bob$/)).toMatchObject({ pointsMilli: '10000', totalMilli: '10000' });
+
+    // Play again: only the leader, and it starts the same game as round 3 (a retry with the same id starts nothing more).
+    const third = randomUUID();
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/again`, { roundId: third }, bob)).statusCode).toBe(403);
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/again`, { roundId: third }, leader)).json().data).toEqual({ roundId: third });
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/again`, { roundId: third }, leader)).json().data).toEqual({ roundId: third });
+    expect((await view(lobbyId, bob)).round).toMatchObject({ number: 3, game: 'majority', teams: null, seated: true });
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/round/end`, {}, leader)).statusCode).toBe(200);
   });
 
   it('requires two duelists and records a drawn duel without a win or points', async () => {

@@ -60,9 +60,11 @@
   background: linear-gradient(#51aaff, #796eed 38%, #fdad4c 68%, #fa4b4f);
 }
 .pool-power-cue {
-  position: absolute; left: 50%; top: calc(6px + (100% - 40px) * var(--pool-power) / 100); width: 8px; height: 34px; translate: -50% 0;
-  border-radius: 4px 4px 2px 2px; background: linear-gradient(#f4efe3 0 5px, #3a6fb0 5px 7px, #e7c08a 7px 70%, #6b3a1f 70%);
-  box-shadow: 0 1px 3px #000a;
+  /* A whole cue, tip up, as long as the bar: pulling slides it down (the bar clips the butt), like drawing a cue back. */
+  position: absolute; left: 50%; top: calc(6px + (100% - 40px) * var(--pool-power) / 100); width: 12px; height: calc(100% + 24px); translate: -50% 0;
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); border-radius: 3px 3px 0 0;
+  background: linear-gradient(#f4efe3 0 6px, #3a6fb0 6px 9px, #f1d9ad 9px, #e3bf86 52%, #1d1a2b 52% 56%, #6b3a1f 56% 64%, #24150c 64% 68%, #6b3a1f 68% 82%, #2b1a10 82%);
+  filter: drop-shadow(0 1px 2px #000a);
 }
 .pool-power[data-pulling="false"] .pool-power-cue { transition: top 120ms ease-out; }
 .pool-power-track[aria-disabled="true"] { opacity: .5; cursor: default; }
@@ -196,6 +198,7 @@
   grid-area: 1 / 1; justify-self: start; margin: 0; padding: 6px 12px;
   border-radius: 8px; background: #111d; color: #fff;
 }
+.pool-tv .duel-result-icon { width: 28px; height: 28px; border-radius: 8px; } .pool-tv .duel-result small { color: #fffc; }
 .pool-tv .duel-tie p { margin: 0; color: inherit; }
 .pool-tv-clock { grid-area: 1 / 2; }
 .pool-tv-clock:empty { display: none; }

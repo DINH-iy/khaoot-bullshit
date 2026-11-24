@@ -30,7 +30,26 @@ export function poolPocketCenter(index: number): readonly [number, number] {
   return side ? [x, y + out * 18] : [x + (x === 0 ? -10 : 10), y + out * 10];
 }
 
+/** A small repeatable random source, so the wood grain and cloth weave are the same on every phone and every frame. */
+function seeded(seed: number) { let value = seed >>> 0; return () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 2 ** 32; }; }
+
+/** The table without balls, drawn once per felt and required pocket and then copied each frame (it never changes). */
+const tables = new Map<string, HTMLCanvasElement>();
 function paintTable(ctx: CanvasRenderingContext2D, felt: PoolFelt, eightPocket: number | null | undefined) {
+  if (typeof document === 'undefined') { paintTableOnce(ctx, felt, eightPocket); return; }
+  const key = `${felt}:${eightPocket ?? ''}`;
+  let table = tables.get(key);
+  if (!table) {
+    table = document.createElement('canvas'); table.width = POOL_CANVAS_WIDTH; table.height = POOL_CANVAS_HEIGHT;
+    const paint = table.getContext('2d');
+    if (!paint) { paintTableOnce(ctx, felt, eightPocket); return; }
+    paint.translate(POOL_RAIL, POOL_RAIL); paintTableOnce(paint, felt, eightPocket);
+    tables.set(key, table);
+  }
+  ctx.drawImage(table, -POOL_RAIL, -POOL_RAIL);
+}
+
+function paintTableOnce(ctx: CanvasRenderingContext2D, felt: PoolFelt, eightPocket: number | null | undefined) {
   const cloth = POOL_FELT_COLORS[felt];
   // Wooden frame with a soft top sheen and a dark outer edge.
   const wood = ctx.createLinearGradient(0, -POOL_RAIL, 0, POOL_HEIGHT + POOL_RAIL);
@@ -51,6 +70,21 @@ function paintTable(ctx: CanvasRenderingContext2D, felt: PoolFelt, eightPocket: 
   ctx.strokeStyle = '#c08a5e66';
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  // Wood grain: fine wavy streaks along the rails, lighter and darker.
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(-POOL_RAIL, -POOL_RAIL, POOL_CANVAS_WIDTH, POOL_CANVAS_HEIGHT, 30); ctx.clip();
+  const grain = seeded(7);
+  for (let line = 0; line < 70; line++) {
+    const along = line % 2 === 0; const offset = grain() * (along ? POOL_CANVAS_HEIGHT : POOL_CANVAS_WIDTH) - POOL_RAIL;
+    const wave = 1 + grain() * 2.5; const length = along ? POOL_CANVAS_WIDTH : POOL_CANVAS_HEIGHT;
+    ctx.beginPath();
+    for (let step = 0; step <= 40; step++) {
+      const t = step / 40 * length - POOL_RAIL; const bend = Math.sin(step / 3 + line) * wave;
+      if (along) { if (step) ctx.lineTo(t, offset + bend); else ctx.moveTo(t, offset + bend); } else if (step) ctx.lineTo(offset + bend, t); else ctx.moveTo(offset + bend, t);
+    }
+    ctx.strokeStyle = grain() > .5 ? '#ffd9a614' : '#1a0b0420'; ctx.lineWidth = .6 + grain() * 1.4; ctx.stroke();
+  }
+  ctx.restore();
 
   // Leather pocket cups sit in the rail; the cloth and cushions are laid over their inner half.
   for (const index of POOL_POCKETS.keys()) {
@@ -73,6 +107,19 @@ function paintTable(ctx: CanvasRenderingContext2D, felt: PoolFelt, eightPocket: 
   bed.addColorStop(1, cloth.edge);
   ctx.fillStyle = bed;
   ctx.fillRect(0, 0, POOL_WIDTH, POOL_HEIGHT);
+  // The cloth's fine weave: tiny lighter and darker specks, too small to read as dirt.
+  const weave = seeded(11);
+  for (let speck = 0; speck < 2600; speck++) {
+    ctx.fillStyle = weave() > .5 ? '#ffffff0d' : '#0000000f';
+    ctx.fillRect(weave() * POOL_WIDTH, weave() * POOL_HEIGHT, 1 + weave(), 1 + weave());
+  }
+  // The rail's inner edge throws a soft shadow onto the cloth all round.
+  const edgeShade = (x: number, y: number, w: number, h: number, x1: number, y1: number, x2: number, y2: number) => {
+    const fade = ctx.createLinearGradient(x1, y1, x2, y2); fade.addColorStop(0, '#00000040'); fade.addColorStop(1, '#0000');
+    ctx.fillStyle = fade; ctx.fillRect(x, y, w, h);
+  };
+  edgeShade(0, 0, POOL_WIDTH, 14, 0, 0, 0, 14); edgeShade(0, POOL_HEIGHT - 14, POOL_WIDTH, 14, 0, POOL_HEIGHT, 0, POOL_HEIGHT - 14);
+  edgeShade(0, 0, 14, POOL_HEIGHT, 0, 0, 14, 0); edgeShade(POOL_WIDTH - 14, 0, 14, POOL_HEIGHT, POOL_WIDTH, 0, POOL_WIDTH - 14, 0);
 
   // Each pocket mouth: cloth between the jaws that darkens into the hole.
   for (const [index, [mouthX, mouthY]] of POOL_POCKETS.entries()) {
@@ -165,6 +212,10 @@ function paintTable(ctx: CanvasRenderingContext2D, felt: PoolFelt, eightPocket: 
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fillStyle = hole;
     ctx.fill();
+    // A metal rim catching the light on the far side of the hole, so it reads as a round opening with depth.
+    const rim = ctx.createLinearGradient(x, y - inward * radius, x, y + inward * radius);
+    rim.addColorStop(0, '#d9c9a8b0'); rim.addColorStop(.5, '#7a6a5040'); rim.addColorStop(1, '#0000');
+    ctx.beginPath(); ctx.arc(x, y, radius + 1.5, 0, Math.PI * 2); ctx.strokeStyle = rim; ctx.lineWidth = 2.5; ctx.stroke();
     if (index === eightPocket) {
       ctx.strokeStyle = '#ffda72';
       ctx.lineWidth = 3;

@@ -82,6 +82,5 @@ export function LookPreview({ definition, scope, style, className, selected }: {
             </section>}
         </div></div></PhoneFrame>
     </div>}
-    <p className="hint">{tx('previewHint')}</p>
   </div>;
 }

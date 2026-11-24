@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SHARED_SCREEN_MINIGAMES, type ArcadeAction, type RoomSnapshot } from '@party/contracts';
-import { roomApi } from '../room/api.js';
+import { newId, roomApi } from '../room/api.js';
 import { navigate } from '../navigation.js';
 import { CopyButton } from '../room/join-qr.js';
 import { Popover } from '../room/room-chrome.js';
@@ -64,7 +64,17 @@ export function ArcadeLeaderNext({ state, disabled }: { state: RoomSnapshot; dis
     {needsDisplay && <ArcadeDisplayLink sessionId={state.view.sessionId} />}
     {next && <button type="button" className="primary arcade-next" disabled={disabled || busy || next.blocked} onClick={() => act(next.action)}>
       {NEXT_ICON[next.action] && <FaIcon name={NEXT_ICON[next.action]!} />}{next.label}</button>}
+    {/* After the results: the same game once more, with new values (another graph, new dots, a new target…). */}
+    {next?.action === 'end' && <PlayAgain lobbyId={arcade.lobbyId} disabled={disabled || busy} />}
   </div>;
+}
+
+function PlayAgain({ lobbyId, disabled }: { lobbyId: string; disabled: boolean }) {
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  // The room ends and every phone goes through the lobby straight into the new round.
+  const again = () => { setBusy(true); setError(''); void roomApi(`/api/arcade/lobbies/${lobbyId}/again`, { roundId: newId() }).catch(cause => { setError(arcadeProblem(cause)); setBusy(false); }); };
+  return <>{error && <p role="alert" className="error">{error}</p>}
+    <button type="button" className="ghost arcade-next" disabled={disabled || busy} onClick={again}><FaIcon name="rotate" /> {busy ? 'Starting…' : 'Play again'}</button></>;
 }
 
 function ArcadeDisplayLink({ sessionId }: { sessionId: string }) {

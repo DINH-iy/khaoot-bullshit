@@ -13,7 +13,6 @@ import { InvitePanel } from './invite-panel.js';
 import { FieldLimit } from '../controls/field-limit.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { readMemory, rememberPlace } from './editor-memory.js';
-import { EditorTour, finishEditorTour, needsEditorTour, TOUR_TEXTS } from './editor-tour.js';
 import { editingAction, editingLabel, modLabel, readZoomShortcuts, rememberZoomShortcuts, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
 import { HelpPanel } from './help-panel.js';
 import { Icon } from '../controls/icons.js';
@@ -57,8 +56,7 @@ function EditorPage({ gameId }: { gameId: string }) {
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
 function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: HostRole | null; historyIdentity: string | undefined }) {
   const d = useDraft(gameId, historyIdentity); const t = useTexts(SHELL_TEXTS);
-  const mediaText = useTexts(MEDIA_TEXTS); const savePointText = useTexts(SAVE_POINT_TEXTS); const tourText = useTexts(TOUR_TEXTS);
-  const [tour, setTour] = useState(needsEditorTour);
+  const mediaText = useTexts(MEDIA_TEXTS); const savePointText = useTexts(SAVE_POINT_TEXTS);
   const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
   const changeZoomShortcuts = (shortcuts: ZoomShortcuts) => { setZoomShortcuts(shortcuts); rememberZoomShortcuts(shortcuts); };
   const [rehearsing, setRehearsing] = useState(false);
@@ -160,7 +158,6 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
           ] : []),
           { label: savePointText('menu'), icon: 'save', shortcut: `${modLabel} + S`, onSelect: () => openPanel('savePoints') },
           { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: editingLabel('help', zoomShortcuts.edits.help), onSelect: () => setHelping(true) },
-          { label: tourText('title'), icon: 'help', onSelect: () => setTour(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}
         <PeerBar live={live} />
@@ -171,7 +168,6 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
       { label: selected.length !== 1 ? t('rehearseSelectOne') : fromScene ? t('rehearseSceneFix', { fix: fix(fromScene) }) : t('rehearseScene'),
         blocked: selected.length !== 1 || fromScene > 0, run: () => d.rehearse(selected[0]!) },
     ]} />}
-    {tour && <EditorTour onClose={() => { finishEditorTour(); setTour(false); }} />}
     {helping && <HelpPanel zoomShortcuts={zoomShortcuts} onZoomShortcuts={changeZoomShortcuts} onClose={() => setHelping(false)} />}
     {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly} onClose={() => setLibraryOpen(false)} />}
     {savePoints && <SavePointsPanel gameId={gameId} d={d} onClose={() => setSavePoints(false)} />}

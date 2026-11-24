@@ -13,8 +13,6 @@ test('a save point brings the game back after a change, keeps what it was, and c
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
-  const tour = page.getByRole('region', { name: 'Editor tour' });
-  if (await tour.isVisible().catch(() => false)) await tour.getByRole('button', { name: 'Skip tour' }).click();
   const saved = page.getByRole('status').filter({ hasText: 'All changes saved' });
   await expect(saved).toBeVisible({ timeout: 10_000 });
 
@@ -50,11 +48,19 @@ test('a save point brings the game back after a change, keeps what it was, and c
   await page.reload();
   await expect(page.getByLabel('Game name')).toHaveValue(`${name} (broken)`);
 
-  // The save points survive a reload (the panel stays open) and are deleted after a confirmation.
+  // The save points survive a reload (the panel stays open). Going back again keeps no new copy: the game as it is
+  // now is already the save point "Before going back", so nothing is lost and nothing piles up.
   const reopened = page.getByRole('region', { name: 'Save points' });
+  await reopened.getByRole('button', { name: 'Go back to “Before renaming”' }).click();
+  await page.getByRole('alertdialog', { name: 'Go back to “Before renaming”?' }).getByRole('button', { name: 'Go back' }).click();
+  await expect(page.getByLabel('Game name')).toHaveValue(name);
+  await expect(reopened.getByText('Back at save point “Before renaming”. Nothing was lost: what it was before is the save point “Before going back”.')).toBeVisible();
+  await expect(reopened.getByRole('listitem')).toHaveCount(2);
+  await expect(saved).toBeVisible({ timeout: 10_000 });
+  // Deleted after a confirmation.
   await reopened.getByRole('button', { name: 'Delete save point “Before renaming”' }).click();
   await page.getByRole('alertdialog', { name: 'Delete “Before renaming”?' }).getByRole('button', { name: 'Delete' }).click();
   await expect(reopened.getByRole('listitem')).toHaveCount(1);
-  await expect(reopened.getByRole('listitem')).toContainText('Before going back to “Before renaming”');
+  await expect(reopened.getByRole('listitem')).toContainText('Before going back');
   await page.screenshot({ path: test.info().outputPath('save-points.png') });
 });

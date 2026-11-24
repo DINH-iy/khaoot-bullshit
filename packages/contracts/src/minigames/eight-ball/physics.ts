@@ -1,4 +1,4 @@
-import { BALL_RADIUS, inPoolMouth, POCKET_RADIUS, POOL_BALL_PRESETS, POOL_JAWS, POOL_HEIGHT, POOL_MAX_MOTION_FRAMES, POOL_POCKETS, POOL_WIDTH, POOL_STEPS_PER_FRAME, type PoolImpact, type PoolBallBehavior, type PoolFrame, type PoolSpin } from './pool.js';
+import { BALL_RADIUS, inPoolMouth, POOL_BALL_PRESETS, POOL_JAWS, POOL_HEIGHT, POOL_MAX_MOTION_FRAMES, POOL_POCKETS, POOL_WIDTH, POOL_STEPS_PER_FRAME, type PoolImpact, type PoolBallBehavior, type PoolFrame, type PoolSpin } from './pool.js';
 
 const RATE = 120;
 const SAMPLE_INTERVAL = POOL_STEPS_PER_FRAME;
@@ -28,6 +28,9 @@ function collide(a: Ball, b: Ball) {
   return impulse;
 }
 
+/** The radius of a jaw's rounded nose. */
+const JAW_ROUND = 4;
+
 function cushion(ball: Ball, bounce: number, sideSpin: number) {
   let impact = 0;
   // Pocket openings have no cushion: the ball runs on into the pocket unless it clips a jaw.
@@ -43,14 +46,19 @@ function cushion(ball: Ball, bounce: number, sideSpin: number) {
     ball.vy = (ball.y === BALL_RADIUS ? Math.abs(ball.vy) : -Math.abs(ball.vy)) * bounce;
     ball.vx -= ball.vy * sideSpin * .23;
   }
-  for (const [jx, jy] of POOL_JAWS) {
+  // Each jaw is a rounded cushion nose set into the rail at the pocket's edge: a ball that catches the edge of an
+  // opening is reflected out off its curve, the way a real pocket's point throws it back.
+  for (const [tipX, tipY] of POOL_JAWS) {
+    const jx = tipX === 0 ? -JAW_ROUND : tipX === POOL_WIDTH ? POOL_WIDTH + JAW_ROUND : tipX;
+    const jy = tipY === 0 ? -JAW_ROUND : tipY === POOL_HEIGHT ? POOL_HEIGHT + JAW_ROUND : tipY;
+    const reach = BALL_RADIUS + JAW_ROUND;
     const dx = ball.x - jx, dy = ball.y - jy;
     const distance = Math.hypot(dx, dy);
-    if (distance >= BALL_RADIUS || distance === 0) continue;
+    if (distance >= reach || distance === 0) continue;
     const nx = dx / distance, ny = dy / distance;
     const toward = ball.vx * nx + ball.vy * ny;
-    ball.x = jx + nx * BALL_RADIUS;
-    ball.y = jy + ny * BALL_RADIUS;
+    ball.x = jx + nx * reach;
+    ball.y = jy + ny * reach;
     if (toward >= 0) continue;
     ball.vx -= (1 + bounce) * toward * nx;
     ball.vy -= (1 + bounce) * toward * ny;
@@ -59,10 +67,13 @@ function cushion(ball: Ball, bounce: number, sideSpin: number) {
   return impact;
 }
 
-/** The pocket a ball drops into: near a pocket's middle, or past the edge of the cloth through an opening. */
+/**
+ * The pocket a ball drops into, once more than half of it is over the edge of the cloth (its centre past the edge).
+ * That only happens at a pocket opening (elsewhere the cushion keeps it on the table), so a ball that only grazes an
+ * opening on its way along the rail rolls on: it is not pulled in from beside the pocket.
+ */
 function pocketFor(ball: Ball) {
-  const near = POOL_POCKETS.findIndex(([x, y]) => Math.hypot(x - ball.x, y - ball.y) < POCKET_RADIUS);
-  if (near !== -1 || (ball.x >= 0 && ball.x <= POOL_WIDTH && ball.y >= 0 && ball.y <= POOL_HEIGHT)) return near;
+  if (ball.x >= 0 && ball.x <= POOL_WIDTH && ball.y >= 0 && ball.y <= POOL_HEIGHT) return -1;
   let closest = 0;
   for (const [index, [x, y]] of POOL_POCKETS.entries()) {
     const [cx, cy] = POOL_POCKETS[closest]!;

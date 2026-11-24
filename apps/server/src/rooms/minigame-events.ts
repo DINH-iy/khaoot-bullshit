@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { GameIdSchema, StrokeSchema, type MinigameSettings } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { minigameRules, parseDefinition } from '../game/definition.js';
-import { locateStage } from '../game/graph.js';
+import { locateRunStage } from '../game/graph.js';
 import { EligibilitySchema } from '../game/model.js';
 import { readMinigameRun } from '../minigames/shared/rules.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay-drawing/relay.js';
@@ -31,7 +31,7 @@ export function registerMinigameEvents(io: Server, client: PrismaClient, live: L
     let result: Running | null = null;
     const run = stage ? readMinigameRun(stage.presentation) : null;
     if (stage && run) {
-      const entry = locateStage(parseDefinition(stage.session.gameVersion.definition), stage.nodeKey, stage.stageKey);
+      const entry = locateRunStage(parseDefinition(stage.session.gameVersion.definition), stage);
       if (entry?.stage.kind === 'minigame') {
         const rules = minigameRules(entry.stage); const eligible = EligibilitySchema.safeParse(stage.eligibility);
         const context = rules.game === 'relay-drawing' ? await teamContext(client as unknown as Transaction, stage) : null;

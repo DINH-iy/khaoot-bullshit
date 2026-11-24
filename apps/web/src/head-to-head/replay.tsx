@@ -58,9 +58,10 @@ function draw(ctx: CanvasRenderingContext2D, replay: HeadToHeadReplay, index: nu
   ctx.font = `${cell * 0.8}px "Segoe UI Symbol", "Noto Sans Symbols 2", serif`;
   squaresOf(frame.fen).forEach(({ square, piece }, at) => {
     const x = (at % 8) * cell; const y = Math.floor(at / 8) * cell;
-    ctx.fillStyle = square === frame.from || square === frame.to ? '#cdb64a' : (Math.floor(at / 8) + at) % 2 === 0 ? '#ede6d6' : '#7b6aa8'; ctx.fillRect(x, y, cell, cell);
-    if (piece) { ctx.fillStyle = piece === piece.toUpperCase() ? '#fff' : '#111'; ctx.strokeStyle = piece === piece.toUpperCase() ? '#111' : '#fff'; ctx.lineWidth = 1;
-      ctx.fillText(`${PIECES[piece]}︎`, x + cell / 2, y + cell / 2 + 2); ctx.strokeText(`${PIECES[piece]}︎`, x + cell / 2, y + cell / 2 + 2); }
+    ctx.fillStyle = square === frame.from || square === frame.to ? '#e6c95a' : (Math.floor(at / 8) + at) % 2 === 0 ? '#e9e3f7' : '#6f5bb0'; ctx.fillRect(x, y, cell, cell);
+    // Filled pieces for both sides: the edge first, then the fill on top, like the board.
+    if (piece) { const white = piece === piece.toUpperCase(); ctx.fillStyle = white ? '#fff' : '#1b1830'; ctx.strokeStyle = white ? '#1b1830' : '#f4f1ff'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+      ctx.strokeText(`${PIECES[piece]}︎`, x + cell / 2, y + cell / 2 + 2); ctx.fillText(`${PIECES[piece]}︎`, x + cell / 2, y + cell / 2 + 2); }
   });
 }
 

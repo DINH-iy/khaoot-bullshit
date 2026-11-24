@@ -14,6 +14,7 @@ import { FIELDS_TEXTS } from '../fields.text.js';
 import { gameDescription, gameName } from '../../../presentation/catalog.text.js';
 const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
 import { InfoTip } from '../../controls/info-tip.js';
+import { MinigameDrawFields } from './minigame-draw-fields.js';
 
 const rainbow = () => t('rainbow');
 type Change = (next: Definition, group?: string) => void;
@@ -27,7 +28,7 @@ const ms = (text: string, min: number, max: number) => Math.round(Math.min(max, 
  * minigame is chosen when the scene is added; it is only asked here for a scene
  * whose minigame is still to be chosen (for example one imported from text).
  */
-export function MinigameFields({ part, definition, node, index, onChange }: { part: 'settings' | 'points'; definition: Definition; node: Node; index: number; onChange: Change }) {
+export function MinigameFields({ part, definition, node, index, onChange, inDraw = false }: { part: 'settings' | 'points'; definition: Definition; node: Node; index: number; onChange: Change; inDraw?: boolean }) {
   const a = useTexts(ANIMATION_TEXTS);
   const numberText = useTexts(NUMBER_CHOICE_TEXTS);
   const stage = node.stages[index]!; const game = String(stage['game'] ?? '');
@@ -70,8 +71,18 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
       onChange={tiebreak => edit(current => { const copy: Stage = { ...current }; if (tiebreak === 'shared') copy['tiebreak'] = 'shared'; else delete copy['tiebreak']; return copy; }, 'tiebreak')}
       choices={[{ value: 'faster', label: t('tieFaster') }, { value: 'shared', label: t('tieShared') }]} />}
   </> : null;
+  // One game or a draw in this one scene. A draw's games are each set with their pencil: the usual settings below,
+  // on a stand-in scene of that game (inside the draw, without the choice again).
+  const drawChoice = !inDraw && known && <MinigameDrawFields definition={definition} node={node} index={index} onChange={onChange}
+    settingsFor={(standIn, onStage) => {
+      const virtual = { ...definition, nodes: definition.nodes.map(entry => entry.key === node.key ? { ...entry, stages: entry.stages.map((current, at) => at === index ? standIn : current) } : entry) } as Definition;
+      return <MinigameFields part="settings" inDraw definition={virtual} node={virtual.nodes.find(entry => entry.key === node.key)!} index={index}
+        onChange={next => { const changed = next.nodes.find(entry => entry.key === node.key)?.stages[index]; if (changed) onStage(changed); }} />;
+    }} />;
+  if (!inDraw && Array.isArray(stage['draw'])) return <div className="minigame-fields">{drawChoice}</div>;
   return <div className="minigame-fields">
-    {known ? <div className="configuration-game"><strong>{gameName(game)}</strong>
+    {drawChoice}
+    {inDraw ? null : known ? <div className="configuration-game"><strong>{gameName(game)}</strong>
       <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('changeMinigame')}</button></div>
     : <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('chooseMinigame')}</button>}
     {/* A new minigame starts from its own defaults and a fitting timer; a team minigame gets round-only teams of two, which the host can change. */}

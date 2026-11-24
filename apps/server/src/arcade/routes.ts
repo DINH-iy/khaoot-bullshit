@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, ArcadePickSchema, GameIdSchema, isArcadeGame, type RoomReply } from '@party/contracts';
+import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeGraphsSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, ArcadePickSchema, GameIdSchema, isArcadeGame, type RoomReply } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { GameError } from '../game/errors.js';
@@ -9,6 +9,7 @@ import { allowedOrigin, RateLimiter, RoomError, roomAssert, roomCookie } from '.
 import { CONNECTED_MS, createLobbies, ensureLeader, lockLobby, lookOf, memberCookie, present } from './lobbies.js';
 import { leaderboard, lobbyScores } from './results.js';
 import type { Rounds } from './rounds.js';
+import { graphLibrary } from '../minigames/draw-the-graph/library.js';
 
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, ROOM_NOT_AVAILABLE: 404, AUTH_UNAVAILABLE: 503,
   LOBBY_PASSWORD_REQUIRED: 403, LOBBY_LOCKED: 409, LOBBY_FULL: 409, ARCADE_FULL: 409, ROUND_ON: 409, NOT_ENOUGH_PLAYERS: 409, INVALID_STATE: 409, REVISION_CONFLICT: 409 };
@@ -136,6 +137,16 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
   // A phone in a round's room checks in here, so its member stays present (and leader) while playing.
   app.post('/api/arcade/lobbies/:lobbyId/here', async (request, reply) => {
     try { guard(request, 'view', 1200); const lobbyId = lobbyParam(request); await lobbies.touch(await requireMember(request, lobbyId)); return { ok: true, data: {} }; } catch (error) { return fail(reply, error); }
+  });
+  // The graph library for picking a Draw the Graph chart: lobby members only, and never the hidden half.
+  app.get('/api/arcade/lobbies/:lobbyId/graphs', async (request, reply) => {
+    try {
+      guard(request, 'view', 1200); const lobbyId = lobbyParam(request); await requireMember(request, lobbyId);
+      return { ok: true, data: ArcadeGraphsSchema.parse({ graphs: (await graphLibrary(client)).map(entry => entry.entry) }) };
+    } catch (error) { return fail(reply, error); }
+  });
+  app.post('/api/arcade/lobbies/:lobbyId/again', async (request, reply) => {
+    try { guard(request, 'act', 240); const lobbyId = lobbyParam(request); return { ok: true, data: await rounds.again(await requireMember(request, lobbyId), request.body) }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/arcade/lobbies/:lobbyId/rounds', async (request, reply) => {
     try { guard(request, 'act', 240); const lobbyId = lobbyParam(request); return { ok: true, data: await rounds.start(await requireMember(request, lobbyId), request.body) }; } catch (error) { return fail(reply, error); }

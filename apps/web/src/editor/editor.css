@@ -967,9 +967,6 @@
 .writing-starters > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .writing-starters summary { cursor: pointer; }
 
-.editor-tour { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--e-border); }
-.editor-tour p { margin: 0; flex: 1 1 300px; font-size: .9rem; }
-.editor-tour > div { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .replace-scene-dialog { max-width: calc(100% - 24px); max-height: calc(100% - 24px); overflow: auto; }
 .replace-scene-dialog:not([open]) { display: none; }
@@ -984,7 +981,6 @@
 /* Ends on `none` and fills only backwards: an animation still applied after it ends (`both`) keeps a dialog the frame for fixed descendants in Firefox, and dropdown lists (and dialogs) opened in it were placed off by its offset. */
 @keyframes editor-panel-enter { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
-.editor:has(> .editor-tour) { grid-template-rows: auto auto minmax(0, 1fr); }
 
 
 .scene-editor > .scene-stage { display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0; min-height: 0; padding: clamp(8px, 1.3vw, 20px); gap: 10px; }

@@ -130,8 +130,15 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
     case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
     case 'minigame': {
       // `game` by key or by name ("Tap race"); unknown names stay a placeholder to choose in the editor.
+      const keyOf = (value: unknown) => { const name = text(value).toLowerCase().trim().replace(/\s+/g, '-'); return MINIGAME_KEYS.find(entry => entry === name || MINIGAMES[entry].name.toLowerCase().replace(/\s+/g, '-') === name); };
+      // `draw`: a minigame draw in this one scene, 2 to 8 games, each a name or { "game", "seconds", "settings" }; one is drawn when the scene starts.
+      const drawn = Array.isArray(raw['draw']) ? raw['draw'].flatMap(entry => {
+        const item: Json = isObject(entry) ? entry : { game: entry }; const drawnGame = keyOf(item['game']); if (!drawnGame) return [];
+        return [{ game: drawnGame, ...(isObject(item['settings']) ? { settings: item['settings'] } : {}), durationMs: seconds(item) ?? MINIGAMES[drawnGame].defaultSeconds * 1000 }];
+      }).slice(0, 8) : [];
+      const draw = drawn.length >= 2 ? { draw: drawn } : {};
       const wanted = text(raw['game']).toLowerCase().trim().replace(/\s+/g, '-');
-      const game = MINIGAME_KEYS.find(entry => entry === wanted || MINIGAMES[entry].name.toLowerCase().replace(/\s+/g, '-') === wanted) ?? (wanted || 'to-be-chosen');
+      const game = drawn.length >= 2 ? drawn[0]!.game : keyOf(raw['game']) ?? (wanted || 'to-be-chosen');
       const known = isMinigameKey(game);
       const points = Array.isArray(raw['points']) ? raw['points'].map(entry => milli(entry)).filter(entry => entry !== undefined).slice(0, 12) : [];
       const teamResult = ['best', 'average', 'total'].includes(text(raw['teamResult'])) ? { teamResult: text(raw['teamResult']) } : {};
@@ -147,7 +154,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const busSips = Array.isArray(raw['sips']) && raw['sips'].length === 4 ? raw['sips'].map(entry => Math.round(Math.min(20, Math.max(0, Number(entry) || 0)))) : null;
       const sips = game === 'bus' && (busSips || raw['rainbow'] === false) ? { settings: { sips: busSips ?? [1, 2, 3, 4], ...(raw['rainbow'] === false ? { rainbow: false } : {}) } } : {};
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
     }
     case 'duel': {
       // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.
