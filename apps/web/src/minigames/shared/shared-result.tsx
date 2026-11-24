@@ -47,6 +47,13 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
   const otherAwards = reveal.awards.filter(award => !rankedPlayers.has(award.playerId));
   const nameOf = (id: string) => players.get(id)?.displayName ?? playText('formerPlayer');
   const points = (milli: string | undefined) => milli === undefined ? '—' : labels('points', { points: formatPoints(milli) });
+  // A team row: the team's own award, or (when a round pays the members instead) what each member got.
+  const teamPoints = (teamId: string) => {
+    const own = teamAwards.get(teamId); if (own !== undefined) return points(own);
+    const members = stage.teams?.teams.find(team => team.teamId === teamId)?.memberIds ?? [];
+    const amounts = [...new Set(members.map(id => awards.get(id)).filter(amount => amount !== undefined))];
+    return amounts.length === 1 ? labels('pointsEach', { points: formatPoints(amounts[0]!) }) : points(undefined);
+  };
   const coin = answer.coin;
   const animateRoulette = state.role === 'display' || !state.displayConnected;
   const prediction = coin !== undefined || answer.roulette !== undefined;
@@ -84,7 +91,7 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
           {entry.stroke && <span className="mg-circle"><DrawingView drawings={[{ v: 1, strokes: [{ c: 0, w: 14, p: entry.stroke }] }]} label={c('circleBy', { name })} /></span>}
           <span>{minigameResult(game, entry.value, settings, !playerId, entry)}</span>
         </div>
-        <strong className="mg-result-points">{points(playerId ? awards.get(playerId) : teamId ? teamAwards.get(teamId) : undefined)}</strong>
+        <strong className="mg-result-points">{playerId ? points(awards.get(playerId)) : teamId ? teamPoints(teamId) : points(undefined)}</strong>
         {bus && <div className="mg-result-board">{STEP_RENDERERS.bus?.board?.(bus, settings, false)}</div>}
         {picture && <div className="mg-result-drawing">{picture}</div>}
       </li>;

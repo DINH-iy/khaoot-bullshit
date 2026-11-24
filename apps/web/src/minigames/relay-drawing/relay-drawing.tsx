@@ -7,6 +7,9 @@ import { CONTROL_TEXTS } from '../shared/controls.text.js';
 import { PagedResultList } from '../../ui/paged-result-list.js';
 import { useText } from '../../presentation/look.js';
 import { DrawingPad } from '../../drawing/drawing-pad.js';
+import { DRAWING_TEXTS } from '../../drawing/drawing.text.js';
+import { Icon } from '../../presentation/line-icons.js';
+import { StageAction } from '../../room/stage-action.js';
 import { DrawingView, uploadDrawing, useDrawings } from '../../drawing/drawing-view.js';
 import { ANIMATION_TEXTS, DrawingAnimation, useAnimationWords } from './animation-relay.js';
 import { Countdown } from '../shared/countdown.js';
@@ -77,7 +80,7 @@ export function RelayDrawing({ state, stage, offset, canPlay, disabled, onVote, 
 
 /** This player's turn: draw on top of the team's picture; the strokes are sent when the turn ends (or earlier, when done). */
 function MyTurn({ sessionId, stageRunId, team, animation, turn, turnLeft, disabled, onPart, sendStroke }: { sessionId: string; stageRunId: string; team: Team; animation: boolean; turn: number; turnLeft: number; disabled: boolean; onPart: (turn: number, assetId: string) => void; sendStroke: MinigameLive['sendStroke'] }) {
-  const t = useText(); const c = useTexts(CONTROL_TEXTS); const [drawing, setDrawing] = useState(emptyDrawing()); const sent = useRef(false); const [error, setError] = useState('');
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const d = useTexts(DRAWING_TEXTS); const [drawing, setDrawing] = useState(emptyDrawing()); const sent = useRef(false); const [error, setError] = useState('');
   const parts = useDrawings(sessionId, team.parts.map(part => part.assetId));
   const latest = useRef(drawing); latest.current = drawing;
   // Others see the strokes as they are drawn: a growing stroke at most every 100 ms, every finished stroke, and undo.
@@ -95,10 +98,11 @@ function MyTurn({ sessionId, stageRunId, team, animation, turn, turnLeft, disabl
   // At the end of the turn the strokes go, whatever is drawn (an empty turn is allowed).
   useEffect(() => { if (turnLeft <= 300) send(); });
   return <div className="mg-turn">
-    <p className="mg-sub"><strong>{t('minigame.yourTurn')}</strong> · {Math.ceil(turnLeft / 1000)} s</p>
+    {/* The turn line carries the send button, so the drawing keeps the room. */}
+    <div className="mg-turn-head"><p className="mg-sub"><strong>{t('minigame.yourTurn')}</strong> <span className="turn-seconds">{Math.ceil(turnLeft / 1000)} s</span></p>
+      <StageAction><button type="button" className="primary drawing-submit" aria-label={t('drawing.submit')} disabled={disabled || sent.current} onClick={send}><Icon name="send" size={18} /><span>{d('send')}</span></button></StageAction></div>
     <DrawingPad value={drawing} onChange={change} onStrokeProgress={progress} under={animation ? [] : parts} disabled={disabled || sent.current} label={c('teamDrawingTurn')} />
     {error && <p role="alert" className="error">{error}</p>}
-    <button type="button" className="primary" disabled={disabled || sent.current} onClick={send}>{t('drawing.submit')}</button>
   </div>;
 }
 

@@ -36,7 +36,7 @@ describe('importing a game from text', () => {
     expect(stage('roulette')).toMatchObject({ kind: 'minigame', game: 'red-or-black-roulette', durationMs: 15_000, placementMilli: ['10000'] });
     expect(game).toMatchObject({ presentation: { phoneMenuIcons: { scores: 'star', games: 'wheel', packs: 'sparkles', blackjack: 'cards' } } });
     expect(stage('pool')).toMatchObject({ kind: 'duel', pick: 'random', durationMs: 20_000, betMilli: '2000', matchSeconds: 120,
-      contest: { kind: 'game', game: 'eight-ball', settings: { ballBehavior: { preset: 'arcade' }, start: { side: 'random', percent: 30 } } }, places: { kind: 'list', pointsMilli: ['10000'] } });
+      contest: { kind: 'game', game: 'eight-ball', settings: { ballBehavior: { preset: 'arcade' }, start: { side: 'random', percent: 30 }, felt: 'blue' } }, places: { kind: 'list', pointsMilli: ['10000'] } });
     // The minigame draw: a party choice decided by a draw, one minigame scene per game; the team game gets teams for that round.
     expect(stage('draw')).toMatchObject({ kind: 'route', durationMs: null, decide: { method: 'draw' }, options: [{ label: 'Tap race' }, { label: 'Relay drawing' }] });
     expect(game.edges.filter(edge => edge.from === 'draw').map(edge => edge.to)).toEqual(['draw-tap', 'draw-relay']);
@@ -57,6 +57,12 @@ describe('importing a game from text', () => {
     expect(stage('art')['scoring']).toEqual({ kind: 'judged', maxAwardMilli: '10000', places: { kind: 'list', pointsMilli: ['10000', '5000'] } });
     expect(stage('joke')['scoring']).toEqual({ kind: 'none' });
     expect(stage('pic')['scoring']).toEqual({ kind: 'judged', maxAwardMilli: '5000' });
+  });
+
+  it('names the teams of a Pick teams scene, filling missing names with the standard ones', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Named', scenes: [{ id: 'pick', type: 'pick-teams', teams: 3, names: ['Sharks', 'Jets'], colors: 'teams' }] }));
+    expect(issues).toEqual([]);
+    expect((definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]!['form']).toMatchObject({ names: ['Sharks', 'Jets', 'Green'], colors: 'teams' });
   });
 
   it('imports a minigame draw with a timer, so it draws by itself', () => {

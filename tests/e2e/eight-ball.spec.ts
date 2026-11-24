@@ -97,7 +97,6 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await expect(sidewaysTable).toBeInViewport({ ratio: 1 });
     await expect(power).toBeInViewport({ ratio: 1 });
     await expect(landscape.getByRole('button', { name: 'Shoot' })).toBeInViewport({ ratio: 1 });
-    await expect(power).toHaveCSS('writing-mode', 'vertical-lr');
     await expect(landscape.locator('.pool-landscape-frame')).toHaveCSS('transform', /^matrix\(0, 1, -1, 0,/);
     const rotated = (await sidewaysTable.boundingBox())!;
     expect(rotated.height).toBeGreaterThan(portraitWidth * 1.3);
@@ -131,7 +130,7 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: rotatedX, y: shaftY }] });
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect(shoot).toBeEnabled();
-    await expect(aim).toHaveValue('0');
+    await expect(aim).toHaveAttribute('aria-valuenow', '0');
 
     let releaseMove!: () => void;
     const moveGate = new Promise<void>(resolve => { releaseMove = resolve; });
@@ -158,8 +157,8 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     try {
       await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: rotatedX, y: shaftY }] });
       await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: rotatedX, y: shaftY - rotated.height * 125 / POOL_CANVAS_WIDTH }] });
-      await expect(aim).toHaveValue('0');
-      expect(Number(await power.inputValue())).toBeGreaterThan(75);
+      await expect(aim).toHaveAttribute('aria-valuenow', '0');
+      expect(Number(await power.getAttribute('aria-valuenow'))).toBeGreaterThan(75);
       await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await expect(sidewaysTable).toHaveAttribute('data-shot-at-strike', '0');
       await expect.poll(cueAtStart).toBeLessThan(100);

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { chooseOption } from './helpers.js';
+import { chooseOption, removeForkedStyles } from './helpers.js';
 
 const token = process.env['LOCAL_OWNER_TOKEN'];
 if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -24,68 +24,72 @@ async function setColour(page: Page, name: string, code: string) {
   await picker.getByLabel('Hex code').fill(code);
   await picker.getByLabel('Hex code').press('Enter');
 }
+// The style list shows one group at a time.
+const styleGroup = (page: Page, name: string) => page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name, exact: true }).click();
 const group = (page: Page, title: RegExp) => page.locator('.look-panel summary').filter({ has: page.locator('.ed-section-title', { hasText: title }) });
 
-test('changing a style asks first, and a later font change keeps the style and its colours', async ({ page, baseURL }, info) => {
+const savedStyle = async (page: Page, baseURL: string, name: string) => ((await (await page.request.get(`${baseURL}/api/host/styles`, { headers: headers(baseURL) })).json()).data as { name: string; theme: unknown }[]).find(style => style.name === name)?.theme;
+/** The name of the style a change to a built-in one made, from the note under the styles. */
+const forkedName = async (page: Page, builtIn: string) => {
+  const note = page.getByRole('status').filter({ hasText: `made a new style: My ${builtIn}` });
+  await expect(note).toBeVisible();
+  return (await note.textContent())!.replace(/^.*made a new style: /, '').replace(/\.$/, '');
+};
+
+test('a built-in style is never changed: the first change makes a new style of yours, without asking, and it follows later changes', async ({ page, baseURL }, info) => {
   test.skip(info.project.name !== 'desktop-chrome', 'Look & feel is an editor task.');
   const { theme } = await openLook(page, baseURL!);
+  await styleGroup(page, 'Everyday');
   await page.getByRole('button', { name: 'Pub quiz', exact: true }).click();
   // The reported steps: a style, its background colour, then the font.
   await group(page, /^Colours$/).click();
   await setColour(page, 'Background', '#336699');
-  const asked = page.getByRole('dialog', { name: 'Change “Pub quiz”?' });
-  await expect(asked.getByLabel('Name of the style')).toHaveValue('My Pub quiz');
-  // Cancel drops the change; the style stays as it was.
-  await asked.getByRole('button', { name: 'Cancel' }).click();
-  await expect(asked).toHaveCount(0);
-  await setColour(page, 'Background', '#336699');
-  await asked.getByRole('button', { name: 'Only change this look' }).click();
+  await expect(page.getByRole('dialog', { name: /^Change/ })).toHaveCount(0);
+  const name = await forkedName(page, 'Pub quiz');
   await group(page, /^Text$/).click();
   await chooseOption(page.getByRole('combobox', { name: 'Font', exact: true }), 'mono');
   await expect.poll(theme).toEqual({ preset: 'pub', colors: { background: '#336699' }, font: 'mono' });
-  // Asked once: further changes go straight to this look.
-  await expect(asked).toHaveCount(0);
-  await expect(group(page, /^Style$/)).toContainText('Pub quiz');
+  // The new style keeps following, and the look is that style (shown under Yours, selected).
+  await expect.poll(() => savedStyle(page, baseURL!, name)).toEqual({ preset: 'pub', colors: { background: '#336699' }, font: 'mono' });
+  await expect(group(page, /^Style$/)).toContainText(name);
+  await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await removeForkedStyles(page, baseURL!, 'Pub quiz');
 });
 
-test('a changed style becomes a new saved style that keeps following the changes, and can be deleted', async ({ page, baseURL }, info) => {
+test('changing your own style asks: update it or save the change as a new style; it can be deleted', async ({ page, baseURL }, info) => {
   test.skip(info.project.name !== 'desktop-chrome', 'Look & feel is an editor task.');
   const { theme } = await openLook(page, baseURL!);
-  const name = `Night ${randomUUID().slice(0, 6)}`;
+  await styleGroup(page, 'Everyday');
   await page.getByRole('button', { name: 'Gala', exact: true }).click();
   await group(page, /^Text$/).click();
   await chooseOption(page.getByRole('combobox', { name: 'Font', exact: true }), 'mono');
-  const asked = page.getByRole('dialog', { name: 'Change “Gala”?' });
-  await asked.getByLabel('Name of the style').fill(name);
-  await asked.getByRole('button', { name: 'Create new style' }).click();
-  await expect(asked).toHaveCount(0);
-  await expect(page.getByRole('status').filter({ hasText: `${name} is saved with your styles.` })).toBeVisible();
+  const name = await forkedName(page, 'Gala');
   const card = page.getByRole('button', { name, exact: true });
   await expect(card).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(theme).toEqual({ preset: 'elegant', font: 'mono' });
 
-  // The saved style follows further changes without asking again.
-  await chooseOption(page.getByRole('combobox', { name: 'Font for titles', exact: true }), 'slab');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  const saved = async () => ((await (await page.request.get(`${baseURL}/api/host/styles`, { headers: headers(baseURL!) })).json()).data as { name: string; theme: unknown }[]).find(style => style.name === name)?.theme;
-  await expect.poll(saved).toEqual({ preset: 'elegant', font: 'mono', headingFont: 'slab' });
-  await expect(card).toHaveAttribute('aria-pressed', 'true');
-
   // Picking a built-in style and the saved one again brings its look back.
+  await styleGroup(page, 'Everyday');
   await page.getByRole('button', { name: 'Clean', exact: true }).click();
+  await styleGroup(page, 'Yours');
   await card.click();
-  await expect.poll(theme).toEqual({ preset: 'elegant', font: 'mono', headingFont: 'slab' });
+  await expect.poll(theme).toEqual({ preset: 'elegant', font: 'mono' });
 
-  // An own style offers to update it too.
+  // An own style asks first: update it, or keep it and save the change as a new style. Never only here.
   await chooseOption(page.getByRole('combobox', { name: 'Font', exact: true }), 'serif');
   const own = page.getByRole('dialog', { name: `Change “${name}”?` });
+  await expect(own.getByRole('button', { name: 'Only change this look' })).toHaveCount(0);
   await own.getByRole('button', { name: `Update “${name}”` }).click();
-  await expect.poll(saved).toEqual({ preset: 'elegant', font: 'serif', headingFont: 'slab' });
+  await expect.poll(() => savedStyle(page, baseURL!, name)).toEqual({ preset: 'elegant', font: 'serif' });
+  // Asked once: later changes follow the style.
+  await chooseOption(page.getByRole('combobox', { name: 'Font for titles', exact: true }), 'slab');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(() => savedStyle(page, baseURL!, name)).toEqual({ preset: 'elegant', font: 'serif', headingFont: 'slab' });
 
   await page.getByRole('button', { name: `Delete style ${name}` }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete style' }).click();
   await expect(card).toHaveCount(0);
-  await expect.poll(saved).toBeUndefined();
+  await expect.poll(() => savedStyle(page, baseURL!, name)).toBeUndefined();
   // The game keeps its look.
   await expect.poll(theme).toEqual({ preset: 'elegant', font: 'serif', headingFont: 'slab' });
 });
@@ -94,6 +98,12 @@ test('the current look can be saved as a new style', async ({ page, baseURL }, i
   test.skip(info.project.name !== 'desktop-chrome', 'Look & feel is an editor task.');
   await openLook(page, baseURL!);
   const name = `Own ${randomUUID().slice(0, 6)}`;
+  // The last tile of your own styles: same size as a style, with a dashed edge.
+  await styleGroup(page, 'Yours');
+  await expect(page.getByRole('button', { name: 'Save as new style' })).toHaveClass(/new-style-card/);
+  // “This scene” is the preview shown first.
+  await expect(page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'This scene', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  if (process.env['DRAW_SHOTS']) await page.screenshot({ path: `${process.env['DRAW_SHOTS']}/look-and-feel.png` });
   await page.getByRole('button', { name: 'Save as new style' }).click();
   const dialog = page.getByRole('dialog', { name: 'Save as new style' });
   await dialog.getByLabel('Name of the style').fill(name);

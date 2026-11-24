@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { DRAWING_COLORS, DRAWING_SIZE, DRAWING_WIDTHS, MAX_DRAWING_POINTS, type Drawing, type Stroke } from '@party/contracts';
 import { useTexts } from '../i18n/texts.js';
 import { DRAWING_TEXTS } from './drawing.text.js';
@@ -31,6 +31,8 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
   bringIntoView?: boolean;
 }) {
   const t = useText(); const d = useTexts(DRAWING_TEXTS); const surface = useRef<SVGSVGElement>(null); const hintId = useId();
+  const pad = useRef<HTMLDivElement>(null); const toolbox = useRef<HTMLDivElement>(null);
+  const fitted = useFitToScreen(pad, surface, toolbox);
   const [color, setColor] = useState(0); const [width, setWidth] = useState(1); const [current, setCurrent] = useState<Stroke | null>(null);
   // The eraser: the paper's colour (white, palette index 1) at the chosen size.
   const [erasing, setErasing] = useState(false); const ink = erasing ? PAPER : color;
@@ -85,10 +87,10 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
   const cannotEdit = disabled || !value.strokes.length;
   const undo = () => onChange({ ...value, strokes: value.strokes.slice(0, -1) });
   const clear = () => onChange({ ...value, strokes: [] });
-  return <div className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}${erasing ? ' erasing' : ''}`}>
+  return <div ref={pad} className={`drawing-pad${blind ? ' blind' : ''}${disabled ? ' disabled' : ''}${erasing ? ' erasing' : ''}`}>
     {/* Impossible to miss: in a blind round your own lines stay hidden until you send the drawing. */}
     {blind && <p className="blind-banner"><span aria-hidden="true">🙈</span><strong>{t('drawing.blindTitle')}</strong><small>{t('drawing.blindHint')}</small></p>}
-    <svg ref={surface} className="drawing-surface" viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription={d('area')} aria-label={label}
+    <svg ref={surface} className="drawing-surface" style={fitted ? { width: fitted } : undefined} viewBox={`0 0 ${DRAWING_SIZE} ${DRAWING_SIZE}`} role="application" aria-roledescription={d('area')} aria-label={label}
       aria-describedby={hintId} tabIndex={disabled ? -1 : 0} onKeyDown={key} onBlur={() => setPen(previous => ({ ...previous, active: false }))}
       onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
       <rect width={DRAWING_SIZE} height={DRAWING_SIZE} fill="#ffffff" />
@@ -99,7 +101,7 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
     </svg>
     <p id={hintId} className="drawing-keys">{d('keyboard')}</p>
     {blind && <p className="drawing-note">{t('drawing.blind')} · {value.strokes.length + (current ? 1 : 0)}</p>}
-    {tools && <div className="drawing-tools">
+    {tools && <div ref={toolbox} className="drawing-tools">
       <div className="drawing-colors" role="radiogroup" aria-label={t('drawing.colour')}>{DRAWING_COLORS.map((swatch, index) => <button key={swatch} type="button" role="radio" aria-checked={!erasing && color === index} aria-label={d(COLOR_NAMES[index]!)}
         style={{ background: swatch }} onClick={() => { setColor(index); setErasing(false); }} />)}</div>
       {/* Sizes, the eraser (it rubs out at the chosen size), undo and start over. On a short screen they share one row
@@ -113,4 +115,37 @@ export function DrawingPad({ value, onChange, under = [], blind = false, maxStro
       </div>
     </div>}
   </div>;
+}
+
+/** Space kept free under the pad on a phone: the card's own padding and a little air. */
+const PHONE_MARGIN = 28;
+/**
+ * On a phone (in a room or the test bench), the square takes all the height that is left: from its top to
+ * the bottom of the screen (above the floating menu bar), minus the tools under it, and never wider than the
+ * pad. Measured, not guessed, so it follows every layout, text size and screen. Elsewhere it is left to CSS.
+ */
+function useFitToScreen(pad: React.RefObject<HTMLDivElement | null>, surface: React.RefObject<SVGSVGElement | null>, toolbox: React.RefObject<HTMLDivElement | null>) {
+  const [size, setSize] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const box = pad.current; if (!box?.closest('.room-player')) return;
+    const measure = () => {
+      const square = surface.current; if (!square) return;
+      const dock = document.querySelector('.phone-dock-buttons')?.getBoundingClientRect();
+      const bottom = (dock && dock.height ? dock.top : innerHeight) - PHONE_MARGIN;
+      const gap = parseFloat(getComputedStyle(box).rowGap) || 0;
+      const below = (toolbox.current?.getBoundingClientRect().height ?? 0) + (toolbox.current ? gap : 0);
+      // Measured from the top of the page, so a scrolled page does not change the size.
+      const top = square.getBoundingClientRect().top + scrollY;
+      const room = Math.floor(bottom + scrollY - top - below);
+      const next = Math.max(128, Math.min(box.clientWidth, room));
+      setSize(current => current === next ? current : next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box); if (toolbox.current) observer.observe(toolbox.current); observer.observe(document.body);
+    addEventListener('resize', measure);
+    return () => { observer.disconnect(); removeEventListener('resize', measure); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return size;
 }

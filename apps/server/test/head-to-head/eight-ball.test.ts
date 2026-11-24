@@ -1,4 +1,4 @@
-import { HeadToHeadViewSchema, shootPool, type PoolFrame } from '@party/contracts';
+import { BALL_RADIUS, HeadToHeadViewSchema, POOL_HEIGHT, POOL_WIDTH, PoolFrameSchema, rackPool, shootPool, type PoolFrame } from '@party/contracts';
 import { describe, expect, it } from 'vitest';
 import { eightBall, finishPoolOnTime, settlePoolTie } from '../../src/head-to-head/eight-ball/rules.js';
 import { matchView, playMove, startMatch } from '../../src/head-to-head/match.js';
@@ -55,6 +55,13 @@ describe('8-ball pool', () => {
     expect(() => eightBall.apply(missed, 1, { ...shot(180), cue: [600, 150] })).not.toThrow();
   });
 
+  it('carries the chosen felt to the board and replay, and leaves it out by default', () => {
+    const blue = eightBall.start({ felt: 'blue' });
+    expect(eightBall.board(blue, null)).toMatchObject({ felt: 'blue' });
+    expect(eightBall.replay(blue)).toMatchObject({ felt: 'blue' });
+    expect(eightBall.board(eightBall.start({}), null)).not.toHaveProperty('felt');
+  });
+
   it('returns the eight to the table after the break and omits it from both pot trays', () => {
     const frame: PoolFrame = [[0, 400, 110], [1, 400, 75], [8, 400, 40], [9, 600, 160]];
     const opening = eightBall.apply({ ...eightBall.start({}), frames: [frame] }, 0, shot(270, 0));
@@ -98,6 +105,45 @@ describe('8-ball pool', () => {
     expect(draw.balls.find(ball => ball[0] === 0)![1]).toBeLessThan(250);
     expect(shootPool([[0, 100, 200]], 180, 40, undefined, [100, 0]).balls[0]![2]).toBeGreaterThan(225);
     expect(shootPool([[0, 100, 200]], 180, 40, undefined, [-100, 0]).balls[0]![2]).toBeLessThan(175);
+  });
+
+  it('lets a center-ball hit roll on after contact from a distance but stop short from close up', () => {
+    const cueAfter = (from: number) => shootPool([[0, from, 200], [1, 400, 200]], 0, 38).balls.find(ball => ball[0] === 0)![1];
+    expect(cueAfter(100)).toBeGreaterThan(390);
+    expect(cueAfter(365)).toBeLessThan(385);
+  });
+
+  it('sends balls through pocket openings without letting any leave the table another way', () => {
+    // Along the top cushion straight through the side-pocket opening.
+    expect(shootPool([[0, 200, 12], [3, 700, 300]], 0, 60).pocketed[0]).toEqual({ id: 0, pocket: 1 });
+    // Straight at a jaw tip: the ball comes back out instead of dropping.
+    expect(shootPool([[0, 377, 200]], 270, 50).pocketed).toEqual([]);
+    for (let angle = 0; angle < 360; angle += 7.25) {
+      for (const power of [35, 70, 100]) {
+        const shot = shootPool(rackPool(), angle, power);
+        expect(PoolFrameSchema.safeParse(shot.balls).success).toBe(true);
+        expect(shot.balls.length + shot.pocketed.length).toBe(16);
+        for (const [, x, y] of shot.balls) {
+          expect(x).toBeGreaterThanOrEqual(BALL_RADIUS - 1);
+          expect(x).toBeLessThanOrEqual(POOL_WIDTH - BALL_RADIUS + 1);
+          expect(y).toBeGreaterThanOrEqual(BALL_RADIUS - 1);
+          expect(y).toBeLessThanOrEqual(POOL_HEIGHT - BALL_RADIUS + 1);
+        }
+      }
+    }
+  });
+
+  it('hits harder on the break so a full-power break spreads the rack', () => {
+    const rack = rackPool();
+    const shot = shootPool(rack, 0, 100, undefined, undefined, true);
+    const later = shootPool(rack, 0, 100);
+    expect(Math.hypot(...[0, 1].map(axis => shot.motion[1]![0]![axis + 1]! - rack[0]![axis + 1]!)))
+      .toBeGreaterThan(Math.hypot(...[0, 1].map(axis => later.motion[1]![0]![axis + 1]! - rack[0]![axis + 1]!)));
+    const moved = rack.filter(([id, x, y]) => {
+      const after = shot.balls.find(ball => ball[0] === id);
+      return id !== 0 && (!after || Math.hypot(after[1] - x, after[2] - y) > 40);
+    });
+    expect(moved.length).toBeGreaterThanOrEqual(10);
   });
 
   it('uses pots at expiry and switches to scratches when both sides are on the eight', () => {

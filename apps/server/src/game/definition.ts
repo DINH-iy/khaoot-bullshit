@@ -28,6 +28,8 @@ const SplitSchema = z.discriminatedUnion('kind', [
 export const FormationSchema = z.object({
   split: SplitSchema, formation: z.enum(['random', 'skill', 'host', 'players']),
   names: z.array(z.string().trim().min(1).max(30)).max(12).optional(),
+  // Who picks the team colours while teams are made: the host (left out), or each team for itself (the host still can).
+  colors: z.enum(['host', 'teams']).optional(),
 }).strict().superRefine((form, ctx) => {
   if (form.names && (form.names.length < teamCount(form) || new Set(form.names.map(name => name.toLowerCase())).size !== form.names.length)) ctx.addIssue({ code: 'custom', message: 'Give every team a unique name' });
 });

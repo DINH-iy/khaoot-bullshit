@@ -21,7 +21,7 @@ function draw(ctx: CanvasRenderingContext2D, replay: HeadToHeadReplay, index: nu
     const scale = SIZE / POOL_CANVAS_WIDTH;
     ctx.translate(0, (SIZE - POOL_CANVAS_HEIGHT * scale) / 2);
     ctx.scale(scale, scale);
-    paintPool(ctx, replay.frames[index]!);
+    paintPool(ctx, replay.frames[index]!, { felt: replay.felt });
     ctx.restore();
     return;
   }

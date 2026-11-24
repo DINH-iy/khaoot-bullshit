@@ -1,3 +1,5 @@
+import { DEFAULT_TEAM_NAMES, defaultTeamColor, TEAM_SWATCHES, TeamColorSchema } from '@party/contracts';
+export { DEFAULT_TEAM_NAMES };
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { GameIdSchema } from '@party/contracts';
@@ -10,14 +12,15 @@ import type { Transaction } from '../model.js';
 // identified by its name within the room, so points given to "Red" always count
 // for "Red". Game teams persist across rounds; round teams apply to one round.
 // Every new lineup starts as a proposal the host can change and must confirm.
-export const DEFAULT_TEAM_NAMES = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Orange', 'Pink', 'Teal', 'White', 'Black', 'Gold', 'Silver'];
 export type TeamPlay = Extract<Play, { kind: 'teams' }>;
 export type Carryover = 'keep' | 'fresh' | 'members';
 
 const FormingSchema = z.object({
   scope: z.enum(['game', 'round']), carryover: z.enum(['keep', 'fresh', 'members']), formation: z.enum(['random', 'skill', 'host', 'players']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
-  teams: z.array(z.object({ name: z.string().min(1).max(30), targetSize: z.number().int().min(1).nullable() }).strict()).min(1).max(12),
+  // `color` (absent in proposals made before team colours): the team's colour. `colorsBy`: who may change it.
+  teams: z.array(z.object({ name: z.string().min(1).max(30), targetSize: z.number().int().min(1).nullable(), color: TeamColorSchema.optional() }).strict()).min(1).max(12),
+  colorsBy: z.enum(['host', 'teams']).optional(),
   // Player ID -> team index, or null for sitting out. Players not listed are unassigned.
   assignment: z.record(GameIdSchema, z.number().int().min(0).max(11).nullable()),
   captains: z.record(z.string().regex(/^\d{1,2}$/), GameIdSchema),
@@ -43,6 +46,18 @@ function shuffle<T>(items: T[]): T[] {
 const targets = (form: Formation) => form.split.kind === 'count' ? Array.from({ length: form.split.teams }, () => null) : form.split.sizes.map(size => size === 'rest' ? null : size);
 
 /** Random teams: balanced for a team count; fixed sizes first, then "the rest" (others sit out when no team takes the rest). */
+/** The English name of each team swatch: a team named after its colour follows a new colour's name. */
+const SWATCH_NAMES: Record<string, string> = { '#e8505b': 'Red', '#36a2eb': 'Blue', '#5fb84a': 'Green', '#e6b422': 'Yellow', '#8e5be8': 'Purple', '#f28c28': 'Orange', '#f07aa8': 'Pink', '#2bb3a3': 'Teal', '#8d6e63': 'Brown', '#9aa0ad': 'Grey', '#4f6ae0': 'Indigo', '#c2185b': 'Raspberry' };
+/** Every team with a colour (proposals made before team colours get theirs from their name or place). */
+const withColors = (teams: Forming['teams']) => teams.map((team, index) => ({ ...team, color: team.color ?? defaultTeamColor(team.name, index) }));
+/** Two teams never share a colour: a repeat takes the first swatch nobody uses. */
+function distinctColors(teams: (Forming['teams'][number] & { color: string })[]) {
+  const used = new Set<string>();
+  return teams.map(team => {
+    const color = used.has(team.color) ? TEAM_SWATCHES.find(swatch => !used.has(swatch) && !teams.some(other => other.color === swatch)) ?? team.color : team.color;
+    used.add(color); return { ...team, color };
+  });
+}
 export function randomAssignment(teams: Forming['teams'], playerIds: string[], balanced: boolean): Forming['assignment'] {
   const order = shuffle(playerIds); const assignment: Forming['assignment'] = {};
   if (balanced) { order.forEach((id, index) => { assignment[id] = index % teams.length; }); return assignment; }
@@ -61,8 +76,8 @@ async function bySkill(tx: Transaction, sessionId: string, teams: Forming['teams
 
 export async function startForming(tx: Transaction, sessionId: string, form: Formation, play: TeamPlay, scope: 'game' | 'round', carryover: Carryover, playerIds: string[]): Promise<Forming> {
   const names = form.names ?? DEFAULT_TEAM_NAMES;
-  const teams = targets(form).slice(0, teamCount(form)).map((targetSize, index) => ({ name: names[index]!, targetSize }));
-  return { scope, carryover, formation: form.formation, answers: play.answers, points: play.points, teams,
+  const teams = distinctColors(targets(form).slice(0, teamCount(form)).map((targetSize, index) => ({ name: names[index]!, targetSize, color: defaultTeamColor(names[index]!, index) })));
+  return { scope, carryover, formation: form.formation, answers: play.answers, points: play.points, teams, colorsBy: form.colors ?? 'host',
     assignment: form.formation === 'skill' ? await bySkill(tx, sessionId, teams, playerIds) : form.formation === 'random' ? randomAssignment(teams, playerIds, form.split.kind === 'count') : {}, captains: {} };
 }
 
@@ -72,11 +87,12 @@ export async function currentGameLineup(tx: Transaction, sessionId: string) {
   return lineups.find(lineup => LineupInfoSchema.safeParse(lineup.carryover).success && LineupInfoSchema.parse(lineup.carryover).scope === 'game') ?? null;
 }
 
-async function createLineup(tx: Transaction, sessionId: string, info: z.infer<typeof LineupInfoSchema>, teams: { name: string; members: string[]; captain: string | null }[]) {
+async function createLineup(tx: Transaction, sessionId: string, info: z.infer<typeof LineupInfoSchema>, teams: { name: string; color?: string; members: string[]; captain: string | null }[]) {
   const last = await tx.teamLineup.findFirst({ where: { sessionId }, orderBy: { number: 'desc' }, select: { number: true } });
   const lineup = await tx.teamLineup.create({ data: { sessionId, number: (last?.number ?? 0) + 1, carryover: { ...info, order: teams.map(team => team.name) } } });
   for (const team of teams) {
-    const row = await tx.sessionTeam.upsert({ where: { sessionId_name: { sessionId, name: team.name } }, create: { sessionId, name: team.name }, update: {} });
+    // A team made again under its name keeps its row; a newly picked colour replaces the old one.
+    const row = await tx.sessionTeam.upsert({ where: { sessionId_name: { sessionId, name: team.name } }, create: { sessionId, name: team.name, ...(team.color ? { color: team.color } : {}) }, update: team.color ? { color: team.color } : {} });
     await tx.teamMember.createMany({ data: team.members.map(playerId => ({ sessionId, lineupId: lineup.id, teamId: row.id, playerId, isCaptain: playerId === team.captain })) });
   }
   return lineup;
@@ -101,7 +117,7 @@ export async function gameLineupForRound(tx: Transaction, sessionId: string, pre
 }
 
 /** Applies a team-forming command to the proposal; returns the updated proposal, or the confirmed lineup. */
-export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill' }, actorPlayerId: string | null, presentIds: string[]) {
+export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string }, actorPlayerId: string | null, presentIds: string[]) {
   const present = new Set(presentIds);
   const size = (index: number) => Object.entries(forming.assignment).filter(([id, team]) => team === index && present.has(id)).length;
   // More or fewer teams than the game proposed: a new team gets the next free colour name; at least one team stays.
@@ -109,7 +125,7 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     requireGame(forming.teams.length < 12, 'INVALID_COMMAND');
     const taken = new Set(forming.teams.map(team => team.name.toLowerCase()));
     const name = DEFAULT_TEAM_NAMES.find(candidate => !taken.has(candidate.toLowerCase())) ?? `Team ${forming.teams.length + 1}`;
-    return { forming: { ...forming, teams: [...forming.teams, { name, targetSize: null }] } };
+    return { forming: { ...forming, teams: distinctColors([...withColors(forming.teams), { name, targetSize: null, color: defaultTeamColor(name, forming.teams.length) }]) } };
   }
   if (command.type === 'teams.remove') {
     const index = command.teamIndex ?? -1;
@@ -141,6 +157,23 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     const captains = Object.fromEntries(Object.entries(forming.captains).filter(([, captain]) => captain !== playerId));
     return { forming: { ...forming, assignment: { ...forming.assignment, [playerId]: index }, captains } };
   }
+  if (command.type === 'teams.color') {
+    // The host picks any colour for any team; a member picks one of the swatches for their own team, when the
+    // scene lets teams choose. Two teams never share a colour.
+    const index = command.teamIndex ?? -1; const color = (command.color ?? '').toLowerCase();
+    requireGame(index >= 0 && index < forming.teams.length, 'INVALID_COMMAND');
+    if (actorPlayerId) {
+      requireGame(forming.colorsBy === 'teams' && forming.assignment[actorPlayerId] === index, 'FORBIDDEN');
+      requireGame((TEAM_SWATCHES as readonly string[]).includes(color), 'INVALID_COMMAND');
+    }
+    const teams = withColors(forming.teams);
+    requireGame(!teams.some((team, position) => position !== index && team.color === color), 'INVALID_COMMAND');
+    // A team still called after its colour (Red…) takes the name of the colour it picks (Teal), when that name is free.
+    const named = SWATCH_NAMES[color]; const current = teams[index]!.name;
+    const renamed = named && [...DEFAULT_TEAM_NAMES, ...Object.values(SWATCH_NAMES)].includes(current)
+      && !teams.some((team, position) => position !== index && team.name.toLowerCase() === named.toLowerCase()) ? named : current;
+    return { forming: { ...forming, teams: teams.map((team, position) => position === index ? { ...team, color, name: renamed } : team) } };
+  }
   if (command.type === 'teams.captain') {
     const index = command.playerId ? forming.assignment[command.playerId] : undefined;
     requireGame(command.playerId && present.has(command.playerId) && index !== undefined && index !== null, 'INELIGIBLE');
@@ -150,7 +183,7 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
   const groups = forming.teams.map((team, index) => {
     const members = presentIds.filter(id => forming.assignment[id] === index);
     const chosen = forming.captains[String(index)];
-    return { name: team.name, members, captain: chosen && members.includes(chosen) ? chosen : members.length ? members[randomInt(members.length)]! : null };
+    return { name: team.name, color: team.color ?? defaultTeamColor(team.name, index), members, captain: chosen && members.includes(chosen) ? chosen : members.length ? members[randomInt(members.length)]! : null };
   }).filter(group => group.members.length > 0);
   // Empty teams are dropped; players left unassigned sit this round out.
   requireGame(groups.length > 0, 'INVALID_STATE');

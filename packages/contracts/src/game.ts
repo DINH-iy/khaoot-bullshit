@@ -1,3 +1,4 @@
+import { TeamColorSchema } from './team-colors.js';
 import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
 import { HeadToHeadKeySchema, HeadToHeadMoveSchema, HeadToHeadViewSchema } from './head-to-head.js';
@@ -137,6 +138,8 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('teams.add'), stageRunId: GameIdSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.remove'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11) }).strict(),
   z.object({ ...envelope, type: z.literal('teams.choose'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11) }).strict(),
+  // A team's colour while teams are made: the host picks any colour; a member picks one of the swatches for their own team when the scene lets teams choose.
+  z.object({ ...envelope, type: z.literal('teams.color'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11), color: TeamColorSchema }).strict(),
   // In a team round the host judges each team.
   z.object({ ...hostEnvelope, type: z.literal('stage.judgeTeam'), stageRunId: GameIdSchema, teamId: GameIdSchema, amountMilli: AwardMilliSchema }).strict(),
   // The host picks a route at any time before one is recorded: while voting
@@ -175,7 +178,7 @@ export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Round commands available to the phone holding delegated host controls. */
 export const HOST_PHONE_COMMANDS = ['session.start', 'session.pause', 'session.resume', 'stage.close', 'stage.advance', 'stage.explained', 'stage.reveal', 'stage.nextResult'] as const;
 /** Commands available to an ordinary player. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'teams.color', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),
@@ -220,7 +223,9 @@ export const BallotEntrySchema = z.object({
 export const StageTeamsSchema = z.object({
   forming: z.boolean(), formation: z.enum(['random', 'skill', 'host', 'players']), scope: z.enum(['game', 'round']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
-  teams: z.array(z.object({ index: z.number().int().min(0), name: z.string().min(1).max(30), teamId: GameIdSchema.nullable(), targetSize: z.number().int().min(1).nullable(),
+  // `color`: the team's colour (picked by the host, or by the team when the scene allows it). `colorsBy`: who may pick it now.
+  colorsBy: z.enum(['host', 'teams']).optional(),
+  teams: z.array(z.object({ index: z.number().int().min(0), name: z.string().min(1).max(30), color: TeamColorSchema, teamId: GameIdSchema.nullable(), targetSize: z.number().int().min(1).nullable(),
     memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable() }).strict()),
   unassignedIds: z.array(GameIdSchema), ownTeamIndex: z.number().int().min(0).nullable(),
 }).strict();
@@ -265,6 +270,8 @@ export const PublicStageSchema = z.object({
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.
   deadlineAt: z.string().datetime().nullable(), pausedRemainingMs: z.number().int().min(0).nullable(),
+  // The scene's own timer length, so a clock can show how much of it is left (absent in older views; null: no timer).
+  timerMs: z.number().int().min(0).nullable().optional(),
   // Progress is public; what was answered is not.
   submittedCount: z.number().int().min(0), eligibleCount: z.number().int().min(0),
   // `placesMilli`: points for 1st, 2nd… when the challenge pays by place (the host picks each player's place).
@@ -329,7 +336,7 @@ export const SessionViewSchema = z.object({
   // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
   awards: z.array(FinaleSlideSchema).nullable(),
   // Totals of the game's current teams, following that lineup's carryover rule.
-  teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema }).strict()),
+  teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), color: TeamColorSchema, memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema }).strict()),
 }).strict();
 export type SessionView = z.infer<typeof SessionViewSchema>;
 

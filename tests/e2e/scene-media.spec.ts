@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { chooseOption, closeHostFold, openHostFold } from './helpers.js';
+import { chooseOption, closeHostFold, openHostFold, removeForkedStyles } from './helpers.js';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -50,10 +50,13 @@ test('scene translations, background motion and a YouTube clip work from editor 
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   await page.getByLabel('Change the look of').click();
   await page.getByRole('option', { name: 'The whole game' }).click();
+  await page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: 'Bold', exact: true }).click();
   await page.getByRole('button', { name: 'ASCII Terminal' }).click();
+  await page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'Question', exact: true }).click();
   await page.locator('summary').getByText('Shapes and background', { exact: true }).click();
   await page.getByRole('button', { name: 'Starlight' }).click();
-  await page.getByRole('dialog', { name: 'Change “ASCII Terminal”?' }).getByRole('button', { name: 'Only change this look' }).click();
+  await expect(page.getByRole('status').filter({ hasText: /made a new style: My ASCII Terminal/ })).toBeVisible();
+  await removeForkedStyles(page, test.info().project.use.baseURL!, 'ASCII Terminal');
   await expect(page.locator('.room-preview.motion-starlight')).toHaveCount(2);
   await page.getByRole('tab', { name: 'Texts', exact: true }).click();
   await chooseOption(page.getByLabel('Text language'), 'nl');

@@ -8,7 +8,7 @@ import { useText } from '../presentation/look.js';
 import { translate } from '../i18n/texts.js';
 import { CONNECTION_KEYS, ROOM_TEXTS } from './room.text.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
-import { nameList, teamColor } from './teams.js';
+import { nameList } from './teams.js';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 
@@ -70,8 +70,14 @@ export function RoundBar({ state, stage, phase, remaining, timerRef, tools }: { 
   if (!phase && !mine && !details.length && !tools && (forming || stage.status !== 'ACTIVE')) return null;
   return <div className="round-info" role="group" aria-label={r('thisRound')}>
     {phase && <p className={`chip phase-pill${forming ? ' teams' : ''}`} role="status">{KIND_ICON[stage.kind] && <FaIcon name={KIND_ICON[stage.kind]!} />}{phase}</p>}
-    {mine && <p className="chip team-flag" style={{ '--team': teamColor(mine.name, mine.index) } as React.CSSProperties} title={r('yourTeam', { team: mine.name })}>
-      <FaIcon name="flag" /><span className="visually-hidden">{r('yourTeamHidden')}</span>{mine.name}{mine.captainId === state.selfPlayerId && <span className="team-captain" title={r('youCaptain')}><FaIcon name="star" label={r('captain')} /></span>}</p>}
+    {/* Phones: how many have answered (voted), next to the phase, compact, so the round keeps the room. The host and the shared screen show it as a line. */}
+    {state.role === 'player' && counted(stage) && (() => {
+      const text = `${t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}${stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}`;
+      return <p className="chip chip-count" title={text}><FaIcon name={stage.status === 'CLOSED' ? 'lock' : 'check'} /><span aria-hidden="true">{stage.submittedCount}/{stage.eligibleCount}</span><span className="visually-hidden">{text}</span></p>;
+    })()}
+    {/* Your team as its colour only (the name is read out and shown on hover); the page's top stripe has it too. */}
+    {mine && <p className="chip team-flag" style={{ '--team': mine.color } as React.CSSProperties} title={r('yourTeam', { team: mine.name })}>
+      <FaIcon name="flag" /><span className="visually-hidden">{r('yourTeamHidden')}{mine.name}</span>{mine.captainId === state.selfPlayerId && <span className="team-captain" title={r('youCaptain')}><FaIcon name="star" label={r('captain')} /></span>}</p>}
     {stage.input?.kind === 'drawing' && stage.input.blind && <p className="chip chip-warn"><span aria-hidden="true">🙈</span> {r('blind')}</p>}
     {!forming && !stage.explain && stage.minigame?.game !== 'stop-clock' && <div ref={timerRef} className={`chip chip-timer${remaining === null ? ' no-limit' : ''}`}><StageTimer stage={stage} remaining={remaining} /></div>}
     {stage.minigame?.game === 'stop-clock' && stage.status === 'ACTIVE' && !stage.explain &&
@@ -83,6 +89,8 @@ export function RoundBar({ state, stage, phase, remaining, timerRef, tools }: { 
   </div>;
 }
 
+/** Rounds where people answer or vote, until the results are shown (with a lock once answers are closed): the top bar counts them. */
+export const counted = (stage: Stage) => ['collect', 'vote', 'minigame'].includes(stage.kind) && stage.status !== 'VOID' && !stage.revealed && !stage.explain && !stage.teams?.forming && stage.eligibleCount > 0;
 /** What the (i) explains about the round. */
 function roundDetails(stage: Stage, t: ReturnType<typeof useText>): [IconName, string][] {
   const rows: [IconName, string][] = [];

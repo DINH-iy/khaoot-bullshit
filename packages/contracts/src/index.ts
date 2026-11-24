@@ -18,6 +18,7 @@ export * from './minigames/red-or-black-roulette/roulette.js';
 export * from './phone-menu.js';
 export * from './minigames/speed-run/course.js';
 export * from './players.js';
+export * from './team-colors.js';
 export * from './drawing.js';
 export * from './feedback.js';
 export * from './people.js';

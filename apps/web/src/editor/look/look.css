@@ -15,6 +15,10 @@
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 .preset-card { display: grid; gap: 8px; text-align: left; padding: 12px; min-height: 76px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; }
 .preset-card.on { border-color: #6d3fd6; outline: 2px solid #fff; outline-offset: -4px; }
+/* The new-style tile: the size of a style card, empty, with a dashed edge and a plus. */
+.preset-card.new-style-card { place-content: center; justify-items: center; gap: 4px; text-align: center; background: transparent; color: var(--e-muted); border: 2px dashed var(--e-border); font-weight: 600; }
+.preset-card.new-style-card:hover, .preset-card.new-style-card:focus-visible { color: var(--e-text); border-color: var(--e-accent); background: var(--e-accent-soft); }
+.style-groups { flex-wrap: wrap; margin-bottom: 10px; }
 .swatches { display: flex; gap: 4px; } .swatches i { width: 16px; height: 16px; border-radius: 50%; display: block; box-shadow: 0 0 0 1px rgb(255 255 255 / .4); }
 
 .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
@@ -185,3 +189,5 @@
 .style-change-actions { display: grid; gap: 8px; }
 .style-change-actions button { min-height: 44px; }
 .ed-dialog .style-change-actions button.primary { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1d1730); font-weight: 700; }
+.timer-samples { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--r-bg1, #241a4d); font-size: 1.2rem; }
+.timer-samples .timer-clock.up { animation: none; }

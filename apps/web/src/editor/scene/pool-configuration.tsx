@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { DEFAULT_POOL_START, PoolStartSchema, rackPool } from '@party/contracts';
+import { DEFAULT_POOL_START, PoolFeltSchema, PoolStartSchema, rackPool } from '@party/contracts';
 import { paintPool, POOL_CANVAS_HEIGHT, POOL_CANVAS_WIDTH } from '../../head-to-head/eight-ball/table.js';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
@@ -38,7 +38,9 @@ function PoolDialog({ stage, onChange, addTeams, close }: Props & { close: () =>
   const ref = useRef<HTMLDialogElement>(null);
   const title = useId();
   const [draft, setDraft] = useState(stage);
-  const rawStart = (draft['contest'] as { settings?: { start?: unknown } } | undefined)?.settings?.start;
+  const draftSettings = (draft['contest'] as { settings?: { start?: unknown; felt?: unknown } } | undefined)?.settings;
+  const rawStart = draftSettings?.start;
+  const previewFelt = PoolFeltSchema.safeParse(draftSettings?.felt).data;
   const previewStart = PoolStartSchema.safeParse(rawStart).data ?? DEFAULT_POOL_START;
   const previewSide = previewStart.side === 'random' ? 'left' : previewStart.side;
   const [panel, setPanel] = useState<'match' | 'table' | 'points'>('match');
@@ -75,7 +77,7 @@ function PoolDialog({ stage, onChange, addTeams, close }: Props & { close: () =>
         {panel === 'table' && <>
           <canvas className="pool-config-table" width={POOL_CANVAS_WIDTH} height={POOL_CANVAS_HEIGHT} role="img" aria-label={t('preview')} ref={canvas => {
             const ctx = canvas?.getContext('2d');
-            if (ctx) { const start = { ...previewStart, side: previewSide }; paintPool(ctx, rackPool(start), { start }); }
+            if (ctx) { const start = { ...previewStart, side: previewSide }; paintPool(ctx, rackPool(start), { start, felt: previewFelt }); }
           }} />
           <DuelFields part="table" stage={draft} onChange={setDraft} />
         </>}

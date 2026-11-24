@@ -22,7 +22,7 @@ import { translate, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { MediaField } from './fields/media-field.js';
 import { musicSummary, SceneMusicFields } from './fields/music-fields.js';
-import { MINIGAME_KEYS, TEAM_MINIGAMES, type MinigameKey } from '@party/contracts';
+import { DEFAULT_TEAM_NAMES, MINIGAME_KEYS, TEAM_MINIGAMES, type MinigameKey } from '@party/contracts';
 import { gameName } from '../../presentation/catalog.text.js';
 import { drawGameOf, isDrawScene, withDrawGame, isWheelScene, cardText, connect, connectProblem, deleteScene, disconnect, isRoute, isVotable, optionsOf, QUIZ_KINDS, quizKind, setRouteOptions, uniqueKey, updateStage, withQuizKind, WRITING_STARTERS, type Definition, type Node, type Option, type Stage } from '../model.js';
 
@@ -207,11 +207,50 @@ function PickTeamsFields({ definition, node, stage, onChange }: { definition: De
   // Making teams again later in the game: the team scores can start over or carry on.
   const again = definition.nodes.some(other => other.key !== node.key && other.stages.some(part => part.kind === 'teams'));
   return <>
-    <FormFields form={form} onChange={next => set('form', next)} />
+    <FormFields form={form} onChange={next => set('form', withNames(next))} />
+    <TeamNameFields form={form} onChange={next => set('form', next)} />
     <label className="choice"><input type="checkbox" checked={stage['captains'] === true} onChange={event => set('captains', event.target.checked ? true : undefined)} />{t('captains')}</label>
+    <Segmented label={t('colorsBy')} value={form.colors === 'teams' ? 'teams' : 'host'} choices={[{ value: 'host', label: t('colorsHost') }, { value: 'teams', label: t('colorsTeams') }]}
+      onChange={value => { const next = { ...form }; if (value === 'teams') next.colors = 'teams'; else delete next.colors; set('form', next); }} />
+    {form.colors === 'teams' && <p className="hint">{t('colorsHint')}</p>}
     {again && <Segmented label={t('scoresAgain')} stacked value={String(stage['carryover'] ?? 'fresh')} choices={carryover()} onChange={value => set('carryover', value === 'fresh' ? undefined : value)} />}
     <p className="hint">{t('teamsHint')}</p>
   </>;
+}
+
+const formCount = (form: Form) => form.split.kind === 'count' ? form.split.teams : form.split.sizes.length;
+/** Own team names follow the number of teams: a new team gets a standard name nobody uses yet. */
+function withNames(form: Form): Form {
+  if (!form.names) return form;
+  const names = form.names.slice(0, formCount(form));
+  for (const name of DEFAULT_TEAM_NAMES) { if (names.length >= formCount(form)) break; if (!names.some(taken => taken.toLowerCase() === name.toLowerCase())) names.push(name); }
+  return { ...form, names };
+}
+/**
+ * The team names of a Pick teams scene, one field per team. An empty field is the standard name (shown greyed);
+ * all standard names again means no own names at all.
+ */
+function TeamNameFields({ form, onChange }: { form: Form; onChange: (form: Form) => void }) {
+  const count = formCount(form); const standard = DEFAULT_TEAM_NAMES.slice(0, count);
+  const stored = Array.from({ length: count }, (_, index) => form.names?.[index] ?? standard[index]!);
+  // What is typed, so a field can be empty for a moment; empty fields are saved as the standard name.
+  const [typed, setTyped] = useState(() => stored.map((name, index) => name === standard[index] ? '' : name));
+  const key = stored.join('|');
+  useEffect(() => setTyped(stored.map((name, index) => name === standard[index] ? '' : name)), [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const change = (index: number, value: string) => {
+    const next = typed.map((name, at) => at === index ? value : name); setTyped(next);
+    const names = next.map((name, at) => name.trim() || standard[at]!);
+    const copy: Form = { ...form }; if (names.every((name, at) => name === standard[at])) delete copy.names; else copy.names = names;
+    onChange(copy);
+  };
+  const shown = Array.from({ length: count }, (_, index) => (typed[index] ?? '').trim() || standard[index]!);
+  const repeated = new Set(shown.map(name => name.toLowerCase())).size !== shown.length;
+  return <fieldset className="team-name-fields"><legend>{t('teamNames')}</legend>
+    {Array.from({ length: count }, (_, index) => <label key={index} className="ed-inline">{t('teamNameN', { number: index + 1 })}
+      <input value={typed[index] ?? ''} placeholder={standard[index]} maxLength={30} onChange={event => change(index, event.target.value)} /></label>)}
+    {repeated && <p role="alert" className="error">{t('sameNames')}</p>}
+    <p className="hint">{t('teamNamesHint')}</p>
+  </fieldset>;
 }
 
 // What happens to the team scores when teams are made again.
@@ -243,7 +282,7 @@ function PlayFields({ definition, node, index, onChange }: { definition: Definit
     </>}
   </fieldset>;
 }
-type Form = { split: { kind: 'count'; teams: number } | { kind: 'sizes'; sizes: (number | 'rest')[] }; formation: string; names?: string[] };
+type Form = { split: { kind: 'count'; teams: number } | { kind: 'sizes'; sizes: (number | 'rest')[] }; formation: string; names?: string[]; colors?: 'host' | 'teams' };
 /** How teams are made: a number of teams or exact sizes like "1, rest" or "2, 2"; random, by the host, or by the players. */
 export function FormFields({ form, onChange }: { form: Form; onChange: (form: Form) => void }) {
   const sizes = form.split.kind === 'sizes' ? form.split.sizes.join(', ') : '';

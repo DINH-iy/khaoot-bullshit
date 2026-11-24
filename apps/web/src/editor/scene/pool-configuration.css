@@ -14,7 +14,17 @@
 .pool-configuration-tabs button { flex: 1; }
 .pool-config-table {
   display: block; width: min(100%, 380px); height: auto; margin-inline: auto;
-  border-radius: 8px;
+  filter: drop-shadow(0 4px 6px #0004);
 }
 .pool-configuration .ed-unit { max-width: 55%; }
 .pool-configuration .ed-unit input { min-width: 0; width: 6rem; }
+.pool-felt-fields { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.pool-felt-fields legend { padding: 0; margin-block-end: 6px; font-size: .875rem; }
+.pool-felt-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.editor .pool-felt-swatch {
+  width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%;
+  border: 3px solid var(--e-panel); box-shadow: 0 0 0 1px var(--e-line);
+  background: radial-gradient(circle at 40% 35%, var(--felt), var(--felt-edge));
+}
+.editor .pool-felt-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--e-accent); }
+.pool-felt-swatch:focus-visible { outline: 2px solid var(--e-accent); outline-offset: 3px; }

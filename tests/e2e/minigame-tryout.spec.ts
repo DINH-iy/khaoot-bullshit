@@ -198,14 +198,12 @@ test('8-ball free play lets one phone shoot for both sides in landscape', async 
   await assist.click();
   await expect(assist).toHaveAttribute('aria-pressed', 'false');
   // Aim away from the rack so the other side takes the next shot.
-  const setRange = async (slider: typeof aim, value: string) => slider.evaluate((node, next) => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, next);
-    node.dispatchEvent(new Event('input', { bubbles: true }));
-  }, value);
-  await setRange(aim, '180');
-  await landscape.getByRole('button', { name: 'Aim right' }).click();
-  await expect(aim).toHaveValue('180.25');
-  await setRange(landscape.getByRole('slider', { name: 'Power' }), '40');
+  for (let turn = 0; turn < 36; turn++) await aim.press('PageUp');
+  await aim.press('ArrowRight');
+  await expect(aim).toHaveAttribute('aria-valuenow', '180.25');
+  const power = landscape.getByRole('slider', { name: 'Power' });
+  for (let step = 0; step < 7; step++) await power.press('ArrowDown');
+  await expect(power).toHaveAttribute('aria-valuenow', '40');
   await landscape.getByRole('button', { name: 'Spin', exact: true }).click();
   await landscape.getByRole('button', { name: 'Cue-ball contact' }).press('ArrowUp');
   await expect(landscape.locator('output')).toContainText('height 10');
@@ -222,5 +220,5 @@ test('8-ball free play lets one phone shoot for both sides in landscape', async 
   await expect(phone.getByRole('button', { name: 'Aim assist' })).toHaveAttribute('aria-pressed', 'false');
   await panel.getByLabel('Starting side').selectOption('right');
   await panel.getByRole('button', { name: 'Replay' }).click();
-  await expect(phone.getByRole('slider', { name: 'Aim' })).toHaveValue('180');
+  await expect(phone.getByRole('slider', { name: 'Aim' })).toHaveAttribute('aria-valuenow', '180');
 });

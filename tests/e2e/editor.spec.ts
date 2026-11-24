@@ -86,7 +86,7 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await card(page, /Welcome! Get ready to play/).dblclick();
   await page.getByRole('button', { name: 'Add after this' }).click();
   await page.getByRole('tab', { name: 'Games' }).click();
-  await page.getByRole('menuitem', { name: /^Minigame/ }).click();
+  await page.getByRole('menuitem', { name: /^Minigame(?! draw)/ }).click();
   await page.getByRole('menuitem', { name: /^Stop the clock/ }).click();
   const previewArea = page.getByRole('region', { name: 'Preview' });
   await expect(previewArea.locator('.minigame-preview')).toContainText('A clock starts counting');
@@ -103,13 +103,16 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   await page.getByLabel('Change the look of').click();
   await page.getByRole('option', { name: 'The whole game' }).click();
+  await page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: 'Space & sea', exact: true }).click();
   await page.getByRole('button', { name: 'Neptune', exact: true }).click();
+  await page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'Question', exact: true }).click();
   const planetPreview = page.locator('.room-preview.motion-starlight').first();
   await expect(planetPreview).toBeVisible();
   await expect(planetPreview).toHaveCSS('--r-accent', '#91d8ff');
   await saved(page);
 
   await page.goto('/?admin=look');
+  await page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: 'Space & sea', exact: true }).click();
   await page.getByRole('button', { name: 'Space', exact: true }).click();
   await expect(page.locator('.join-look-preview .room.motion-starlight')).toBeVisible();
 });
@@ -152,7 +155,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: 'Games' })).toHaveAttribute('aria-selected', 'true');
   await expect(tabs.getByRole('tab', { name: 'Games' })).toBeFocused();
-  await expect(page.getByRole('menu', { name: 'Add a scene' }).getByRole('menuitem', { name: /^Minigame/ })).toBeVisible();
+  await expect(page.getByRole('menu', { name: 'Add a scene' }).getByRole('menuitem', { name: /^Minigame(?! draw)/ })).toBeVisible();
   expect((await new AxeBuilder({ page }).include('.add-menu').analyze()).violations).toEqual([]);
   // A scoreboard is added straight away (no second menu); what it shows is a setting in its panel.
   await tabs.getByRole('tab', { name: 'Between rounds' }).click();
@@ -289,7 +292,7 @@ test('the categorized minigame picker stays above the editor dock on a short scr
   await openCopy(page, baseURL!, 'Short-screen palette', false);
   await page.getByRole('button', { name: 'Add a scene', exact: true }).click();
   await page.getByRole('tab', { name: 'Games', exact: true }).click();
-  await page.getByRole('menuitem', { name: /^Minigame/ }).click();
+  await page.getByRole('menuitem', { name: /^Minigame(?! draw)/ }).click();
   const categories = page.getByRole('tablist', { name: 'Minigame categories' });
   await expect(categories.getByRole('tab')).toHaveText(['Speed', 'Precision', 'Drawing', 'Luck & choices', 'Drinking']);
   await categories.getByRole('tab', { name: 'Speed', exact: true }).press('ArrowRight');
@@ -384,7 +387,7 @@ test('open sections follow you from scene to scene, also past a scene that does 
   await expect(section('Content')).not.toHaveAttribute('open', '');
   await expect(section('Points')).toHaveCount(0);
   // A minigame has them again: Points and Who plays are open, Content still closed.
-  await back(); await add('Games', /^Minigame/, /^Tap race/); await open();
+  await back(); await add('Games', /^Minigame(?! draw)/, /^Tap race/); await open();
   await expect(section('Points')).toHaveAttribute('open', '');
   await expect(section('Who plays')).toHaveAttribute('open', '');
   await expect(section('Content')).not.toHaveAttribute('open', '');
@@ -458,7 +461,7 @@ test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens 
   // Help & shortcuts: the ? key, the ☰ menu, and the map's Tips (which list the gestures).
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Help & shortcuts' });
-  await expect(help.getByRole('row').filter({ hasText: 'Undo' })).toBeVisible();
+  await expect(help.getByRole('row').filter({ hasText: 'Undo (only your own' })).toBeVisible();
   expect((await new AxeBuilder({ page }).include('.help-panel').analyze()).violations).toEqual([]);
   await page.keyboard.press('Escape');
   await expect(help).toHaveCount(0);
@@ -911,6 +914,20 @@ test('scenes can be duplicated, copied into another game, found on the minimap, 
   await prompt.fill('More room for the question.\n'.repeat(40));
   expect(await prompt.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
   expect((await prompt.boundingBox())!.height).toBeLessThanOrEqual(288);
+  // Dragging the corner overrides the automatic height, both larger and smaller.
+  const dragCorner = async (by: number) => {
+    const box = (await prompt.boundingBox())!;
+    await page.mouse.move(box.x + box.width - 3, box.y + box.height - 3);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width - 3, box.y + box.height - 3 + by, { steps: 5 });
+    await page.mouse.up();
+  };
+  await dragCorner(120);
+  expect((await prompt.boundingBox())!.height).toBeGreaterThan(330);
+  await dragCorner(-260);
+  const shrunk = (await prompt.boundingBox())!.height;
+  expect(shrunk).toBeLessThan(150);
+  expect((await prompt.locator('..').boundingBox())!.height).toBeLessThan(shrunk + 2);
   await prompt.fill('A live scene draft');
   await expect(page.locator('.scene-props textarea').first()).toHaveValue('A live scene draft');
   const answer = canvas.getByLabel('Answer option 1', { exact: true });

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { defaultLook, type RoomSnapshot } from '@party/contracts';
+import { defaultLook, TEAM_SWATCHES, type RoomSnapshot } from '@party/contracts';
+import { ColorPicker } from '../ui/color-picker.js';
+import { DRAWING_TEXTS } from '../drawing/drawing.text.js';
 import { Avatar } from '../players/avatar.js';
 import { translate } from '../i18n/texts.js';
 import { PLAY_TEXTS } from './play.text.js';
@@ -17,10 +19,11 @@ const pointsText = { team: 'pTeam', members: 'pMembers', both: 'pBoth' } as cons
 export const captainAnswers = (teams: Teams | null) => Boolean(teams && !teams.forming && teams.answers === 'captain');
 export const ownTeam = (teams: Teams | null) => teams?.teams.find(team => team.index === teams.ownTeamIndex);
 
-/** A colour for each team: its own colour when it is named after one, else one from the answer palette. */
-const TEAM_COLORS: Record<string, string> = { red: '#e8505b', blue: '#36a2eb', green: '#5fb84a', yellow: '#e6b422', purple: '#8e5be8', orange: '#f28c28', pink: '#f07aa8', teal: '#2bb3a3', white: '#b0adbd', black: '#4a4560', gold: '#c99a1f', silver: '#9aa0ad' };
-const PALETTE = ['#e8505b', '#36a2eb', '#5fb84a', '#e6b422', '#8e5be8', '#f28c28', '#f07aa8', '#2bb3a3'];
-export const teamColor = (name: string, index: number) => TEAM_COLORS[name.toLowerCase()] ?? PALETTE[index % PALETTE.length]!;
+/** The names of the team colours players pick from (the drawing palette's names). */
+const SWATCH_NAMES: Record<string, keyof typeof DRAWING_TEXTS.en> = { '#e8505b': 'red', '#36a2eb': 'blue', '#5fb84a': 'green', '#e6b422': 'yellow', '#8e5be8': 'purple', '#f28c28': 'orange', '#f07aa8': 'pink', '#2bb3a3': 'teal', '#8d6e63': 'brown', '#9aa0ad': 'grey', '#4f6ae0': 'indigo', '#c2185b': 'wine' };
+const swatchName = (color: string) => SWATCH_NAMES[color] ? translate(DRAWING_TEXTS, SWATCH_NAMES[color]!) : color.toUpperCase();
+/** A solid lower-case #rrggbb (the picker may give a see-through colour; teams stay solid). */
+const solid = (hex: string) => hex.slice(0, 7).toLowerCase();
 const lookOf = (state: RoomSnapshot, id: string) => state.players.find(player => player.id === id)?.look ?? defaultLook(id);
 
 /**
@@ -54,12 +57,20 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
         {' '}{p(captains ? 'captainsAnswer' : 'everyoneAnswers')} {p(pointsText[teams.points])}</p>
     </div>
     <ul className="team-columns">{teams.teams.map(team => {
-      const color = teamColor(team.name, team.index); const mine = teams.ownTeamIndex === team.index;
+      const color = team.color; const mine = teams.ownTeamIndex === team.index;
+      const taken = new Set(teams.teams.filter(other => other.index !== team.index).map(other => other.color));
       const full = team.targetSize !== null && team.memberIds.length >= team.targetSize;
       return <li key={team.index} className={`team-column${mine ? ' mine' : ''}${picked && !team.memberIds.includes(picked) ? ' target' : ''}`} style={{ '--team': color } as React.CSSProperties} {...dropTo(team.index)}>
-        <div className="team-column-head"><strong>{team.name}</strong><span className="team-count">{team.targetSize !== null ? p('ofTarget', { count: team.memberIds.length, target: team.targetSize }) : ` · ${team.memberIds.length}`}</span>
-          {host && teams.teams.length > 1 && <button type="button" className="team-remove" disabled={disabled} aria-label={p('removeTeam', { team: team.name })} onClick={() => send('teams.remove', { stageRunId: stage.id, teamIndex: team.index })}>×</button>}</div>
+        <div className="team-column-head">{host && <ColorPicker className="team-color-pick" value={color} label={p('teamColour', { team: team.name })} title={p('teamColour', { team: team.name })}
+            suggestions={TEAM_SWATCHES.filter(swatch => !taken.has(swatch))} onChange={hex => { const next = solid(hex); if (!taken.has(next) && next !== color) send('teams.color', { stageRunId: stage.id, teamIndex: team.index, color: next }); }} />}
+          <strong>{team.name}</strong><span className="team-count">{team.targetSize !== null ? p('ofTarget', { count: team.memberIds.length, target: team.targetSize }) : ` · ${team.memberIds.length}`}</span>
+          {host && teams.teams.length > 1 && <button type="button" className="team-remove danger" disabled={disabled} aria-label={p('removeTeam', { team: team.name })} onClick={() => send('teams.remove', { stageRunId: stage.id, teamIndex: team.index })}>×</button>}</div>
         {captains && team.captainId && <p className="visually-hidden">{p('captainOf', { name: nameOf(state, team.captainId) })}</p>}
+        {/* A team picks its own colour from the swatches, when the scene lets teams choose. */}
+        {state.role === 'player' && mine && teams.colorsBy === 'teams' && <div className="team-swatches" role="radiogroup" aria-label={p('ourColour')}>{TEAM_SWATCHES.map(swatch =>
+          <button key={swatch} type="button" role="radio" aria-checked={swatch === color} disabled={disabled || taken.has(swatch)} style={{ background: swatch }}
+            aria-label={taken.has(swatch) ? p('colourTaken', { colour: swatchName(swatch) }) : swatchName(swatch)} title={swatchName(swatch)}
+            onClick={() => { if (swatch !== color) send('teams.color', { stageRunId: stage.id, teamIndex: team.index, color: swatch }); }} />)}</div>}
         {chooser && <button type="button" className="team-join" disabled={disabled || mine || full} onClick={() => send('teams.choose', { stageRunId: stage.id, teamIndex: team.index })}>
           {p(mine ? 'youAreIn' : full ? 'isFull' : 'join', { team: team.name })}</button>}
         {team.memberIds.length ? <ul className="team-members">{team.memberIds.map(id => chip(id, team))}</ul> : <p className="team-empty">{p(host ? 'nobodyTap' : 'nobody')}</p>}
@@ -92,7 +103,7 @@ export function TeamSummary({ state, stage }: { state: RoomSnapshot; stage: Stag
   // A player sees their team as a coloured flag in the round bar (with the team mates under its (i)).
   if (state.role === 'player') return mine ? null : <p className="team-summary">{p('sitOut')}</p>;
   // Host and shared screen: the same coloured columns as while picking, smaller.
-  return <ul className="team-columns compact" aria-label={p('teams')}>{teams.teams.map(team => <li key={team.index} className="team-column" style={{ '--team': teamColor(team.name, team.index) } as React.CSSProperties}>
+  return <ul className="team-columns compact" aria-label={p('teams')}>{teams.teams.map(team => <li key={team.index} className="team-column" style={{ '--team': team.color } as React.CSSProperties}>
     <div className="team-column-head"><strong>{team.name}</strong><span className="team-count"> · {team.memberIds.length}</span></div>
     <p className="team-names">{list(state, team.memberIds)}{team.captainId && teams.answers === 'captain' ? p('captainSummary', { name: nameOf(state, team.captainId) }) : ''}</p></li>)}</ul>;
 }

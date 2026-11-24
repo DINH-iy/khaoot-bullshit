@@ -8,7 +8,9 @@
 .room .dock-button { display: inline-flex; align-items: center; gap: 8px;
   min-height: 52px; padding: 0 20px; border-radius: 999px; font-weight: 800; background: color-mix(in srgb, var(--r-surface) 92%, black); color: var(--r-text);
   border: 1px solid var(--r-line); box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
-.room .dock-button.dock-react { min-height: 44px; width: 44px; padding: 0; justify-content: center; }
+.room .dock-button.dock-react, .room .dock-button.dock-menu { min-height: 44px; width: 44px; padding: 0; justify-content: center; }
+.room .dock-button.dock-menu { position: relative; }
+.room .dock-menu .dock-dot { position: absolute; top: 6px; right: 6px; }
 .dock-react .phone-menu-icon { background: transparent; }
 .room .dock-button > span[aria-hidden] { font-size: 1.2rem; line-height: 1; }
 .room .dock-button .dock-dot { width: 10px; height: 10px; margin-left: 0; }

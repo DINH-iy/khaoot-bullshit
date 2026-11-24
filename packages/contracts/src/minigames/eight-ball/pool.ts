@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const POOL_WIDTH = 800;
 export const POOL_HEIGHT = 400;
 export const BALL_RADIUS = 10;
-export const POCKET_RADIUS = 22;
+export const POCKET_RADIUS = 24;
 export const POOL_START_LINE = POOL_WIDTH / 4;
 export const POOL_START_MIN_PERCENT = 10;
 export const POOL_START_MAX_PERCENT = 40;
@@ -14,7 +14,22 @@ export type PoolStart = z.infer<typeof PoolStartSchema>;
 export type ResolvedPoolStart = z.infer<typeof ResolvedPoolStartSchema>;
 export const DEFAULT_POOL_START: ResolvedPoolStart = { side: 'left', percent: 25 };
 export const poolStartX = (start: ResolvedPoolStart = DEFAULT_POOL_START) => POOL_WIDTH * (start.side === 'right' ? 100 - start.percent : start.percent) / 100;
+export const POOL_FELTS = ['green', 'blue', 'teal', 'red', 'purple', 'gray'] as const;
+export const PoolFeltSchema = z.enum(POOL_FELTS);
+export type PoolFelt = z.infer<typeof PoolFeltSchema>;
+export const DEFAULT_POOL_FELT: PoolFelt = 'green';
 export const POOL_POCKETS = [0, POOL_HEIGHT].flatMap(y => [0, POOL_WIDTH / 2, POOL_WIDTH].map(x => [x, y] as const));
+/** Where the cushion noses end beside each pocket, measured along the rail from the pocket's middle. */
+export const POOL_CORNER_MOUTH = 27;
+export const POOL_SIDE_MOUTH = 23;
+/** True for a spot along a rail that is a pocket opening rather than cushion. */
+export const inPoolMouth = (along: number, length: number, side: boolean) =>
+  along < POOL_CORNER_MOUTH || along > length - POOL_CORNER_MOUTH || side && Math.abs(along - length / 2) < POOL_SIDE_MOUTH;
+/** The jaw tips: the cushion ends a ball can glance off on its way in. */
+export const POOL_JAWS: readonly (readonly [number, number])[] = [
+  ...[0, POOL_HEIGHT].flatMap(y => [POOL_CORNER_MOUTH, POOL_WIDTH / 2 - POOL_SIDE_MOUTH, POOL_WIDTH / 2 + POOL_SIDE_MOUTH, POOL_WIDTH - POOL_CORNER_MOUTH].map(x => [x, y] as const)),
+  ...[0, POOL_WIDTH].flatMap(x => [POOL_CORNER_MOUTH, POOL_HEIGHT - POOL_CORNER_MOUTH].map(y => [x, y] as const)),
+];
 export const oppositePoolPocket = (pocket: number) => POOL_POCKETS.length - 1 - pocket;
 export const POOL_MAX_SHOTS = 160;
 export const POOL_MAX_MOTION_FRAMES = 181;
@@ -74,6 +89,7 @@ export const PoolBoardSchema = z.strictObject({
   impacts: z.array(PoolImpactSchema).max(2 * (POOL_MAX_MOTION_FRAMES - 1)).optional(),
   ballBehavior: PoolBallBehaviorSchema.optional(),
   start: ResolvedPoolStartSchema.optional(),
+  felt: PoolFeltSchema.optional(),
   potsBySeat: z.tuple([z.array(z.number().int().min(1).max(15)).max(15), z.array(z.number().int().min(1).max(15)).max(15)]).optional(),
 });
 

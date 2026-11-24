@@ -1,3 +1,4 @@
+import { defaultTeamColor } from '@party/contracts';
 import type { StageRun } from '../../generated/prisma/client.js';
 import type { Transaction } from '../model.js';
 import { LineupInfoSchema, readForming, readStagePlay, teamContext, type TeamContext } from './teams.js';
@@ -9,20 +10,21 @@ export async function stageTeams(tx: Transaction, stage: StageRun, viewerPlayerI
   const forming = readForming(stage.presentation);
   if (forming) {
     const present = (await tx.sessionPlayer.findMany({ where: { sessionId: stage.sessionId, leftAt: null }, select: { id: true }, orderBy: { joinedAt: 'asc' } })).map(player => player.id);
-    const teams = forming.teams.map((team, index) => ({ index, name: team.name, teamId: null, targetSize: team.targetSize,
+    const teams = forming.teams.map((team, index) => ({ index, name: team.name, color: team.color ?? defaultTeamColor(team.name, index), teamId: null, targetSize: team.targetSize,
       memberIds: present.filter(id => forming.assignment[id] === index), captainId: forming.captains[String(index)] ?? null }));
     const own = viewerPlayerId ? forming.assignment[viewerPlayerId] : undefined;
-    return { forming: true, formation: forming.formation, scope: forming.scope, answers: forming.answers, points: forming.points, teams,
+    return { forming: true, formation: forming.formation, colorsBy: forming.colorsBy ?? 'host', scope: forming.scope, answers: forming.answers, points: forming.points, teams,
       unassignedIds: present.filter(id => forming.assignment[id] === undefined || forming.assignment[id] === null), ownTeamIndex: own ?? null };
   }
   const play = readStagePlay(stage.presentation);
   if (!context || !play || !stage.lineupId) return null;
   const lineup = await tx.teamLineup.findUniqueOrThrow({ where: { id: stage.lineupId } });
   const info = LineupInfoSchema.parse(lineup.carryover);
-  const names = new Map((await tx.sessionTeam.findMany({ where: { id: { in: [...context.members.keys()] } } })).map(team => [team.id, team.name]));
+  const rows = await tx.sessionTeam.findMany({ where: { id: { in: [...context.members.keys()] } } });
+  const names = new Map(rows.map(team => [team.id, team.name])); const colors = new Map(rows.map(team => [team.id, team.color]));
   const order = info.order ?? [];
   const teams = [...context.members.entries()].sort(([a], [b]) => order.indexOf(names.get(a) ?? '') - order.indexOf(names.get(b) ?? '')).map(([teamId, memberIds], index) => ({
-    index, name: names.get(teamId) ?? 'Team', teamId, targetSize: null, memberIds, captainId: context.captainOf.get(teamId) ?? null }));
+    index, name: names.get(teamId) ?? 'Team', color: colors.get(teamId) ?? defaultTeamColor(names.get(teamId) ?? '', index), teamId, targetSize: null, memberIds, captainId: context.captainOf.get(teamId) ?? null }));
   const ownTeam = viewerPlayerId ? context.teamOf.get(viewerPlayerId) : undefined;
   return { forming: false, formation: 'random' as const, scope: info.scope, answers: play.answers, points: play.points, teams,
     unassignedIds: [], ownTeamIndex: teams.find(team => team.teamId === ownTeam)?.index ?? null };
@@ -55,7 +57,7 @@ export async function teamStandings(tx: Transaction, sessionId: string, playerTo
   return teams.map(team => {
     const memberIds = current.members.filter(member => member.teamId === team.id).map(member => member.playerId);
     const fromMembers = base.info.data!.carryover === 'members' ? memberIds.reduce((total, id) => total + (playerTotals.get(id) ?? 0n), 0n) : 0n;
-    return { teamId: team.id, name: team.name, memberIds, total: (earned.get(team.id) ?? 0n) + fromMembers };
+    return { teamId: team.id, name: team.name, color: team.color ?? defaultTeamColor(team.name, 0), memberIds, total: (earned.get(team.id) ?? 0n) + fromMembers };
   }).sort((a, b) => a.total === b.total ? a.name.localeCompare(b.name) : a.total > b.total ? -1 : 1)
     .map(({ total, ...team }) => ({ ...team, amountMilli: total.toString() }));
 }

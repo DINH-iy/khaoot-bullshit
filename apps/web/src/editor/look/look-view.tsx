@@ -57,7 +57,7 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
       </fieldset>
     </aside>
     <section className="look-preview-area" aria-label={t('previewLabel')}>
-      <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={style} className={themeClass(look.theme)} /></LookContext.Provider>
+      <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={style} className={themeClass(look.theme)} selected={selected.length === 1 ? selected[0] : undefined} /></LookContext.Provider>
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>
   </div>;

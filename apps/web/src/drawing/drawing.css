@@ -2,7 +2,9 @@
 .drawing-view { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: calc(var(--r-radius, 16px) * .5); box-shadow: 0 0 0 1px rgb(0 0 0 / .12); background: #fff; }
 .drawing-pad { display: grid; gap: 10px; width: min(100%, 34rem); margin-inline: auto; }
 .drawing-answer { display: grid; gap: 12px; width: min(100%, 34rem); margin-inline: auto; }
-.drawing-answer .drawing-submit { justify-self: end; min-height: 44px; }
+.drawing-answer .drawing-submit { justify-self: end; }
+/* The compact send button: an icon and a short word. */
+.drawing-submit { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding-inline: 14px; flex: none; }
 /* No scrolling, zooming or text selection while drawing. */
 .drawing-surface { display: block; width: 100%; height: auto; aspect-ratio: 1; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 14px; box-shadow: 0 0 0 2px var(--r-line, #ccc); cursor: crosshair; background: #fff; }
 .drawing-pad.disabled .drawing-surface { cursor: not-allowed; opacity: .75; }
@@ -38,11 +40,10 @@
 /* Sizes and eraser in one row; undo and start over below (or, on a short screen, all in one row as icons). */
 .drawing-row { display: grid; gap: 8px; }
 .drawing-actions button .tool-label, .drawing-eraser .tool-label { margin-inline-start: 6px; }
-/* On a phone the square shrinks to the height left over, so the colours, sizes and buttons stay on screen with it,
-   above the floating menu bar. */
+/* On a phone the square is sized to the height left over (measured in drawing-pad.tsx), so the colours, sizes and
+   buttons stay on screen with it, above the floating menu bar. */
 .room-player :is(.drawing-answer, .mg-turn) .drawing-pad { justify-items: center; }
 .room-player :is(.drawing-answer, .mg-turn) .drawing-tools { width: 100%; }
-.room-player :is(.drawing-answer, .mg-turn) .drawing-surface { width: min(100%, max(10rem, calc(100svh - 37rem))); }
 @media (max-height: 760px) {
   .drawing-row { display: flex; gap: 6px; }
   .drawing-row .drawing-widths { flex: 5; }
@@ -50,7 +51,4 @@
   .drawing-row .tool-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .room .drawing-widths .drawing-eraser, .drawing-widths .drawing-eraser { flex: 1; padding: 0; }
   .drawing-row .drawing-actions button { flex: 1; min-width: 40px; padding: 0; justify-content: center; }
-  .room-player :is(.drawing-answer, .mg-turn) .drawing-surface { width: min(100%, max(10rem, calc(100svh - 31rem))); }
-  /* Pass the pencil also has its turn line and send button: a little less room. */
-  .room-player .mg-turn .drawing-surface { width: min(100%, max(9rem, calc(100svh - 34.5rem))); }
 }

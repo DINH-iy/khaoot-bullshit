@@ -155,7 +155,8 @@
 .answer-bars li:nth-child(8n+1) .bar { background: var(--a1); } .answer-bars li:nth-child(8n+2) .bar { background: var(--a2); } .answer-bars li:nth-child(8n+3) .bar { background: var(--a3); }
 .answer-bars li:nth-child(8n+4) .bar { background: var(--a4); } .answer-bars li:nth-child(8n+5) .bar { background: var(--a5); } .answer-bars li:nth-child(8n+6) .bar { background: var(--a6); }
 .answer-bars li.correct { outline: 3px solid var(--r-accent); }
-.answer-bars li.wrong { opacity: .75; }
+/* Wrong answers: the bar is dimmed, its label keeps full contrast. */
+.answer-bars li.wrong .bar { opacity: .6; }
 .room .results { display: grid; gap: 10px; padding: 18px; }
 .room .results h3, .room .results h4 { margin: 0; }
 
@@ -234,6 +235,13 @@
 .round-info .chip { margin: 0; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--r-card); font-size: .9rem; font-weight: 600; line-height: 1.2; }
 .round-info .phase-pill { justify-self: auto; }
 .round-info .chip-timer { margin-left: auto; font-variant-numeric: tabular-nums; }
+.round-info .chip-count { font-variant-numeric: tabular-nums; }
+/* Narrow phones: tighter chips, so phase, count, timer and ⓘ stay on one line. */
+.timer-short { display: none; }
+/* Narrow phones: a round without a time limit needs no timer chip. */
+@media (max-width: 400px) { .round-info .chip-timer.no-limit { display: none; } }
+@media (max-width: 400px) { .round-info .timer-short { display: inline; } .round-info .timer:has(.timer-short) .timer-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
+@media (max-width: 400px) { .round-info { gap: 6px; padding-inline: 12px; } .round-info .chip { padding: 4px 8px; gap: 4px; font-size: .85rem; } .round-info :is(.phase-pill, .chip-count) > svg { display: none; } }
 .round-info .chip-timer .timer { font-size: 1.05rem; font-weight: 800; }
 .round-info .chip-timer.no-limit .timer { font-size: .9rem; font-weight: 600; color: var(--r-muted); }
 .round-info .chip-timer:has(.timer-ending) { background: color-mix(in srgb, var(--r-bad) 25%, var(--r-card)); }
@@ -309,6 +317,7 @@
 .team-column-head { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; background: var(--team-strong); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .35); }
 .team-column-head strong { font-size: 1.15rem; }
 .team-column-head .team-count { font-weight: 700; opacity: .9; }
+.room .team-remove.danger { background: #fff; color: #b3261e; border: 2px solid #b3261e; }
 .room .team-remove { margin-left: auto; min-height: 30px; min-width: 30px; padding: 0; border-radius: 50%; border: 0; background: rgb(0 0 0 / .25); color: #fff; font-size: 1.1rem; line-height: 1; }
 .team-members { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .team-members li { margin: 0; }
@@ -594,3 +603,35 @@
 
 .room .result-page-actions button { min-height: 44px; min-width: 44px; padding: 0 6px; }
 .room .result-page-actions span { color: var(--r-muted); }
+/* The round's title with its main action (Send…) beside it; the slot takes no room when empty. */
+.stage-heading-row { display: flex; align-items: center; gap: 12px; }
+.stage-heading-row > h2 { flex: 1; min-width: 0; }
+.stage-action-slot { flex: none; display: flex; }
+.stage-action-slot:empty { display: none; }
+/* The timer as a round clock (Look & feel → Timer): its slice empties; it pulses red at the end and flashes red when time is up. */
+.timer-as-clock { display: inline-flex; align-items: center; margin: 0; }
+.timer-clock { width: 1.9em; height: 1.9em; display: block; }
+.round-info .chip-timer:has(.timer-as-clock) { padding: 0; background: transparent; }
+.round-info .timer-clock { width: 2.6rem; height: 2.6rem; }
+/* The face is empty (time gone); only the slice left is filled. */
+.timer-clock-face { fill: transparent; stroke: var(--r-text); stroke-width: 1.6; stroke-opacity: .85; }
+.timer-clock-slice { fill: var(--r-accent); transition: fill .3s; }
+.timer-clock-hub { fill: var(--r-text); }
+.timer-clock.paused .timer-clock-slice { fill: var(--r-muted); }
+.timer-clock.ending .timer-clock-slice { fill: var(--r-bad, #ff6b6b); animation: timer-clock-pulse 1s ease-in-out infinite; }
+.timer-clock.up { animation: timer-clock-flash .5s steps(1, end) 6; }
+.timer-clock.up .timer-clock-face { stroke: var(--r-bad, #ff6b6b); stroke-width: 2.4; stroke-opacity: 1; }
+.timer-clock.up .timer-clock-hub { fill: var(--r-bad, #ff6b6b); }
+@keyframes timer-clock-pulse { 50% { opacity: .7; } }
+@keyframes timer-clock-flash { 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { .timer-clock.ending .timer-clock-slice, .timer-clock.up { animation: none; } }
+/* A player in a team: a stripe in the team's colour along the top of the page, and the team chip shows only the colour. */
+.room-player.in-team { border-top: 6px solid var(--my-team); }
+/* Team colours: the host's colour button on a team, and the swatches a team picks from. */
+/* The host's colour button: a round chip of the team colour in front of the name. */
+.room .team-column-head .color-trigger.team-color-pick { flex: none; min-height: 32px; padding: 0; gap: 0; border-radius: 50%; }
+.room .team-column-head .team-color-pick > .color-chip { width: 28px; height: 28px; border-radius: 50%; box-shadow: 0 0 0 2px #fff; }
+.team-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.room .team-swatches button { width: 36px; min-height: 36px; padding: 0; border-radius: 50%; border: 2px solid rgb(255 255 255 / .6); }
+.room .team-swatches button[aria-checked=true] { outline: 3px solid var(--r-text); outline-offset: 2px; }
+.room .team-swatches button:disabled { opacity: .25; }

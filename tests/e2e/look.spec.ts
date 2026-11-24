@@ -1,10 +1,20 @@
-import { chooseOption } from './helpers.js';
+import { chooseOption, removeForkedStyles } from './helpers.js';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 test.use({ contextOptions: { reducedMotion: 'no-preference' } });
 const settled = (page: Page) => page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== 'running'));
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
+/** Sets a look colour with the app's colour picker: open it from the colour, type the code, press Enter. */
+async function setColour(page: Page, name: string, code: string) {
+  await page.getByRole('button', { name: new RegExp(`^${name} #`) }).click();
+  const picker = page.getByRole('dialog', { name });
+  await picker.getByRole('button', { name: 'HEX', exact: true }).click();
+  await picker.getByLabel('Hex code').fill(code);
+  await picker.getByLabel('Hex code').press('Enter');
+  await picker.getByLabel('Hex code').press('Escape');
+  await expect(picker).toHaveCount(0);
+}
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
 
 test('the owner styles a game, rewrites its texts and picks animations, and phones show exactly that', async ({ page, baseURL, browser }) => {
@@ -23,21 +33,23 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   await settled(page); expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
   // A style, a colour and a readability warning.
+  await page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: 'Bold', exact: true }).click();
   await page.getByRole('button', { name: 'Neon night', exact: true }).click();
+  await page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'Question', exact: true }).click();
   await expect(page.locator('.room-preview').first()).toHaveCSS('font-family', /Arial Narrow/);
   await page.getByRole('group', { name: 'Show this moment' }).getByRole('button', { name: 'Results', exact: true }).click();
   await expect(page.locator('.look-tv .round-results .result-answer')).toHaveText('Correct answer: Paris');
   await expect(page.locator('.look-phone .round-results .results-points-large')).toHaveText('+10');
   // The style page is in small groups; only Style starts open.
-  await expect(page.getByLabel('Text on main buttons')).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Text on main buttons #/ })).toBeHidden();
   await page.locator('summary', { hasText: /^Colours/ }).click();
-  await page.getByLabel('Text on main buttons').fill('#00f0ff');
-  // The first change to a style asks what it is for; here only this game's look changes.
-  const asked = page.getByRole('dialog', { name: 'Change “Neon night”?' });
-  await asked.getByRole('button', { name: 'Only change this look' }).click();
-  await expect(asked).toHaveCount(0);
+  await setColour(page, 'Text on main buttons', '#00f0ff');
+  // A built-in style is never changed: the change makes a new style of yours, without asking.
+  await expect(page.getByRole('dialog', { name: /^Change/ })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: /made a new style: My Neon night/ })).toBeVisible();
+  await removeForkedStyles(page, baseURL!, 'Neon night');
   await expect(page.getByText('Text on main buttons is hard to read')).toBeVisible();
-  await page.getByLabel('Text on main buttons').fill('#001417');
+  await setColour(page, 'Text on main buttons', '#001417');
   await expect(page.getByText('Text on main buttons is hard to read')).toHaveCount(0);
 
   // Own words, shown in the preview straight away.
@@ -118,9 +130,10 @@ test('a colour palette from Canva, Figma or Coolors is imported, and the colours
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   // The MBO Utrecht style is one of the starting points.
+  await page.getByRole('group', { name: 'Style groups' }).getByRole('button', { name: 'Brands', exact: true }).click();
   await page.getByRole('button', { name: /MBO Utrecht/ }).click();
   await page.locator('summary', { hasText: /^Colours/ }).click();
-  await expect(page.getByLabel('Answer A colour')).toHaveValue('#f39200');
+  await expect(page.getByRole('button', { name: 'Answer A colour', exact: true })).toHaveAttribute('title', '#F39200');
 
   await page.getByRole('button', { name: 'Import colours…' }).click();
   const importing = page.getByRole('dialog', { name: 'Import colours' });
@@ -130,9 +143,10 @@ test('a colour palette from Canva, Figma or Coolors is imported, and the colours
   await settled(page);
   expect((await new AxeBuilder({ page }).include('.palette-dialog').analyze()).violations).toEqual([]);
   await importing.getByRole('button', { name: 'Use these colours' }).click();
-  await page.getByRole('dialog', { name: 'Change “MBO Utrecht”?' }).getByRole('button', { name: 'Only change this look' }).click();
-  await expect(page.getByLabel('Answer A colour')).toHaveValue('#264653');
-  await expect(page.getByLabel('Answer E colour')).toHaveValue('#e76f51');
+  await expect(page.getByRole('status').filter({ hasText: /made a new style: My MBO Utrecht/ })).toBeVisible();
+  await removeForkedStyles(page, baseURL!, 'MBO Utrecht');
+  await expect(page.getByRole('button', { name: 'Answer A colour', exact: true })).toHaveAttribute('title', '#264653');
+  await expect(page.getByRole('button', { name: 'Answer E colour', exact: true })).toHaveAttribute('title', '#E76F51');
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole('button', { name: 'Export colours…' }).click();

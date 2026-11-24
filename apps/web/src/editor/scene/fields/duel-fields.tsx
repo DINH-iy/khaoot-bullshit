@@ -1,4 +1,4 @@
-import { DEFAULT_POOL_START, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, placePoints, PoolBallBehaviorSchema, PoolMatchSecondsSchema, POOL_MATCH_MAX_SECONDS, PoolStartSchema, type Places } from '@party/contracts';
+import { DEFAULT_POOL_START, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, placePoints, PoolBallBehaviorSchema, PoolFeltSchema, PoolMatchSecondsSchema, DEFAULT_POOL_FELT, POOL_MATCH_MAX_SECONDS, PoolStartSchema, type Places } from '@party/contracts';
 import { PlacesFields } from './places-fields.js';
 import { useState } from 'react';
 import { ChoiceDialog, type CardChoice } from '../../controls/choice-dialog.js';
@@ -7,6 +7,7 @@ import { CREATURE_TEXTS } from '../../../head-to-head/creature-board.js';
 import { HOSTED_POOL_TEXTS } from '../../../head-to-head/eight-ball/hosted.text.js';
 import { PoolBehaviorFields } from '../../../head-to-head/eight-ball/behavior-fields.js';
 import { PoolStartFields } from '../../../head-to-head/eight-ball/start-fields.js';
+import { PoolFeltFields } from '../../../head-to-head/eight-ball/felt-fields.js';
 import { translate, useTexts } from '../../../i18n/texts.js';
 import { FIELDS_TEXTS } from '../fields.text.js';
 import { gameDescription, gameHowToPlay, gameName } from '../../../presentation/catalog.text.js';
@@ -35,6 +36,7 @@ export function DuelFields({ part, stage, onChange, addTeams }: { part: 'setting
   const settings = contest.kind === 'game' ? contest.settings ?? {} : {};
   const ballBehavior = PoolBallBehaviorSchema.safeParse(settings['ballBehavior']);
   const poolStart = PoolStartSchema.safeParse(settings['start']);
+  const felt = PoolFeltSchema.safeParse(settings['felt']);
   const set = (change: Partial<Stage>, field: string) => onChange({ ...stage, ...change }, field);
   const [picking, setPicking] = useState(false);
   const teamPool = game === 'eight-ball' && stage['pick'] === 'teams';
@@ -74,6 +76,8 @@ export function DuelFields({ part, stage, onChange, addTeams }: { part: 'setting
       </p>)}
     </div>;
   if (part === 'table') return <>
+    <PoolFeltFields value={felt.data ?? DEFAULT_POOL_FELT} onChange={next =>
+      set({ contest: { kind: 'game', game: 'eight-ball', settings: { ...settings, felt: next } } }, 'pool-felt')} />
     <div className="configuration-timing"><PoolStartFields value={poolStart.data ?? DEFAULT_POOL_START} onChange={start =>
       set({ contest: { kind: 'game', game: 'eight-ball', settings: { ...settings, start } } }, 'pool-start')} /></div>
     <PoolBehaviorFields value={ballBehavior.data ?? { preset: 'arcade' }} onChange={behavior =>

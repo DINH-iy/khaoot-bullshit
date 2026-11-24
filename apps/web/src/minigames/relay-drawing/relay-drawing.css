@@ -1,5 +1,5 @@
 .mg-relay, .mg-turn, .mg-relay-screen { display: grid; gap: 12px; width: 100%; justify-items: center; }
-.mg-relay .drawing-view, .mg-turn .drawing-pad { width: min(100%, 30rem); }
+.mg-relay .drawing-view, .mg-turn .drawing-pad { width: min(100%, 34rem); }
 .mg-relay-screen .drawing-gallery { width: 100%; }
 
 .drawing-animation .actions { justify-content: center; gap: 0.35rem; }
@@ -11,3 +11,7 @@
 .room-player .mg-turn { gap: 8px; }
 .room-player .mg-relay > .drawing-view { width: min(100%, max(10rem, calc(100svh - 20rem))); }
 .room-player .mg-turn .mg-sub { font-size: .9375rem; text-align: center; }
+.mg-turn-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.room-player .mg-turn .mg-turn-head .mg-sub { text-align: start; }
+/* The seconds stay together and stand out a little: a small badge after the turn line. */
+.turn-seconds { display: inline-block; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: var(--r-card-strong); font-variant-numeric: tabular-nums; }

@@ -104,7 +104,10 @@ test('players draw blind and vote, draw the roundest circle, and pass the pencil
   for (const phone of phones) { await phone.getByRole('radio').first().check(); await phone.getByRole('button', { name: 'Save vote' }).click(); await expect(phone.getByText('Your vote is in!')).toBeVisible(); }
   await host.getByRole('button', { name: 'Close answers' }).click();
   await host.getByRole('button', { name: 'Reveal results' }).click();
-  const pictures = host.getByRole('region', { name: 'Round results' }).getByRole('img', { name: /^Drawing of / });
+  // Each team's picture, labelled with the team's name, and the points each member got.
+  const results = host.getByRole('region', { name: 'Round results' });
+  const pictures = results.locator('.mg-result-drawing').getByRole('img');
+  await expect(results.locator('.mg-result-points').first()).toContainText(/\d+ pts each/);
   await expect(pictures).toHaveCount(2);
   await expect(pictures.first().locator('path')).not.toHaveCount(0);
   expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);

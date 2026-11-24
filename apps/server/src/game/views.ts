@@ -159,6 +159,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         stage: current && entry ? { id: current.id, nodeKey: current.nodeKey, stageKey: current.stageKey, kind: entry.stage.kind, prompt: entry.stage.prompt, translations: entry.stage.translations,
           input: entry.stage.kind === 'collect' ? publicInput(entry.stage.input, `${current.id}:${actorKey(actor.data)}`)
             : entry.stage.kind === 'route' && entry.stage.decide.method !== 'host' && entry.stage.decide.method !== 'draw' ? { kind: 'choice', layout: 'tiles', options: entry.stage.options } : null, status: current.status,
+          timerMs: 'durationMs' in entry.stage && typeof entry.stage.durationMs === 'number' ? entry.stage.durationMs : null,
           deadlineAt: !current.revealedAt ? current.deadlineAt?.toISOString() ?? null : null, pausedRemainingMs: !current.revealedAt ? current.pausedRemainingMs : null,
           submittedCount: submissions.length, eligibleCount: choice ? choice.voterCount : eligible?.success ? eligible.data.playerIds.length : 0,
           // The host's judging: a challenge, or a writing, upload or drawing round with host points.

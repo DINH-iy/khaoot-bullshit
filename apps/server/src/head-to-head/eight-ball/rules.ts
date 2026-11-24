@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { BALL_RADIUS, canPlacePoolCue, DEFAULT_POOL_START, oppositePoolPocket, POOL_HEIGHT, POOL_MAX_SHOTS, POOL_WIDTH,
-  poolGroup, poolLegalTarget, isLegalPoolContact, poolPositionClear, poolStartX, rackPool, shootPool, type PoolImpact, type HeadToHeadView, type PoolBallBehavior, type PoolFrame, type ResolvedPoolStart } from '@party/contracts';
+  poolGroup, poolLegalTarget, isLegalPoolContact, poolPositionClear, poolStartX, rackPool, shootPool, type PoolImpact, type HeadToHeadView, type PoolBallBehavior, type PoolFelt, type PoolFrame, type ResolvedPoolStart } from '@party/contracts';
 import { illegal, type HeadToHeadRules, type Seat } from '../engine.js';
 
 interface Pool {
@@ -19,6 +19,7 @@ interface Pool {
   timedOut?: true;
   ballBehavior?: PoolBallBehavior;
   start?: ResolvedPoolStart;
+  felt?: PoolFelt;
   potsBySeat?: [number[], number[]];
 }
 
@@ -81,7 +82,8 @@ export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
     const start: ResolvedPoolStart = { side: side === 'random' ? (randomInt(2) === 0 ? 'left' : 'right') : side,
       percent: settings.start?.percent ?? DEFAULT_POOL_START.percent };
     return { frames: [rackPool(start)], motion: [], turn: 0, solids: null, ballInHand: false, foul: false, winner: null, start,
-      ending: null, lastPocket: { solid: null, stripe: null }, ...(settings.ballBehavior ? { ballBehavior: settings.ballBehavior } : {}) };
+      ending: null, lastPocket: { solid: null, stripe: null }, ...(settings.ballBehavior ? { ballBehavior: settings.ballBehavior } : {}),
+      ...(settings.felt ? { felt: settings.felt } : {}) };
   },
   turn: data => data.winner !== null || data.timedOut || atLimit(data) ? null : data.turn,
   apply(data, seat, move) {
@@ -92,8 +94,8 @@ export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
     const placement = move.cue;
     illegal(!placement || (data.ballInHand && canPlacePoolCue(...placement, before, startArea)), 'The cue ball cannot be placed there');
     const start = placement ? before.map((ball): PoolFrame[number] => ball[0] === 0 ? [0, ...placement] : ball) : before;
-    const shot = shootPool(start, move.angle, move.power, data.ballBehavior, move.spin);
     const opening = data.frames.length === 1;
+    const shot = shootPool(start, move.angle, move.power, data.ballBehavior, move.spin, opening);
     const own = groupFor(data, seat);
     const legalTarget = poolLegalTarget(before, own, opening);
     const onEight = legalTarget === 'eight';
@@ -130,7 +132,7 @@ export const eightBall: HeadToHeadRules<'eight-ball', Pool> = {
   board: data => ({ game: 'eight-ball', balls: current(data), motion: data.motion, solids: data.solids,
     ballInHand: data.ballInHand, foul: data.foul, shot: data.frames.length - 1,
     ...(data.ballBehavior ? { ballBehavior: data.ballBehavior } : {}), ...(data.impacts ? { impacts: data.impacts } : {}),
-    start: data.start ?? DEFAULT_POOL_START, potsBySeat: pottedBallsBySeat(data),
+    start: data.start ?? DEFAULT_POOL_START, ...(data.felt ? { felt: data.felt } : {}), potsBySeat: pottedBallsBySeat(data),
     eightPocket: eightBall.outcome(data) ? null : targetPocket(data, data.turn), ending: data.ending }),
-  replay: data => ({ game: 'eight-ball', frames: data.frames }),
+  replay: data => ({ game: 'eight-ball', frames: data.frames, ...(data.felt ? { felt: data.felt } : {}) }),
 };

@@ -7,7 +7,8 @@ import '../../ui/game-slider.css';
 import { Section } from '../controls/section.js';
 import { Swatches } from '../controls/swatches.js';
 import { ColorPicker } from '../../ui/color-picker.js';
-import { useId, useState, type CSSProperties } from 'react';
+import { useId, useRef, useState, type CSSProperties } from 'react';
+import { ClockFace } from '../../room/stage-timer.js';
 import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
 const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
@@ -20,6 +21,13 @@ import { Icon } from '../controls/icons.js';
 import type { SavedStyle } from '@party/contracts';
 
 /** The card of a style: its backgrounds, title font, answer colours and button colour. */
+/** The built-in styles in small groups, so the list stays short; a style not listed here lands in Everyday. */
+const STYLE_GROUPS = { everyday: ['party', 'clean', 'elegant', 'pub', 'kids'], bold: ['neon', 'retro', 'terminal'], space: ['space', 'mars', 'saturn', 'neptune', 'ocean'], occasions: ['christmas', 'birthday'], brands: ['mbou'] } as const;
+type StyleGroup = 'yours' | keyof typeof STYLE_GROUPS;
+const GROUP_NAMES = { yours: 'gYours', everyday: 'gEveryday', bold: 'gBold', space: 'gSpace', occasions: 'gOccasions', brands: 'gBrands' } as const satisfies Record<StyleGroup, keyof typeof LOOK_TEXTS.en>;
+const groupOf = (preset: string): keyof typeof STYLE_GROUPS => (Object.keys(STYLE_GROUPS) as (keyof typeof STYLE_GROUPS)[]).find(group => (STYLE_GROUPS[group] as readonly string[]).includes(preset)) ?? 'everyday';
+const presetsIn = (group: keyof typeof STYLE_GROUPS) => Object.keys(THEME_PRESETS).filter(key => groupOf(key) === group);
+
 function StyleCard({ name, theme, on, onClick }: { name: string; theme: FullTheme; on: boolean; onClick: () => void }) {
   return <button type="button" className={`preset-card${on ? ' on' : ''}`} aria-pressed={on} onClick={onClick}
     style={{ background: `linear-gradient(160deg, ${theme.colors.background}, ${theme.colors.background2})`, color: theme.colors.text, fontFamily: fontCssFamily(theme.headingFont) }}>
@@ -95,10 +103,29 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(false);
   const [removing, setRemoving] = useState<SavedStyle | null>(null);
-  const [savedName, setSavedName] = useState('');
+  const [savedName, setSavedName] = useState(''); const [forked, setForked] = useState('');
+  // The group shown: the one picked, else the one holding this look's style (your own styles when it is yours).
+  const [group, setGroup] = useState<StyleGroup | null>(null);
+  const shownGroup: StyleGroup = group ?? (current?.own ? 'yours' : layer.preset && THEME_PRESETS[layer.preset] ? groupOf(layer.preset) : saved.styles.length ? 'yours' : 'everyday');
+  // A change to a built-in style while it becomes a new style of yours: the newest look, applied once it exists.
+  const forking = useRef<Theme | null>(null);
   const apply = (next: Theme) => {
+    if (forking.current) { forking.current = next; return; }
     if (pending) { setPending(next); return; }
     if (!current) { onChange(next); return; }
+    // Built-in styles are never changed: the first change makes a new style of yours (“My Neon night”), and the
+    // look follows it. If saving fails (the list is full), this look still changes and the error shows.
+    if (!current.own && decision?.key !== current.key) {
+      forking.current = next; const base = t('styleCopyName', { name: current.name }).slice(0, 56);
+      const taken = new Set(saved.styles.map(style => style.name));
+      let name = base; for (let number = 2; taken.has(name); number++) name = `${base} ${number}`;
+      void createFrom(name, next).then(id => {
+        const look = forking.current ?? next; forking.current = null; onChange(look);
+        if (id) { setForked(name); if (look !== next) void saved.save({ id, name, theme: look }, true); }
+        else setDecision({ key: current.key, styleId: null });
+      });
+      return;
+    }
     if (decision?.key === current.key) {
       onChange(next);
       if (decision.styleId && current.own) { void saved.save({ id: current.own.id, name: current.own.name, theme: next }, true); setDecision({ key: `saved:${current.own.id}`, styleId: current.own.id }); }
@@ -109,14 +136,14 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
   const set = (patch: Partial<Theme>) => apply({ ...(pending ?? layer), ...patch });
   const setColor = (name: keyof Colors, value: string | string[]) => set({ colors: { ...((pending ?? layer).colors ?? {}), [name]: value } });
   // Picking a style starts afresh: its first change asks again.
-  const chooseStyle = (next: Theme | undefined) => { setPending(null); setDecision(null); setSavedName(''); onChange(next); };
+  const chooseStyle = (next: Theme | undefined) => { setPending(null); setDecision(null); setSavedName(''); setForked(''); onChange(next); };
   const createFrom = async (name: string, look: Theme) => {
     setBusy(true);
     const id = await saved.create(name, look);
     setBusy(false);
-    if (!id) return false;
-    setDecision({ key: `saved:${id}`, styleId: id }); setSavedName(name);
-    return true;
+    if (!id) return null;
+    setDecision({ key: `saved:${id}`, styleId: id }); setSavedName(name); setGroup('yours');
+    return id;
   };
   const answers = full.colors.answers;
   // Every colour of this look, offered in the colour picker for reuse.
@@ -128,21 +155,21 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
   const markName = { letters: 'A B C', numbers: '1 2 3', shapes: t('markShapes'), custom: t('markOwn'), none: t('markNone') }[full.markers];
   return <div className="look-panel">
     <Section title={t('style')} memory="look:style" open summary={presetName}>
-      {saved.styles.length > 0 && <>
-        <p className="field-title">{t('yourStyles')}</p>
-        <div className="preset-grid">{saved.styles.map(style => <div key={style.id} className="saved-style">
+      {/* One group at a time (your own styles, then the built-in ones by kind), so the list stays short. */}
+      <div className="segmented style-groups" role="group" aria-label={t('styleGroups')}>{(['yours', ...Object.keys(STYLE_GROUPS)] as StyleGroup[]).map(key =>
+        <button key={key} type="button" aria-pressed={shownGroup === key} onClick={() => setGroup(key)}>{t(GROUP_NAMES[key])}</button>)}</div>
+      {shownGroup === 'yours' ? <div className="preset-grid">
+        {saved.styles.map(style => <div key={style.id} className="saved-style">
           <StyleCard name={style.name} theme={resolveTheme(...below, style.theme)} on={current?.own?.id === style.id} onClick={() => chooseStyle(style.theme)} />
           <button type="button" className="small-button icon-only danger-icon" aria-label={t('styleRemoveLabel', { name: style.name })} title={t('styleRemoveLabel', { name: style.name })}
             onClick={() => setRemoving(style)}><Icon name="trash" size={16} /></button>
-        </div>)}</div>
-        <p className="field-title">{t('builtInStyles')}</p>
-      </>}
-      <div className="preset-grid">{Object.entries(THEME_PRESETS).map(([key, preset]) =>
-        <StyleCard key={key} name={styleName(key)} theme={preset.theme} on={current?.key === `preset:${key}`} onClick={() => chooseStyle({ preset: key })} />)}</div>
-      <div className="palette-actions">
-        <button type="button" className="small-button with-icon" onClick={() => setNaming(true)}><Icon name="plus" size={16} />{t('styleSaveNew')}</button>
+        </div>)}
+        {/* Saving this look as a new style: a tile like the styles, with a dashed edge. */}
+        <button type="button" className="preset-card new-style-card" aria-label={t('styleSaveNew')} title={t('styleSaveNew')} onClick={() => setNaming(true)}><Icon name="plus" size={22} /><span>{t('newStyle')}</span></button>
       </div>
-      {savedName && <p role="status" className="hint">{t('styleSaved', { name: savedName })}</p>}
+      : <div className="preset-grid">{presetsIn(shownGroup).map(key =>
+        <StyleCard key={key} name={styleName(key)} theme={THEME_PRESETS[key]!.theme} on={current?.key === `preset:${key}`} onClick={() => chooseStyle({ preset: key })} />)}</div>}
+      {savedName && <p role="status" className="hint">{forked === savedName ? t('styleForked', { name: savedName }) : t('styleSaved', { name: savedName })}</p>}
       {saved.error && <p role="alert" className="error">{t(saved.error)}</p>}
       <p className="hint">{t('styleHint')}</p>
     </Section>
@@ -197,6 +224,18 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       {full.sliderStyle === 'dial' && <DialPreview colors={full.colors} />}
     </Section>}
 
+    {!noAnswers && <Section title={t('timerTitle')} memory="look:timer" summary={t(full.timerStyle === 'clock' ? 'timerClock' : 'timerDigits')}>
+      <div className="segmented" role="group" aria-label={t('timerTitle')}>{(['digits', 'clock'] as const).map(key =>
+        <button key={key} type="button" aria-pressed={full.timerStyle === key} onClick={() => set({ timerStyle: key })}>{t(key === 'clock' ? 'timerClock' : 'timerDigits')}</button>)}</div>
+      {full.timerStyle === 'clock' && <><p className="field-title">{t('timerTurn')}</p>
+        <div className="segmented" role="group" aria-label={t('timerTurn')}>{(['clockwise', 'counterclockwise'] as const).map(key =>
+          <button key={key} type="button" aria-pressed={full.timerTurn === key} onClick={() => set({ timerTurn: key })}>{t(key === 'clockwise' ? 'timerClockwise' : 'timerCounter')}</button>)}</div>
+        {/* A live example: full, then emptying, then the red end. */}
+        <div className="timer-samples room" role="img" aria-label={t('timerSample')} style={themeStyle(full)}>
+          {[[20, 20], [14, 20], [3, 20], [0, 20]].map(([left, total]) => <ClockFace key={left} left={left! * 1000} total={total! * 1000} ending={left! <= 5} up={left === 0} clockwise={full.timerTurn !== 'counterclockwise'} />)}</div></>}
+      <p className="hint">{t('timerHint')}</p>
+    </Section>}
+
     {!noAnswers && <Section title={t('answerMarks')} memory="look:marks" summary={markName}>
       {markChoices().map(({ key, label, options }) => <div key={key}>
         <p className="field-title">{label}</p>
@@ -206,11 +245,10 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
       <p className="hint">{t('marksHint')}</p>
     </Section>}
     {theme && <button type="button" className="small-button danger-outline" onClick={() => chooseStyle(undefined)}>{t('removeAll')}</button>}
-    {pending && current && <StyleChangeDialog styleName={current.name} own={Boolean(current.own)} busy={busy} error={saved.error ? t(saved.error) : ''}
+    {pending && current?.own && <StyleChangeDialog styleName={current.name} busy={busy} error={saved.error ? t(saved.error) : ''}
       onCreate={name => { const look = pending; void createFrom(name, look).then(done => { if (done) { setPending(null); onChange(look); } }); }}
       onUpdate={() => { const look = pending; const own = current.own!; setPending(null); setDecision({ key: `saved:${own.id}`, styleId: own.id });
         void saved.save({ id: own.id, name: own.name, theme: look }); onChange(look); }}
-      onOnlyHere={() => { const look = pending; setPending(null); setDecision({ key: current.key, styleId: null }); onChange(look); }}
       onCancel={() => setPending(null)} />}
     {naming && <NewStyleDialog error={saved.error ? t(saved.error) : ''} defaultName={current ? t('styleCopyName', { name: current.name }) : t('styleDefaultName')} busy={busy}
       onSave={name => { void createFrom(name, layer).then(done => { if (done) setNaming(false); }); }} onCancel={() => setNaming(false)} />}

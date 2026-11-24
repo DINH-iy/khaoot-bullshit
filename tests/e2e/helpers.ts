@@ -57,3 +57,11 @@ export async function chooseOption(control: Locator, option: string | { label: s
   const choice = typeof option === 'string' ? list.locator(`[data-value=${JSON.stringify(option)}]`) : list.getByRole('option', { name: option.label, exact: true });
   await choice.click();
 }
+
+/** Changing a built-in style makes a saved style (“My Neon night”, “My Neon night 2”…): tests remove theirs again. */
+export async function removeForkedStyles(page: Page, baseURL: string, builtIn: string) {
+  const headers = { 'x-party-request': '1', origin: baseURL };
+  const styles = (await (await page.request.get(`${baseURL}/api/host/styles`, { headers })).json()).data as { id: string; name: string }[];
+  for (const style of styles.filter(entry => entry.name === `My ${builtIn}` || entry.name.startsWith(`My ${builtIn} `)))
+    await page.request.post(`${baseURL}/api/host/styles/${style.id}/delete`, { headers, data: {} });
+}

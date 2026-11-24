@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolShotSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
+import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolFeltSchema, PoolShotSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
 
 /**
  * Head-to-head games: two players, one board. Used by the duel scene (the two
@@ -27,7 +27,7 @@ const SETTINGS = {
   rps: z.object({ firstTo: z.number().int().min(1).max(5) }).strict(),
   tictactoe: z.object({}).strict(),
   chess: z.object({}).strict(),
-  'eight-ball': z.object({ ballBehavior: PoolBallBehaviorSchema.optional(), start: PoolStartSchema.optional() }).strict(),
+  'eight-ball': z.object({ ballBehavior: PoolBallBehaviorSchema.optional(), start: PoolStartSchema.optional(), felt: PoolFeltSchema.optional() }).strict(),
   'creature-duel': z.object({ size: z.union([z.literal(1), z.literal(3)]) }).strict(),
 } satisfies Record<HeadToHeadKey, z.ZodType>;
 export type HeadToHeadSettings<K extends HeadToHeadKey = HeadToHeadKey> = z.infer<typeof SETTINGS[K]>;
@@ -71,7 +71,7 @@ export type HeadToHeadOutcome = z.infer<typeof HeadToHeadOutcomeSchema>;
  * video). Kept only as long as the match itself: it goes when the room ends.
  */
 export const HeadToHeadReplaySchema = z.discriminatedUnion('game', [
-  z.strictObject({ game: z.literal('eight-ball'), frames: z.array(PoolFrameSchema).min(1).max(POOL_MAX_SHOTS + 1) }),
+  z.strictObject({ game: z.literal('eight-ball'), frames: z.array(PoolFrameSchema).min(1).max(POOL_MAX_SHOTS + 1), felt: PoolFeltSchema.optional() }),
   z.object({ game: z.literal('creature-duel'), frames: z.array(CreatureFrame).min(1).max(41) }).strict(),
   z.object({ game: z.literal('rps'), rounds: z.array(z.object({ picks: z.tuple([RpsPickSchema, RpsPickSchema]), winner: z.union([z.literal(0), z.literal(1)]).nullable() }).strict()).max(200) }).strict(),
   z.object({ game: z.literal('tictactoe'), moves: z.array(z.number().int().min(0).max(8)).max(9) }).strict(),

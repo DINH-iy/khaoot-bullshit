@@ -8,6 +8,7 @@ import { GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameK
 import { useLanguage } from '../../i18n/language.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { DrawBoard } from '../../room/minigame-draw.js';
+import { ClockFace } from '../../room/stage-timer.js';
 import { PLAY_TEXTS } from '../../room/play.text.js';
 import { buildLook, LookContext, themeClass, useThemeStyle } from '../../presentation/look.js';
 import { FaIcon } from '../../presentation/icons.js';
@@ -26,7 +27,8 @@ import { MinigamePractice } from './minigame-practice.js';
 import { ScenePractice } from './scene-practice.js';
 import { PRACTICE_TEXTS } from './scene-practice.text.js';
 
-type Device = 'sharedScreen' | 'phone';
+// `both`: the shared screen and the phone side by side (Look & feel's “This scene”).
+type Device = 'sharedScreen' | 'phone' | 'both';
 interface PreviewProps { definition: Definition; node: Node; index: number }
 interface CanvasControls {
   readOnly: boolean;
@@ -98,12 +100,10 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
         <SceneComposition layout={layout} media={mediaButton ? <div className={`canvas-media${sharedMedia ? '' : ' empty'}`}>{sharedMedia}{mediaButton}</div> : sharedMedia}>
           {stage.kind === 'info' && (canvas ? <input className="tv-banner canvas-title" aria-label={fields('title')} placeholder={fields('title')} value={title} maxLength={120} readOnly={canvas.readOnly}
             onChange={event => canvas.edit(current => ({ ...current, title: event.target.value }), 'title')} /> : <p className="tv-banner">{title}</p>)}
-          {canvas ? <div className="canvas-prompt-box" data-text={prompt || promptLabel}>
-            <textarea className="tv-prompt canvas-prompt" rows={1} aria-label={promptLabel} placeholder={promptLabel}
-              value={prompt} readOnly={canvas.readOnly} maxLength={2000} onChange={event => canvas.edit(current => ({ ...current, prompt: event.target.value }), 'prompt')} />
-          </div> : <p className="tv-prompt">{prompt}</p>}
+          {canvas ? <CanvasPrompt value={prompt} label={promptLabel} readOnly={canvas.readOnly}
+            onChange={value => canvas.edit(current => ({ ...current, prompt: value }), 'prompt')} /> : <p className="tv-prompt">{prompt}</p>}
         </SceneComposition>
-        {!interactive && timer && <p className="timer">{timer}</p>}
+        {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}
         {practice}
         {!interactive && draw && <DrawBoard options={options} drawn={null} at={null} seed="" waiting={drawHint} />}
@@ -131,7 +131,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
           <p className="phone-prompt">{phoneLabel}</p>
           {stage.kind === 'info' && <p className="phone-hint">{prompt}</p>}
         </SceneComposition>
-        {!interactive && timer && <p className="timer">{timer}</p>}
+        {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}
         {practice}
         {!interactive && draw && <DrawBoard options={options} drawn={null} at={null} seed="" waiting={drawHint} />}
@@ -168,6 +168,24 @@ function MinigamePreview({ stage, game, text, compact }: { stage: Stage; game: k
       {target && <p className="minigame-preview-target"><span>{t('target')}</span><strong>{target} {t('sec')}</strong></p>}
     </div>
     {!compact && cue && <span className="minigame-preview-cue">{cue}</span>}
+  </div>;
+}
+
+/** The canvas question grows with its text until the author drags its corner; from then on it keeps the author's height. */
+function CanvasPrompt({ value, label, readOnly, onChange }: { value: string; label: string; readOnly: boolean; onChange: (value: string) => void }) {
+  const field = useRef<HTMLTextAreaElement>(null);
+  const [sized, setSized] = useState(false);
+  useEffect(() => {
+    const element = field.current;
+    if (!element || sized) return;
+    // Only the browser's resize handle writes an inline height on this field.
+    const watch = new MutationObserver(() => { if (element.style.height) setSized(true); });
+    watch.observe(element, { attributes: true, attributeFilter: ['style'] });
+    return () => watch.disconnect();
+  }, [sized]);
+  return <div className="canvas-prompt-box" data-text={value || label} data-sized={sized || undefined}>
+    <textarea ref={field} className="tv-prompt canvas-prompt" rows={1} aria-label={label} placeholder={label}
+      value={value} readOnly={readOnly} maxLength={2000} onChange={event => onChange(event.target.value)} />
   </div>;
 }
 

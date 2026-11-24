@@ -23,6 +23,8 @@ const view = (f: World, index: number) => readSessionView(prisma, player(f, inde
 const hostView = (f: World) => readSessionView(prisma, f.host, f.sessionId);
 const close = async (f: World, stageRunId: string) => { await hostCommand(f, 'stage.close', { stageRunId }); await hostCommand(f, 'stage.reveal', { stageRunId }).catch(() => undefined); };
 const totals = async (f: World) => new Map((await hostView(f)).teamStandings.map(team => [team.name, team.amountMilli]));
+// Commands players may also send carry no revision, from the host too (as the room screen sends them).
+const hostColor = (f: World, extra: object) => service.execute(f.host, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'teams.color', ...extra });
 const sizes = async (f: World) => (await hostView(f)).stage!.teams!.teams.map(team => team.memberIds.length);
 
 describe('team rounds', () => {
@@ -142,6 +144,43 @@ describe('team rounds', () => {
     await expect(hostCommand(again, 'teams.remove', { stageRunId: run, teamIndex: 0 })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
     for (let count = 1; count < 12; count++) await hostCommand(again, 'teams.add', { stageRunId: run });
     await expect(hostCommand(again, 'teams.add', { stageRunId: run })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+  });
+
+  it('gives teams colours: the host picks any colour, a team picks a swatch for itself when allowed; two teams never share one, and the colour stays', async () => {
+    const pickScene = (colors?: 'teams') => ({ key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players', ...(colors ? { colors } : {}) } }] });
+    const f = await fixture(3, game([pickScene('teams'), quiz('a', teams('everyone', 'team'))]));
+    const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
+    const colors = async () => (await hostView(f)).stage!.teams!.teams.map(team => team.color);
+    // Named after a colour: that colour; the view says the teams may pick.
+    expect(await colors()).toEqual(['#e8505b', '#36a2eb']);
+    expect((await view(f, 0)).stage!.teams!.colorsBy).toBe('teams');
+    for (const [index, team] of [[0, 0], [1, 1], [2, 1]] as const) await act(f, index, 'teams.choose', { stageRunId, teamIndex: team });
+    // A member picks one of the swatches for their own team; not another team's, not any colour, not one in use.
+    await act(f, 0, 'teams.color', { stageRunId, teamIndex: 0, color: '#2bb3a3' });
+    await expect(act(f, 0, 'teams.color', { stageRunId, teamIndex: 1, color: '#f28c28' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(act(f, 1, 'teams.color', { stageRunId, teamIndex: 1, color: '#123456' })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await expect(act(f, 1, 'teams.color', { stageRunId, teamIndex: 1, color: '#2bb3a3' })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    // The host picks any colour (not one another team has).
+    await hostColor(f, { stageRunId, teamIndex: 1, color: '#123456' });
+    await expect(hostColor(f, { stageRunId, teamIndex: 1, color: '#2bb3a3' })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    expect(await colors()).toEqual(['#2bb3a3', '#123456']);
+    // Kept once the teams are made: the next round, the team totals and the stored teams.
+    await hostCommand(f, 'teams.confirm', { stageRunId });
+    await hostCommand(f, 'stage.advance', { stageRunId });
+    expect(await colors()).toEqual(['#2bb3a3', '#123456']);
+    // Red picked teal, so it is called Teal now; Blue's own colour has no name, so Blue keeps its name.
+    expect((await hostView(f)).stage!.teams!.teams.map(team => team.name)).toEqual(['Teal', 'Blue']);
+    expect((await hostView(f)).teamStandings.map(team => [team.name, team.color]).sort()).toEqual([['Blue', '#123456'], ['Teal', '#2bb3a3']]);
+    expect((await prisma.sessionTeam.findMany({ where: { sessionId: f.sessionId }, orderBy: { name: 'asc' } })).map(team => team.color)).toEqual(['#123456', '#2bb3a3']);
+    // Without the setting only the host picks, and a new team gets a colour nobody uses.
+    const hostOnly = await fixture(1, game([pickScene()]));
+    const run = (await hostCommand(hostOnly, 'session.start')).stageRunId!;
+    await act(hostOnly, 0, 'teams.choose', { stageRunId: run, teamIndex: 0 });
+    await expect(act(hostOnly, 0, 'teams.color', { stageRunId: run, teamIndex: 0, color: '#2bb3a3' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await hostColor(hostOnly, { stageRunId: run, teamIndex: 0, color: '#5fb84a' });
+    await hostCommand(hostOnly, 'teams.add', { stageRunId: run });
+    const added = (await readSessionView(prisma, hostOnly.host, hostOnly.sessionId)).stage!.teams!.teams.map(team => team.color);
+    expect(new Set(added).size).toBe(3);
   });
 
   it('refuses a round in the game teams with no Pick teams scene before it', () => {

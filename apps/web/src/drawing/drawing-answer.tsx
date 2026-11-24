@@ -1,3 +1,5 @@
+import { Icon } from '../presentation/line-icons.js';
+import { StageAction } from '../room/stage-action.js';
 import { useEffect, useState } from 'react';
 import { DrawingSchema, emptyDrawing, type Drawing } from '@party/contracts';
 import { useTexts } from '../i18n/texts.js';
@@ -33,7 +35,9 @@ export function DrawingAnswer({ sessionId, stageRunId, input, disabled, timeUp, 
   useEffect(() => { if (timeUp) setAutoSend(current => current === 'no' ? 'due' : current); }, [timeUp]);
   useEffect(() => { if (autoSend === 'due' && !sending) { setAutoSend('done'); if (drawing.strokes.length) void send(); } }, [autoSend, drawing]);
   return <div className="drawing-answer">
-    <button type="button" className="primary drawing-submit" disabled={disabled || sending || timeUp || !drawing.strokes.length} onClick={() => { void send(); }}>{timeUp ? t('timer.up') : t('drawing.submit')}</button>
+    {/* Small, at the top: the drawing keeps the room. Its full name (“Send my drawing”) is read out. */}
+    <StageAction><button type="button" className="primary drawing-submit" aria-label={timeUp ? t('timer.up') : t('drawing.submit')} disabled={disabled || sending || timeUp || !drawing.strokes.length} onClick={() => { void send(); }}>
+      <Icon name="send" size={18} /><span>{timeUp ? t('timer.up') : d('send')}</span></button></StageAction>
     {error && <p role="alert" className="error">{error}</p>}
     <DrawingPad value={drawing} onChange={setDrawing} under={input.start ? [input.start] : []} blind={input.blind ?? false} maxStrokes={input.maxStrokes} disabled={timeUp || sending} label={d('yours')} />
   </div>;

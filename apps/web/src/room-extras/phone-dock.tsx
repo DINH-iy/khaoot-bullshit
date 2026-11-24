@@ -82,8 +82,9 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
         aria-expanded={sheet === 'react'} aria-label={t('react.open')} onClick={() => setSheet(sheet === 'react' ? null : 'react')}>
         {icon('react')}
       </button>}
-      <button type="button" className="dock-button" aria-haspopup="dialog" aria-expanded={sheet === 'menu'} onClick={() => setSheet(sheet === 'menu' ? null : 'menu')}>
-        <Icon name="menu" size={20} />{x('menu')}{news && <span className="dock-dot" aria-label={x('news')} />}
+      {/* Just the burger: the menu's name is read out, not shown. */}
+      <button type="button" className="dock-button dock-menu" aria-haspopup="dialog" aria-expanded={sheet === 'menu'} aria-label={x('menu')} title={x('menu')} onClick={() => setSheet(sheet === 'menu' ? null : 'menu')}>
+        <Icon name="menu" size={22} />{news && <span className="dock-dot" aria-label={x('news')} />}
       </button>
     </div>
     {sheet === 'menu' && <BottomSheet key="menu" title={x('menu')} onClose={close} resizable><nav className="phone-dock" aria-label={x('more')}>

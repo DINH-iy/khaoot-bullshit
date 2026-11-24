@@ -29,6 +29,8 @@ const paths: Record<string, string> = {
   duel: 'M4 4l9 9 M20 4l-9 9 M7 14l3 3 M17 14l-3 3 M5 16l-2 2 2 2 2-2 M19 16l2 2-2 2-2-2',
   // A menu of more actions: three lines.
   menu: 'M4 7h16 M4 12h16 M4 17h16',
+  // Send: a paper plane.
+  send: 'M3 11l18-8-8 18-2-8z M11 13L21 3',
   // History: a clock with an arrow turning back.
   history: 'M3.5 12a8.5 8.5 0 1 0 2.5-6 M3 3.5v5h5 M12 7.5V12l3 2',
   // A warning: a triangle with an exclamation mark (problems to fix first).

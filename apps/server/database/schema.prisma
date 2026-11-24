@@ -241,6 +241,8 @@ model SessionTeam {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sessionId String   @db.Uuid
   name      String   @db.VarChar(60)
+  // The team's colour (#rrggbb), picked while teams were made; null: from its name.
+  color     String?  @db.VarChar(7)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   session     GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)

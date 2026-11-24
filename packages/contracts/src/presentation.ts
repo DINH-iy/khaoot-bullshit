@@ -85,12 +85,16 @@ const FullColorsSchema = z.object({
 });
 export const ColorsSchema = FullColorsSchema.partial().strict();
 export const SLIDER_STYLES = ['blade', 'notch', 'ring', 'dial'] as const;
+/** How a round's time left shows: as numbers (“1:25 left”) or as a round clock that empties and flashes red at the end. */
+export const TIMER_STYLES = ['digits', 'clock'] as const;
+/** Which way the clock's time runs out: clockwise like a clock hand (standard), or the other way. */
+export const TIMER_TURNS = ['clockwise', 'counterclockwise'] as const;
 export const ThemeSchema = z.object({
   preset: z.string().max(40).optional(),
   colors: ColorsSchema.optional(),
   font: ThemeFontSchema.optional(), headingFont: ThemeFontSchema.optional(),
   radius: z.number().int().min(0).max(40).optional(), textScale: z.number().min(.8).max(1.6).optional(),
-  sliderStyle: z.enum(SLIDER_STYLES).optional(),
+  sliderStyle: z.enum(SLIDER_STYLES).optional(), timerStyle: z.enum(TIMER_STYLES).optional(), timerTurn: z.enum(TIMER_TURNS).optional(),
   background: z.enum(['gradient', 'solid', 'dots', 'stripes', 'glow', 'grid']).optional(), tiles: z.enum(['filled', 'outline', 'glass', 'flat']).optional(),
   backgroundMotion: z.enum(['none', 'starlight', 'light-lines']).optional(),
   // A shine and glow on answer tiles and main buttons; off unless chosen.
@@ -106,7 +110,7 @@ export const ThemeSchema = z.object({
 export type Theme = z.infer<typeof ThemeSchema>;
 export type FullTheme = { [K in Exclude<keyof Theme, 'preset' | 'colors'>]-?: NonNullable<Theme[K]> } & { colors: z.infer<typeof FullColorsSchema> };
 // Defaults shared by the built-in styles.
-const PRESET_DEFAULTS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const, backgroundMotion: 'none' as const, sliderStyle: 'blade' as const };
+const PRESET_DEFAULTS = { markers: 'letters' as const, customMarks: [] as string[], markerShape: 'circle' as const, markerPlace: 'start' as const, routeMarkers: 'arrows' as const, backgroundMotion: 'none' as const, sliderStyle: 'blade' as const, timerStyle: 'digits' as const, timerTurn: 'clockwise' as const };
 const SPACE: FullTheme = { ...PRESET_DEFAULTS, font: 'system', headingFont: 'condensed', radius: 14, textScale: 1, background: 'glow', backgroundMotion: 'starlight', tiles: 'glass', uppercaseHeadings: true, gradients: false,
     colors: { background: '#0a1024', background2: '#21113e', surface: '#18213c', text: '#f5f4ff', muted: '#bec9e8', accent: '#a3e6ff', accentText: '#081827', success: '#97f0ba', danger: '#ffa8bd',
       answers: ['#8c275c', '#23508e', '#795324', '#206754', '#584097', '#8c422e'], answerText: '#ffffff' } };

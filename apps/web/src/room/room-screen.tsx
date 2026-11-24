@@ -17,6 +17,7 @@ import { ExpectedPeople, NameRequests, NewKeyCard, PickYourName, SignupSetting, 
 import { TeamForming, TeamSummary, captainAnswers, ownTeam } from './teams.js';
 import { RouteChoice } from './route-choice.js';
 import { MinigameDraw } from './minigame-draw.js';
+import { StageActionSlot } from './stage-action.js';
 import { PLAY_TEXTS } from './play.text.js';
 import { ExplainPanel } from './explain-panel.js';
 import { HOSTED_POOL_TEXTS } from '../head-to-head/eight-ball/hosted.text.js';
@@ -238,6 +239,7 @@ export function RoomScreen() {
   };
   const graphText = useTexts(GRAPH_TEXTS);
   const poolText = useTexts(HOSTED_POOL_TEXTS); const playText = useTexts(PLAY_TEXTS);
+  const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const stage = state?.view.stage; const disabled = room.saving || Boolean(room.pending) || room.connection !== 'Connected';
   const remaining = useRemaining(stage, room.clockOffset); const timeUp = remaining === 0 && stage?.pausedRemainingMs === null;
   // Time is up with an answer chosen or typed but not sent (a choice, text, an order, an upload, a route vote): send it
@@ -376,7 +378,10 @@ export function RoomScreen() {
     </main></LookContext.Provider>;
   }
 
-  return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''} ${lookClass}`} style={lookStyle}>
+  // A player in a team: the page's top stripe is the team's colour (this round's team, else the game's).
+  const myTeamColor = role === 'player' && state ? (stage?.teams?.teams.find(team => team.index === stage.teams!.ownTeamIndex)?.color
+    ?? state.view.teamStandings.find(team => team.memberIds.includes(state.selfPlayerId ?? ''))?.color) : undefined;
+  return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><StageActionSlot.Provider value={actionSlot}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''}${myTeamColor ? ' in-team' : ''} ${lookClass}`} style={myTeamColor ? { ...lookStyle, '--my-team': myTeamColor } as React.CSSProperties : lookStyle}>
     <header className="room-bar session-bar">
       <h1 className="visually-hidden">{state ? r(role === 'host' ? 'hostScreen' : role === 'display' ? 'sharedScreen' : 'yourPhone', { title: state.view.title }) : r('partyRoom')}</h1>
       <p className="brand">party<span>.</span></p>
@@ -444,10 +449,11 @@ export function RoomScreen() {
           </div> : null}>
             {stage.info && <p className="stage-banner">{stage.info.title}</p>}
             {/* While teams are picked, the round's question waits: one thing at a time. */}
-            <h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard')
+            {/* The title, with the round's main action (such as Send) next to it when the round puts one there. */}
+            <div className="stage-heading-row"><h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard')
               : stage.minigame?.graph && isDefaultGraphQuestion(stage.prompt)
                 ? graphText(state.tryout || stage.minigame.graph.chart.yLabel === 'Books lent (thousands)' ? 'sampleQuestion' : 'trendQuestion')
-                : stage.prompt)}</h2>
+                : stage.prompt)}</h2><div ref={setActionSlot} className="stage-action-slot" /></div>
             {stage.info && <p className="info-text">{stage.prompt}</p>}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
@@ -459,7 +465,8 @@ export function RoomScreen() {
           {!forming && !explaining && <><div ref={answersRef} className="answers-slot">{role !== 'player' && stage.input && stage.input.kind !== 'text' && stage.input.kind !== 'media' && !stage.revealed && <OptionsBoard input={stage.input} route={stage.kind === 'route'} />}
           {stage.kind === 'vote' && !stage.revealed && <div ref={ballotRef}><VoteBallot key={stage.id} state={state} stage={stage} disabled={disabled || timeUp} canVote={role === 'player' && !answerBlock && !state.view.ownSubmission && stage.status === 'ACTIVE' && running}
             onVote={value => command('submission.submit', { stageRunId: stage.id, value })} /></div>}
-          {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && !(role === 'player' && stage.kind === 'minigame') && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
+          {/* Phones see the count in the top bar (x/y); the host and the shared screen keep the line. */}
+          {stage.kind !== 'challenge' && stage.kind !== 'route' && stage.kind !== 'duel' && role !== 'player' && !showOnly && !stage.revealed && <p className="progress-line">{t(stage.kind === 'vote' ? 'progress.voted' : 'progress.answered', { count: stage.submittedCount, total: stage.eligibleCount })}{stage.status === 'CLOSED' ? ` · ${t('progress.locked')}` : ''}</p>}
           {host && stage.kind === 'challenge' && stage.status === 'CLOSED' && !stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
           {stage.countdownUntil && role !== 'player' && <Countdown startsAt={stage.countdownUntil} offset={room.clockOffset}>{null}</Countdown>}
           {stage.kind === 'minigame' && !stage.revealed && <div ref={miniRef}><MinigameStage state={state} stage={stage} offset={room.clockOffset}
@@ -581,7 +588,7 @@ export function RoomScreen() {
     {state && role === 'player' && <PointsCelebration customizable={state.view.phoneEffects === true} roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
     {state && role === 'display' && canSeeScores && !scoreMoment && state.view.status !== 'LOBBY' && stage?.revealed && <FloatingScores leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
     {state && role !== 'player' && state.settings.reactions && !scoreBubbles && <ReactionsOverlay state={state} store={room.reactions} />}
-  </main></RoomSessionContext.Provider></LookContext.Provider>;
+  </main></StageActionSlot.Provider></RoomSessionContext.Provider></LookContext.Provider>;
 }
 
 type StageInput = NonNullable<NonNullable<ReturnType<typeof useRoom>['snapshot']>['view']['stage']>['input'];

@@ -451,7 +451,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type.startsWith('teams.')) {
     requireGame(stage.status === 'ACTIVE' && forming, 'INVALID_STATE');
     if (command.type === 'teams.choose') requireGame(actor.role === 'player', 'FORBIDDEN');
-    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill' }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
+    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
     const { forming: _done, ...rest } = stage.presentation as Record<string, unknown>;
     if ('lineupId' in result) {
       // Confirmed: the round starts now, with its timer, for the players in a team (after its explanation, if it has one).

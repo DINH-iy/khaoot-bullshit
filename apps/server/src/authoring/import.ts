@@ -1,5 +1,5 @@
 import { HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
-import { HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
+import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -122,7 +122,9 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
     case 'teams': {
       const how = ['random', 'skill', 'host', 'players'].includes(text(raw['how'] ?? raw['formation'])) ? text(raw['how'] ?? raw['formation']) : 'players';
       const count = Math.max(2, Math.min(12, Math.round(Number(raw['teams']) || 2)));
-      return { key, kind: 'teams', prompt: text(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how },
+      return { key, kind: 'teams', prompt: text(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how, ...(text(raw['colors']) === 'teams' ? { colors: 'teams' } : {}),
+          // `names`: the teams' own names, one per team (the standard colour names fill any missing ones).
+          ...(Array.isArray(raw['names']) && raw['names'].length ? { names: Array.from({ length: count }, (_, index) => text((raw['names'] as unknown[])[index]).slice(0, 30) || DEFAULT_TEAM_NAMES[index]!) } : {}) },
         ...(raw['captains'] === true ? { captains: true } : {}) };
     }
     case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };

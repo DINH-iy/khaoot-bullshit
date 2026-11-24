@@ -83,8 +83,9 @@ export function useSavedStyles() {
  * Asked at the first change to a look that is exactly a style: make a new style from it,
  * update the saved style (own styles only), or change only this game. Cancel drops the change.
  */
-export function StyleChangeDialog({ styleName, own, busy, error, onCreate, onUpdate, onOnlyHere, onCancel }: {
-  styleName: string; own: boolean; busy: boolean; error: string; onCreate: (name: string) => void; onUpdate: () => void; onOnlyHere: () => void; onCancel: () => void;
+/** Changing one of your own saved styles: save the change as a new style, or update that style (never without asking). */
+export function StyleChangeDialog({ styleName, busy, error, onCreate, onUpdate, onCancel }: {
+  styleName: string; busy: boolean; error: string; onCreate: (name: string) => void; onUpdate: () => void; onCancel: () => void;
 }) {
   const t = useTexts(LOOK_TEXTS); const id = useId();
   const [name, setName] = useState(() => t('styleCopyName', { name: styleName }).slice(0, 60));
@@ -95,13 +96,12 @@ export function StyleChangeDialog({ styleName, own, busy, error, onCreate, onUpd
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onCancel(); } }}
       onSubmit={event => { event.preventDefault(); if (name.trim() && !busy) onCreate(name.trim()); }}>
       <h2 id={`${id}-title`}>{t('styleChangeTitle', { name: styleName })}</h2>
-      <p id={`${id}-text`}>{t(own ? 'styleChangeOwnText' : 'styleChangeText')}</p>
+      <p id={`${id}-text`}>{t('styleChangeOwnText')}</p>
       <label>{t('styleName')}<input ref={input} value={name} maxLength={60} required onChange={event => setName(event.target.value)} /></label>
       {error && <p role="alert" className="error">{error}</p>}
       <div className="style-change-actions">
         <button type="submit" className="primary" disabled={busy || !name.trim()}>{t(busy ? 'styleSaving' : 'styleCreate')}</button>
-        {own && <button type="button" disabled={busy} onClick={onUpdate}>{t('styleUpdate', { name: styleName })}</button>}
-        <button type="button" disabled={busy} onClick={onOnlyHere}>{t('styleOnlyHere')}</button>
+        <button type="button" disabled={busy} onClick={onUpdate}>{t('styleUpdate', { name: styleName })}</button>
         <button type="button" onClick={onCancel}>{t('styleCancel')}</button>
       </div>
     </form>
