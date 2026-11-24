@@ -1,4 +1,4 @@
-import type { MinigameSettings } from '@party/contracts';
+import type { MinigameSettings, RouletteBets } from '@party/contracts';
 import type { Fairness } from './fairness.js';
 import type { MinigameRun } from './rules.js';
 
@@ -8,6 +8,7 @@ export interface ClaimedResult {
   stroke?: number[] | undefined;
   graphLine?: number[] | undefined;
   teamId?: string | undefined;
+  bets?: RouletteBets | undefined;
 }
 
 export interface JudgedResult {
@@ -19,6 +20,7 @@ export interface JudgedResult {
   angle?: number;
   dotGuess?: number;
   graphLine?: number[];
+  bets?: RouletteBets;
 }
 
 export type ResultJudge = (input: {

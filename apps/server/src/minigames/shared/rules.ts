@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
-import { CoinSideSchema, createDotPattern, isSharedPrediction, ROULETTE_POCKETS, RoulettePocketSchema } from '@party/contracts';
+import { CoinSideSchema, createDotPattern, isSharedPrediction, ROULETTE_POCKETS, RoulettePocketSchema, RouletteTableBetsSchema, rouletteStake } from '@party/contracts';
 import { ANGLE_TARGETS, AngleSchema, ANIMATION_WORDS, chooseCutTarget, CutTargetSchema, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { GameError, requireGame } from '../../game/errors.js';
 import { DotRunSchema } from '../count-the-dots/dots.js';
@@ -98,8 +98,14 @@ export function judgeResult(game: MinigameKey, settings: MinigameSettings, run: 
   const input = { settings, run, value, at, started, fair };
   if (game === 'reaction') return reaction(input);
   requireGame(!value.early, 'INVALID_SUBMISSION');
+  if (game === 'red-or-black-roulette') {
+    // Bets on the table; the value is their total stake (checked against the player's points when it is saved).
+    const bets = RouletteTableBetsSchema.safeParse(value.bets);
+    requireGame(at >= started && run.roulette !== undefined && bets.success, 'INVALID_SUBMISSION');
+    return { value: rouletteStake(bets.data), bets: bets.data };
+  }
   if (isSharedPrediction(game)) {
-    requireGame(at >= started && (run.coin !== undefined || run.roulette !== undefined) && (value.value === 0 || value.value === 1), 'INVALID_SUBMISSION');
+    requireGame(at >= started && run.coin !== undefined && (value.value === 0 || value.value === 1), 'INVALID_SUBMISSION');
     return { value: value.value };
   }
   const judge = judges[game];

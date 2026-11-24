@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { COIN_SIDES, CoinSideSchema } from '../heads-or-tails/coin.js';
-import { ROULETTE_PICKS, RoulettePocketSchema } from '../red-or-black-roulette/roulette.js';
+import { RoulettePocketSchema, RouletteTableBetsSchema } from '../red-or-black-roulette/roulette.js';
 import { DotGuessSchema, DotPatternSchema, DotSettingsSchema } from '../count-the-dots/dot-pattern.js';
 import { GraphHueSchema, GraphLineSchema, GraphRoundViewSchema, GraphSettingsSchema, GraphDataSchema } from '../draw-the-graph/graph.js';
 import { CutSettingsSchema, CutTargetSchema } from '../cut-the-line/target.js';
@@ -38,7 +38,8 @@ export const MinigameSettingsSchemas = {
   'count-the-dots': DotSettingsSchema,
   'draw-the-graph': GraphSettingsSchema,
   'heads-or-tails': z.object({}).strict(),
-  'red-or-black-roulette': z.object({}).strict(),
+  // Roulette: players bet their points. `betFloor`: what a player may bet when their score is lower (ROULETTE_BET_FLOOR when absent).
+  'red-or-black-roulette': z.object({ betFloor: z.number().int().min(0).max(10_000).optional() }).strict(),
   // Pass the pencil: each team draws one picture, members taking turns; then everyone votes for the best (not their own).
   'relay-drawing': z.object({ secondsPerTurn: z.number().int().min(5).max(60), voteSeconds: z.number().int().min(10).max(120), animation: z.boolean().optional() }).strict(),
   // Drive the bus (the Dutch drinking game "bussen", without the final bus): each team guesses four cards
@@ -112,9 +113,9 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
   'heads-or-tails': { name: 'Heads or Tails', description: 'Make a private prediction for one shared coin flip.',
     howToPlay: 'Pick a side. Correct guesses earn points.',
     better: 'none', defaults: {}, defaultSeconds: 15 },
-  'red-or-black-roulette': { name: 'Red or Black Roulette', description: 'Pick a colour for one shared roulette spin.',
-    howToPlay: 'Pick red or black in secret. The wheel spins when guesses close. A correct guess earns points. Green zero pays neither colour.',
-    better: 'none', defaults: {}, defaultSeconds: 15 },
+  'red-or-black-roulette': { name: 'Roulette', description: 'Bet your points on one shared roulette spin.',
+    howToPlay: 'Put points on numbers, colours, odd or even, low or high, dozens or columns. The ball rolls when betting closes. A number pays 35 to 1, a dozen or column 2 to 1, the rest 1 to 1. Losing bets are lost.',
+    better: 'none', defaults: {}, defaultSeconds: 30 },
   'relay-drawing': { name: 'Pass the pencil', description: 'Teams draw one picture together, taking turns; then everyone votes.', howToPlay: 'Your team draws one picture. Each player adds to it in turn. Then vote for the best drawing of another team.',
     better: 'higher', defaults: { secondsPerTurn: 15, voteSeconds: 30 }, defaultSeconds: 120 },
   bus: { name: 'Drive the bus', description: 'Teams guess four cards: red or black, higher or lower, inside or outside, the suit. Wrong: drink.',
@@ -151,7 +152,7 @@ export function formatMinigameResult(game: MinigameKey, value: number | null, se
   if (game === 'count-the-dots') return `${value} off`;
   if (game === 'draw-the-graph') return `${(value / 100).toFixed(1)}% off`;
   if (game === 'heads-or-tails') return COIN_SIDES[value] === 'heads' ? 'Heads' : 'Tails';
-  if (game === 'red-or-black-roulette') return ROULETTE_PICKS[value] === 'red' ? 'Red' : 'Black';
+  if (game === 'red-or-black-roulette') return value === 0 ? 'Free pick' : `Bet ${value}`;
   if (game === 'relay-drawing') return `${value} ${value === 1 ? 'vote' : 'votes'}`;
   if (game === 'bus') return `${value} ${value === 1 ? 'sip' : 'sips'}`;
   if (game === 'majority') return value === 0 ? 'Left' : 'Right';
@@ -227,7 +228,9 @@ export const MinigameValueSchema = z.object({ kind: z.literal('minigame'), value
   stroke: z.array(z.number().int().min(0).max(1000)).min(2).max(800).optional(), teamId: z.string().uuid().optional(),
   // The server records the original cut here and puts its distance from the target in value.
   cut: z.number().int().min(0).max(100).optional(),
-  angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional() }).strict();
+  angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(),
+  // Roulette: the bets (value holds their total stake).
+  bets: RouletteTableBetsSchema.optional() }).strict();
 
 /** The minigame as a screen sees it while it runs. Never contains secret parts (which door hides what). */
 export const PublicMinigameSchema = z.object({
@@ -248,7 +251,7 @@ export const PublicMinigameSchema = z.object({
 export const MinigameRevealSchema = z.object({
   kind: z.literal('minigame'), game: z.enum(MINIGAME_KEYS as [MinigameKey, ...MinigameKey[]]),
   entries: z.array(z.object({ playerId: z.string().uuid().nullable(), teamId: z.string().uuid().nullable(), value: z.number().int().nullable(), place: z.number().int().min(1).nullable(),
-    stroke: z.array(z.number().int()).optional(), cut: z.number().int().min(0).max(100).optional(), angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(), graphHue: GraphHueSchema.optional() }).strict()),
+    stroke: z.array(z.number().int()).optional(), cut: z.number().int().min(0).max(100).optional(), angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(), graphHue: GraphHueSchema.optional(), bets: RouletteTableBetsSchema.optional() }).strict()),
   doorsMilli: z.array(Milli).nullable(), graph: GraphDataSchema.optional(), dotCount: z.number().int().positive().optional(), coin: CoinSideSchema.optional(), roulette: RoulettePocketSchema.optional(),
   dotReveal: z.strictObject({ pattern: DotPatternSchema, startedAt: z.string().datetime() }).optional(),
 }).strict();

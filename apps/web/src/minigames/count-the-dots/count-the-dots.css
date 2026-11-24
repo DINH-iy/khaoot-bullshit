@@ -15,6 +15,8 @@
 .mg-dot-form input::placeholder { color: var(--r-muted); opacity: .65; }
 .mg-dot-form button { width: 100%; }
 .mg-dot-reveal { display: grid; gap: 8px; }
+/* A phone without a screen: the board and the guess below it share the height. */
+.mg-dot-phone { --dot-surround: 24rem; width: 100%; margin-block-end: 12px; }
 .mg-dot-total { margin: 0; text-align: center; font-size: clamp(1.25rem, 4vw, 2rem); font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .mg-dot-board.is-counting > span:last-child {
   background: var(--r-accent);

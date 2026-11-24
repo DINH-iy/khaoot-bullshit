@@ -67,8 +67,12 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
   useEffect(() => {
     if (!needed || (sheet !== 'games' && sheet !== 'challenges')) return;
     setSheet(null); setPausedNote(true);
-    const hide = setTimeout(() => setPausedNote(false), 4000); return () => clearTimeout(hide);
   }, [needed, sheet]);
+  // Its own timer: closing the sheet above re-runs that effect, which must not cancel the hiding.
+  useEffect(() => {
+    if (!pausedNote) return;
+    const hide = setTimeout(() => setPausedNote(false), 4000); return () => clearTimeout(hide);
+  }, [pausedNote]);
   // Something changed in the challenges while they were closed: a dot on the Menu button.
   const news = state.settings.sideGames && challengeTick !== seenTick;
   return <>

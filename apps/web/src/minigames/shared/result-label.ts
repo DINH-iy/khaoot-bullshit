@@ -1,4 +1,4 @@
-import { CLAP_BEATS_MS, COIN_SIDES, ROULETTE_PICKS, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { CLAP_BEATS_MS, COIN_SIDES, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { currentLanguage } from '../../i18n/language.js';
 import { translate } from '../../i18n/texts.js';
 import { CONTROL_TEXTS } from './controls.text.js';
@@ -11,7 +11,7 @@ export function minigameResult(game: MinigameKey, value: number | null, settings
   const t = (key: keyof typeof CONTROL_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROL_TEXTS, key, values);
   if (value === null) return t(game === 'reaction' && !team ? 'falseStart' : 'noResult');
   if (game === 'heads-or-tails') return translate(COIN_TEXTS, COIN_SIDES[value] ?? 'heads');
-  if (game === 'red-or-black-roulette') return translate(ROULETTE_TEXTS, ROULETTE_PICKS[value] ?? 'red');
+  if (game === 'red-or-black-roulette') return value === 0 ? translate(ROULETTE_TEXTS, 'freePick') : translate(ROULETTE_TEXTS, 'bet', { amount: value });
   if (game === 'reaction') return `${value} ms`;
   if (game === 'speed-run') return `${(value / 1000).toLocaleString(currentLanguage(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} s`;
   if (game === 'clap-beat') return `${value} / ${CLAP_BEATS_MS.length}`;

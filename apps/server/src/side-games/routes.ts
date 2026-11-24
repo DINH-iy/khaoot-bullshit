@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   BLACKJACK_OUTCOMES, BlackjackMoveSchema, packPrice, BlackjackResultSchema, BlackjackStartSchema, CoinFlipSchema, CoinResultSchema, CoinSideSchema, GameIdSchema, GamblingBoardSchema, PackOpenSchema, PackResultSchema, playerNeeded,
-  ROULETTE_POCKETS, RoulettePickSchema, RoulettePocketSchema, RouletteResultSchema, RouletteSpinSchema, RouletteTableBetsSchema, RouletteTableSpinSchema, RouletteTableResultSchema, rouletteColor, rouletteReturn,
+  ROULETTE_POCKETS, RoulettePocketSchema, RouletteTableBetsSchema, RouletteTableSpinSchema, RouletteTableResultSchema, rouletteReturn,
   REFILL_BELOW, REFILL_CHIPS, SlotResultSchema, SlotSpinSchema, slotMultiplier, WalletSchema, type GamblerRow, type RoomReply, type SlotSymbol,
 } from '@party/contracts';
 import type { Config } from '../config.js';
@@ -26,7 +26,6 @@ const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_
 // A stored hand: the cards (the dealer's hidden one included) and, once over, its result.
 const StoredHandSchema = HandStateSchema.extend({ outcome: z.enum(BLACKJACK_OUTCOMES).nullable() });
 const StoredCoinSchema = z.object({ guess: CoinSideSchema, coin: CoinSideSchema }).strict();
-const StoredRouletteSchema = z.object({ guess: RoulettePickSchema, roulette: RoulettePocketSchema }).strict();
 const StoredTableSchema = z.object({ bets: RouletteTableBetsSchema, roulette: RoulettePocketSchema }).strict();
 const readHand = (round: SideRound): { hand: HandState; outcome: Outcome | null } => {
   const parsed = StoredHandSchema.safeParse(round.state); roomAssert(parsed.success, 'INVALID_STATE');
@@ -130,39 +129,32 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
     } catch (error) { return fail(reply, error); }
   });
 
-  for (const game of ['heads-or-tails', 'red-or-black-roulette'] as const) {
-    const coinGame = game === 'heads-or-tails';
-    const ledgerGame = coinGame ? game : 'roulette';
-    const requestSchema = coinGame ? CoinFlipSchema : RouletteSpinSchema;
-    const stateSchema = coinGame ? StoredCoinSchema : StoredRouletteSchema;
-    const resultSchema = coinGame ? CoinResultSchema : RouletteResultSchema;
-    app.post(`/api/rooms/:sessionId/side/${game}`, async (request, reply) => {
-      try {
-        const parsed = requestSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
-        const { roundId, guess, bet } = parsed.data;
-        return { ok: true, data: await play(request, async (tx, seat, chips) => {
-          const before = await earlier(tx, seat, roundId, ledgerGame);
-          if (before) {
-            const stored = stateSchema.safeParse(before.state);
-            roomAssert(stored.success && stored.data.guess === guess && before.bet === bet, 'INVALID_COMMAND');
-            return resultSchema.parse({ roundId, ...stored.data, bet, payout: before.payout, balance: await balance(tx, seat) });
-          }
-          roomAssert(bet === 0 || chips, 'CHIPS_OFF');
-          roomAssert(bet === 0 || await balance(tx, seat) >= bet, 'NOT_ENOUGH_CHIPS');
-          const outcome = coinGame ? { coin: flipCoin() } : { roulette: randomInt(ROULETTE_POCKETS) };
-          const winningPick = outcome.roulette === undefined ? outcome.coin : rouletteColor(outcome.roulette);
-          const payout = winningPick === guess ? 2 * bet : 0;
-          const state = { guess, ...outcome };
-          await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: ledgerGame, finished: true, bet, payout, state } });
-          if (bet) await tx.chipEntry.createMany({ data: [
-            { ...entryFor(seat), roundId, game: ledgerGame, reason: 'BET', amount: -bet },
-            ...(payout ? [{ ...entryFor(seat), roundId, game: ledgerGame, reason: 'PAYOUT' as const, amount: payout }] : []),
-          ] });
-          return resultSchema.parse({ roundId, ...state, bet, payout, balance: await balance(tx, seat) });
-        }) };
-      } catch (error) { return fail(reply, error); }
-    });
-  }
+  // Roulette is played on the full table (side/roulette below), the same table as the hosted minigame.
+  app.post('/api/rooms/:sessionId/side/heads-or-tails', async (request, reply) => {
+    try {
+      const parsed = CoinFlipSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+      const { roundId, guess, bet } = parsed.data;
+      return { ok: true, data: await play(request, async (tx, seat, chips) => {
+        const before = await earlier(tx, seat, roundId, 'heads-or-tails');
+        if (before) {
+          const stored = StoredCoinSchema.safeParse(before.state);
+          roomAssert(stored.success && stored.data.guess === guess && before.bet === bet, 'INVALID_COMMAND');
+          return CoinResultSchema.parse({ roundId, ...stored.data, bet, payout: before.payout, balance: await balance(tx, seat) });
+        }
+        roomAssert(bet === 0 || chips, 'CHIPS_OFF');
+        roomAssert(bet === 0 || await balance(tx, seat) >= bet, 'NOT_ENOUGH_CHIPS');
+        const coin = flipCoin();
+        const payout = coin === guess ? 2 * bet : 0;
+        const state = { guess, coin };
+        await tx.sideRound.create({ data: { id: roundId, ...entryFor(seat), game: 'heads-or-tails', finished: true, bet, payout, state } });
+        if (bet) await tx.chipEntry.createMany({ data: [
+          { ...entryFor(seat), roundId, game: 'heads-or-tails', reason: 'BET', amount: -bet },
+          ...(payout ? [{ ...entryFor(seat), roundId, game: 'heads-or-tails', reason: 'PAYOUT' as const, amount: payout }] : []),
+        ] });
+        return CoinResultSchema.parse({ roundId, ...state, bet, payout, balance: await balance(tx, seat) });
+      }) };
+    } catch (error) { return fail(reply, error); }
+  });
 
   app.post('/api/rooms/:sessionId/side/roulette', async (request, reply) => {
     try {

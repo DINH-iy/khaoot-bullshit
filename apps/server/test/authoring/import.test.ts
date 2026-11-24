@@ -33,7 +33,7 @@ describe('importing a game from text', () => {
     expect(stage('coin')).toMatchObject({ kind: 'minigame', game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['10000'] });
     expect(stage('graph')).toMatchObject({ kind: 'minigame', game: 'draw-the-graph', durationMs: 30_000,
       settings: { revealEasing: 'ease-out', graph: { visible: [10, 20, 35, 50], hidden: [55, 65, 62, 80], yLabel: 'Visitors', scale: { min: 0, max: 1000 }, splitAt: 0.4, source: 'Example dataset', sourceUrl: 'https://example.org/museum-visits', sourceNote: 'Annual admissions.' } } });
-    expect(stage('roulette')).toMatchObject({ kind: 'minigame', game: 'red-or-black-roulette', durationMs: 15_000, placementMilli: ['10000'] });
+    expect(stage('roulette')).toMatchObject({ kind: 'minigame', game: 'red-or-black-roulette', durationMs: 30_000, settings: { betFloor: 50 } });
     expect(game).toMatchObject({ presentation: { phoneMenuIcons: { scores: 'star', games: 'wheel', packs: 'sparkles', blackjack: 'cards' } } });
     expect(stage('pool')).toMatchObject({ kind: 'duel', pick: 'random', durationMs: 20_000, betMilli: '2000', matchSeconds: 120,
       contest: { kind: 'game', game: 'eight-ball', settings: { ballBehavior: { preset: 'arcade' }, start: { side: 'random', percent: 30 }, felt: 'blue' } }, places: { kind: 'list', pointsMilli: ['10000'] } });

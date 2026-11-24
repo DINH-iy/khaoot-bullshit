@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { CoinSideSchema } from './minigames/heads-or-tails/coin.js';
-import { RoulettePickSchema, RoulettePocketSchema } from './minigames/red-or-black-roulette/roulette.js';
 import type { SessionView } from './game.js';
 import { EconomySchema, PackItemViewSchema, PackSetViewSchema } from './packs.js';
 
@@ -12,7 +11,7 @@ import { EconomySchema, PackItemViewSchema, PackSetViewSchema } from './packs.js
  */
 export const SIDE_GAMES = ['slots', 'blackjack', 'packs', 'heads-or-tails', 'red-or-black-roulette'] as const;
 export type SideGame = typeof SIDE_GAMES[number];
-export const SIDE_GAME_NAMES: Record<SideGame, string> = { slots: 'Slot machine', blackjack: 'Blackjack', packs: 'Packs', 'heads-or-tails': 'Heads or Tails', 'red-or-black-roulette': 'Red or Black Roulette' };
+export const SIDE_GAME_NAMES: Record<SideGame, string> = { slots: 'Slot machine', blackjack: 'Blackjack', packs: 'Packs', 'heads-or-tails': 'Heads or Tails', 'red-or-black-roulette': 'Roulette' };
 
 /** A broke player can take a refill; refills are counted on the leaderboard. */
 export const REFILL_CHIPS = 500;
@@ -66,7 +65,6 @@ export type BlackjackView = z.infer<typeof BlackjackViewSchema>;
 export const SlotSpinSchema = z.object({ roundId: z.uuid(), bet: BetSchema }).strict();
 const ChanceBet = { roundId: z.uuid(), bet: z.union([z.literal(0), BetSchema]) };
 export const CoinFlipSchema = z.object({ ...ChanceBet, guess: CoinSideSchema }).strict();
-export const RouletteSpinSchema = z.object({ ...ChanceBet, guess: RoulettePickSchema }).strict();
 /** Opening a pack of one set (`setId`); the round ID makes a retried open count once. */
 export const PackOpenSchema = z.object({ roundId: z.uuid(), setId: z.uuid(), preview: z.literal(true).optional() }).strict();
 export const BlackjackStartSchema = z.object({ roundId: z.uuid(), bet: BetSchema }).strict();
@@ -78,9 +76,6 @@ export type SlotResult = z.infer<typeof SlotResultSchema>;
 export const CoinResultSchema = z.object({ roundId: z.uuid(), guess: CoinSideSchema, coin: CoinSideSchema,
   bet: z.number().int().min(0), payout: z.number().int().min(0), balance: z.number().int() }).strict();
 export type CoinResult = z.infer<typeof CoinResultSchema>;
-export const RouletteResultSchema = z.object({ roundId: z.uuid(), guess: RoulettePickSchema, roulette: RoulettePocketSchema,
-  bet: z.number().int().min(0), payout: z.number().int().min(0), balance: z.number().int() }).strict();
-export type RouletteResult = z.infer<typeof RouletteResultSchema>;
 export const PackResultSchema = z.object({ roundId: z.uuid(), items: z.array(z.string()).length(PACK_SIZE), balance: z.number().int(), god: z.boolean().optional(), collected: z.boolean().optional() }).strict();
 export type PackResult = z.infer<typeof PackResultSchema>;
 export const BlackjackResultSchema = z.object({ hand: BlackjackViewSchema, balance: z.number().int() }).strict();

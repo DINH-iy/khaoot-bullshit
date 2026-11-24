@@ -1,37 +1,128 @@
-.roulette-choices, .roulette-reveal, .roulette-table {
-  --roulette-red: #a62036; --roulette-black: #1c1b28; --roulette-green: #126348;
+:root { --roulette-spin-time: 4.2s; }
+.roulette-reveal, .roulette-table, .mg-results, .mg-personal-result {
+  --roulette-red: #a62036; --roulette-black: #1c1b28; --roulette-green: #126348; --roulette-felt: #1f4a3b; --roulette-gold: #c9a15a;
 }
-.roulette-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; width: min(100%, 23rem); margin-inline: auto; }
-.room button.roulette-choice { min-height: 5.25rem; color: #fff; font-size: clamp(1.1rem, 5vw, 1.55rem); font-weight: 850; border: 1px solid #fff5; }
-.room button.roulette-choice.red, .roulette-result.red { background: var(--roulette-red); }
-.room button.roulette-choice.black, .roulette-result.black { background: var(--roulette-black); }
-.roulette-result.green { background: var(--roulette-green); }
+
+/* The wheel. Sizes are shares of the wheel's width (cqi), so the ball lines up at any size. */
 .roulette-reveal { display: grid; justify-items: center; gap: .7rem; }
-.roulette-display { position: relative; width: min(58vw, 14rem); aspect-ratio: 1; margin-top: .8rem; }
+.roulette-display {
+  --pocket-step: calc(360deg / 37); --ball: 4.6cqi;
+  position: relative; container-type: inline-size; width: clamp(12rem, 40vmin, 22rem); aspect-ratio: 1; margin-top: .4rem; border-radius: 50%;
+  /* The bowl around the wheel: the ball rolls on the wooden track. */
+  background: radial-gradient(circle closest-side, transparent 0 82%, #2d1b10 82% 83%, #6b4428 83% 93.5%, var(--roulette-gold) 93.5% 96.5%, #5a3a22 96.5% 100%);
+  box-shadow: 0 .6rem 1.6rem #0006, inset 0 0 0 1px #f5d9a066;
+}
 .roulette-wheel {
-  position: absolute; inset: 0; box-sizing: border-box; border-radius: 50%; border: .4rem solid #c39b56;
-  background: radial-gradient(circle, #e5b962 0 8%, #93643a 9% 12%, #242330 13% 43%, #bf9857 44% 46%, transparent 47%), var(--roulette-pockets);
-  box-shadow: inset 0 0 0 2px #f9dfae, 0 .5rem 1.5rem #0005;
+  position: absolute; inset: 9cqi; border-radius: 50%;
+  background:
+    radial-gradient(circle closest-side, #e7c178 0 8%, #8a5a33 8.5% 14%, #2a1d16 14.5% 54%, var(--roulette-gold) 54.5% 57.5%, transparent 58%),
+    radial-gradient(circle closest-side, transparent 0 80%, #0005 80% 81.5%, transparent 82%),
+    repeating-conic-gradient(from calc(var(--pocket-step) / -2), #e9c98acc 0 .45deg, transparent .45deg var(--pocket-step)),
+    var(--roulette-pockets);
+  box-shadow: 0 0 0 .5cqi #3b2416, inset 0 0 2cqi #0007;
   transform: rotate(var(--roulette-stop));
 }
-.roulette-pointer { position: absolute; top: -.6rem; left: 50%; width: 1.2rem; height: 1.3rem; transform: translateX(-50%); background: #ffdc97; clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.roulette-result { margin: 0; padding: .3em .85em; border: 1px solid #fff4; border-radius: 999px; color: #fff; font-size: clamp(1rem, 5vw, 1.5rem); font-weight: 800; }
-@media (prefers-reduced-motion: no-preference) {
-  .roulette-animated .roulette-wheel { animation: roulette-spin 1.45s cubic-bezier(.16,.77,.29,1) both; }
-  .roulette-animated .roulette-result, .roulette-results-animated { animation: roulette-result-in .2s 1.3s both; }
+.roulette-wheel-number {
+  position: absolute; inset: 0; padding-top: 1.3cqi; text-align: center; color: #fff;
+  font: 700 3.2cqi/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; transform: rotate(var(--pocket-angle));
 }
-@keyframes roulette-spin { from { transform: rotate(calc(var(--roulette-stop) - 1080deg)); } }
+.roulette-turret {
+  position: absolute; inset: 43%; border-radius: 50%;
+  background: linear-gradient(#f1d28f, #b98c4a) center / 100% 16% no-repeat, linear-gradient(#f1d28f, #b98c4a) center / 16% 100% no-repeat,
+    radial-gradient(circle closest-side, #f6dc9e 0 30%, transparent 32%);
+}
+.roulette-ball {
+  position: absolute; top: 0; left: 50%; width: var(--ball); aspect-ratio: 1; margin-left: calc(var(--ball) / -2); border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, #e4e4e8 40%, #9a9aa4 100%); box-shadow: 0 .5cqi .8cqi #0008;
+}
+/* The ball in its pocket, turning with the wheel (where it rests when nothing moves). */
+.roulette-ball-seat { position: absolute; inset: 0; transform: rotate(var(--roulette-pocket)); }
+.roulette-ball-seat .roulette-ball { transform: translateY(8.6cqi); }
+/* The ball on the track, only while it rolls. */
+.roulette-ball-orbit { position: absolute; inset: 0; }
+.roulette-ball-orbit .roulette-ball { opacity: 0; transform: translateY(2.2cqi); }
+
+.roulette-result { margin: 0; padding: .3em .85em; border: 1px solid #fff4; border-radius: 999px; color: #fff; font-size: clamp(1rem, 5vw, 1.5rem); font-weight: 800; font-variant-numeric: tabular-nums; }
+.roulette-result.red { background: var(--roulette-red); }
+.roulette-result.black { background: var(--roulette-black); }
+.roulette-result.green { background: var(--roulette-green); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .roulette-animated .roulette-wheel { animation: roulette-wheel-spin var(--roulette-spin-time) linear both; }
+  .roulette-animated .roulette-ball-orbit { animation: roulette-ball-orbit var(--roulette-spin-time) linear both; }
+  .roulette-animated .roulette-ball-orbit .roulette-ball { animation: roulette-ball-drop var(--roulette-spin-time) linear both; }
+  .roulette-animated .roulette-ball-seat .roulette-ball { animation: roulette-ball-seated var(--roulette-spin-time) linear both; }
+  .roulette-animated .roulette-result, .roulette-results-animated { animation: roulette-result-in .25s calc(var(--roulette-spin-time) - .15s) both; }
+}
+/* At 70% the ball lands in the pocket, which is then 40° before the top; both finish there together. */
+@keyframes roulette-wheel-spin {
+  0% { transform: rotate(calc(var(--roulette-stop) - 900deg)); animation-timing-function: cubic-bezier(.2, .5, .6, .92); }
+  70% { transform: rotate(calc(var(--roulette-stop) - 40deg)); animation-timing-function: cubic-bezier(.3, .6, .6, 1); }
+  100% { transform: rotate(var(--roulette-stop)); }
+}
+@keyframes roulette-ball-orbit {
+  0% { transform: rotate(1260deg); animation-timing-function: cubic-bezier(.15, .45, .45, 1); }
+  70%, 100% { transform: rotate(-40deg); }
+}
+@keyframes roulette-ball-drop {
+  0% { opacity: 1; transform: translateY(2.2cqi); }
+  44% { transform: translateY(2.2cqi); animation-timing-function: ease-in; }
+  55% { transform: translateY(15.6cqi); animation-timing-function: ease-out; }
+  59% { transform: translateY(12.4cqi); animation-timing-function: ease-in; }
+  63% { transform: translateY(17.6cqi); animation-timing-function: ease-out; }
+  66% { transform: translateY(16.2cqi); animation-timing-function: ease-in; }
+  69.9% { opacity: 1; transform: translateY(17.6cqi); }
+  70%, 100% { opacity: 0; transform: translateY(17.6cqi); }
+}
+@keyframes roulette-ball-seated { 0%, 69.9% { opacity: 0; } 70%, 100% { opacity: 1; } }
 @keyframes roulette-result-in { from { opacity: 0; } to { opacity: 1; } }
-.roulette-wheel-number { position: absolute; inset: 2.5% 0 2.5%; text-align: center; color: #fff; font: 700 clamp(.4rem, 2vw, .68rem)/1 system-ui; transform: rotate(var(--pocket-angle)); }
-.roulette-table { display: grid; gap: 8px; }
-.roulette-number-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
-.roulette-number-board .green { grid-column: 1 / -1; }
-.roulette-outside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
-.room .roulette-square { position: relative; display: grid; place-items: center; align-content: center; min-height: 44px; min-width: 0; padding: 2px; color: #fff; font-weight: 800; border: 1px solid #fff5; border-radius: 8px; }
-.room .roulette-square.red { background: var(--roulette-red); }
-.room .roulette-square.black { background: var(--roulette-black); }
-.room .roulette-square.green { background: var(--roulette-green); }
-.room .roulette-square[aria-pressed=true] { outline: 2px solid var(--r-accent); outline-offset: -2px; }
-.roulette-chip { align-self: center; padding: 0 .35em; border-radius: 999px; background: #ffe497; color: #292115; font-size: .75rem; font-weight: 800; }
-.roulette-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.roulette-controls > span { flex: 1 1 auto; }
+
+/* The betting table. Two halves of the number board side by side keep it short on a phone. */
+.roulette-table { --roulette-cell: clamp(30px, 5.2dvh, 44px); display: grid; gap: 8px; width: min(100%, 26rem); margin-inline: auto; min-width: 0; }
+.roulette-chips { display: flex; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.roulette-chips label {
+  position: relative; flex: 1; display: grid; place-items: center; min-height: 44px; min-width: 0; border-radius: 999px;
+  border: 2px dashed var(--r-line, #fff5); font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.roulette-chips label.chosen { border-style: solid; border-color: var(--r-accent, #ffe497); background: color-mix(in srgb, var(--r-accent, #ffe497) 22%, transparent); }
+.roulette-chips input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.roulette-chips label:has(input:focus-visible) { outline: 3px solid var(--r-accent, #ffe497); outline-offset: 2px; }
+.roulette-hint { margin: 0; text-align: center; font-size: .9375rem; }
+/* Green 0 at the head of the numbers, as on a real table; the outside bets below span the width. */
+.roulette-board { display: grid; grid-template-columns: minmax(28px, 1fr) repeat(2, minmax(0, 6fr)); gap: 4px 6px; }
+.roulette-board > .zero { grid-column: 1; grid-row: 1; }
+.roulette-outside { grid-column: 1 / -1; }
+.roulette-numbers, .roulette-outside { display: grid; gap: 4px; }
+.roulette-numbers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.roulette-outside { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.roulette-table .roulette-square {
+  position: relative; display: grid; place-items: center; min-height: var(--roulette-cell); min-width: 0; margin: 0; padding: 2px;
+  color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; border: 1px solid #fff5; border-radius: 8px;
+}
+.roulette-table .roulette-outside .roulette-square { font-size: clamp(.6rem, 2.7vw, .72rem); white-space: nowrap; }
+.roulette-table .roulette-square.red { background: var(--roulette-red); }
+.roulette-table .roulette-square.black { background: var(--roulette-black); }
+.roulette-table .roulette-square.green { background: var(--roulette-green); }
+.roulette-table .roulette-square.outside { background: var(--roulette-felt); }
+.roulette-table .roulette-square[aria-pressed=true] { outline: 3px solid var(--r-accent, #ffe497); outline-offset: -3px; }
+.roulette-table .roulette-square:disabled { opacity: .55; }
+.roulette-chip {
+  position: absolute; top: -5px; right: -3px; min-width: 1.4em; padding: 0 .3em; border-radius: 999px; border: 2px dashed #8a6a1c;
+  background: #ffe497; color: #292115; font-size: .7rem; line-height: 1.25; font-weight: 800; pointer-events: none;
+}
+.roulette-controls { display: flex; align-items: center; gap: 8px; }
+.roulette-stake { flex: 1 1 auto; min-width: 0; font-variant-numeric: tabular-nums; font-weight: 700; }
+.roulette-table .roulette-undo { min-width: 44px; min-height: 44px; font-size: 1.25rem; }
+/* Short phones: the whole table, its chips and Lock in still fit beside the room's bars. */
+@media (max-height: 720px) {
+  .roulette-table { --roulette-cell: clamp(27px, 4.5dvh, 34px); gap: 6px; }
+  .roulette-chips label { min-height: 40px; }
+  .roulette-hint { display: none; }
+}
+@media (max-height: 620px) {
+  .roulette-table { --roulette-cell: 24px; gap: 4px; }
+  .roulette-chips label { min-height: 34px; }
+  .roulette-board { row-gap: 3px; }
+  .roulette-numbers, .roulette-outside { gap: 3px; }
+  .roulette-table .roulette-controls button { min-height: 38px; }
+}

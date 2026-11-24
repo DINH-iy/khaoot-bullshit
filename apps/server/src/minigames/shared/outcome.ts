@@ -1,4 +1,4 @@
-import { AwardMilliSchema, COIN_SIDES, isSharedPrediction, MinigameValueSchema, ROULETTE_PICKS, rouletteColor, SubmissionValueSchema, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { AwardMilliSchema, COIN_SIDES, isSharedPrediction, MinigameValueSchema, rouletteMatches, rouletteNet, rouletteStake, SubmissionValueSchema, type MinigameKey, type MinigameSettings, type RouletteBets } from '@party/contracts';
 import { route, type Award, type TeamContext } from '../../game/teams/teams.js';
 import { places, rankValue, teamValue, usesSubmissionTime, type MinigameRun } from './rules.js';
 
@@ -7,7 +7,7 @@ export interface MinigameRules { game: MinigameKey; settings: MinigameSettings; 
 interface Row { playerId: string | null; teamId: string | null; value: unknown; receivedAt?: Date }
 export interface Outcome {
   /** Team rows first (in a team round), each with the team's result; then every player's own result. */
-  entries: { playerId: string | null; teamId: string | null; value: number | null; place: number | null; stroke?: number[]; cut?: number; angle?: number; dotGuess?: number; graphLine?: number[] }[];
+  entries: { playerId: string | null; teamId: string | null; value: number | null; place: number | null; stroke?: number[]; cut?: number; angle?: number; dotGuess?: number; graphLine?: number[]; bets?: RouletteBets }[];
   awards: Award[];
 }
 
@@ -43,14 +43,29 @@ export function minigameOutcome(rules: MinigameRules, rows: Row[], context: Team
       awards: tallies.flatMap(tally => route({ amountMilli: pointsOf(placed.get(tally)), stageRunId, awardKey: `minigame:${stageRunId}:team:${tally.teamId}`, reason: 'Minigame place' }, { teamId: tally.teamId }, context)) };
   }
   const pointsFor = (place: number | undefined) => place === undefined ? 0n : BigInt(AwardMilliSchema.parse(rules.placementMilli[place - 1] ?? '0'));
+  if (rules.game === 'red-or-black-roulette') {
+    // Roulette: each player wins or loses what their bets make on the shared spin (see rouletteNet). A player with a winning bet is marked first.
+    const pocket = run?.roulette;
+    const players = results.flatMap(row => {
+      if (!row.playerId) return [];
+      // Results from before the betting table were a free pick of red (0) or black (1).
+      const bets: RouletteBets | undefined = row.result.bets ?? (row.result.value === 0 || row.result.value === 1 ? [{ guess: row.result.value === 0 ? 'red' : 'black', bet: 0 }] : undefined);
+      return bets ? [{ playerId: row.playerId, bets }] : [];
+    }).map(({ playerId, bets }) => ({ playerId, bets, stake: rouletteStake(bets),
+      hit: pocket !== undefined && bets.some(entry => rouletteMatches(pocket, entry.guess)), net: pocket === undefined ? 0 : rouletteNet(pocket, bets) }));
+    const entries = players.map(player => ({ playerId: player.playerId, teamId: null, value: player.stake, place: player.hit ? 1 : null, bets: player.bets }))
+      .sort((a, b) => (a.place ?? 2) - (b.place ?? 2));
+    const awards = players.flatMap(player => route({ amountMilli: BigInt(player.net) * 1000n, stageRunId,
+      awardKey: `minigame:${stageRunId}:${player.playerId}`, reason: player.net > 0 ? 'Roulette win' : 'Roulette loss' }, { playerId: player.playerId }, null));
+    return { entries, awards };
+  }
   if (isSharedPrediction(rules.game)) {
-    const winningPick = rules.game === 'heads-or-tails' ? COIN_SIDES.findIndex(side => side === run?.coin)
-      : run?.roulette === undefined ? -1 : ROULETTE_PICKS.findIndex(color => color === rouletteColor(run.roulette!));
+    const winningPick = COIN_SIDES.findIndex(side => side === run?.coin);
     const entries = results.filter(row => row.playerId && (row.result.value === 0 || row.result.value === 1)).map(row => ({
       playerId: row.playerId!, teamId: null, value: row.result.value, place: row.result.value === winningPick ? 1 : null,
     })).sort((a, b) => (a.place ?? 2) - (b.place ?? 2));
     const awards = entries.filter(entry => entry.place === 1).flatMap(entry => route({ amountMilli: pointsFor(1), stageRunId,
-      awardKey: `minigame:${stageRunId}:${entry.playerId}`, reason: rules.game === 'heads-or-tails' ? 'Correct coin guess' : 'Correct roulette guess' }, { playerId: entry.playerId }, null));
+      awardKey: `minigame:${stageRunId}:${entry.playerId}`, reason: 'Correct coin guess' }, { playerId: entry.playerId }, null));
     return { entries, awards };
   }
   if (rules.game === 'bus' && context) {

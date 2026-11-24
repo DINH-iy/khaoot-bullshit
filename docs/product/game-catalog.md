@@ -141,7 +141,7 @@ Use the [minigame playtest checklist](minigame-playtest.md) to tune one implemen
 | 2 | Match the Angle | Implemented with 1° steps, targets away from common angles, and server submission time breaking ties in circular distance. |
 | 3 | Count the Dots | Implemented. Only the host and shared display see the pattern. Phones open the guessing field when the viewing timer ends. |
 | 4 | Heads or Tails | Built as a secret-pick hosted round with one shared reveal, and as a solo phone game with optional play-chip stakes. |
-| 5 | Red or Black Roulette | Built with one shared spin and points for correct guesses. Solo play supports optional play-chip stakes. Green zero pays neither colour. |
+| 5 | Roulette | Built: full European table (numbers, colours, odd/even, low/high, dozens, columns) with a rolling ball on one shared wheel. Players bet their own points, up to their score or the scene's minimum stake. The arcade and the solo phone game (play chips) use the same table. |
 | 6 | Build Your Meme | Add captions to an author-provided image. Show entries anonymously and vote for the funniest. |
 | 7 | Draw the Graph | Implemented. Players finish the same partial graph with assigned colours. The host and TV reveal all guesses with the actual line. Lowest average vertical error wins, with submission time breaking ties. |
 | 8 | Program the Robot | Use Blockly for the phone’s block editor. Author a grid and let players arrange movement blocks. Rank finishes first, then progress and time. Add loops, conditions or enemies after playtesting the basic round. |

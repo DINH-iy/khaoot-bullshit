@@ -87,23 +87,17 @@ describe('people: a phone always joins as the same person', () => {
 });
 
 describe('side games and chips', () => {
-  it('settles a solo roulette spin once and keeps free spins out of the chip ledger', async () => {
+  it('has one roulette: the old red-or-black side spin is gone, and outside bets pay on the table', async () => {
     const room = await openRoom();
     const phone = await join(room.roomCode, 'Roulette player');
-    const path = `/api/rooms/${room.sessionId}/side/red-or-black-roulette`;
-    const body = { roundId: randomUUID(), bet: 25, guess: 'red' };
-    expect((await call('POST', path, { ...body, guess: 'green' }, phone)).statusCode).toBe(400);
-    const replies = await Promise.all([call('POST', path, body, phone), call('POST', path, body, phone)]);
-    expect(replies.map(reply => reply.statusCode)).toEqual([200, 200]);
-    const first = replies[0]!.json().data;
-    expect(replies[1]!.json().data).toEqual(first);
-    const payout = rouletteColor(first.roulette) === 'red' ? 50 : 0;
-    expect(first).toMatchObject({ ...body, payout, balance: START_CHIPS - 25 + payout });
-    expect(await prisma.chipEntry.findMany({ where: { roundId: body.roundId }, orderBy: { amount: 'asc' }, select: { amount: true } }))
-      .toEqual(payout ? [{ amount: -25 }, { amount: 50 }] : [{ amount: -25 }]);
-    const free = { ...body, roundId: randomUUID(), bet: 0 };
-    expect((await call('POST', path, free, phone)).json().data).toMatchObject({ bet: 0, payout: 0, balance: first.balance });
-    expect(await prisma.chipEntry.count({ where: { roundId: free.roundId } })).toBe(0);
+    expect((await call('POST', `/api/rooms/${room.sessionId}/side/red-or-black-roulette`, { roundId: randomUUID(), bet: 25, guess: 'red' }, phone)).statusCode).toBe(404);
+    const bets = [{ guess: 'dozen3', bet: 10 }, { guess: 'odd', bet: 5 }];
+    const result = (await call('POST', `/api/rooms/${room.sessionId}/side/roulette`, { roundId: randomUUID(), bets }, phone)).json().data;
+    const pocket = result.roulette as number;
+    const payout = (pocket >= 25 ? 30 : 0) + (pocket % 2 === 1 ? 10 : 0);
+    expect(result).toMatchObject({ payout, balance: START_CHIPS - 15 + payout });
+    const free = (await call('POST', `/api/rooms/${room.sessionId}/side/roulette`, { roundId: randomUUID(), bets: [{ guess: 'low', bet: 0 }] }, phone)).json().data;
+    expect(free).toMatchObject({ payout: 0, balance: result.balance });
   });
 
   it('settles an entire roulette board atomically and supports green zero as a straight-up bet', async () => {

@@ -1,4 +1,4 @@
-import { CLAP_BEATS_MS, MINIGAMES, rouletteColor, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { CLAP_BEATS_MS, DEFAULT_REVEAL_EASING, MINIGAMES, RevealEasingSchema, rouletteColor, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import type { ReactNode } from 'react';
 import { useLanguage } from '../../i18n/language.js';
 import { useTexts } from '../../i18n/texts.js';
@@ -12,7 +12,8 @@ import { AngleComparison } from '../match-the-angle/match-angle.js';
 import { DotPhoneResult } from '../count-the-dots/count-dots.js';
 import { GraphChart } from '../draw-the-graph/graph-chart.js';
 import { CoinReveal } from '../heads-or-tails/coin.js';
-import { ROULETTE_TEXTS } from '../red-or-black-roulette/roulette.js';
+import { betSummary, ROULETTE_TEXTS, RouletteReveal } from '../red-or-black-roulette/roulette.js';
+import { DotReveal } from '../count-the-dots/dot-reveal.js';
 import { STEP_RENDERERS } from './steps/renderers.js';
 import { DrawingAnimation } from '../relay-drawing/animation-relay.js';
 import { CONTROL_TEXTS } from './controls.text.js';
@@ -23,8 +24,8 @@ import './phone-result.css';
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Reveal = NonNullable<Stage['reveal']>;
 type Answer = Extract<Reveal['answer'], { kind: 'minigame' }>;
-export function MinigamePhoneResult({ stage, state, answer, reveal, label }: {
-  stage: Stage; state: RoomSnapshot; answer: Answer; reveal: Reveal; label: string;
+export function MinigamePhoneResult({ stage, state, answer, reveal, label, offset }: {
+  stage: Stage; state: RoomSnapshot; answer: Answer; reveal: Reveal; label: string; offset: number;
 }) {
   const t = useTexts(PHONE_RESULT_TEXTS);
   const c = useTexts(CONTROL_TEXTS);
@@ -48,7 +49,13 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label }: {
   const seconds = (ms: number) => `${(ms / 1000).toLocaleString(language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} s`;
   const percentage = (value: number) => `${value.toLocaleString(language, { maximumFractionDigits: 2 })}%`;
   const value = entry?.value;
-  if (answer.dotCount !== undefined) return <DotPhoneResult count={answer.dotCount} guess={own?.dotGuess} points={points} label={text('results.title')} />;
+  // With no screen watching, the phone plays the reveal the screen would have shown (the dots counted up, the coin, the wheel).
+  const screenless = !state.screenConnected;
+  if (answer.dotCount !== undefined) {
+    const result = <DotPhoneResult count={answer.dotCount} guess={own?.dotGuess} points={points} label={text('results.title')} />;
+    return answer.dotReveal ? <DotReveal pattern={answer.dotReveal.pattern} startedAt={answer.dotReveal.startedAt} offset={offset}
+      easing={RevealEasingSchema.safeParse(stage.minigame?.settings['revealEasing']).data ?? DEFAULT_REVEAL_EASING}>{result}</DotReveal> : result;
+  }
 
   let facts: ResultFact[] = [];
   let visual: ReactNode;
@@ -83,13 +90,15 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label }: {
       facts = [[t('error'), own?.value == null ? '—' : percentage(own.value / 100)]];
       break;
     case 'heads-or-tails':
-      if (answer.coin) visual = <CoinReveal coin={answer.coin} animate={false} />;
+      if (answer.coin) visual = <CoinReveal coin={answer.coin} animate={screenless} />;
       facts = [[t('pick'), value == null ? '—' : minigameResult(game, value, settings)]];
       break;
     case 'red-or-black-roulette': {
       const color = answer.roulette === undefined ? undefined : rouletteColor(answer.roulette);
-      facts = [[t('landed'), color ? <span className={`mg-pocket ${color}`}>{roulette(color)}</span> : '—'],
-        [t('pick'), value == null ? '—' : minigameResult(game, value, settings)]];
+      // The spinning wheel names where it landed itself.
+      if (screenless && answer.roulette !== undefined) visual = <RouletteReveal pocket={answer.roulette} animate />;
+      facts = [...(visual ? [] : [[t('landed'), color ? <span className={`mg-pocket ${color}`}>{answer.roulette} · {roulette(color)}</span> : '—'] satisfies ResultFact]),
+        [roulette('yourBets'), own?.bets ? betSummary(own.bets) : '—']];
       break;
     }
     case 'lucky-doors': facts = [[t('door'), value == null ? '—' : minigameResult(game, value, settings)]]; break;
@@ -119,13 +128,18 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label }: {
     }
   }
 
-  return <div className="mg-personal-result" role="region" aria-label={label} data-game={game}>
-    {visual}
+  // While the coin or the wheel turns, the outcome below waits for it to land.
+  const waits = screenless ? game === 'heads-or-tails' && answer.coin ? 'coin-result-list-animated' : game === 'red-or-black-roulette' && answer.roulette !== undefined ? 'roulette-results-animated' : undefined : undefined;
+  const outcome = <>
     {facts.length > 0 && <ResultFacts facts={facts} />}
     {note ? <p className="mg-personal-note">{note}</p> : !entry && <p className="mg-personal-note">{t('noPlay')}</p>}
     <div className="mg-personal-score">
       {place != null && game !== 'heads-or-tails' && game !== 'red-or-black-roulette' && game !== 'majority' && <span>{t(teamEntry ? 'teamPlace' : 'place', { place })}</span>}
       <strong className={total > 0 ? 'earned' : undefined}>{t('points', { points: signed })}</strong>
     </div>
+  </>;
+  return <div className="mg-personal-result" role="region" aria-label={label} data-game={game}>
+    {visual}
+    {waits ? <div className={`mg-personal-outcome ${waits}`}>{outcome}</div> : outcome}
   </div>;
 }

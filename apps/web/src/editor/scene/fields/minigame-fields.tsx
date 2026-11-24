@@ -1,4 +1,4 @@
-import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, ROULETTE_BET_FLOOR, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
 import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
 import { SpeedRunCourseFields } from './speed-run-course.js';
@@ -41,6 +41,17 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
   const placement = (stage['placementMilli'] as string[] | undefined) ?? ['10000', '6000', '3000'];
   const places = (stage['places'] as Places | undefined) ?? { kind: 'list' as const, pointsMilli: placement };
   const setPlaces = (next: Places | undefined) => edit(current => { const copy: Stage = { ...current }; delete copy['placementMilli']; if (next) copy['places'] = next; else delete copy['places']; return copy; }, 'placement');
+  if (part === 'points' && game === 'red-or-black-roulette') {
+    // Roulette pays what the bets win, not points by place; the round only sets the minimum stake.
+    const floor = (settings as MinigameSettings<'red-or-black-roulette'> | null)?.betFloor ?? ROULETTE_BET_FLOOR;
+    return <>
+      <label className="ed-inline">{t('betFloor')}<span className="ed-unit">
+        <input type="number" min={0} max={10_000} value={floor} aria-describedby="roulette-floor-hint"
+          onChange={event => { const value = Math.round(Number(event.currentTarget.value)); if (Number.isFinite(value)) setSettings({ betFloor: Math.min(10_000, Math.max(0, value)) }, 'bet-floor'); }} />{t('pts')}
+      </span></label>
+      <p className="hint" id="roulette-floor-hint">{t('betFloorHint')}</p>
+    </>;
+  }
   if (part === 'points' && isSharedPrediction(game)) {
     const parsed = PlacesSchema.safeParse(places);
     const amount = (parsed.success ? placePoints(parsed.data)[0] : placement[0]) ?? '0';

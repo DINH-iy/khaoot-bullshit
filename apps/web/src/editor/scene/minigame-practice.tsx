@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  ANGLE_TARGETS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, chooseCutTarget, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_PICKS, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
-  DEFAULT_REVEAL_EASING, SAMPLE_GRAPH, graphError, angleError, busGuessRight, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteColor, isSharedPrediction,
+  ANGLE_TARGETS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, chooseCutTarget, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_BET_FLOOR, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
+  DEFAULT_REVEAL_EASING, SAMPLE_GRAPH, graphError, angleError, busGuessRight, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteMatches, rouletteNet, isSharedPrediction,
   type BusGuess, type Drawing, type MinigameKey, type MinigameSettings, type StepSideView,
 } from '@party/contracts';
 import { DrawingPad } from '../../drawing/drawing-pad.js';
@@ -123,7 +123,13 @@ function PracticeAttempt({ game, settings, stage, attempt, shared }: {
         <p className="practice-result" role="status">{minigameResult(game, graphError(graph.data, result.graphLine), settings)}</p>
       </>;
     }
-    if (pocket !== undefined) return <><RouletteReveal pocket={pocket} animate /><p>{coinText(ROULETTE_PICKS[result.value] === rouletteColor(pocket) ? 'right' : 'wrong')}</p></>;
+    if (pocket !== undefined && result.bets) {
+      // Practice: what the bets would have won or lost.
+      const net = rouletteNet(pocket, result.bets);
+      const hit = result.bets.some(entry => rouletteMatches(pocket, entry.guess));
+      return <><RouletteReveal pocket={pocket} animate /><p className="practice-result roulette-results-animated" role="status">
+        {coinText(hit ? 'right' : 'wrong')}{result.value > 0 && ` · ${net > 0 ? '+' : ''}${formatPoints(String(net * 1000))}`}</p></>;
+    }
     if (coin) return <><CoinReveal coin={coin} animate /><p>{coinText(COIN_SIDES[result.value] === coin ? 'right' : 'wrong')}</p></>;
     const { value, stroke } = result;
     if (game === 'stop-clock') return <ClockResult target={(settings as MinigameSettings<'stop-clock'>).targetMs} elapsed={value} />;
@@ -137,7 +143,8 @@ function PracticeAttempt({ game, settings, stage, attempt, shared }: {
   if (STEP_RENDERERS[game]) return <Countdown startsAt={startsAt} offset={0}>
     <StepPractice game={game} settings={settings} starts={starts} expired={expired} />
   </Countdown>;
-  return <TimedMinigame game={game} settings={settings} startsAt={startsAt} goAt={goAt} cutTarget={cutTarget} angleTarget={angleTarget} graph={graph} offset={0} disabled={false} onResult={setResult} onTaps={ignoreTaps} />;
+  return <TimedMinigame game={game} settings={settings} startsAt={startsAt} goAt={goAt} cutTarget={cutTarget} angleTarget={angleTarget} graph={graph} offset={0} disabled={false} onResult={setResult} onTaps={ignoreTaps}
+    rouletteLimit={game === 'red-or-black-roulette' ? (settings as MinigameSettings<'red-or-black-roulette'>).betFloor ?? ROULETTE_BET_FLOOR : undefined} />;
 }
 
 function StepPractice({ game, settings, starts, expired }: { game: MinigameKey; settings: MinigameSettings; starts: number; expired: boolean }) {

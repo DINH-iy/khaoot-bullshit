@@ -50,7 +50,8 @@ export function viewPresentation(game: Look, scene: Look) {
   return { ...mergePresentationTexts(game, scene), ...(game?.phoneMenuIcons ? { phoneMenuIcons: game.phoneMenuIcons } : {}), animations: { ...(game?.animations ?? {}), ...(scene?.animations ?? {}) }, themes: [game?.theme, scene?.theme].filter(Boolean) };
 }
 
-export async function readSessionView(client: PrismaClient, trustedActor: TrustedActor, sessionId: string, clock: Clock = () => new Date()): Promise<SessionView> {
+export async function readSessionView(client: PrismaClient, trustedActor: TrustedActor, sessionId: string, clock: Clock = () => new Date(),
+  { pictureOnPhone = false }: { pictureOnPhone?: boolean } = {}): Promise<SessionView> {
   try {
     const actor = TrustedActorSchema.safeParse(trustedActor);
     const id = GameIdSchema.safeParse(sessionId);
@@ -113,9 +114,11 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         ? new Map(eligible.data.playerIds.map((id, index) => [id, graphHue(graph.seed, index)])) : null;
       const ownGraphHue = viewer ? graphColors?.get(viewer) : undefined;
       const sharedScreen = actor.data.role !== 'player';
-      const revealEasing = sharedScreen && (rules?.game === 'count-the-dots' || rules?.game === 'draw-the-graph')
+      // What the screen shows (the dots to count and their reveal) goes to the phones when no screen is watching.
+      const showsPicture = sharedScreen || pictureOnPhone;
+      const revealEasing = showsPicture && (rules?.game === 'count-the-dots' || rules?.game === 'draw-the-graph')
         ? (rules.settings as MinigameSettings<'count-the-dots' | 'draw-the-graph'>).revealEasing : undefined;
-      const showPattern = sharedScreen && current?.status === 'ACTIVE' && session.status === 'RUNNING'
+      const showPattern = showsPicture && current?.status === 'ACTIVE' && session.status === 'RUNNING'
         && dotRun && clock().getTime() < Date.parse(dotRun.guessAt);
       // A step game: every side's progress (secrets never; a team's vote counts only for its own members and the host).
       const steps = rules && isStepMinigame(rules.game) && current ? await stepView(tx, current, rules, context, eligible?.success ? eligible.data.playerIds : [], { playerId: viewer, host: actor.data.role === 'host' }) : null;
@@ -133,7 +136,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       const minigameAnswer = rules && revealed ? { kind: 'minigame', game: rules.game, doorsMilli: run?.doorsMilli ?? null,
         ...(graph && graphChart ? { graph: { ...graphChart, hidden: graph.hidden, source: graph.source, sourceNote: graph.sourceNote, sourceUrl: graph.sourceUrl } } : {}),
         ...(dotRun ? { dotCount: dotRun.pattern.length } : {}),
-        ...(dotRun && sharedScreen && current?.revealedAt ? { dotReveal: {
+        ...(dotRun && showsPicture && current?.revealedAt ? { dotReveal: {
           pattern: dotRun.pattern, startedAt: current.revealedAt.toISOString(),
         } } : {}),
         ...(run?.coin ? { coin: run.coin } : {}),

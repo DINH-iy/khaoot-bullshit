@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolBallBehavior, PoolStart } from '@party/contracts';
-import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
+import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
@@ -678,6 +678,12 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       requireGame(claimed.kind === 'minigame' && run, 'INVALID_SUBMISSION');
       const fair = live && actor.role === 'player' ? { latencyMs: live.latencyMs(session.id, actor.playerId), taps: live.taps(stage.id, run.startsAt, actor.playerId) } : NO_FAIRNESS;
       const value = { kind: 'minigame' as const, ...judgeResult(rules.game, rules.settings, run, claimed, now, fair) };
+      if (rules.game === 'red-or-black-roulette' && value.value > 0) {
+        // Roulette stakes come from the score the player can see (revealed rounds and corrections), or the round's minimum stake when that is higher.
+        const score = await tx.scoreEntry.aggregate({ where: { sessionId: session.id, recipientPlayerId: actor.playerId, OR: [{ stageRunId: null }, { stage: { revealedAt: { not: null } } }] }, _sum: { amountMilli: true } });
+        const floor = (rules.settings as MinigameSettings<'red-or-black-roulette'>).betFloor ?? ROULETTE_BET_FLOOR;
+        requireGame(value.value <= rouletteBetLimit(Number((score._sum.amountMilli ?? 0n) / 1000n), floor), 'INVALID_SUBMISSION');
+      }
       if (rules.game === 'relay-drawing') {
         // Votes open after the last turn, for another team's picture.
         requireGame(context, 'INVALID_STATE');

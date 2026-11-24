@@ -106,6 +106,42 @@ describe('minigames', () => {
     expect(await prisma.scoreEntry.count({ where: { sessionId: f.sessionId } })).toBe(2);
   });
 
+  it('lets roulette players bet their score or the minimum stake, and pays wins and takes losses at the reveal', async () => {
+    const w = world();
+    const f = await fixture(3, game({ game: 'red-or-black-roulette', durationMs: 30_000, settings: { betFloor: 50 } }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+    // Player 0 has 200 points (a correction counts at once); the others have none.
+    await host(w, f, 'score.adjust', { playerId: f.players[0]!.id, amountMilli: '200000', reason: 'Head start' });
+    const pocket = readMinigameRun((await prisma.stageRun.findUniqueOrThrow({ where: { id: stageRunId } })).presentation)!.roulette!;
+    const miss = (pocket + 1) % 37;
+    const bet = (index: number, bets: { guess: number | string; bet: number }[]) => w.service.execute({ role: 'player', playerId: f.players[index]!.id }, {
+      formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'submission.submit', stageRunId,
+      value: { kind: 'minigame', value: 0, bets } });
+    w.advance(3000);
+    await expect(bet(0, [{ guess: pocket, bet: 150 }, { guess: 'red', bet: 51 }])).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await expect(bet(1, [{ guess: miss, bet: 51 }])).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await bet(0, [{ guess: pocket, bet: 150 }]);
+    await bet(1, [{ guess: miss, bet: 50 }]);
+    await bet(2, [{ guess: 'odd', bet: 0 }]);
+    const display = { role: 'display' as const, sessionId: f.sessionId };
+    // Bets stay private until the reveal: only the player sees their own.
+    expect((await readSessionView(prisma, { role: 'player', playerId: f.players[1]!.id }, f.sessionId)).ownSubmission?.value).toEqual({ kind: 'minigame', value: 50, bets: [{ guess: miss, bet: 50 }] });
+    expect((await readSessionView(prisma, display, f.sessionId)).stage!.reveal).toBeNull();
+    w.advance(30_000);
+    await w.service.execute(f.host, { formatVersion: 1, type: 'stage.timeout', commandId: randomUUID(), sessionId: f.sessionId, stageRunId });
+    const revealed = await readSessionView(prisma, display, f.sessionId);
+    expect(revealed.stage!.reveal!.answer).toMatchObject({ game: 'red-or-black-roulette', roulette: pocket, entries: expect.arrayContaining([
+      { playerId: f.players[0]!.id, teamId: null, value: 150, place: 1, bets: [{ guess: pocket, bet: 150 }] },
+      { playerId: f.players[1]!.id, teamId: null, value: 50, place: null, bets: [{ guess: miss, bet: 50 }] },
+    ]) });
+    expect(revealed.standings).toEqual(expect.arrayContaining([
+      { playerId: f.players[0]!.id, amountMilli: String((200 + 150 * 35) * 1000) },
+      { playerId: f.players[1]!.id, amountMilli: '-50000' },
+    ]));
+    // The free pick wins or loses nothing.
+    expect(await prisma.scoreEntry.count({ where: { sessionId: f.sessionId, recipientPlayerId: f.players[2]!.id } })).toBe(0);
+  });
+
   it('keeps Count the Dots private to the displays and accepts guesses during the viewing window', async () => {
     const w = world();
     const f = await fixture(5, game({ game: 'count-the-dots', durationMs: 15_000, settings: { viewSeconds: 5, count: { mode: 'exact', value: 500 } } }));
@@ -125,6 +161,9 @@ describe('minigames', () => {
     expect(opened.deadlineAt).toBe(new Date(w.now() + 20_000).toISOString());
     expect((await view(f.host)).stage!.minigame!.dots).toEqual(dots);
     expect((await view(player(0))).stage!.minigame!.dots).toEqual({ guessAt: dots.guessAt });
+    // With no screen watching (two phones in the arcade), the phones get the dots to count themselves.
+    const screenless = (index: number) => readSessionView(prisma, player(index), f.sessionId, clock, { pictureOnPhone: true });
+    expect((await screenless(0)).stage!.minigame!.dots).toEqual(dots);
     for (const [index, [x1, y1]] of pattern.entries()) {
       expect(pattern.slice(index + 1).every(([x2, y2]) => Math.hypot(x1 - x2, y1 - y2) >= 2 * DOT_RADIUS)).toBe(true);
     }
@@ -144,6 +183,7 @@ describe('minigames', () => {
     expect((await view(display)).stage!.minigame!.dots?.pattern).toEqual(pattern);
     w.advance(1);
     expect((await view(display)).stage!.minigame!.dots?.pattern).toBeUndefined();
+    expect((await screenless(0)).stage!.minigame!.dots?.pattern).toBeUndefined();
     w.advance(100);
     await play(w, f, 1, stageRunId, count - 2);
     await expect(play(w, f, 2, stageRunId, 1000)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
@@ -164,8 +204,8 @@ describe('minigames', () => {
     const result = await view(player(0));
     expect(result.stage!.minigame!.dots?.pattern).toBeUndefined();
     expect(result.stage!.reveal!.answer).not.toHaveProperty('dotReveal');
-    for (const actor of [f.host, display]) {
-      expect((await view(actor)).stage!.reveal!.answer).toMatchObject({
+    for (const shown of [view(f.host), view(display), screenless(0)]) {
+      expect((await shown).stage!.reveal!.answer).toMatchObject({
         dotReveal: { pattern, startedAt: new Date(w.now()).toISOString() },
       });
     }

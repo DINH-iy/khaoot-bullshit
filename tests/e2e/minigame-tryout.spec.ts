@@ -89,7 +89,7 @@ test('every hosted minigame opens and reveals a compact phone result in the benc
     reaction: '.reaction-pad', 'clap-beat': '.clap-pad', 'tap-race': '.mg-tap-race .mg-pad', 'speed-run': '.step-options',
     'stop-clock': '.mg-pad.stop', 'lucky-doors': '.step-options', 'perfect-circle': '.drawing-pad', 'cut-the-line': '.mg-cut-line',
     'match-the-angle': '.mg-match-angle', 'count-the-dots': '.mg-dot-form', 'draw-the-graph': '.graph-phone',
-    'heads-or-tails': '.coin-choices', 'red-or-black-roulette': '.roulette-choices',
+    'heads-or-tails': '.coin-choices', 'red-or-black-roulette': '.roulette-table',
     'relay-drawing': '.mg-relay', bus: '.step-options', majority: '.step-options',
   };
   const overflow = (node: Element) => ({

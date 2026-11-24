@@ -5,3 +5,8 @@
 .mg-race-track span { display: block; height: 100%; border-radius: inherit; background: var(--r-accent); transition: width .25s ease-out; }
 .mg-race-count { font-variant-numeric: tabular-nums; font-weight: 800; text-align: right; }
 @media (prefers-reduced-motion: reduce) { .mg-race-track span { transition: none; } }
+/* On a phone with no screen watching: everyone's bars under the pad, compact. */
+.mg-phone-race { width: min(100%, 26rem); margin: 12px auto 0; }
+.mg-phone-race .mg-race { gap: 6px; }
+.mg-phone-race .mg-race li { grid-template-columns: auto minmax(3rem, 6rem) 1fr 2.5rem; gap: 8px; }
+.mg-phone-race .mg-race-track { height: 14px; }

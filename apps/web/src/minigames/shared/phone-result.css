@@ -57,3 +57,5 @@
 .mg-clock-result { display: grid; gap: 8px; width: 100%; text-align: center; }
 
 .mg-personal-result[data-game="match-the-angle"] .mg-result-facts > div:last-child dd { color: var(--r-accent); }
+/* The outcome under a coin or wheel that a screenless phone plays itself (it appears once that lands). */
+.mg-personal-outcome { display: grid; justify-items: center; gap: 10px; width: 100%; }

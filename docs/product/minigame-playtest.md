@@ -27,7 +27,7 @@ Play and tune one game at a time. Keep the current game under **In review**, and
 - [ ] **Match the Angle** — Check the angle direction, 1° snap, and fastest-submission tiebreak.
 - [ ] **Count the Dots** — Check dot legibility on TV, submissions during and after viewing, and the compact phone result.
 - [ ] **Heads or Tails** — Check secret picks, the shared flip, and solo play with and without chips.
-- [ ] **Red or Black Roulette** — Check secret picks, green zero, and the shared spin. In solo Roulette, also try exact numbers and multiple wagers.
+- [ ] **Roulette** — Bet points on numbers and outside bets, check the stake limit (score or minimum stake), green zero, the rolling ball, and that wins and losses change the score. Check that arcade and solo Roulette (play chips) use the same table.
 - [ ] **Lucky doors** — Check that the reveal and points match the selected door in shuffled and fixed modes.
 - [ ] **Pass the pencil** — Check turn handoff, live drawing, voting, and the animation variant.
 - [ ] **Drive the bus** — Check every choice and the captain and voting flows in a team round.
@@ -74,7 +74,7 @@ Every minigame scene exposes its prompt and the timing controls applicable to it
 | Count the Dots | Display time, guess time, random or authored count, slight overlap, and reveal easing |
 | Draw the Graph | Stock or custom data, CSV or Grapher import, cutoff, axis labels, source, and reveal easing |
 | Heads or Tails | Award for a correct guess and guess time. Coin probabilities are fixed. |
-| Red or Black Roulette | Award for a correct guess and guess time. Wheel pockets and odds are fixed. |
+| Roulette | Minimum stake (`betFloor`) and betting time. Wheel pockets and odds are fixed. |
 | Pass the pencil | Time per turn, voting time, and animation mode |
 | Drive the bus | Sips per step, rainbow rule, and team decision method |
 | Left or right | Vote time and places. Majority and tie rules are fixed. |
@@ -99,7 +99,7 @@ The phone has one round result with the player's own measurement, guess, or team
 | Count the Dots | Numeric entry | Actual count and own guess |
 | Draw the Graph | Plot, Clear, and Lock in | Own trace against the actual line |
 | Heads or Tails | Two coin faces | Landed face and own pick |
-| Red or Black Roulette | Two color buttons | Landed color and own pick |
+| Roulette | Betting table with chips | Rolling ball, landed pocket, own bets and points won or lost |
 | Pass the pencil | Turn drawing area and paged ballot | Own team's drawing and votes or accuracy |
 | Drive the bus | Cards and current choice | Own team's cards and total sips |
 | Left or right | Direction choices | Own pick and majority or tie |
@@ -112,6 +112,5 @@ Hosts can open **Configure minigame** in the Scene editor to change settings and
 
 - Extend team play to each minigame. Give the captain the team submission and let the host choose whether captains are assigned or elected on phones. Define the team rules for games that currently play individually.
 - Let the host choose whether Heads or Tails flips automatically after guesses lock or waits for a host action.
-- Replace the hosted roulette color-only choice with numbered and table bets, score bonuses for winning bets, and an animated ball. Losing bets leave the score as it was.
 - Replace the compact drawing color dropdown with swatches, simplify the Pass the Pencil ballot and host timer controls, and tighten the Left or Right prompt. Remove redundant dot indicators while keeping the Count the Dots board used for play.
 - Let a team that earns a rainbow in Drive the Bus choose the opposing team that takes the sips.

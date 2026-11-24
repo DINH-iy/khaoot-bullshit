@@ -168,7 +168,7 @@ function PickRound({ players, onStart }: { players: number; onStart: (game: Arca
         options={[{ value: 'random', label: 'At random' }, { value: 'players', label: 'By the players' }]} /></label>}
     </div>
     <p className="arcade-meta">{gameDescription(game)}</p>
-    {isMinigameKey(game) && SHARED_SCREEN_MINIGAMES.includes(game) && <p className="arcade-meta">Open the shared screen from the round to watch together.</p>}
+    {isMinigameKey(game) && SHARED_SCREEN_MINIGAMES.includes(game) && <p className="arcade-meta">No TV? The phones show the game too. A shared screen from the round lets everyone watch together.</p>}
     {!enough && <p className="arcade-meta">{duel ? 'A duel needs two players.' : `${count} teams need at least ${count} players.`}</p>}
     <button type="button" className="primary big" disabled={!enough} onClick={() => onStart(game, count ? { count, formation } : null)}>Play {gameName(game)}</button>
   </section>;

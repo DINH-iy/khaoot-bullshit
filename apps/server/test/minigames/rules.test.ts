@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANGLE_TARGETS, DOT_RADIUS, DotPatternSchema, DotSettingsSchema, MINIGAMES, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteColor, rouletteReturn } from '@party/contracts';
+import { ANGLE_TARGETS, DOT_RADIUS, DotPatternSchema, DotSettingsSchema, MINIGAMES, ROULETTE_OUTSIDE, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteBetLimit, rouletteColor, rouletteMatches, rouletteNet, rouletteReturn } from '@party/contracts';
 import { judgeResult, places, startMinigame, teamValue } from '../../src/minigames/shared/rules.js';
 import { FASTEST_REACTION_MS } from '../../src/minigames/reaction/judge.js';
 import { TAP_TAIL } from '../../src/minigames/tap-race/judge.js';
@@ -27,19 +27,59 @@ describe('minigame rules', () => {
     expect(rouletteReturn(32, 'red', 25)).toBe(50);
   });
 
-  it('awards every correct roulette pick and pays neither color on green zero', () => {
+  it('covers the usual pockets with every outside bet, and green zero loses them all', () => {
+    const covered = (pick: typeof ROULETTE_OUTSIDE[number]) => Array.from({ length: ROULETTE_POCKETS }, (_, pocket) => pocket).filter(pocket => rouletteMatches(pocket, pick));
+    for (const pick of ['red', 'black', 'odd', 'even', 'low', 'high'] as const) expect(covered(pick), pick).toHaveLength(18);
+    for (const pick of ['dozen1', 'dozen2', 'dozen3', 'column1', 'column2', 'column3'] as const) expect(covered(pick), pick).toHaveLength(12);
+    expect(covered('dozen2')).toEqual([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
+    expect(covered('column1')).toEqual([1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]);
+    expect(ROULETTE_OUTSIDE.filter(pick => rouletteMatches(0, pick))).toEqual([]);
+    // Payouts include the stake: a dozen pays 2 to 1, an even-money bet 1 to 1, a number 35 to 1.
+    expect(rouletteReturn(14, 'dozen2', 10)).toBe(30);
+    expect(rouletteReturn(14, 'even', 10)).toBe(20);
+    expect(rouletteNet(17, [{ guess: 17, bet: 5 }, { guess: 'red', bet: 10 }])).toBe(175 - 10);
+    expect(rouletteNet(0, [{ guess: 'red', bet: 10 }, { guess: 'odd', bet: 5 }])).toBe(-15);
+  });
+
+  it('lets a player bet their score, or the minimum stake when their score is lower', () => {
+    expect(rouletteBetLimit(250)).toBe(250);
+    expect(rouletteBetLimit(20)).toBe(100);
+    expect(rouletteBetLimit(-40, 30)).toBe(30);
+    expect(rouletteBetLimit(12.9, 0)).toBe(12);
+  });
+
+  it('accepts roulette bets once the spin is chosen and stores their total stake', () => {
     const game = 'red-or-black-roulette';
-    const rule = rules(game, { placementMilli: ['4000'] });
-    const guesses = [row(ids[0], 0), row(ids[1], 0), row(ids[2], 1)];
-    const counts = Array.from({ length: ROULETTE_POCKETS }, (_, pocket) => rouletteColor(pocket));
-    expect(counts.filter(color => color === 'red')).toHaveLength(18);
-    expect(counts.filter(color => color === 'black')).toHaveLength(18);
-    expect(counts.filter(color => color === 'green')).toHaveLength(1);
-    for (const [pocket, winners] of [[0, []], [1, [ids[0], ids[1]]], [2, [ids[2]]]] as const) {
-      const run = startMinigame(game, {}, now, () => pocket);
-      const result = minigameOutcome(rule, guesses, null, 'stage', run);
-      expect(result.awards.map(award => [award.playerId, award.amountMilli])).toEqual(winners.map(id => [id, 4000n]));
-    }
+    const run = startMinigame(game, {}, now, () => 7);
+    const bets = [{ guess: 7, bet: 5 }, { guess: 'black' as const, bet: 20 }];
+    expect(judgeResult(game, {}, run, { value: 0, bets }, at(3000))).toEqual({ value: 25, bets });
+    expect(rejected(() => judgeResult(game, {}, run, { value: 1 }, at(3000)))).toBe(true);
+    expect(rejected(() => judgeResult(game, {}, run, { value: 0, bets: [{ guess: 'red', bet: 5 }, { guess: 'red', bet: 5 }] }, at(3000)))).toBe(true);
+    expect(rejected(() => judgeResult(game, {}, run, { value: 0, bets: [{ guess: 'blue' as never, bet: 5 }] }, at(3000)))).toBe(true);
+    expect(rejected(() => judgeResult(game, {}, run, { value: 0, bets }, at(1000)))).toBe(true);
+  });
+
+  it('pays each player what their roulette bets win and takes what they lose', () => {
+    const game = 'red-or-black-roulette';
+    const bet = (playerId: string, bets: { guess: number | string; bet: number }[]) => ({ playerId, teamId: null, value: { kind: 'minigame', value: bets.reduce((sum, entry) => sum + entry.bet, 0), bets } });
+    const rows = [
+      bet(ids[0], [{ guess: 14, bet: 10 }]), // straight up: +350
+      bet(ids[1], [{ guess: 'black', bet: 20 }, { guess: 'dozen1', bet: 5 }]), // 14 is red and in 13–24: -20 - 5
+      bet(ids[2], [{ guess: 'even', bet: 0 }]), // a free pick that wins: no points
+      row(ids[3], 1), // from before the table: a free pick of black
+    ];
+    const run = startMinigame(game, {}, now, () => 14);
+    expect(run.roulette).toBe(14);
+    const result = minigameOutcome(rules(game, { placementMilli: ['4000'] }), rows, null, 'stage', run);
+    expect(result.awards.map(award => [award.playerId, award.amountMilli, award.reason])).toEqual([
+      [ids[0], 350_000n, 'Roulette win'], [ids[1], -25_000n, 'Roulette loss'],
+    ]);
+    expect(result.entries.map(entry => [entry.playerId, entry.place, entry.value])).toEqual([
+      [ids[0], 1, 10], [ids[2], 1, 0], [ids[1], null, 25], [ids[3], null, 0],
+    ]);
+    // Green zero: only a bet on 0 wins.
+    const zero = minigameOutcome(rules(game), [bet(ids[0], [{ guess: 0, bet: 2 }, { guess: 'red', bet: 3 }])], null, 'stage', startMinigame(game, {}, now, () => 0));
+    expect(zero.awards.map(award => award.amountMilli)).toEqual([(72n - 5n) * 1000n]);
   });
 
   it('skips easy targets all the way around the circle and accepts 360° as 0°', () => {

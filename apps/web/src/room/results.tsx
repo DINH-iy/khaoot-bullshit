@@ -101,7 +101,7 @@ export function StageResults({ state, stage, offset = 0, onNext, onGraphPlayback
   const own = state.selfPlayerId ? reveal.awards.find(award => award.playerId === state.selfPlayerId) : undefined;
   if (answer?.kind === 'minigame') {
     const label = p('roundResults');
-    if (state.role === 'player') return <MinigamePhoneResult stage={stage} state={state} answer={answer} reveal={reveal} label={label} />;
+    if (state.role === 'player') return <MinigamePhoneResult stage={stage} state={state} answer={answer} reveal={reveal} label={label} offset={offset} />;
     return <RoundResultsCard title={t('results.title')} label={label} hideHeading>
       {state.role === 'host' && stage.graphPlayback && onGraphPlayback && <GraphReplayControls
         playback={stage.graphPlayback} offset={offset} onAction={onGraphPlayback} disabled={disabled || state.view.status !== 'RUNNING'} />}

@@ -15,7 +15,7 @@ import { chartInk, GraphChart } from '../draw-the-graph/graph-chart.js';
 import { GRAPH_TEXTS } from '../draw-the-graph/graph.text.js';
 import { CoinReveal } from '../heads-or-tails/coin.js';
 import { COIN_TEXTS } from '../heads-or-tails/coin.text.js';
-import { RouletteReveal } from '../red-or-black-roulette/roulette.js';
+import { ROULETTE_TEXTS, RouletteReveal } from '../red-or-black-roulette/roulette.js';
 import { DrawingAnimation } from '../relay-drawing/animation-relay.js';
 import { STEP_RENDERERS } from './steps/renderers.js';
 import { minigameResult } from './result-label.js';
@@ -33,6 +33,7 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
   const t = useText();
   const c = useTexts(CONTROL_TEXTS);
   const coinText = useTexts(COIN_TEXTS);
+  const rouletteText = useTexts(ROULETTE_TEXTS);
   const graphText = useTexts(GRAPH_TEXTS);
   const labels = useTexts(PHONE_RESULT_TEXTS);
   const playText = useTexts(PLAY_TEXTS);
@@ -69,7 +70,7 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
   const ranked = answer.entries.some(entry => entry.place !== null);
   const standings = answer.entries.length > 0 ? <section className={coin ? 'coin-result-list-animated' : answer.roulette !== undefined && animateRoulette
       ? 'roulette-results-animated' : playback ? 'graph-places' : undefined}>
-    <h3>{prediction ? coinText('picks') : game === 'lucky-doors' ? c('whoChose') : t('minigame.places')}</h3>
+    <h3>{answer.roulette !== undefined ? rouletteText('bets') : prediction ? coinText('picks') : game === 'lucky-doors' ? c('whoChose') : t('minigame.places')}</h3>
     <PagedResultList ordered className="mg-podium" pageSize={PAGE_SIZE} rows={answer.entries.map(entry => {
       const { playerId, teamId } = entry;
       const name = playerId ? nameOf(playerId) : teamId ? teamName(state, teamId) : playText('formerPlayer');

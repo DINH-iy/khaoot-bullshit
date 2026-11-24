@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DOT_HEIGHT, DOT_RADIUS, DOT_WIDTH, DotGuessSchema, MAX_DOT_GUESS, type DotPattern } from '@party/contracts';
 import { useTexts } from '../../i18n/texts.js';
+import { useServerNow } from '../shared/clock.js';
 import { CONTROL_TEXTS } from '../shared/controls.text.js';
 import type { Result } from '../shared/countdown.js';
 import './count-the-dots.css';
@@ -26,6 +27,16 @@ export function DotGuessForm({ disabled, onResult }: { disabled: boolean; onResu
       value={answer} disabled={disabled} onChange={event => setAnswer(event.currentTarget.value.replace(/[^0-9]/g, '').slice(0, String(MAX_DOT_GUESS).length))} /></label>
     <button type="submit" className="primary" disabled={disabled || value === undefined}>{t('dotSubmit')}</button>
   </form>;
+}
+
+/** The guess on a phone. With no screen watching, the phone also gets the dots to count, shown until guessing starts. */
+export function DotPhone({ pattern, guessAt, offset, disabled, onResult }: { pattern?: DotPattern | undefined; guessAt?: string | undefined; offset: number; disabled: boolean; onResult: (result: Result) => void }) {
+  const viewing = Boolean(pattern && guessAt);
+  const now = useServerNow(offset, viewing);
+  return <>
+    {pattern && guessAt && now < Date.parse(guessAt) && <div className="mg-dot-phone"><DotBoard pattern={pattern} /></div>}
+    <DotGuessForm disabled={disabled} onResult={onResult} />
+  </>;
 }
 
 export function DotPhoneResult({ count, guess, points, label }: { count: number; guess?: number | undefined; points?: string | undefined; label: string }) {

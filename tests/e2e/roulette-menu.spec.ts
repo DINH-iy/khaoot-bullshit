@@ -16,8 +16,8 @@ test('Roulette works on the TV and in Games, with per-game icons and free pack p
   const draft = (await (await host.request.post(games, { headers, data: { gameId, title: 'Roulette night', startFrom: 'timed-quiz' } })).json()).data;
   const definition = {
     formatVersion: 2, title: 'Roulette night', startNodeKey: 'wheel', edges: [],
-    nodes: [{ key: 'wheel', stages: [{ key: 'main', kind: 'minigame', prompt: 'Pick a color', game: 'red-or-black-roulette',
-      durationMs: 15_000, countdownSeconds: 1, placementMilli: ['8000'] }] }],
+    nodes: [{ key: 'wheel', stages: [{ key: 'main', kind: 'minigame', prompt: 'Place your bets', game: 'red-or-black-roulette',
+      durationMs: 30_000, countdownSeconds: 1 }] }],
   };
   expect((await host.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).ok()).toBe(true);
   await host.goto(`${baseURL}/?edit=${gameId}&view=look`);
@@ -116,24 +116,30 @@ test('Roulette works on the TV and in Games, with per-game icons and free pack p
     const balance = sheet.locator('.chip-pill strong');
     await expect(balance).toBeVisible();
     const before = Number((await balance.textContent())!.replace(/\D/g, ''));
-    const numberBoard = sheet.getByRole('group', { name: 'Roulette betting board' });
-    await expect(numberBoard.getByRole('button')).toHaveCount(37);
+    const numberBoard = sheet.getByRole('group', { name: 'Roulette table' });
+    // 37 numbers (green zero too) and 12 outside bets.
+    await expect(numberBoard.getByRole('button')).toHaveCount(49);
     await sheet.getByRole('radio', { name: '25', exact: true }).check();
     await numberBoard.getByRole('button', { name: /Green zero/ }).tap();
     await numberBoard.getByRole('button', { name: /^32 · Red/ }).tap();
-    await sheet.getByRole('button', { name: 'Red', exact: true }).tap();
-    await expect(sheet.getByText('Stake: 75 chips')).toBeVisible();
+    await numberBoard.getByRole('button', { name: /^Red, / }).tap();
+    await expect(sheet.getByText(`Stake 75 of ${before}`)).toBeVisible();
     await sheet.getByRole('button', { name: 'Spin', exact: true }).tap();
     const solo = sheet.locator('.roulette-result');
     await expect(solo).toBeVisible();
     const result = (await solo.textContent())!;
     const payout = (/^(0|32) ·/.test(result) ? 25 * 36 : 0) + (/ · Red$/.test(result) ? 50 : 0);
-    await expect(balance).toContainText(String(before - 75 + payout));
+    // Digits only: a balance of 1000 or more shows a thousands separator.
+    await expect.poll(async () => Number((await balance.textContent())!.replace(/\D/g, ''))).toBe(before - 75 + payout);
 
     await host.getByRole('button', { name: 'Start the game' }).click();
     await expect(sheet).toHaveCount(0);
-    await phone.getByRole('button', { name: 'Black', exact: true }).tap();
-    await expect(phone.locator('.mg-done')).toContainText('Black');
+    // Ada has no points yet, so she may bet up to the minimum stake (100 by default).
+    await expect(phone.getByText('Stake 0 of 100')).toBeVisible();
+    await phone.getByRole('radio', { name: '10', exact: true }).check();
+    await phone.getByRole('group', { name: 'Roulette table' }).getByRole('button', { name: /^Black, / }).tap();
+    await phone.getByRole('button', { name: 'Lock in bets' }).tap();
+    await expect(phone.locator('.mg-done')).toContainText('Black 10');
     await expect(display.locator('.roulette-result')).toHaveCount(0);
     await expect(display.locator('.mg-podium')).toHaveCount(0);
     await host.getByRole('button', { name: 'Close answers' }).click();
@@ -142,7 +148,11 @@ test('Roulette works on the TV and in Games, with per-game icons and free pack p
     await expect(display.locator('.roulette-wheel')).toHaveCount(1);
     await expect(phone.locator('.roulette-wheel')).toHaveCount(0);
     await expect(phone.locator('.mg-personal-result .mg-pocket')).toHaveText((await shared.textContent())!);
-    await expect(display.locator('.mg-podium li').filter({ hasText: 'Ada' })).toContainText((await shared.textContent()) === 'Black' ? 'Correct guess' : 'Wrong guess');
+    const black = / · Black$/.test((await shared.textContent())!);
+    const ada = display.locator('.mg-podium li').filter({ hasText: 'Ada' });
+    await expect(ada).toContainText(black ? 'Correct guess' : 'Wrong guess');
+    await expect(ada).toContainText('Bet 10');
+    await expect(ada.locator('.mg-result-points')).toContainText(black ? '10' : '−10');
   } finally {
     await mobile.close();
     await display.close();

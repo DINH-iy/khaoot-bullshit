@@ -35,6 +35,8 @@ export const RoomSnapshotSchema = z.object({
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
   // Whether a shared screen is connected: it plays the room's videos and songs; without one the host's screen does.
   displayConnected: z.boolean().optional(),
+  // Whether a host or shared screen is watching. Without one (two phones in the arcade), phones show the round's picture themselves.
+  screenConnected: z.boolean().optional(),
   birthdayVote: z.object({ voted: z.boolean(), ready: z.boolean() }).strict().optional(),
   hostPhone: z.boolean().optional(), hostPhonePlayerId: GameIdSchema.nullable().optional(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema, canBan: z.boolean().optional() }).strict()),
