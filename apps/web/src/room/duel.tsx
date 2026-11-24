@@ -57,7 +57,8 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
   const canBet = !teamPool && !duelist && state.role === 'player' && stage.status === 'ACTIVE' && !own && !winner && state.view.status === 'RUNNING';
   const playing = duel.contest.kind === 'game' && duel.contest.view;
   const poolPlaying = pool && Boolean(playing) && stage.status === 'CLOSED';
-  const showBoard = !pool || duelist || Boolean(state.arcade) || state.role !== 'player';
+  // Pool is watched on the screen; with none watching (the arcade, a room without a host screen) every phone shows the table.
+  const showBoard = !pool || duelist || Boolean(state.arcade) || !state.screenConnected || state.role !== 'player';
   return <div className={`duel${poolPlaying ? ' duel-pool-playing' : ''}`} role="region" aria-label={p('duel')}>
     <div className="duel-vs">{[a, b].map((id, index) => { const bets = duel.bets.find(entry => entry.playerId === id)?.count ?? 0;
       return <div key={id} className={`duel-side${winner === id ? ' winner' : winner ? ' loser' : ''}`}>

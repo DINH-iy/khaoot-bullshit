@@ -59,3 +59,19 @@
 .mg-personal-result[data-game="match-the-angle"] .mg-result-facts > div:last-child dd { color: var(--r-accent); }
 /* The outcome under a coin or wheel that a screenless phone plays itself (it appears once that lands). */
 .mg-personal-outcome { display: grid; justify-items: center; gap: 10px; width: 100%; }
+/* A phone with no screen watching: everyone's standings under its own result. */
+.mg-results-everyone { width: 100%; padding-block-start: 10px; border-block-start: 1px solid var(--r-line); text-align: start; }
+.dot-result + .mg-results-everyone { margin-block-start: 12px; }
+.mg-results-everyone .mg-podium { gap: 6px; }
+/* One line per player: place, face and name (cut off with …), result, points. */
+.mg-results-everyone .mg-podium li { grid-template-columns: 2ch minmax(0, 1fr) minmax(0, auto) auto; gap: 4px 8px; padding: 4px 10px; line-height: 1.3; }
+.mg-results-everyone .mg-result-measurement { grid-area: auto; justify-self: end; max-width: 8rem; color: var(--r-muted); font-size: .875rem; }
+.mg-results-everyone .mg-result-measurement > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mg-results-everyone .mg-result-points { grid-area: auto; min-width: 4.5rem; }
+/* All rows share the columns, so the divider before the points lines up in every row. */
+@supports (grid-template-columns: subgrid) {
+  .mg-results-everyone .mg-podium { grid-template-columns: 2ch minmax(0, 1fr) minmax(0, auto) auto; }
+  .mg-results-everyone .mg-podium li { grid-column: 1 / -1; grid-template-columns: subgrid; }
+  .mg-results-everyone .mg-result-points { min-width: 0; }
+}
+.mg-results-everyone h3 { margin-block-end: 4px; }

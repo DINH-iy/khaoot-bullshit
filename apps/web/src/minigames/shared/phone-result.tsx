@@ -19,6 +19,7 @@ import { DrawingAnimation } from '../relay-drawing/animation-relay.js';
 import { CONTROL_TEXTS } from './controls.text.js';
 import { PHONE_RESULT_TEXTS } from './phone-result.text.js';
 import { minigameResult } from './result-label.js';
+import { MinigameResults } from './shared-result.js';
 import './phone-result.css';
 
 type Stage = NonNullable<RoomSnapshot['view']['stage']>;
@@ -51,8 +52,10 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label, offse
   const value = entry?.value;
   // With no screen watching, the phone plays the reveal the screen would have shown (the dots counted up, the coin, the wheel).
   const screenless = !state.screenConnected;
+  // …and everyone's standings under this phone's own result, as the screen would show them.
+  const everyone = screenless && <MinigameResults state={state} stage={stage} reveal={reveal} answer={answer} offset={offset} standingsOnly />;
   if (answer.dotCount !== undefined) {
-    const result = <DotPhoneResult count={answer.dotCount} guess={own?.dotGuess} points={points} label={text('results.title')} />;
+    const result = <><DotPhoneResult count={answer.dotCount} guess={own?.dotGuess} points={points} label={text('results.title')} />{everyone}</>;
     return answer.dotReveal ? <DotReveal pattern={answer.dotReveal.pattern} startedAt={answer.dotReveal.startedAt} offset={offset}
       easing={RevealEasingSchema.safeParse(stage.minigame?.settings['revealEasing']).data ?? DEFAULT_REVEAL_EASING}>{result}</DotReveal> : result;
   }
@@ -137,6 +140,7 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label, offse
       {place != null && game !== 'heads-or-tails' && game !== 'red-or-black-roulette' && game !== 'majority' && <span>{t(teamEntry ? 'teamPlace' : 'place', { place })}</span>}
       <strong className={total > 0 ? 'earned' : undefined}>{t('points', { points: signed })}</strong>
     </div>
+    {everyone}
   </>;
   return <div className="mg-personal-result" role="region" aria-label={label} data-game={game}>
     {visual}

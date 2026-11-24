@@ -127,8 +127,9 @@ export function StageResults({ state, stage, offset = 0, onNext, onGraphPlayback
       return <li key={row.submissionId} className={`ballot-entry${selected ? ' saved-vote' : ''}`}><strong>{author} · {stage.voteMode === 'ranked' ? formatPoints(String(row.votes * 1000)) + ' pts' : p(row.votes === 1 ? 'voteOne' : 'voteMany', { count: row.votes })}</strong>{entry && <BallotContent sessionId={state.view.sessionId} entry={entry} label={p('entryFrom', { name: author })} />}{selected && <SavedVoteBadge />}</li>;
     }))}</ol> : <p>{p('nothingToVote')}</p>)}
     {answer?.kind === 'media' && (answer.entries.length ? <ul className="gallery">{cards(answer.entries.map(entry => <li key={entry.assetId}><MediaView sessionId={state.view.sessionId} media={entry} label={p('uploadFrom', { name: nameOf(state, entry.playerId) })} /><span>{nameOf(state, entry.playerId)}</span></li>))}</ul> : <p>{p('nobodyUploaded')}</p>)}
-    {/* Everyone's points: folded on phones so the round fits on one screen; open on the host and shared screens. */}
-    <PointsFold folded={state.role === 'player'} label={t('results.points')}>
+    {/* Everyone's points: folded on phones so the round fits on one screen; open on the host and shared screens,
+        and on phones when no screen is watching (an arcade round), since nobody else shows them. */}
+    <PointsFold folded={state.role === 'player' && Boolean(state.screenConnected)} label={t('results.points')}>
       {reveal.teamAwards.length > 0 && <><h4>{t('results.teamPoints')}</h4><ul className="plain-list">{reveal.teamAwards.map(award => <li key={award.teamId}>{teamName(state, award.teamId)} · {formatPoints(award.amountMilli)}</li>)}</ul></>}
       {stage.input?.kind !== 'media' && <h4>{t('results.points')}</h4>}
       {stage.input?.kind === 'media' ? null : reveal.awards.length ? <PagedResultList key={stage.id} pageSize={reveal.awards.length}

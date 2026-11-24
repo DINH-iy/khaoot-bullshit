@@ -481,7 +481,7 @@ export function RoomScreen() {
           {stage.kind === 'route' && <div ref={routeRef}>{stage.route?.method === 'draw' ? <MinigameDraw state={state} stage={stage} offset={room.clockOffset} disabled={disabled} send={command} />
             : <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />}</div>}
           {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel key={stage.id} state={state} stage={stage} disabled={disabled || (poolDuel && stage.status === 'CLOSED' && timeUp && Boolean(stage.deadlineAt))} send={command} /></div>}
-          {stage.kind !== 'route' && stage.revealed && (!poolDuel || (role !== 'player' && stage.duel?.pick !== 'teams' && stage.reveal?.awards.length)) && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })}
+          {stage.kind !== 'route' && stage.revealed && (!poolDuel || ((role !== 'player' || !state.screenConnected) && stage.duel?.pick !== 'teams' && stage.reveal?.awards.length)) && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })}
             onGraphPlayback={action => command('stage.graphPlayback', { stageRunId: stage.id, action })} disabled={disabled} /></div>}
           {/* A writing, upload or drawing round with host points: the host gives them under the shown answers. */}
           {host && stage.kind === 'collect' && stage.challenge && stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
@@ -496,7 +496,7 @@ export function RoomScreen() {
             }}>
               <AnswerInput sessionId={state.view.sessionId} input={stage.input} draft={draft} onChange={setDraft} legend={stage.kind === 'route' ? t('vote.legend') : t('answer.legend')} route={stage.kind === 'route'} />
               <button className="primary" disabled={disabled || !draftValue(stage.input, draft) || timeUp}>{timeUp ? t('timer.up') : stage.kind === 'route' ? t('vote.submit') : t('answer.submit')}</button></form>
-            : role === 'player' && !poolDuel ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly ? '' : t('wait.screen')}</p> : null}</div></>}
+            : role === 'player' && !poolDuel ? <p className="wait-note">{stage.kind === 'challenge' ? t('wait.challenge') : stage.kind === 'vote' || showOnly || (stage.kind === 'duel' && !state.screenConnected) ? '' : t('wait.screen')}</p> : null}</div></>}
         </section>}
         {role !== 'display' && <WheelBadge wheel={state.view.wheel} />}
         {state.view.status === 'FINISHED' && <div ref={finaleRef}><FinaleShow state={state} /></div>}

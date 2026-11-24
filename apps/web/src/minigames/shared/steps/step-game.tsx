@@ -51,14 +51,19 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
   const renderer = STEP_RENDERERS[game]!; const settings = minigame.settings as MinigameSettings; const me = state.selfPlayerId;
   const side = steps?.sides.find(entry => entry.playerId === me || (entry.teamId !== null && stage.teams?.teams.find(team => team.teamId === entry.teamId)?.memberIds.includes(me ?? '')));
   const starts = minigame.startsAt ? Date.parse(minigame.startsAt) : null;
-  const now = useServerNow(offset, Boolean(side?.voteEndsAt) || (starts !== null && starts > Date.now() + offset - 1000));
+  // Ticking also for the other sides' vote time when this phone shows them.
+  const now = useServerNow(offset, Boolean(side?.voteEndsAt) || (starts !== null && starts > Date.now() + offset - 1000)
+    || (!state.screenConnected && Boolean(steps?.sides.some(entry => entry.voteEndsAt))));
   if (state.view.status === 'PAUSED') return <p className="wait-note" role="status">{t('phase.paused')}</p>;
   if (!steps || !side) return <p className="wait-note">{t(howToPlayKey(game))}</p>;
   const board = renderer.board?.(side, settings, true);
   const head = <>{side.teamId && <p className="step-team-title">{side.name}</p>}{board}</>;
+  // With no screen watching, the phone also shows how the other sides are doing, as the screen would.
+  const others = !state.screenConnected && steps.sides.length > 1
+    ? <StepSides state={state} game={game} settings={settings} sides={steps.sides.filter(entry => entry !== side)} now={now} compact /> : null;
   if (!side.options) return <div className="step-phone">{head}
-    <p className="mg-big" role="status">{side.result !== null ? minigameResult(game, side.result, settings) : game === 'speed-run' ? minigameResult(game, null, settings) : c('saved')}</p><p>{t('minigame.played')}</p></div>;
-  if (!canPlay || !minigame.startsAt) return <div className="step-phone">{head}<p className="wait-note">{t(howToPlayKey(game))}</p></div>;
+    <p className="mg-big" role="status">{side.result !== null ? minigameResult(game, side.result, settings) : game === 'speed-run' ? minigameResult(game, null, settings) : c('saved')}</p><p>{t('minigame.played')}</p>{others}</div>;
+  if (!canPlay || !minigame.startsAt) return <div className="step-phone">{head}<p className="wait-note">{t(howToPlayKey(game))}</p>{others}</div>;
   // The countdown everyone starts together after (as in every minigame).
   if (starts !== null && now < starts) return <div className="step-phone">{head}<p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil((starts - now) / 1000)}</p></div>;
   const who = canMove(state, stage, side, steps.decides);
@@ -82,28 +87,35 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
           </div>}
         </>}
     </div>
+    {others}
   </div>;
 }
 
-/** Every side on the shared screen and for the host: its board, and whether it is choosing, voting or done. */
-export function StepScreen({ state, stage, offset }: { state: RoomSnapshot; stage: Stage; offset: number }) {
-  const t = useText(); const c = useTexts(CONTROL_TEXTS); const minigame = stage.minigame!; const game = minigame.game as MinigameKey; const name = useTexts(CATALOG_TEXTS);
-  const renderer = STEP_RENDERERS[game]!; const settings = minigame.settings as MinigameSettings; const steps = minigame.steps;
-  const start = minigame.startsAt ? Date.parse(minigame.startsAt) : 0;
-  const now = useServerNow(offset, Boolean(steps?.sides.some(side => side.voteEndsAt)) || (game === 'speed-run' && start > Date.now() + offset));
+/** Each side's board and whether it is choosing, voting or done: on the shared screen, or (compact, without this phone's side) on a phone with no screen. */
+function StepSides({ state, game, settings, sides, now, compact = false }: { state: RoomSnapshot; game: MinigameKey; settings: MinigameSettings; sides: StepSideView[]; now: number; compact?: boolean }) {
+  const c = useTexts(CONTROL_TEXTS); const renderer = STEP_RENDERERS[game]!;
   const status = (side: StepSideView) => {
     if (!side.options) return side.result !== null ? minigameResult(game, side.result, settings) : game === 'speed-run' ? minigameResult(game, null, settings) : c('done');
     if (side.voteEndsAt) return c('voting', { count: side.voters.length, seconds: Math.max(0, Math.ceil((Date.parse(side.voteEndsAt) - now) / 1000)) });
     if (side.captainId) return c('captainChooses', { name: nameOf(state, side.captainId) });
     return side.step > 0 ? c('step', { number: side.step + 1 }) : c('choosing');
   };
+  return <ol className={`step-sides${compact ? ' step-sides-compact' : ''}`} aria-label={c('progress')}>{sides.map(side =>
+    <li key={side.teamId ?? side.playerId} className={side.options ? undefined : 'done'}><span className="step-side-name">{side.name}</span>{renderer.board?.(side, settings, false)}<span className="step-status">{status(side)}</span></li>)}</ol>;
+}
+
+/** Every side on the shared screen and for the host: its board, and whether it is choosing, voting or done. */
+export function StepScreen({ state, stage, offset }: { state: RoomSnapshot; stage: Stage; offset: number }) {
+  const t = useText(); const c = useTexts(CONTROL_TEXTS); const minigame = stage.minigame!; const game = minigame.game as MinigameKey; const name = useTexts(CATALOG_TEXTS);
+  const settings = minigame.settings as MinigameSettings; const steps = minigame.steps;
+  const start = minigame.startsAt ? Date.parse(minigame.startsAt) : 0;
+  const now = useServerNow(offset, Boolean(steps?.sides.some(side => side.voteEndsAt)) || (game === 'speed-run' && start > Date.now() + offset));
   const title = name(game);
   const repeatingTitle = stage.prompt.trim().replace(/[.!?]+$/, '').toLocaleLowerCase() === title.toLocaleLowerCase();
   return <div className={`mg-screen mg-${game}`}>
     {!repeatingTitle && <p className="mg-name">{title}</p>}
     {state.view.status === 'PAUSED' ? <p className="mg-paused" role="status">{t('phase.paused')}</p>
       : game === 'speed-run' && now < start ? <p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil((start - now) / 1000)}</p>
-      : steps && <ol className="step-sides" aria-label={c('progress')}>{steps.sides.map(side =>
-        <li key={side.teamId ?? side.playerId} className={side.options ? undefined : 'done'}><span className="step-side-name">{side.name}</span>{renderer.board?.(side, settings, false)}<span className="step-status">{status(side)}</span></li>)}</ol>}
+      : steps && <StepSides state={state} game={game} settings={settings} sides={steps.sides} now={now} />}
   </div>;
 }

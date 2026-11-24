@@ -101,6 +101,12 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     // Everyone answered: the round closes by itself a moment later.
     await ann.page.getByRole('button', { name: 'Show the results' }).click();
     await expect(bo.page.getByText(/Waiting for the leader to go back to the lobby/)).toBeVisible();
+    // No screen watches an arcade round: every phone shows everyone's results under its own.
+    for (const page of players) {
+      const results = page.getByRole('region', { name: 'Round results' });
+      await expect(results.getByRole('heading', { name: 'Places' })).toBeVisible();
+      for (const name of ['Ann', 'Bo', 'Cy']) await expect(results.getByRole('listitem').filter({ hasText: name })).toHaveCount(1);
+    }
     await ann.page.getByRole('button', { name: 'Back to the lobby' }).click();
 
     // Everyone is back in the lobby with the round's results and the running total.

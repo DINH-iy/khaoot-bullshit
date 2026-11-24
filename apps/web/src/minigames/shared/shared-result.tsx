@@ -26,9 +26,15 @@ type Stage = NonNullable<RoomSnapshot['view']['stage']>;
 type Reveal = NonNullable<Stage['reveal']>;
 type Answer = Extract<Reveal['answer'], { kind: 'minigame' }>;
 const PAGE_SIZE = 5;
+// Under a phone's own result there is room for fewer rows.
+const PHONE_PAGE_SIZE = 3;
 
-export function MinigameResults({ state, stage, reveal, answer, offset }: {
-  state: RoomSnapshot; stage: Stage; reveal: Reveal; answer: Answer; offset: number;
+/**
+ * Everyone's outcome of a minigame round: the shared visual (coin, wheel, graph, dots…) and the standings.
+ * `standingsOnly`: just the list (and what was behind the doors), for a phone with no screen watching, under its own result.
+ */
+export function MinigameResults({ state, stage, reveal, answer, offset, standingsOnly = false }: {
+  state: RoomSnapshot; stage: Stage; reveal: Reveal; answer: Answer; offset: number; standingsOnly?: boolean;
 }) {
   const t = useText();
   const c = useTexts(CONTROL_TEXTS);
@@ -68,10 +74,11 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
     '--graph-reveal-state': playback.playingSince ? 'running' : 'paused',
   } as CSSProperties : undefined, [playback?.playingSince, playback?.positionMs, offset, easing]);
   const ranked = answer.entries.some(entry => entry.place !== null);
-  const standings = answer.entries.length > 0 ? <section className={coin ? 'coin-result-list-animated' : answer.roulette !== undefined && animateRoulette
+  // On a phone the list sits in its own result, which already waits for the coin or wheel to land.
+  const standings = answer.entries.length > 0 ? <section className={standingsOnly ? undefined : coin ? 'coin-result-list-animated' : answer.roulette !== undefined && animateRoulette
       ? 'roulette-results-animated' : playback ? 'graph-places' : undefined}>
     <h3>{answer.roulette !== undefined ? rouletteText('bets') : prediction ? coinText('picks') : game === 'lucky-doors' ? c('whoChose') : t('minigame.places')}</h3>
-    <PagedResultList ordered className="mg-podium" pageSize={PAGE_SIZE} rows={answer.entries.map(entry => {
+    <PagedResultList ordered className="mg-podium" pageSize={standingsOnly ? PHONE_PAGE_SIZE : PAGE_SIZE} rows={answer.entries.map(entry => {
       const { playerId, teamId } = entry;
       const name = playerId ? nameOf(playerId) : teamId ? teamName(state, teamId) : playText('formerPlayer');
       const bus = !playerId && game === 'bus' ? minigame?.steps?.sides.find(side => side.teamId === teamId) : undefined;
@@ -98,6 +105,13 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
       </li>;
     })} />
   </section> : <p className="mg-personal-note">{labels('noPlay')}</p>;
+  const doors = answer.doorsMilli && <><h3>{t('minigame.behindDoors')}</h3><ol className="mg-doors revealed">{answer.doorsMilli.map((milli, index) =>
+    <li key={index} className="mg-door">{t('minigame.door', { number: index + 1 })}<strong>{formatPoints(milli)}</strong></li>)}</ol></>;
+  const pointsOnly = otherAwards.length > 0 && <details className="mg-source"><summary>{t('results.points')}</summary>
+    <PagedResultList className="plain-list round-awards" pageSize={PAGE_SIZE} rows={otherAwards.map(award =>
+      <li key={award.playerId}><span>{nameOf(award.playerId)}</span><strong>{formatPoints(award.amountMilli)}</strong></li>)} />
+  </details>;
+  if (standingsOnly) return answer.entries.length > 0 || doors ? <div className="mg-results mg-results-everyone">{doors}{answer.entries.length > 0 && standings}{pointsOnly}</div> : null;
   return <div key={playback ? `${playback.playingSince}:${playback.positionMs}` : stage.id}
     className={playback ? 'mg-results graph-results' : 'mg-results'} style={graphTiming}>
     {coin && <CoinReveal coin={coin} animate />}
@@ -117,17 +131,13 @@ export function MinigameResults({ state, stage, reveal, answer, offset }: {
         {answer.graph.sourceUrl && <a className="link-button" href={answer.graph.sourceUrl} target="_blank" rel="noreferrer">{graphText('openSource')}</a>}
       </details>}
     </>}
-    {answer.doorsMilli && <><h3>{t('minigame.behindDoors')}</h3><ol className="mg-doors revealed">{answer.doorsMilli.map((milli, index) =>
-      <li key={index} className="mg-door">{t('minigame.door', { number: index + 1 })}<strong>{formatPoints(milli)}</strong></li>)}</ol></>}
+    {doors}
     {answer.dotReveal ? <DotReveal pattern={answer.dotReveal.pattern} startedAt={answer.dotReveal.startedAt} offset={offset} easing={easing}>
       {standings}
     </DotReveal> : <>
       {answer.dotCount !== undefined && <p className="mg-dot-total">{c('dotTotal', { count: answer.dotCount })}</p>}
       {standings}
     </>}
-    {otherAwards.length > 0 && <details className="mg-source"><summary>{t('results.points')}</summary>
-      <PagedResultList className="plain-list round-awards" pageSize={PAGE_SIZE} rows={otherAwards.map(award =>
-        <li key={award.playerId}><span>{nameOf(award.playerId)}</span><strong>{formatPoints(award.amountMilli)}</strong></li>)} />
-    </details>}
+    {pointsOnly}
   </div>;
 }
