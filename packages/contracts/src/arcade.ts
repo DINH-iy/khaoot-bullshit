@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { GameIdSchema } from './game.js';
-import { MINIGAME_KEYS, isMinigameKey, type MinigameKey } from './minigames/shared/catalog.js';
-import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, type HeadToHeadKey } from './head-to-head.js';
+import { MINIGAME_KEYS, MINIGAMES, MinigameSettingsSchemas, isMinigameKey, type MinigameKey } from './minigames/shared/catalog.js';
+import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, parseHeadToHeadSettings, type HeadToHeadKey } from './head-to-head.js';
 import { PlayerLookSchema } from './players.js';
 import { GraphLibraryEntrySchema, GraphLibraryIdSchema } from './minigames/draw-the-graph/graph.js';
 
@@ -31,11 +31,36 @@ export const CreateArcadeSchema = z.object({ lobbyId: GameIdSchema, title: z.str
 export const JoinArcadeSchema = z.object({ displayName: NameSchema, look: PlayerLookSchema.optional(), password: z.string().max(ARCADE_PASSWORD_MAX).optional() }).strict();
 export const ArcadePasswordUpdateSchema = z.object({ password: PasswordSchema.nullable() }).strict();
 export const ArcadeLockSchema = z.object({ locked: z.boolean() }).strict();
+/**
+ * A game's own settings for arcade rounds, chosen by the leader: `seconds`, how long a minigame round runs, and
+ * `values`, the game's settings (as a game's scene has them; left out: the standard ones). Kept per game in the
+ * lobby's pick, so they stay for Play again and when the leader comes back to that game.
+ */
+export const ARCADE_SECONDS_MIN = 5;
+export const ARCADE_SECONDS_MAX = 600;
+export const ArcadeGameSettingsSchema = z.object({
+  seconds: z.number().int().min(ARCADE_SECONDS_MIN).max(ARCADE_SECONDS_MAX).optional(), values: z.record(z.string().max(40), z.json()).optional(),
+}).strict();
+export type ArcadeGameSettings = z.infer<typeof ArcadeGameSettingsSchema>;
+// Picked in the game's own way, never from the settings sheet: the graph library's chart, a drawn speed-run course.
+const NOT_IN_ARCADE = ['graph', 'course'];
+/** What a round of this game plays with (the standard settings filled in), or null when the chosen ones do not fit the game. */
+export function arcadeSettings(game: ArcadeGame, chosen?: ArcadeGameSettings): { seconds: number | null; values: Record<string, unknown> } | null {
+  const values = Object.fromEntries(Object.entries(chosen?.values ?? {}).filter(([key]) => !NOT_IN_ARCADE.includes(key)));
+  if (isHeadToHeadKey(game)) {
+    const parsed = parseHeadToHeadSettings(game, values);
+    return parsed && chosen?.seconds === undefined ? { seconds: null, values: parsed } : null;
+  }
+  const parsed = MinigameSettingsSchemas[game].safeParse({ ...MINIGAMES[game].defaults, ...values });
+  return parsed.success ? { seconds: chosen?.seconds ?? MINIGAMES[game].defaultSeconds, values: parsed.data as Record<string, unknown> } : null;
+}
+
 /** What the leader has chosen so far for the next round; everyone else watches it (read-only) until the round starts. */
-export const ArcadePickSchema = z.object({ game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable(), graph: GraphLibraryIdSchema.optional() }).strict();
+export const ArcadePickSchema = z.object({ game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable(), graph: GraphLibraryIdSchema.optional(),
+  settings: z.record(z.string().max(32), ArcadeGameSettingsSchema).refine(settings => Object.keys(settings).every(isArcadeGame), 'Settings only for arcade games').optional() }).strict();
 export type ArcadePick = z.infer<typeof ArcadePickSchema>;
 // `graph`: for Draw the Graph, one chart of the graph library; left out, a random one.
-export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable(), graph: GraphLibraryIdSchema.optional() }).strict();
+export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable(), graph: GraphLibraryIdSchema.optional(), settings: ArcadeGameSettingsSchema.optional() }).strict();
 /** Play the round just played again (same game and teams), with new values: another graph, new dots, a new target. */
 export const ArcadeAgainSchema = z.object({ roundId: GameIdSchema }).strict();
 export const ArcadeGraphsSchema = z.object({ graphs: z.array(GraphLibraryEntrySchema) }).strict();

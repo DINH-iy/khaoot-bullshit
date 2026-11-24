@@ -26,6 +26,7 @@ import { MediaLibraryDialog } from '../scene/fields/media-field.js';
 import { MEDIA_TEXTS } from '../scene/fields/media.text.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SHELL_TEXTS } from './shell.text.js';
+import { newId, roomApi } from '../../room/api.js';
 import '../editor.css';
 
 const SAVE_TEXT = { saved: 'saved', pending: 'pending', saving: 'saving', error: 'saveError' } as const satisfies Record<SaveState, keyof typeof SHELL_TEXTS.en>;
@@ -157,6 +158,12 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
             { label: modeLabel, icon: d.readOnly ? 'eye' : 'edit', onSelect: toggleMode },
           ] : []),
           { label: savePointText('menu'), icon: 'save', shortcut: `${modLabel} + S`, onSelect: () => openPanel('savePoints') },
+          // A copy of the whole game (saved first), opened in the editor; the original stays as it is.
+          { label: t('copyGame'), icon: 'copy', onSelect: () => {
+            const copy = newId(); d.setNotice(t('copying'));
+            void d.saveNow().then(() => roomApi('/api/host/games', { gameId: copy, title: t('copyTitle', { title: d.definition?.title ?? '' }).slice(0, 160), startFrom: null, copyOf: gameId }))
+              .then(() => { location.href = `/?edit=${copy}`; }).catch(() => d.setNotice(t('copyFailed')));
+          } },
           { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: editingLabel('help', zoomShortcuts.edits.help), onSelect: () => setHelping(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}

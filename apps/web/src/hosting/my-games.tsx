@@ -39,6 +39,8 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
           ? <button type="button" aria-expanded="true" onClick={() => setProblems(({ [game.gameId]: _hidden, ...rest }) => rest)} aria-label={t('hideProblemsLabel', { title: game.title })}>{t('hideProblems')}</button>
           : <button type="button" aria-expanded="false" onClick={() => showProblems(game.gameId)} aria-label={t('showProblemsLabel', { title: game.title })}>{t('showProblems')}</button>)}
         {game.issueCount === 0 && !game.published?.matchesDraft && <button type="button" disabled={busy} onClick={() => run(roomApi(`/api/host/games/${game.gameId}/publish`, { expectedRevision: game.revision }))} aria-label={t('publishLabel', { title: game.title })}>{t('publish')}</button>}
+        <button type="button" disabled={busy} onClick={() => run(roomApi('/api/host/games', { gameId: newId(), title: t('copyTitle', { title: game.title }).slice(0, 160), startFrom: null, copyOf: game.gameId }))}
+          aria-label={t('copyLabel', { title: game.title })}>{t('copy')}</button>
         {game.published && openRoom && <button type="button" disabled={busy} onClick={() => openRoom(game.gameId)} aria-label={t('openRoomLabel', { title: game.title })}>{t('openRoom')}</button>}
         {removing === game.gameId
           ? <span className="my-game-confirm"><button type="button" className="danger" disabled={busy} onClick={() => { setRemoving(null); run(roomApi(`/api/host/games/${game.gameId}/archive`, {})); }} aria-label={t('yesRemoveLabel', { title: game.title })}>{t('yesRemove')}</button><button type="button" onClick={() => setRemoving(null)}>{t('keepIt')}</button></span>
@@ -47,11 +49,13 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
       {removing === game.gameId && <p className="my-game-note">{t('removeNote')}</p>}
       {problems[game.gameId] && <ul className="my-game-problems" aria-label={t('problemsIn', { title: game.title })}>{problems[game.gameId]!.map((issue, index) => <li key={index}>{issue.nodeKey ? (issue.stageIndex !== null ? t('scenePartProblem', { scene: issue.nodeKey, part: issue.stageIndex + 1 }) : t('sceneProblem', { scene: issue.nodeKey })) : ''}{issue.message}</li>)}</ul>}
     </li>)}</ul>}
-    <form className="new-game" aria-labelledby="new-game-heading" onSubmit={event => { event.preventDefault(); run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: startFrom || null }).then(() => setTitle(''))); }}>
+    <form className="new-game" aria-labelledby="new-game-heading" onSubmit={event => { event.preventDefault(); const own = startFrom.startsWith('own:') ? startFrom.slice(4) : null;
+      run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: own || !startFrom ? null : startFrom, copyOf: own }).then(() => setTitle(''))); }}>
       <h3 id="new-game-heading">{t('newGame')}</h3>
       <label>{t('newGameName')}<input value={title} maxLength={160} onChange={event => setTitle(event.target.value)} required placeholder={t('newGamePlaceholder')} /></label>
       <label>{t('startFrom')}<Dropdown value={startFrom} onChange={setStartFrom}
-        options={[{ value: '', label: t('blankGame') }, ...menu.games.map(game => ({ value: game.key, label: t('copyOf', { title: game.title }) }))]} /></label>
+        options={[{ value: '', label: t('blankGame') }, ...menu.games.map(game => ({ value: game.key, label: t('copyOf', { title: game.title }), group: t('builtInGames') })),
+          ...menu.myGames.map(game => ({ value: `own:${game.gameId}`, label: t('copyOf', { title: game.title }), group: t('yourGames') }))]} /></label>
       <button className="primary" disabled={busy || !title.trim()}>{t('createGame')}</button>
     </form>
   </section>;

@@ -185,7 +185,7 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.', `${bench ? 'bench' : 'rehearse'}-${gameId}`,
       bench ? sessionId => `/?bench=${sessionId}` : undefined);
 
-  return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
+  return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, saveNow: flush, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
     undo: () => restore('undo'), redo: () => restore('redo'), restore,
     // Your steps in words, for the history list: done (oldest first) and undone (the next redo last).
     steps: { undo: history.undo.map(step => ({ label: step.label, at: step.at })), redo: history.redo.map(step => ({ label: step.label, at: step.at })) }, canUndo: !readOnly && history.undo.length > 0, canRedo: !readOnly && history.redo.length > 0 };

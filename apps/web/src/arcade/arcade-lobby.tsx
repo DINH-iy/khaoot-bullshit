@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader } from '../ui/loader.js';
-import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeLobbyView, type ArcadePick, type ArcadeTeams, type GraphLibraryEntry, ArcadeGraphsSchema } from '@party/contracts';
+import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeGameSettings, type ArcadeLobbyView, type ArcadePick, type ArcadeTeams, type GraphLibraryEntry, ArcadeGraphsSchema } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { isUnavailablePageError, navigate, replaceWithHome } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
@@ -14,6 +14,7 @@ import { BottomSheet } from '../room-extras/bottom-sheet.js';
 import { useSiteLookFrame } from '../presentation/site-look.js';
 import { rememberName } from './arcade-home.js';
 import { arcadeProblem, arcadeResult, points } from './arcade-text.js';
+import { ArcadeGameSettingsFields, arcadeSettingsSummary, hasArcadeSettings } from './game-settings.js';
 
 // The lobby checks in every few seconds: that keeps this browser present (and the leader the leader).
 const POLL_MS = 2500;
@@ -91,7 +92,7 @@ export function ArcadeLobby({ lobbyId }: { lobbyId: string }) {
           <span><strong id="round-heading">{gameName(lobby.round.game)}</strong><small>{lobby.round.seated ? 'Going to the round…' : 'It started before you came in. You play in the next one.'}</small></span></div>
       </section>
         : <PickRound lobbyId={lobby.id} players={lobby.members.length} pick={lobby.pick}
-          {...(me.leader ? { onPick: (pick: ArcadePick) => act('pick', pick), onStart: (game: ArcadeGame, teams: ArcadeTeams | null, graph?: string) => act('rounds', { roundId: newId(), game, teams, ...(graph ? { graph } : {}) }) }
+          {...(me.leader ? { onPick: (pick: ArcadePick) => act('pick', pick), onStart: (game: ArcadeGame, teams: ArcadeTeams | null, graph?: string, settings?: ArcadeGameSettings) => act('rounds', { roundId: newId(), game, teams, ...(graph ? { graph } : {}), ...(settings ? { settings } : {}) }) }
             : { chooser: leader?.displayName ?? 'The leader' })} />}
 
       {rounds.length > 0 && <RoundHistory rounds={rounds} me={me.memberId} index={shownIndex} onIndex={setRoundIndex} onScores={() => setSheet('scores')} />}
@@ -224,17 +225,20 @@ function SettingSwitch({ label, hint, on, onChange }: { label: string; hint: str
  */
 function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
   lobbyId: string; players: number; pick: ArcadePick | null; chooser?: string;
-  onPick?: (pick: ArcadePick) => void; onStart?: (game: ArcadeGame, teams: ArcadeTeams | null, graph?: string) => void;
+  onPick?: (pick: ArcadePick) => void; onStart?: (game: ArcadeGame, teams: ArcadeTeams | null, graph?: string, settings?: ArcadeGameSettings) => void;
 }) {
   const watching = chooser !== undefined;
-  const [choosing, setChoosing] = useState(false);
-  const fromPick = () => ({ game: pick?.game ?? 'reaction' as ArcadeGame, teamCount: pick?.teams?.count ?? 0, formation: pick?.teams?.formation ?? 'random' as ArcadeTeams['formation'], graph: pick?.graph });
+  const [choosing, setChoosing] = useState(false); const [setting, setSetting] = useState(false);
+  const fromPick = () => ({ game: pick?.game ?? 'reaction' as ArcadeGame, teamCount: pick?.teams?.count ?? 0, formation: pick?.teams?.formation ?? 'random' as ArcadeTeams['formation'], graph: pick?.graph, settings: pick?.settings ?? {} });
   // The leader starts from the stored choice (also after taking over) and then keeps their own; watchers always show the stored one.
   const [own, setOwn] = useState(fromPick);
-  const { game, teamCount, formation, graph } = watching ? fromPick() : own;
+  const { game, teamCount, formation, graph, settings } = watching ? fromPick() : own;
+  // Each game keeps its own settings in the lobby (changing one game's never touches another's).
+  const chosen = settings[game];
   const choose = (next: Partial<typeof own>) => {
     const value = { ...own, ...next }; setOwn(value);
-    onPick?.({ game: value.game, teams: value.teamCount >= 2 ? { count: value.teamCount, formation: value.formation } : null, ...(value.graph ? { graph: value.graph } : {}) });
+    onPick?.({ game: value.game, teams: value.teamCount >= 2 ? { count: value.teamCount, formation: value.formation } : null, ...(value.graph ? { graph: value.graph } : {}),
+      ...(Object.keys(value.settings).length ? { settings: value.settings } : {}) });
   };
   const duel = isHeadToHeadKey(game);
   const teamOnly = !duel && TEAM_MINIGAMES.includes(game);
@@ -248,12 +252,24 @@ function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
   const tile = <><span className="arcade-game-symbol" aria-hidden="true"><GameSymbol game={game} /></span>
     <span><strong>{gameName(game)}{duel ? ' · duel' : ''}</strong><small>{gameDescription(game)}</small></span></>;
   return <form id="arcade-pick" className="arcade-next" aria-labelledby="pick-heading"
-    onSubmit={event => { event.preventDefault(); if (enough) onStart?.(game, count ? { count, formation } : null, game === 'draw-the-graph' ? graph : undefined); }}>
+    onSubmit={event => { event.preventDefault(); if (enough) onStart?.(game, count ? { count, formation } : null, game === 'draw-the-graph' ? graph : undefined, chosen); }}>
     <h2 id="pick-heading" className="arcade-kicker">Next round</h2>
     {watching && <p className="arcade-meta" role="status"><FaIcon name="star" /> {chooser} is choosing</p>}
-    {watching ? <div className="arcade-game-tile static">{tile}</div>
-      : <button type="button" className="arcade-game-tile" aria-haspopup="dialog" onClick={() => setChoosing(true)}>
-        {tile}<span className="arcade-change">Change</span></button>}
+    <div className="arcade-game-pick">
+      {watching ? <div className="arcade-game-tile static">{tile}</div>
+        : <button type="button" className="arcade-game-tile" aria-haspopup="dialog" onClick={() => setChoosing(true)}>
+          {tile}<span className="arcade-change">Change</span></button>}
+      {/* The game's own settings (round time, targets, a duel's rules); the others can look but not change. */}
+      {hasArcadeSettings(game) && <button type="button" className="arcade-icon-button arcade-settings-button" aria-haspopup="dialog"
+        aria-label={`${gameName(game)} settings${arcadeSettingsSummary(game, chosen) ? `: ${arcadeSettingsSummary(game, chosen)}` : ''}`} data-changed={Boolean(arcadeSettingsSummary(game, chosen)) || undefined}
+        onClick={() => setSetting(true)}><FaIcon name="gear" /></button>}
+    </div>
+    {arcadeSettingsSummary(game, chosen) && <p className="arcade-meta"><FaIcon name="gear" /> {arcadeSettingsSummary(game, chosen)}</p>}
+    {setting && <BottomSheet title={`${gameName(game)} settings`} onClose={() => setSetting(false)}>
+      {watching && <p className="arcade-meta"><FaIcon name="star" /> {chooser} sets these</p>}
+      <ArcadeGameSettingsFields game={game} chosen={chosen} disabled={watching}
+        onChange={next => { const { [game]: _old, ...others } = settings; choose({ settings: next.seconds === undefined && !Object.keys(next.values ?? {}).length ? others : { ...others, [game]: next } }); }} />
+    </BottomSheet>}
     {/* Alone or in teams; choosing teams opens how many and how they are made. Others see the same, read-only. */}
     {!duel && <Segments label="Play" value={count > 0 ? 'teams' : 'alone'} disabled={watching}
       onChange={value => choose({ teamCount: value === 'teams' ? Math.min(lastCount, most) : 0 })}

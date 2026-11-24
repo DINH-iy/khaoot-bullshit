@@ -82,8 +82,10 @@
 }
 .room-player .kind-minigame .mg-big, .room-player .kind-minigame .mg-countdown strong { font-size: clamp(1.25rem, 6vw, 2rem); }
 .mg-done > p, .step-phone > p { margin: 0; text-align: center; }
-.mg-guessed { display: grid; justify-items: center; gap: 3px; margin: 0; text-align: center; }
-.mg-guessed strong { font-size: clamp(1.5rem, 6vw, 2rem); color: var(--r-accent); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.mg-done { width: 100%; }
+.mg-done > .mg-waiting { display: inline-flex; align-items: center; gap: 6px; color: var(--r-muted); }
+.mg-waiting .fa-icon, .mg-waiting svg { flex: none; color: var(--r-ok); }
+.mg-waiting strong { font-size: clamp(1.5rem, 6vw, 2rem); color: var(--r-accent); line-height: 1.15; font-variant-numeric: tabular-nums; }
 .mg-results h3 { margin-block: 0 8px; font-size: 1rem; }
 .mg-perfect-circle .drawing-pad { width: min(100%, clamp(10rem, 50svh, 34rem)); }
 .clap-beat > p { margin: 0; text-align: center; }

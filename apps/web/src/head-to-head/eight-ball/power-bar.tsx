@@ -33,6 +33,7 @@ export function PoolPowerBar({ power, disabled, sideways, onPull, onPower, onSho
     onPull(undefined);
     if (shoot && value >= MIN_SHOT) { onPower(value); onShoot(value); }
   };
+  // A bare number: the CSS scales lengths by it (a percentage there would make the whole calc() invalid).
   const shown = pulled ?? 0;
   const key = (event: KeyboardEvent) => {
     const step = { ArrowUp: 5, ArrowRight: 5, ArrowDown: -5, ArrowLeft: -5, PageUp: 20, PageDown: -20 }[event.key];
@@ -44,10 +45,11 @@ export function PoolPowerBar({ power, disabled, sideways, onPull, onPower, onSho
     <div className="pool-power-track" role="slider" tabIndex={disabled ? -1 : 0} aria-label={t('power')} aria-orientation="vertical"
       aria-valuemin={1} aria-valuemax={100} aria-valuenow={pulled ?? power} aria-valuetext={`${pulled ?? power}%`}
       aria-disabled={disabled} aria-description={t('hint')} title={t('hint')}
-      style={{ '--pool-power': `${shown}%`, '--pool-last': `${power}%` } as CSSProperties}
+      style={{ '--pool-power': shown } as CSSProperties}
       onKeyDown={disabled ? undefined : key}
       onPointerDown={event => {
         if (disabled || event.button !== 0 || !event.isPrimary) return;
+        event.preventDefault(); // no text selection or browser drag while pulling with a mouse
         event.currentTarget.setPointerCapture(event.pointerId);
         const rect = event.currentTarget.getBoundingClientRect();
         drag.current = { pointerId: event.pointerId, start: along(event), size: sideways ? rect.width : rect.height, value: 0 };
@@ -67,6 +69,6 @@ export function PoolPowerBar({ power, disabled, sideways, onPull, onPower, onSho
       <span className="pool-power-fill" aria-hidden="true" />
       <span className="pool-power-cue" aria-hidden="true" />
     </div>
-    <span aria-hidden="true">{pulled ?? power}%</span>
+    <span className="pool-power-value" aria-hidden="true">{pulled ?? power}%</span>
   </div>;
 }

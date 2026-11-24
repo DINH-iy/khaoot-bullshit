@@ -20,6 +20,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
   rehearseScene: 'Rehearse from the selected scene', rehearseSceneFix: 'Rehearse from the selected scene ({fix})',
   publishNothing: 'Publish (nothing new to publish)', publishFix: 'Publish (fix {problems} first)', publishSaving: 'Publish (saving…)', publish: 'Publish',
   playPublished: 'Play the published version ↗', playFirst: 'Play (publish first)',
+  copyGame: 'Make a copy of this game', copyTitle: '{title} (copy)', copying: 'Making a copy…', copyFailed: 'The copy did not work. Try again.',
   gameMenu: 'Game menu', gameSettings: 'Game settings', invitePeople: 'Invite people', exportText: 'Export as text', help: 'Help & shortcuts', lightMode: 'Light mode', darkMode: 'Dark mode',
   exportIntro: 'This is the whole game, exactly. Keep it as a backup, or give it to an AI together with what you want changed, and import its answer from Your games as a new game.',
   close: 'Close', gameAsText: 'The game as text', copied: 'Copied ✓', copy: 'Copy', download: 'Download as a file',
@@ -32,7 +33,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
   // history-labels.ts
   added: 'Added {scene}', addedMany: 'Added {count} scenes', removed: 'Removed {scene}', removedMany: 'Removed {count} scenes', changed: 'Changed {scene}', changedMany: 'Changed {count} scenes',
   changedConnections: 'Changed the connections', startsAt: 'Starts at {scene}', renamed: 'Renamed the game to “{title}”', changedLook: 'Changed the look', changedSettings: 'Changed the game settings',
-  moved: 'Moved {scene}', movedMany: 'Moved {count} scenes', bent: 'Bent or straightened arrows', changedMap: 'Changed the map',
+  moved: 'Moved {scene}', movedMany: 'Moved {count} scenes', bent: 'Bent or straightened arrows', grouped: 'Grouped or ungrouped scenes', changedMap: 'Changed the map',
 }, {
   nl: {
     saved: 'Alle wijzigingen opgeslagen', pending: 'Zo meteen opslaan…', saving: 'Opslaan…', saveError: 'Niet opgeslagen: de server is niet bereikbaar. Opnieuw proberen…',
@@ -51,6 +52,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     rehearseScene: 'Oefenen vanaf de gekozen scène', rehearseSceneFix: 'Oefenen vanaf de gekozen scène ({fix})',
     publishNothing: 'Publiceren (niets nieuws om te publiceren)', publishFix: 'Publiceren (eerst {problems} oplossen)', publishSaving: 'Publiceren (opslaan…)', publish: 'Publiceren',
     playPublished: 'De gepubliceerde versie spelen ↗', playFirst: 'Spelen (eerst publiceren)',
+    copyGame: 'Een kopie van dit spel maken', copyTitle: '{title} (kopie)', copying: 'Kopie maken…', copyFailed: 'Kopiëren lukte niet. Probeer het opnieuw.',
     gameMenu: 'Spelmenu', gameSettings: 'Spelinstellingen', invitePeople: 'Mensen uitnodigen', exportText: 'Exporteren als tekst', help: 'Hulp & sneltoetsen', lightMode: 'Lichte modus', darkMode: 'Donkere modus',
     exportIntro: 'Dit is het hele spel, precies zoals het is. Bewaar het als reservekopie, of geef het aan een AI samen met wat je veranderd wilt hebben, en importeer het antwoord bij Jouw spellen als nieuw spel.',
     close: 'Sluiten', gameAsText: 'Het spel als tekst', copied: 'Gekopieerd ✓', copy: 'Kopiëren', download: 'Downloaden als bestand',
@@ -60,7 +62,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     now: 'Nu', undoAll: 'Alle beschikbare wijzigingen ongedaan maken', whenOpened: 'Vóór deze wijzigingen',
     added: '{scene} toegevoegd', addedMany: '{count} scènes toegevoegd', removed: '{scene} verwijderd', removedMany: '{count} scènes verwijderd', changed: '{scene} gewijzigd', changedMany: '{count} scènes gewijzigd',
     changedConnections: 'De verbindingen gewijzigd', startsAt: 'Begint bij {scene}', renamed: 'Het spel hernoemd naar “{title}”', changedLook: 'Het uiterlijk gewijzigd', changedSettings: 'De spelinstellingen gewijzigd',
-    moved: '{scene} verplaatst', movedMany: '{count} scènes verplaatst', bent: 'Pijlen gebogen of rechtgetrokken', changedMap: 'De kaart gewijzigd',
+    moved: '{scene} verplaatst', movedMany: '{count} scènes verplaatst', bent: 'Pijlen gebogen of rechtgetrokken', grouped: 'Scènes gegroepeerd of losgemaakt', changedMap: 'De kaart gewijzigd',
   },
   de: {
     saved: 'Alle Änderungen gespeichert', pending: 'Gleich wird gespeichert…', saving: 'Wird gespeichert…', saveError: 'Nicht gespeichert: Der Server ist nicht erreichbar. Neuer Versuch…',
@@ -79,6 +81,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     rehearseScene: 'Ab der gewählten Szene proben', rehearseSceneFix: 'Ab der gewählten Szene proben ({fix})',
     publishNothing: 'Veröffentlichen (nichts Neues)', publishFix: 'Veröffentlichen (erst {problems} beheben)', publishSaving: 'Veröffentlichen (wird gespeichert…)', publish: 'Veröffentlichen',
     playPublished: 'Die veröffentlichte Version spielen ↗', playFirst: 'Spielen (erst veröffentlichen)',
+    copyGame: 'Eine Kopie dieses Spiels machen', copyTitle: '{title} (Kopie)', copying: 'Kopie wird erstellt…', copyFailed: 'Das Kopieren hat nicht geklappt. Versuche es erneut.',
     gameMenu: 'Spielmenü', gameSettings: 'Spieleinstellungen', invitePeople: 'Personen einladen', exportText: 'Als Text exportieren', help: 'Hilfe & Tastenkürzel', lightMode: 'Heller Modus', darkMode: 'Dunkler Modus',
     exportIntro: 'Das ist das ganze Spiel, genau so, wie es ist. Bewahre es als Sicherung auf oder gib es einer KI mit deinen Änderungswünschen und importiere ihre Antwort unter Deine Spiele als neues Spiel.',
     close: 'Schließen', gameAsText: 'Das Spiel als Text', copied: 'Kopiert ✓', copy: 'Kopieren', download: 'Als Datei herunterladen',
@@ -88,7 +91,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     now: 'Jetzt', undoAll: 'Alle verfügbaren Änderungen rückgängig machen', whenOpened: 'Vor diesen Änderungen',
     added: '{scene} hinzugefügt', addedMany: '{count} Szenen hinzugefügt', removed: '{scene} entfernt', removedMany: '{count} Szenen entfernt', changed: '{scene} geändert', changedMany: '{count} Szenen geändert',
     changedConnections: 'Die Verbindungen geändert', startsAt: 'Beginnt bei {scene}', renamed: 'Das Spiel in „{title}“ umbenannt', changedLook: 'Das Aussehen geändert', changedSettings: 'Die Spieleinstellungen geändert',
-    moved: '{scene} verschoben', movedMany: '{count} Szenen verschoben', bent: 'Pfeile gebogen oder begradigt', changedMap: 'Die Karte geändert',
+    moved: '{scene} verschoben', movedMany: '{count} Szenen verschoben', bent: 'Pfeile gebogen oder begradigt', grouped: 'Szenen gruppiert oder getrennt', changedMap: 'Die Karte geändert',
   },
   ro: {
     saved: 'Toate modificările au fost salvate', pending: 'Se salvează imediat…', saving: 'Se salvează…', saveError: 'Nesalvat: serverul nu poate fi accesat. Se reîncearcă…',
@@ -107,6 +110,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     rehearseScene: 'Repetă de la scena aleasă', rehearseSceneFix: 'Repetă de la scena aleasă ({fix})',
     publishNothing: 'Publică (nimic nou de publicat)', publishFix: 'Publică (rezolvă întâi {problems})', publishSaving: 'Publică (se salvează…)', publish: 'Publică',
     playPublished: 'Joacă versiunea publicată ↗', playFirst: 'Joacă (publică întâi)',
+    copyGame: 'Fă o copie a acestui joc', copyTitle: '{title} (copie)', copying: 'Se face o copie…', copyFailed: 'Copierea nu a reușit. Încearcă din nou.',
     gameMenu: 'Meniul jocului', gameSettings: 'Setările jocului', invitePeople: 'Invită persoane', exportText: 'Exportă ca text', help: 'Ajutor și scurtături', lightMode: 'Mod luminos', darkMode: 'Mod întunecat',
     exportIntro: 'Acesta este tot jocul, exact cum este. Păstrează-l ca rezervă sau dă-l unui AI împreună cu ce vrei schimbat și importă răspunsul la Jocurile tale ca joc nou.',
     close: 'Închide', gameAsText: 'Jocul ca text', copied: 'Copiat ✓', copy: 'Copiază', download: 'Descarcă ca fișier',
@@ -116,6 +120,6 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     now: 'Acum', undoAll: 'Anulează toate modificările disponibile', whenOpened: 'Înaintea acestor modificări',
     added: 'Adăugat: {scene}', addedMany: '{count} scene adăugate', removed: 'Eliminat: {scene}', removedMany: '{count} scene eliminate', changed: 'Modificat: {scene}', changedMany: '{count} scene modificate',
     changedConnections: 'Conexiunile au fost modificate', startsAt: 'Începe la {scene}', renamed: 'Jocul a fost redenumit „{title}”', changedLook: 'Aspectul a fost modificat', changedSettings: 'Setările jocului au fost modificate',
-    moved: 'Mutat: {scene}', movedMany: '{count} scene mutate', bent: 'Săgeți îndoite sau îndreptate', changedMap: 'Harta a fost modificată',
+    moved: 'Mutat: {scene}', movedMany: '{count} scene mutate', bent: 'Săgeți îndoite sau îndreptate', grouped: 'Scene grupate sau separate', changedMap: 'Harta a fost modificată',
   },
 });

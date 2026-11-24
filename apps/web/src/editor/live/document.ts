@@ -1,4 +1,4 @@
-import { autoLayout, BEND, isBendKey, uniqueKey, type Definition, type Positions } from '../model.js';
+import { autoLayout, BEND, GROUP, isBendKey, isGroupKey, uniqueKey, type Definition, type Positions } from '../model.js';
 import { merge3, same } from './merge.js';
 
 // The editor's state (a game and where its cards sit) as the one document the
@@ -10,9 +10,9 @@ export type Doc = Definition & { editor?: { positions?: Positions } };
 
 export function toDoc(snapshot: Snapshot): Doc {
   const keys = new Set(snapshot.definition.nodes.map(node => node.key));
-  // Cards of existing scenes, and bend points of existing arrows.
+  // Cards of existing scenes, bend points of existing arrows, and the groups of existing scenes.
   const edges = new Set(snapshot.definition.edges.map(edge => edge.key));
-  const kept = (key: string) => keys.has(key) || (isBendKey(key) && edges.has(key.slice(BEND.length, key.lastIndexOf('--'))));
+  const kept = (key: string) => keys.has(key) || (isBendKey(key) && edges.has(key.slice(BEND.length, key.lastIndexOf('--')))) || (isGroupKey(key) && keys.has(key.slice(GROUP.length)));
   return { ...snapshot.definition, editor: { positions: Object.fromEntries(Object.entries(snapshot.positions).filter(([key]) => kept(key))) } };
 }
 export function fromDoc(doc: Doc): Snapshot {
@@ -24,6 +24,7 @@ export function fromDoc(doc: Doc): Snapshot {
 function renameScene(doc: Doc, from: string, to: string): Doc {
   const positions = { ...(doc.editor?.positions ?? {}) };
   if (positions[from]) { positions[to] = positions[from]; delete positions[from]; }
+  if (positions[`${GROUP}${from}`]) { positions[`${GROUP}${to}`] = positions[`${GROUP}${from}`]!; delete positions[`${GROUP}${from}`]; }
   return { ...doc, startNodeKey: doc.startNodeKey === from ? to : doc.startNodeKey,
     nodes: doc.nodes.map(node => ({ ...node, key: node.key === from ? to : node.key, stages: node.stages.map(stage => {
       const source = stage['source'] as { nodeKey?: string } | undefined;

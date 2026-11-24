@@ -1,5 +1,5 @@
 import type { Definition, Positions } from '../model.js';
-import { isBendKey } from '../model.js';
+import { isBendKey, isCardKey, isGroupKey } from '../model.js';
 import { translate } from '../../i18n/texts.js';
 import { SHELL_TEXTS } from './shell.text.js';
 
@@ -36,7 +36,8 @@ export function describeStep(before: { definition: Definition; positions: Positi
   if (json(before.definition) !== json(after.definition)) return t('changedSettings');
   // Only the map: cards moved, or arrows bent or straightened.
   const keys = new Set([...Object.keys(before.positions), ...Object.keys(after.positions)]);
-  const moved = [...keys].filter(key => !isBendKey(key) && json(before.positions[key]) !== json(after.positions[key]));
+  if ([...keys].some(key => isGroupKey(key) && json(before.positions[key]) !== json(after.positions[key]))) return t('grouped');
+  const moved = [...keys].filter(key => isCardKey(key) && json(before.positions[key]) !== json(after.positions[key]));
   if (moved.length) return moved.length === 1 ? t('moved', { scene: name(after.definition, moved[0]!) }) : t('movedMany', { count: moved.length });
   return t([...keys].some(isBendKey) ? 'bent' : 'changedMap');
 }

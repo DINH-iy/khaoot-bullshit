@@ -61,6 +61,9 @@ const paths: Record<string, string> = {
   'align-column': 'M3 3h18 M8 7h8v4H8z M8 14h8v4H8z M12 7V3',
   // Straighten arrows: a straight arrow.
   straighten: 'M4 12h15 M15 8l4 4-4 4',
+  // Group: two cards inside a dashed frame; ungroup: the same two cards without it.
+  group: 'M3 7V4h3 M9 4h6 M18 4h3v3 M21 10v4 M21 17v3h-3 M15 20H9 M6 20H3v-3 M3 14v-4 M7 8h5v4H7z M12 13h5v4h-5z',
+  ungroup: 'M4 5h7v6H4z M13 13h7v6h-7z',
   // Show the whole map: four corners.
   fit: 'M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5',
   // Zoom to the selection: a magnifier.

@@ -25,7 +25,7 @@ export function GraphDataImport({ onImport }: { onImport: (data: GraphData, ques
   const [selectedSeries, setSelectedSeries] = useState(0);
   const [url, setUrl] = useState('');
   const [loadingUrl, setLoadingUrl] = useState(false);
-  const [urlError, setUrlError] = useState<'unsupportedUrl' | 'downloadFailed'>();
+  const [urlError, setUrlError] = useState<'unsupportedUrl' | 'downloadFailed' | 'noSeries'>();
   const remote = remoteSeries[selectedSeries];
   const table = remote?.table ?? localTable;
   const [paste, setPaste] = useState('');
@@ -72,14 +72,14 @@ export function GraphDataImport({ onImport }: { onImport: (data: GraphData, ques
       const data = GrapherImportResultSchema.parse(await roomApi('/api/host/graph-import', { url }));
       if (request !== latestRead.current) return;
       const series = grapherSeries(data);
-      if (!series.length) throw new Error('No time series');
+      if (!series.length) throw new Error('NO_SERIES');
       setRemoteSeries(series);
       setSelectedSeries(0);
       setLocalTable(undefined);
       setError(false);
       chooseTable(series[0]!.table);
     } catch (cause) {
-      if (request === latestRead.current) setUrlError(cause instanceof Error && cause.message === 'UNSUPPORTED_GRAPH_URL' ? 'unsupportedUrl' : 'downloadFailed');
+      if (request === latestRead.current) setUrlError(cause instanceof Error && cause.message === 'UNSUPPORTED_GRAPH_URL' ? 'unsupportedUrl' : cause instanceof Error && cause.message === 'NO_SERIES' ? 'noSeries' : 'downloadFailed');
     } finally { if (request === latestRead.current) setLoadingUrl(false); }
   };
 

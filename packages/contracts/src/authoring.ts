@@ -27,7 +27,9 @@ export const CreateGameSchema = z.object({
   gameId: GameIdSchema, title: z.string().trim().min(1).max(160),
   // Start from a built-in game's content, or from a blank game with one welcome scene.
   startFrom: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/).nullable(),
-}).strict();
+  // Or a copy of one of the author's own games: its current draft, card positions included.
+  copyOf: GameIdSchema.nullable().optional(),
+}).strict().refine(input => !(input.startFrom && input.copyOf), { message: 'Start from a built-in game or copy one of yours, not both' });
 // Where each scene card sits in the Flow editor. Layout only: never part of a published game.
 export const EditorLayoutSchema = z.object({ positions: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/), z.object({ x: z.number().finite().min(-100_000).max(100_000), y: z.number().finite().min(-100_000).max(100_000) }).strict()) }).strict();
 export type EditorLayout = z.infer<typeof EditorLayoutSchema>;

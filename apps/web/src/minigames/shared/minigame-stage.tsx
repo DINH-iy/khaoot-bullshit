@@ -1,4 +1,5 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, type ReactNode } from 'react';
+import { FaIcon } from '../../presentation/icons.js';
 import type { Stroke } from '@party/contracts';
 import type { LiveStrokes } from '../../drawing/live-strokes.js';
 import { defaultLook, isStepMinigame, MinigameValueSchema, ROULETTE_BET_FLOOR, rouletteBetLimit, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
@@ -17,7 +18,8 @@ import { useServerNow } from './clock.js';
 import { ClapCue } from '../clap-beat/clap-beat.js';
 import { TimedMinigame } from './timed-minigame.js';
 import { CutTarget } from '../cut-the-line/cut-line.js';
-import { AngleTarget } from '../match-the-angle/match-angle.js';
+import { CutResult } from '../cut-the-line/cut-result.js';
+import { AngleComparison, AngleTarget } from '../match-the-angle/match-angle.js';
 import { GraphChart } from '../draw-the-graph/graph-chart.js';
 import { GRAPH_TEXTS } from '../draw-the-graph/graph.text.js';
 import { DotBoard } from '../count-the-dots/count-dots.js';
@@ -56,18 +58,25 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
   if (isStepMinigame(minigame.game)) return state.role === 'player' ? <StepPhone state={state} stage={stage} offset={offset} canPlay={canPlay} disabled={disabled} onMove={onMove} />
     : <StepScreen state={state} stage={stage} offset={offset} />;
   if (state.role === 'player') {
+    // Locked in, waiting for the results: what this phone sent, and one ✓ line. Distances stay for the reveal.
     if (own?.success && minigame.game === 'count-the-dots') {
       const [before, after] = c('dotSaved', { guess: '{guess}' }).split('{guess}');
-      return <p className="mg-guessed" role="status">{before}<strong>{own.data.value}</strong>{after}</p>;
+      return <MinigameWaiting note={<>{before}<strong>{own.data.value}</strong>{after}</>} />;
     }
-    if (own?.success && minigame.game === 'cut-the-line') return <p className="mg-sub" role="status">{t('minigame.played')} · {tenths(own.data.cut ?? own.data.value)}%</p>;
-    if (own?.success && minigame.graph) return <>
+    if (own?.success && minigame.game === 'cut-the-line' && minigame.cutTarget !== undefined) return <MinigameWaiting note={t('minigame.played')}>
+      <CutResult target={minigame.cutTarget} cut={own.data.cut ?? own.data.value} locked />
+    </MinigameWaiting>;
+    if (own?.success && minigame.game === 'match-the-angle' && minigame.angleTarget !== undefined && own.data.angle !== undefined) return <MinigameWaiting note={t('minigame.played')}>
+      <AngleComparison target={minigame.angleTarget} guess={own.data.angle} /><p className="mg-big">{tenths(own.data.angle)}°</p>
+    </MinigameWaiting>;
+    if (own?.success && minigame.graph) return <MinigameWaiting note={graphText('saved')}>
       <GraphChart chart={minigame.graph.chart} portrait
         traces={own.data.graphLine ? [{ id: 'own', line: own.data.graphLine, hue: minigame.graph.hue ?? 210 }] : []} />
-      <p className="mg-sub" role="status">{graphText('saved')}</p>
-    </>;
-    if (own?.success && own.data.bets) return <div className="mg-done" role="status"><p className="mg-big">{betSummary(own.data.bets)}</p><p>{rouletteText('locked')}</p></div>;
-    if (own?.success) return <div className={`mg-done${own.data.early ? ' reaction-early' : ''}`} role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : minigameResult(minigame.game, own.data.value, settings, false, own.data)}</p><p>{t('minigame.played')}</p></div>;
+    </MinigameWaiting>;
+    if (own?.success && own.data.bets) return <MinigameWaiting note={rouletteText('locked')}><p className="mg-big">{betSummary(own.data.bets)}</p></MinigameWaiting>;
+    if (own?.success) return <MinigameWaiting note={t('minigame.played')} className={own.data.early ? 'reaction-early' : undefined}>
+      <p className="mg-big">{own.data.early ? t('minigame.tooSoon') : minigameResult(minigame.game, own.data.value, settings, false, own.data)}</p>
+    </MinigameWaiting>;
     if (state.view.status === 'PAUSED') return <p className="mg-paused" role="status">{t('phase.paused')}</p>;
     if (!canPlay || !minigame.startsAt) return <p className="wait-note">{howToPlay(t, minigame)}</p>;
     // With no screen watching, the phone also shows what the screen would (the dots come along in the view; the race bars here).
@@ -122,3 +131,8 @@ function RaceBars({ state, progress }: { state: RoomSnapshot; progress: { player
 
 const lookOf = (state: RoomSnapshot, playerId: string | null) => state.players.find(player => player.id === playerId)?.look ?? defaultLook(playerId ?? 'former');
 const nameOf = (state: RoomSnapshot, playerId: string | null) => state.players.find(player => player.id === playerId)?.displayName ?? 'Former player';
+
+/** A phone's locked-in answer while the others play: what it sent (when there is something to show) and a ✓ line. */
+function MinigameWaiting({ note, className, children }: { note: ReactNode; className?: string | undefined; children?: ReactNode }) {
+  return <div className={`mg-done${className ? ` ${className}` : ''}`} role="status">{children}<p className="mg-waiting"><FaIcon name="check" /><span>{note}</span></p></div>;
+}

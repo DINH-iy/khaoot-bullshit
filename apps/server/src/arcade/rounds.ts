@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ArcadeActSchema, ArcadeAgainSchema, ArcadePickSchema, GraphSettingsSchema, StartArcadeRoundSchema, isArcadeGame, isHeadToHeadKey, isMinigameKey, type ArcadeAction } from '@party/contracts';
+import { ArcadeActSchema, arcadeSettings, ArcadeAgainSchema, ArcadePickSchema, GraphSettingsSchema, StartArcadeRoundSchema, isArcadeGame, isHeadToHeadKey, isMinigameKey, type ArcadeAction } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient, ArcadeMember } from '../generated/prisma/client.js';
 import { contentHash, type GameDefinition } from '../game/definition.js';
@@ -97,11 +97,13 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
   return {
     end,
     /** The leader starts a round for everyone present. A retry with the same round id is the same round. */
-    async start(member: ArcadeMember, input: unknown, now = new Date(), avoidGraph?: string) {
+    async start(member: ArcadeMember, input: unknown, now = new Date(), again?: { avoidGraph?: string }) {
       const parsed = StartArcadeRoundSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND');
       roomAssert(config.ROOM_TOKEN_SECRET, 'AUTH_UNAVAILABLE'); const secret = config.ROOM_TOKEN_SECRET;
       const { roundId, game, teams } = parsed.data; const lobbyId = member.lobbyId;
       roomAssert(arcadeRoundFits(game, teams), 'INVALID_COMMAND');
+      // The leader's settings for this game must fit it (the same rules as a game's scene).
+      const chosen = arcadeSettings(game, parsed.data.settings); roomAssert(chosen, 'INVALID_COMMAND');
       const existing = await client.arcadeRound.findUnique({ where: { id: roundId } });
       if (existing) { roomAssert(existing.lobbyId === lobbyId, 'INVALID_COMMAND'); return { roundId }; }
       const check = async (tx: Transaction) => {
@@ -116,8 +118,8 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
       await client.$transaction(async tx => { await lockLobby(tx, lobbyId); await check(tx); });
       const host = await creator();
       // Draw the Graph plays a chart of the graph library: the one picked, or a random one (another than `avoidGraph`).
-      const chart = game === 'draw-the-graph' ? await chooseGraph(client, parsed.data.graph, avoidGraph) : undefined;
-      const gameVersionId = await versionFor(host.id, arcadeDefinition(game, teams, chart && { ...(chart.graph ? { graph: chart.graph } : {}), question: chart.entry.question }));
+      const chart = game === 'draw-the-graph' ? await chooseGraph(client, parsed.data.graph, again?.avoidGraph) : undefined;
+      const gameVersionId = await versionFor(host.id, arcadeDefinition(game, teams, chart && { ...(chart.graph ? { graph: chart.graph } : {}), question: chart.entry.question }, !again, chosen));
       await service.execute({ role: 'host', creatorId: host.id }, { formatVersion: 1, type: 'session.create', sessionId: roundId, commandId: roundId, expectedRevision: 0, mode: 'REHEARSAL', gameVersionId });
       await client.$transaction(async tx => {
         await lockLobby(tx, lobbyId); await lockRoom(tx, roundId);
@@ -157,7 +159,8 @@ export function createRounds(client: PrismaClient, config: Config, service: Retu
         const stage = (last.session.gameVersion.definition as { nodes?: { stages?: { settings?: unknown }[] }[] }).nodes?.[0]?.stages?.[0];
         avoid = libraryIdOf(GraphSettingsSchema.safeParse(stage?.settings ?? {}).data?.graph);
       }
-      return this.start(member, { roundId: parsed.data.roundId, game: last.game, teams }, now, avoid);
+      const settings = pick?.settings?.[last.game];
+      return this.start(member, { roundId: parsed.data.roundId, game: last.game, teams, ...(settings ? { settings } : {}) }, now, avoid ? { avoidGraph: avoid } : {});
     },
     /** A seated member's access to the room of the round being played. */
     async enter(member: ArcadeMember) {

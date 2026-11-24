@@ -4,9 +4,10 @@ import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { Inspector } from '../scene/inspector.js';
 import { Minimap } from './minimap.js';
+import { anyGrouped, groupFrame, grouped, groupsIn, isOneGroup, ungrouped, withWholeGroups } from './groups.js';
 import {
   addConnectedScene, addDrawGames, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  bendsOf, insertOnEdge, insertPrefab, isBendKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  bendsOf, insertOnEdge, insertPrefab, isBendKey, isGroupKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { InfoTip } from '../controls/info-tip.js';
@@ -59,7 +60,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const duplicate = (keys: string[], offset?: Point) => {
     if (!keys.length) return;
     const copied = duplicateScenes(definition, positions, keys, offset);
-    change(copied.definition, copied.positions); select(copied.keys);
+    // A copy of a whole group is a group of its own.
+    change(copied.definition, isOneGroup(definition, positions, keys) ? grouped(copied.positions, copied.keys) : copied.positions); select(copied.keys);
     setNotice(t(keys.length === 1 ? 'duplicatedOne' : 'duplicatedMany', { count: keys.length }));
   };
 
@@ -78,13 +80,14 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     });
   }, []);
 
-  // ---------- cards: click to select (Shift/Cmd adds), drag to move all selected ----------
+  // ---------- cards: click to select (Shift/Cmd adds; a grouped scene brings its group, Alt takes it alone), drag to move all selected ----------
   const startCardDrag = (event: ReactPointerEvent<HTMLElement>, key: string) => {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest('.port, .port-plus')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const additive = event.shiftKey || event.metaKey || event.ctrlKey;
-    const group = selected.includes(key) && !additive ? selected : [key];
+    const clicked = event.altKey ? [key] : withWholeGroups(definition, positions, [key]);
+    const group = selected.includes(key) && !additive && !event.altKey ? selected : clicked;
     const origin = toCanvas(event.clientX, event.clientY); const starts = Object.fromEntries(group.map(member => [member, positions[member]!]));
     let moved = false; let latest = positions; const element = event.currentTarget;
     const move = (moveEvent: PointerEvent) => {
@@ -104,10 +107,10 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       if (moved) {
         const settled = group.length === 1 ? { ...latest, [key]: freeSpot(definition, latest, key, latest[key]!) } : latest;
         change(definition, settled, '', positions);
-        if (group.length === 1 && !selected.includes(key)) select([key]);
+        if (!selected.includes(key) || event.altKey) select(group);
       } else if (pending) finishPending(key);
-      else if (additive) select(selected.includes(key) ? selected.filter(member => member !== key) : [...selected, key]);
-      else select([key]);
+      else if (additive) select(clicked.every(member => selected.includes(member)) ? selected.filter(member => !clicked.includes(member)) : [...new Set([...selected, ...clicked])]);
+      else select(clicked);
     };
     element.addEventListener('pointermove', move); element.addEventListener('pointerup', up); element.addEventListener('pointercancel', up);
   };
@@ -181,7 +184,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
         const left = Math.min(current.from.x, current.to.x); const right = Math.max(current.from.x, current.to.x);
         const top = Math.min(current.from.y, current.to.y); const bottom = Math.max(current.from.y, current.to.y);
         const inside = definition.nodes.filter(node => { const at = positions[node.key]; return at && at.x < right && at.x + CARD_WIDTH > left && at.y < bottom && at.y + cardHeight(node) > top; }).map(node => node.key);
-        select([...new Set([...selected, ...inside])]);
+        select(withWholeGroups(definition, positions, [...new Set([...selected, ...inside])]));
       };
       element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
       element.addEventListener('pointercancel', finish); return;
@@ -206,7 +209,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
   const fitTo = useCallback((keys?: string[]) => {
-    const rect = canvas.current?.getBoundingClientRect(); const all = keys?.length ? keys.map(key => positions[key]).filter((point): point is Point => Boolean(point)) : Object.values(positions);
+    const rect = canvas.current?.getBoundingClientRect(); const all = keys?.length ? keys.map(key => positions[key]).filter((point): point is Point => Boolean(point)) : Object.entries(positions).filter(([key]) => !isGroupKey(key)).map(([, point]) => point);
     if (!rect || !all.length) return;
     const minX = Math.min(...all.map(point => point.x)); const minY = Math.min(...all.map(point => point.y));
     const maxX = Math.max(...all.map(point => point.x)) + CARD_WIDTH + 64; const maxY = Math.max(...all.map(point => point.y)) + 320;
@@ -215,12 +218,24 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   }, [positions]);
   const fit = useCallback(() => fitTo(), [fitTo]);
   // Tidying the map (the Tidy up menu and its shortcuts). Each is one change, so Undo takes it back.
+  // Tidying moves the cards; the groups stay.
+  const keepGroups = (next: Positions): Positions => ({ ...next, ...Object.fromEntries(Object.entries(positions).filter(([key]) => isGroupKey(key))) });
   const tidy = {
-    rows: () => { change(definition, autoLayout(definition)); setNotice(t('tidiedRows')); },
-    line: () => { change(definition, autoLayout(definition, { oneRow: true })); setNotice(t('tidiedLine')); },
+    rows: () => { change(definition, keepGroups(autoLayout(definition))); setNotice(t('tidiedRows')); },
+    line: () => { change(definition, keepGroups(autoLayout(definition, { oneRow: true }))); setNotice(t('tidiedLine')); },
     lineUp: (direction: 'row' | 'column') => { if (selected.length > 1) change(definition, lineUp(definition, positions, selected, direction)); },
     straighten: () => change(definition, straightenAll(positions)),
   };
+  // Grouping: Ctrl/⌘ + G groups the selected scenes, Ctrl/⌘ + Shift + G takes them out of their groups.
+  const groupSelected = () => {
+    if (selected.length < 2) { setNotice(t('selectTwoGroup')); return; }
+    change(definition, grouped(positions, selected)); setNotice(t('groupedN', { count: selected.length }));
+  };
+  const ungroupSelected = () => {
+    if (!anyGrouped(definition, positions, selected)) return;
+    change(definition, ungrouped(positions, selected)); setNotice(t('ungroupedNotice'));
+  };
+  const groups = useMemo(() => [...groupsIn(definition, positions).values()], [definition, positions]);
   const fitted = useRef(false);
   useEffect(() => { if (!fitted.current) { fitted.current = true; requestAnimationFrame(fit); } }, [fit]);
   useEffect(() => {
@@ -244,7 +259,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     if (!adding) return;
     const target = adding.place ?? { x: adding.at.x, y: adding.at.y - 72 };
     const result = insertPrefab(definition, positions, content, { x: snap(target.x), y: snap(target.y) }, adding.from ? { key: adding.from, option: adding.option } : undefined);
-    change(result.definition, result.positions); setAdding(null); select(result.keys);
+    change(result.definition, result.keys.length > 1 ? grouped(result.positions, result.keys) : result.positions); setAdding(null); select(result.keys);
     const first = result.positions[result.keys[0]!]; if (first) requestAnimationFrame(() => reveal(first));
     setNotice(t(result.keys.length === 1 ? 'insertedOne' : 'insertedMany', { count: result.keys.length }));
   };
@@ -260,6 +275,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const games = inserted ? { definition: result.definition, keys: inserted } : type === 'draw' ? addDrawGames(result.definition, result.key) : { definition: result.definition, keys: [] as string[] };
     let placed: Positions = { ...raw, [result.key]: spot };
     games.keys.forEach((key, index) => { placed = { ...placed, [key]: freeSpot(games.definition, placed, key, { x: snap(spot.x + CARD_WIDTH + GRID * 4), y: snap(spot.y + index * (192 + GRID)) }) }; });
+    // The draw and its games are one group: selected and moved together, Alt-click takes one scene.
+    if (games.keys.length) placed = grouped(placed, [result.key, ...games.keys]);
     change(games.definition, placed); setAdding(null); select([result.key]); requestAnimationFrame(() => reveal(spot));
   };
   // The middle of the selected arrow, where its menu sits (add a scene on it, or remove it).
@@ -350,7 +367,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       change(definition, { ...positions, ...Object.fromEntries(group.map(member => [member, { x: snap(positions[member]!.x + delta.x), y: snap(positions[member]!.y + delta.y) }])) });
       return;
     }
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (pending) finishPending(key); else select(event.shiftKey ? [...new Set([...selected, key])] : [key]); }
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (pending) finishPending(key); else { const whole = withWholeGroups(definition, positions, [key]); select(event.shiftKey ? [...new Set([...selected, ...whole])] : whole); } }
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -369,6 +386,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && (row || column)) {
         event.preventDefault(); if (selected.length > 1) tidy.lineUp(row ? 'row' : 'column'); else setNotice(t('selectTwo')); return;
       }
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.code === 'KeyG') { event.preventDefault(); if (event.shiftKey) ungroupSelected(); else groupSelected(); return; }
       const action = editingAction(event, zoomShortcuts);
       if (action === 'remove' && selectedEdge) { event.preventDefault(); change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }
       else if (action === 'remove' && selected.length) { event.preventDefault(); setAskDelete(true); }
@@ -396,7 +414,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const problemsBy = useMemo(() => { const map = new Map<string, DefinitionIssue[]>(); for (const issue of d.issues) if (issue.nodeKey) map.set(issue.nodeKey, [...(map.get(issue.nodeKey) ?? []), issue]); return map; }, [d.issues]);
   const nodes = definition.nodes; const single = selected.length === 1 ? nodes.find(node => node.key === selected[0]) : undefined;
   const sceneTitle = (key: string) => { const node = definition.nodes.find(entry => entry.key === key); if (!node) return key; const text = cardText(definition, node); return text.banner || text.title; };
-  const deleteSelected = () => { let next = definition; for (const key of selected) next = deleteScene(next, key); const kept = { ...positions }; for (const key of selected) delete kept[key]; change(next, kept); select([]); };
+  const deleteSelected = () => { let next = definition; for (const key of selected) next = deleteScene(next, key); const kept = ungrouped(positions, selected); for (const key of selected) delete kept[key]; change(next, kept); select([]); };
   return <div className={`editor-body${selected.length ? ' with-inspector' : ''}${readOnly ? ' viewing' : ''}`}>
     <div className="flow-tools" role="toolbar" aria-label={t('flowTools')}>
       <button className="with-icon" aria-label={t('addScene')} disabled={readOnly} onClick={() => { const rect = canvas.current?.getBoundingClientRect(); setAdding({ from: null, option: undefined, at: { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } }); }}><Icon name="plus" /><span className="tool-label">{t('addScene')}</span></button>
@@ -421,7 +439,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       <InfoTip label={t('tipsLabel')} icon="tips" text={t('tips')} align="start" clickOnly>
         {close => <span className="tip-list">
           {readOnly && <strong>{t('viewingLong')}</strong>}
-          {(['tip1', 'tip2', 'tip3', 'tip4', 'tip5'] as const).map(key => <span key={key}>{marked(t(key))}</span>)}
+          {(['tip1', 'tip2', 'tip3', 'tip4', 'tip5', 'tip6'] as const).map(key => <span key={key}>{marked(t(key))}</span>)}
           <button type="button" className="small-button" onClick={() => { close(); onHelp(); }}>{t('allShortcuts')}</button>
         </span>}
       </InfoTip>
@@ -430,6 +448,14 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     <div className="flow-canvas" ref={canvas} style={{ backgroundSize: `${GRID * view.zoom}px ${GRID * view.zoom}px`, backgroundPosition: `${view.x - GRID * view.zoom / 2}px ${view.y - GRID * view.zoom / 2}px` }} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
+        {/* Groups: a frame behind their cards; its name selects the whole group. */}
+        {groups.map(members => {
+          const frame = groupFrame(definition, positions, members); const on = members.every(member => selected.includes(member));
+          return <div key={members.join()} className={`flow-group${on ? ' selected' : ''}`} style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}>
+            <button type="button" className="flow-group-name" onPointerDown={event => event.stopPropagation()} onClick={() => select(members)}
+              title={t('groupTitle')}><Icon name="group" size={14} />{t('groupName', { title: sceneTitle(frame.first), count: members.length })}</button>
+          </div>;
+        })}
         <svg className="flow-lines" width="1" height="1" overflow="visible" aria-hidden="true">
           <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="arrow-head" /></marker>
             <marker id="arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="arrow-head on" /></marker></defs>
@@ -500,21 +526,26 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
     </div>
     {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)} onOpen={() => onOpenScene(single.key)}
-      onDelete={next => { const kept = { ...positions }; delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
+      onDelete={next => { const kept = ungrouped(positions, [single.key]); delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
       readOnly={readOnly} prefab={{ content: () => prefabFrom(definition, positions, [single.key]), defaultName: cardText(definition, single).banner || cardText(definition, single).title }} />}
     {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? t('deleteOne', { title: sceneTitle(selected[0]!) }) : t('deleteMany', { count: selected.length })}
       text={t(selected.length === 1 ? 'deleteTextOne' : 'deleteTextMany')}
       confirm={selected.length === 1 ? t('deleteScene') : t('deleteScenes', { count: selected.length })} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}
     {selected.length > 1 && <MultiPanel count={selected.length} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)}
+      onGroup={readOnly || isOneGroup(definition, positions, selected) ? undefined : groupSelected} onUngroup={readOnly || !anyGrouped(definition, positions, selected) ? undefined : ungroupSelected}
       savePrefab={<SavePrefab key={selected.join()} content={() => prefabFrom(definition, positions, selected)} defaultName={`${selected.length} scenes`} />} />}
   </div>;
 }
 
-function MultiPanel({ count, onDelete, onClear, onDuplicate, savePrefab }: { count: number; onDelete: () => void; onClear: () => void; onDuplicate: () => void; savePrefab: React.ReactNode }) {
+function MultiPanel({ count, onDelete, onClear, onDuplicate, onGroup, onUngroup, savePrefab }: { count: number; onDelete: () => void; onClear: () => void; onDuplicate: () => void; onGroup: (() => void) | undefined; onUngroup: (() => void) | undefined; savePrefab: React.ReactNode }) {
   const [confirming, setConfirming] = useState(false);
   return <aside className="inspector" aria-labelledby="multi-heading">
     <div className="inspector-head"><h2 id="multi-heading">{t('selectedN', { count })}</h2><button className="small-button" onClick={onClear}>{t('clear')}</button></div>
     <p className="hint">{t('multiHint')}</p>
+    {(onGroup || onUngroup) && <div className="actions">
+      {onGroup && <button type="button" className="with-icon" onClick={onGroup} title={`${MOD} + G`}><Icon name="group" />{t('groupThese')}</button>}
+      {onUngroup && <button type="button" className="with-icon" onClick={onUngroup} title={`${MOD} + Shift + G`}><Icon name="ungroup" />{t('ungroup')}</button>}
+    </div>}
     <button onClick={onDuplicate}>{t('duplicateN', { count })}</button>
     {savePrefab}
     <p className="hint">{t('copyHint')}</p>

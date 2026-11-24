@@ -16,6 +16,8 @@ export function grapherUrls(input: string) {
   const endpoint = (extension: string) => {
     const out = new URL(source);
     out.pathname += extension;
+    // A chart opening on its map (or another single-year view) would only export one year per country.
+    out.searchParams.set('tab', 'line');
     out.searchParams.set('v', '1');
     out.searchParams.set('csvType', 'filtered');
     out.searchParams.set('useColumnShortNames', 'true');

@@ -190,7 +190,34 @@ describe('arcade lobbies', () => {
     expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/again`, { roundId: third }, leader)).json().data).toEqual({ roundId: third });
     expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/again`, { roundId: third }, leader)).json().data).toEqual({ roundId: third });
     expect((await view(lobbyId, bob)).round).toMatchObject({ number: 3, game: 'majority', teams: null, seated: true });
+    // Everyone just played this game: the replay goes straight into play, without "how to play".
+    const thirdRoom = cookieOf(await call('POST', `/api/arcade/lobbies/${lobbyId}/enter`, {}, leader));
+    expect((await call('GET', `/api/rooms/${third}`, undefined, thirdRoom)).json().data.view.stage).toMatchObject({ kind: 'minigame', status: 'ACTIVE', explain: null });
     expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/round/end`, {}, leader)).statusCode).toBe(200);
+  });
+
+  it("plays a game with the leader's settings, keeps them for Play again, and refuses settings that do not fit", async () => {
+    const { lobbyId, leader } = await open();
+    const lobby = `/api/arcade/lobbies/${lobbyId}`;
+    const settings = { seconds: 40, values: { seconds: 25 } };
+    expect(code(await call('POST', `${lobby}/rounds`, { roundId: randomUUID(), game: 'tap-race', teams: null, settings: { values: { seconds: 99 } } }, leader))).toBe('INVALID_COMMAND');
+    expect((await call('POST', `${lobby}/pick`, { game: 'tap-race', teams: null, settings: { 'tap-race': settings } }, leader)).statusCode).toBe(200);
+    expect((await view(lobbyId, leader)).pick).toMatchObject({ settings: { 'tap-race': settings } });
+    // What the round's room plays: its scene as stored (the round time) and as the phones see it (the settings).
+    const stageOf = async (roundId: string) => {
+      const room = cookieOf(await call('POST', `${lobby}/enter`, {}, leader));
+      const stored = await prisma.gameSession.findUniqueOrThrow({ where: { id: roundId }, select: { gameVersion: { select: { definition: true } } } });
+      const scene = (stored.gameVersion.definition as { nodes: { stages: { durationMs: number }[] }[] }).nodes[0]!.stages[0]!;
+      return { durationMs: scene.durationMs, ...(await call('GET', `/api/rooms/${roundId}`, undefined, room)).json().data.view.stage };
+    };
+    const first = randomUUID();
+    expect((await call('POST', `${lobby}/rounds`, { roundId: first, game: 'tap-race', teams: null, settings }, leader)).statusCode).toBe(200);
+    expect(await stageOf(first)).toMatchObject({ durationMs: 40_000, minigame: { settings: { seconds: 25 } } });
+    // Play again plays the same game with the settings kept for it in the lobby.
+    const second = randomUUID();
+    expect((await call('POST', `${lobby}/again`, { roundId: second }, leader)).statusCode).toBe(200);
+    expect(await stageOf(second)).toMatchObject({ durationMs: 40_000, minigame: { settings: { seconds: 25 } } });
+    expect((await call('POST', `${lobby}/round/end`, {}, leader)).statusCode).toBe(200);
   });
 
   it('requires two duelists and records a drawn duel without a win or points', async () => {

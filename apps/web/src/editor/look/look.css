@@ -212,5 +212,10 @@
 .ed-dialog .style-change-actions button.primary { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1d1730); font-weight: 700; }
 .timer-samples { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--r-bg1, #241a4d); font-size: 1.2rem; }
 .timer-samples .timer-clock.up { animation: none; }
-/* "This scene" shows the shared screen and the phone side by side: the phone stays small so the screen keeps its room. */
-.look-scene .phone { --phone-cap-w: 230px; }
+/* "This scene" uses the same frame as the other moments: the shared screen two thirds, the phone one third, same captions. */
+.look-scene .preview { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.look-scene .preview > figure { min-width: 0; gap: 6px; }
+.look-scene .preview > figure > figcaption { font-size: inherit; font-weight: 700; text-transform: none; letter-spacing: normal; }
+.look-scene .tv { max-width: none; }
+.look-scene .phone { --phone-max-h: 72dvh; width: 100%; }
+@media (max-width: 900px) { .look-scene .preview { grid-template-columns: 1fr; } }

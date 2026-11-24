@@ -21,14 +21,14 @@ const TEXTS = defineTexts('eight-ball', {
   requiredPocket: '8 ball · {pocket}', topLeft: 'Top left', topMiddle: 'Top middle', topRight: 'Top right',
   bottomLeft: 'Bottom left', bottomMiddle: 'Bottom middle', bottomRight: 'Bottom right',
   early: '8 ball sunk early', scratch: 'Scratch on the 8', 'wrong-pocket': '8 ball sunk in the wrong pocket', foulEight: 'Foul on the 8',
-  table: 'Pool table', aim: 'Aim', power: 'Power', shoot: 'Shoot', placeCue: 'Place cue ball', aimCue: 'Aim cue',
+  table: 'Pool table', aim: 'Aim', power: 'Power', shoot: 'Shoot', placeCue: 'Place cue ball', aimCue: 'Aim cue', placeHint: 'Tap the table where the cue ball goes',
   solids: 'Solids', stripes: 'Stripes', open: 'Open table', foul: 'Foul · Ball in hand',
   remaining: '{group} · {count} left', ballInHand: 'Ball in hand', lower: 'Aim left', higher: 'Aim right',
   timeFoul: 'Time’s up · Ball in hand', timeBreak: 'Time’s up · The other player breaks',
 }, {
-  nl: { early: '8-bal te vroeg gepot', scratch: 'Witte bal gepot bij de 8-bal', 'wrong-pocket': '8-bal in de verkeerde pocket', foulEight: 'Fout bij de 8-bal', rotate: 'Draai tafel', exitLandscape: 'Liggende stand verlaten', guide: 'Sleep om te richten. Trek vanaf de witte bal terug om te stoten.', requiredPocket: '8-bal · {pocket}', topLeft: 'Linksboven', topMiddle: 'Middenboven', topRight: 'Rechtsboven', bottomLeft: 'Linksonder', bottomMiddle: 'Middenonder', bottomRight: 'Rechtsonder', table: 'Pooltafel', aim: 'Richting', power: 'Kracht', shoot: 'Stoot', placeCue: 'Witte bal plaatsen', aimCue: 'Richten', solids: 'Hele', stripes: 'Halve', open: 'Open tafel', foul: 'Fout · Bal in de hand', remaining: '{group} · nog {count}', ballInHand: 'Bal in de hand', lower: 'Richt links', higher: 'Richt rechts', timeFoul: 'Tijd is op · Bal in de hand', timeBreak: 'Tijd is op · De ander breekt' },
-  de: { early: 'Acht zu früh versenkt', scratch: 'Spielball mit der Acht versenkt', 'wrong-pocket': 'Acht in der falschen Tasche', foulEight: 'Foul bei der Acht', rotate: 'Tisch drehen', exitLandscape: 'Querformat verlassen', guide: 'Zum Zielen ziehen. Zum Stoßen vom Spielball zurückziehen.', requiredPocket: 'Acht · {pocket}', topLeft: 'Oben links', topMiddle: 'Oben Mitte', topRight: 'Oben rechts', bottomLeft: 'Unten links', bottomMiddle: 'Unten Mitte', bottomRight: 'Unten rechts', table: 'Billardtisch', aim: 'Winkel', power: 'Stärke', shoot: 'Stoßen', placeCue: 'Spielball platzieren', aimCue: 'Zielen', solids: 'Volle', stripes: 'Halbe', open: 'Offener Tisch', foul: 'Foul · Ball in Hand', remaining: '{group} · noch {count}', ballInHand: 'Ball in Hand', lower: 'Nach links zielen', higher: 'Nach rechts zielen', timeFoul: 'Zeit abgelaufen · Ball in Hand', timeBreak: 'Zeit abgelaufen · Der andere stößt an' },
-  ro: { early: 'Bila 8 a intrat prea devreme', scratch: 'Bila albă a intrat cu bila 8', 'wrong-pocket': 'Bila 8 a intrat în buzunarul greșit', foulEight: 'Fault la bila 8', rotate: 'Rotește masa', exitLandscape: 'Ieși din modul peisaj', guide: 'Trage pentru a ținti. Trage înapoi de la bila albă pentru a lovi.', requiredPocket: 'Bila 8 · {pocket}', topLeft: 'Sus stânga', topMiddle: 'Sus mijloc', topRight: 'Sus dreapta', bottomLeft: 'Jos stânga', bottomMiddle: 'Jos mijloc', bottomRight: 'Jos dreapta', table: 'Masă de biliard', aim: 'Unghi', power: 'Putere', shoot: 'Lovește', placeCue: 'Așază bila albă', aimCue: 'Țintește', solids: 'Pline', stripes: 'Dungate', open: 'Masă deschisă', foul: 'Fault · Bilă în mână', remaining: '{group} · {count} rămase', ballInHand: 'Bilă în mână', lower: 'Țintește la stânga', higher: 'Țintește la dreapta', timeFoul: 'Timpul a expirat · Bilă în mână', timeBreak: 'Timpul a expirat · Celălalt jucător sparge' },
+  nl: { early: '8-bal te vroeg gepot', scratch: 'Witte bal gepot bij de 8-bal', 'wrong-pocket': '8-bal in de verkeerde pocket', foulEight: 'Fout bij de 8-bal', rotate: 'Draai tafel', exitLandscape: 'Liggende stand verlaten', guide: 'Sleep om te richten. Trek vanaf de witte bal terug om te stoten.', requiredPocket: '8-bal · {pocket}', topLeft: 'Linksboven', topMiddle: 'Middenboven', topRight: 'Rechtsboven', bottomLeft: 'Linksonder', bottomMiddle: 'Middenonder', bottomRight: 'Rechtsonder', table: 'Pooltafel', aim: 'Richting', power: 'Kracht', shoot: 'Stoot', placeCue: 'Witte bal plaatsen', aimCue: 'Richten', placeHint: 'Tik op de tafel waar de witte bal moet liggen', solids: 'Hele', stripes: 'Halve', open: 'Open tafel', foul: 'Fout · Bal in de hand', remaining: '{group} · nog {count}', ballInHand: 'Bal in de hand', lower: 'Richt links', higher: 'Richt rechts', timeFoul: 'Tijd is op · Bal in de hand', timeBreak: 'Tijd is op · De ander breekt' },
+  de: { early: 'Acht zu früh versenkt', scratch: 'Spielball mit der Acht versenkt', 'wrong-pocket': 'Acht in der falschen Tasche', foulEight: 'Foul bei der Acht', rotate: 'Tisch drehen', exitLandscape: 'Querformat verlassen', guide: 'Zum Zielen ziehen. Zum Stoßen vom Spielball zurückziehen.', requiredPocket: 'Acht · {pocket}', topLeft: 'Oben links', topMiddle: 'Oben Mitte', topRight: 'Oben rechts', bottomLeft: 'Unten links', bottomMiddle: 'Unten Mitte', bottomRight: 'Unten rechts', table: 'Billardtisch', aim: 'Winkel', power: 'Stärke', shoot: 'Stoßen', placeCue: 'Spielball platzieren', aimCue: 'Zielen', placeHint: 'Tippe auf den Tisch, wo der Spielball liegen soll', solids: 'Volle', stripes: 'Halbe', open: 'Offener Tisch', foul: 'Foul · Ball in Hand', remaining: '{group} · noch {count}', ballInHand: 'Ball in Hand', lower: 'Nach links zielen', higher: 'Nach rechts zielen', timeFoul: 'Zeit abgelaufen · Ball in Hand', timeBreak: 'Zeit abgelaufen · Der andere stößt an' },
+  ro: { early: 'Bila 8 a intrat prea devreme', scratch: 'Bila albă a intrat cu bila 8', 'wrong-pocket': 'Bila 8 a intrat în buzunarul greșit', foulEight: 'Fault la bila 8', rotate: 'Rotește masa', exitLandscape: 'Ieși din modul peisaj', guide: 'Trage pentru a ținti. Trage înapoi de la bila albă pentru a lovi.', requiredPocket: 'Bila 8 · {pocket}', topLeft: 'Sus stânga', topMiddle: 'Sus mijloc', topRight: 'Sus dreapta', bottomLeft: 'Jos stânga', bottomMiddle: 'Jos mijloc', bottomRight: 'Jos dreapta', table: 'Masă de biliard', aim: 'Unghi', power: 'Putere', shoot: 'Lovește', placeCue: 'Așază bila albă', aimCue: 'Țintește', placeHint: 'Atinge masa unde vrei bila albă', solids: 'Pline', stripes: 'Dungate', open: 'Masă deschisă', foul: 'Fault · Bilă în mână', remaining: '{group} · {count} rămase', ballInHand: 'Bilă în mână', lower: 'Țintește la stânga', higher: 'Țintește la dreapta', timeFoul: 'Timpul a expirat · Bilă în mână', timeBreak: 'Timpul a expirat · Celălalt jucător sparge' },
 });
 
 const TARGET_TEXTS = defineTexts('pool-target', {
@@ -227,6 +227,8 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, li
   };
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
     if (!ready || editingSpin || event.button !== 0 || !event.isPrimary) return;
+    // A mouse press would otherwise start the browser's own drag of the table picture (Firefox), stealing the pull.
+    event.preventDefault();
     const [x, y] = coordinates(event);
     if (placing && board.ballInHand) {
       if (canPlacePoolCue(x, y, balls, startArea)) { setCue([x, y]); setPlacing(false); }
@@ -263,7 +265,7 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, li
   const playfield = <div className="pool-playfield">
       {powerRight ? aimWheel : powerBar}
       <canvas className="pool-table" ref={canvas} width={POOL_CANVAS_WIDTH} height={POOL_CANVAS_HEIGHT} role="img" aria-label={t('table')}
-        data-shot={board.shot} data-rolling={rolling} data-ghost-angle={ghost?.angle} data-aiming={ready} data-striking={Boolean(striking)} onPointerDown={down}
+        data-shot={board.shot} data-rolling={rolling} data-ghost-angle={ghost?.angle} data-aiming={ready} data-striking={Boolean(striking)} onPointerDown={down} draggable={false} onDragStart={event => event.preventDefault()}
         onPointerMove={event => {
           if (!ready || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
           const drag = cueDrag.current;
@@ -304,8 +306,12 @@ export function PoolBoard({ view, board, names, canMove, onMove, statusLabel, li
     </div>;
   const trays = <PotTrays names={names} pots={shownPots ?? [[], []]} turn={view.turn === 'both' ? null : view.turn} clock={rolling ? undefined : shownClock} />;
   const controls = <>
-    {board.ballInHand && ready && !editingSpin && <button className="ghost pool-place" type="button"
-      onClick={() => setPlacing(!placing)}>{t(placing ? 'aimCue' : 'placeCue')}</button>}
+    {/* Ball in hand: a bright button (it is easy to miss), and while placing, what to do. */}
+    {board.ballInHand && ready && !editingSpin && <div className="pool-place-row">
+      <button className="pool-place" type="button" aria-pressed={placing} onClick={() => setPlacing(!placing)}>
+        <FaIcon name={placing ? 'arrow-right' : 'circle'} />{t(placing ? 'aimCue' : 'placeCue')}</button>
+      {placing && <p className="pool-place-hint" role="status">{t('placeHint')}</p>}
+    </div>}
     {view.seat !== null && !view.outcome && <div className="pool-controls">
       {editingSpin && ready ? <PoolSpinPicker value={spin} onChange={setSpin} onDone={() => setEditingSpin(false)}
         sideways={sideways} /> : <>

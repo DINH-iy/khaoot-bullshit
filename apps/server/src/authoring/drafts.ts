@@ -82,14 +82,16 @@ export function createAuthoring(client: PrismaClient) {
     /** Creates a game with its first draft. Repeating the request returns the same game. */
     async create(creatorId: string, input: unknown): Promise<Draft> {
       const parsed = CreateGameSchema.safeParse(input); requireGame(parsed.success, 'INVALID_COMMAND');
-      const { gameId, title, startFrom } = parsed.data;
+      const { gameId, title, startFrom, copyOf } = parsed.data;
       const existing = await client.game.findUnique({ where: { id: gameId }, include: { draft: true, versions: { orderBy: { number: 'desc' }, take: 1 } } });
       if (existing) { requireGame(existing.creatorId === creatorId && existing.draft, 'FORBIDDEN'); return draftView(existing, existing.draft, existing.versions[0] ?? null); }
       const template = startFrom === null ? null : builtInGames.find(game => game.key === startFrom);
       requireGame(startFrom === null || template, 'NOT_FOUND');
       // A copy of a built-in game is a copy of what the menu shows: the owner's published version, if any.
       const own = template ? (await api.builtInVersions(creatorId)).get(template.key) : undefined;
-      const definition = template ? { ...structuredClone(own?.definition ?? template.definition), title } : blankDefinition(title);
+      // A copy of one of your games starts from its draft as it is now, card positions and all; the original stays as it was.
+      const source = copyOf ? (await owned(creatorId, copyOf)).draft.definition as Record<string, unknown> : undefined;
+      const definition = source ? { ...structuredClone(source), title } : template ? { ...structuredClone(own?.definition ?? template.definition), title } : blankDefinition(title);
       const game = await client.game.create({ data: { id: gameId, creatorId, title, draft: { create: { definition, definitionFormat: formatOf(definition) } } }, include: { draft: true } });
       return draftView(game, game.draft!, null);
     },

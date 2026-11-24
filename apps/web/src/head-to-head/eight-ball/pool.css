@@ -2,7 +2,7 @@
 .pool:has(.pool-power) { --pool-power-space: 104px; }
 .pool-playfield { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .pool-playfield:has(.pool-power) { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; }
-.pool-table { display: block; width: 100%; height: auto; filter: drop-shadow(0 7px 10px #0005); }
+.pool-table { display: block; width: 100%; height: auto; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 7px 10px #0005); }
 .pool-table[data-aiming="true"] { cursor: crosshair; touch-action: none; }
 .pool-open { margin: 0; text-align: center; font-size: .875rem; color: var(--r-muted); }
 .pool-toolbar { display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: center; }
@@ -41,13 +41,24 @@
   to { opacity: 1; transform: none; }
 }
 .pool-controls { display: grid; gap: 8px; }
-.room .pool-place { justify-self: center; min-height: 44px; }
+.pool-place-row { display: grid; justify-items: center; gap: 6px; }
+/* Ball in hand is easy to miss: the place button is bright, with a white ball, and pulses until it is pressed. */
+.room .pool-place { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; margin: 0; padding: 0 20px; border-radius: 999px;
+  border: 2px solid var(--r-accent); background: color-mix(in srgb, var(--r-accent) 22%, var(--r-card-strong)); color: var(--r-text); font-weight: 850; font-size: 1.05rem;
+  animation: pool-place-pulse 1.6s ease-in-out infinite; }
+.room .pool-place .fa-icon { color: #fff; filter: drop-shadow(0 0 3px #0008); }
+.room .pool-place[aria-pressed="true"] { animation: none; background: var(--r-accent); color: var(--r-accent-ink); }
+.pool-place-hint { margin: 0; color: var(--r-accent); font-weight: 750; text-align: center; }
+@keyframes pool-place-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--r-accent) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .room .pool-place { animation: none; } }
 .pool-controls label { position: relative; display: block; min-width: 0; font-size: .8125rem; }
 .pool-controls label span { position: absolute; inset: 0 0 auto; display: flex; justify-content: space-between; gap: 4px; pointer-events: none; }
 .pool-controls label strong { font-variant-numeric: tabular-nums; color: var(--r-accent); }
 .room .pool-controls input.game-slider[type=range] { display: block; padding-block-start: 11px; border: 0; border-radius: 0; background: transparent; }
 .pool-power { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 4px; min-height: 0; text-align: center; }
-.pool-power > span { color: var(--r-text); font-size: .75rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.pool-power-value { justify-self: center; color: var(--r-text); font-size: 1rem; font-weight: 850; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* While pulling, the power is what the player watches: brighter and a little bigger. */
+.pool-power[data-pulling="true"] .pool-power-value { color: var(--r-accent); font-size: 1.125rem; }
 .pool-power-track {
   position: relative; width: 44px; min-height: 88px; height: 100%; box-sizing: border-box; overflow: hidden;
   border-radius: 22px; border: 2px solid #2a1a10; touch-action: none; cursor: ns-resize;
@@ -111,7 +122,7 @@
   .room-player .pool-playfield { grid-column: 1; grid-row: 2; width: min(100%, max(11rem, calc((100svh - 13rem) * var(--pool-table-ratio) + var(--pool-power-space)))); justify-self: center; }
   .room-player .pool-controls { grid-column: 2; grid-row: 2 / span 2; align-self: start; }
   .room-player .pool-toolbar { grid-column: 1 / -1; }
-  .room-player :is(.pool-pot-trays, .pool-open, .pool-place) { grid-column: 1; }
+  .room-player :is(.pool-pot-trays, .pool-open, .pool-place-row) { grid-column: 1; }
   .room-player:has(.duel-pool-playing) .room-bar { padding-block: 5px; }
   .room-player:has(.duel-pool-playing) .round-info { padding-block: 4px; }
   .room-player .room-grid:has(.duel-pool-playing) { padding: 6px 12px; }

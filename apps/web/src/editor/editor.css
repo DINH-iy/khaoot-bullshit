@@ -120,6 +120,15 @@
 .edge:hover .edge-end, .edge.selected .edge-end { fill: var(--e-accent-soft); stroke: var(--e-accent); stroke-width: 2; }
 .port-in.grabbable { pointer-events: auto; cursor: grab; }
 .port-in.grabbable:hover { border-color: var(--e-accent); }
+/* A group: a soft dashed frame behind its cards, named at the top; the name selects the whole group. */
+.flow-group { position: absolute; box-sizing: border-box; border: 2px dashed color-mix(in srgb, var(--e-muted) 55%, transparent); border-radius: 22px;
+  background: color-mix(in srgb, var(--e-accent) 5%, transparent); pointer-events: none; }
+.flow-group.selected { border-color: var(--e-accent); background: color-mix(in srgb, var(--e-accent) 10%, transparent); }
+.flow-group .flow-group-name { position: absolute; left: 12px; top: 6px; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); min-height: 28px; margin: 0;
+  padding: 2px 10px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-card); color: var(--e-text); font-size: .85rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; cursor: pointer; }
+.flow-group.selected .flow-group-name { border-color: var(--e-accent); color: var(--e-accent); }
+.flow-group .flow-group-name svg { flex: none; }
 .select-box { fill: color-mix(in srgb, var(--e-accent) 12%, transparent); stroke: var(--e-accent); stroke-dasharray: 5 5; }
 .scene-card.selected .card-label::after { content: ' · selected'; color: var(--e-accent); }
 
@@ -847,7 +856,9 @@
 }
 .scene-canvas .canvas-prompt-box::after { content: attr(data-text) " "; visibility: hidden; overflow: hidden; pointer-events: none; max-height: clamp(8rem, 34dvh, 18rem); }
 .scene-canvas .canvas-prompt-box[data-sized]::after { display: none; }
-.scene-canvas .canvas-prompt { resize: vertical; overflow: auto; border-color: var(--r-line); }
+.scene-canvas .canvas-prompt { resize: vertical; overflow: auto; border-color: var(--r-line);
+  /* A long question scrolls inside the screen: a thin bar in the scene's own colors, not the browser's gray one. */
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--r-text) 35%, transparent) transparent; }
 .scene-canvas .canvas-prompt:read-only { resize: none; }
 .canvas-media { display: grid; gap: 8px; justify-items: center; }
 .canvas-media > .stage-media { width: 100%; min-width: 0; }

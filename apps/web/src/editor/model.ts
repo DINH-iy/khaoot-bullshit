@@ -49,6 +49,11 @@ export function outputPort(node: Node, position: Point, option?: string): Point 
 export const BEND = 'bend--';
 export const bendKey = (edge: string, index: number) => `${BEND}${edge}--${index}`;
 export const isBendKey = (key: string) => key.startsWith(BEND);
+// A scene's group (flow/groups.ts), kept the same way under "group--<scene>" with the group's number as x.
+export const GROUP = 'group--';
+export const isGroupKey = (key: string) => key.startsWith(GROUP);
+/** A position that is a scene card (not an arrow's bend point or a scene's group). */
+export const isCardKey = (key: string) => !isBendKey(key) && !isGroupKey(key);
 export function bendsOf(positions: Positions, edge: string): Point[] {
   const points: Point[] = []; for (let index = 0; positions[bendKey(edge, index)]; index++) points.push(positions[bendKey(edge, index)]!);
   return points;
@@ -342,7 +347,7 @@ export function autoLayout(definition: Definition, { oneRow = false }: { oneRow?
  */
 export function lineUp(definition: Definition, positions: Positions, keys: string[], direction: 'row' | 'column'): Positions {
   const axis = direction === 'row' ? 'x' : 'y';
-  const placed = keys.filter(key => positions[key] && !isBendKey(key)).sort((a, b) => positions[a]![axis] - positions[b]![axis]);
+  const placed = keys.filter(key => positions[key] && isCardKey(key)).sort((a, b) => positions[a]![axis] - positions[b]![axis]);
   if (placed.length < 2) return positions;
   const first = positions[placed[0]!]!; const next = { ...positions }; let cursor = first[axis];
   for (const key of placed) {
@@ -362,7 +367,7 @@ export interface Guides { x: number | null; y: number | null }
  */
 export function snapCard(definition: Definition, positions: Positions, key: string, raw: Point): { point: Point; guides: Guides } {
   let x = snap(raw.x); let y = snap(raw.y); const guides: Guides = { x: null, y: null };
-  const others = Object.entries(positions).filter(([other]) => other !== key && !isBendKey(other));
+  const others = Object.entries(positions).filter(([other]) => other !== key && isCardKey(other));
   let bestX = ALIGN;
   for (const [, position] of others) if (Math.abs(raw.x - position.x) < bestX) { bestX = Math.abs(raw.x - position.x); x = position.x; guides.x = position.x; }
   let bestY = ALIGN + 4;

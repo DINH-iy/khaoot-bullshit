@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, TEAM_MINIGAMES, type SessionView } from '@party/contracts';
+import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, TEAM_MINIGAMES, arcadeSettings, type SessionView } from '@party/contracts';
 import { arcadeDefinition, arcadeRoundFits } from '../../src/arcade/definition.js';
 import { roundResults } from '../../src/arcade/results.js';
 import { assertExecutable } from '../../src/game/definition.js';
@@ -14,6 +14,33 @@ describe('arcade rounds', () => {
       expect(arcadeRoundFits(game, null)).toBe(!TEAM_MINIGAMES.includes(game));
       if (arcadeRoundFits(game, null)) expect(() => assertExecutable(arcadeDefinition(game, null))).not.toThrow();
       for (const formation of ['random', 'players'] as const) expect(() => assertExecutable(arcadeDefinition(game, { count: 2, formation }))).not.toThrow();
+    }
+  });
+
+  it("plays with the leader's settings for a game, and refuses settings that do not fit it", () => {
+    const stopClock = arcadeSettings('stop-clock', { seconds: 45, values: { targetMs: 7000 } });
+    expect(stopClock).toEqual({ seconds: 45, values: { targetMs: 7000, visibleMs: 3000 } });
+    expect(arcadeDefinition('stop-clock', null, undefined, true, stopClock).nodes[0]?.stages[0]).toMatchObject({ durationMs: 45_000, settings: { targetMs: 7000, visibleMs: 3000 } });
+    const pool = arcadeSettings('eight-ball', { values: { felt: 'blue', shotSeconds: 15 } });
+    expect(() => assertExecutable(arcadeDefinition('eight-ball', null, undefined, true, pool))).not.toThrow();
+    expect(arcadeDefinition('eight-ball', null, undefined, true, pool).nodes[0]?.stages[0]).toMatchObject({ contest: { kind: 'game', game: 'eight-ball', settings: { felt: 'blue', shotSeconds: 15 } } });
+    // Out of range, a duel with a round time, or an unknown setting: no round.
+    expect(arcadeSettings('stop-clock', { values: { targetMs: 3000, visibleMs: 5000 } })).toBeNull();
+    expect(arcadeSettings('rps', { seconds: 30 })).toBeNull();
+    expect(arcadeSettings('tap-race', { values: { speed: 2 } })).toBeNull();
+    // The chart and a speed-run course are never set from the arcade's settings.
+    expect(arcadeSettings('draw-the-graph', { values: { graph: { visible: [1, 2] } } })?.values).not.toHaveProperty('graph');
+    // Every game plays with its standard settings.
+    for (const game of [...MINIGAME_KEYS, ...HEAD_TO_HEAD_KEYS]) expect(arcadeSettings(game)).not.toBeNull();
+  });
+
+  it('explains the game the first time and skips that when the round is played again', () => {
+    for (const game of MINIGAME_KEYS) {
+      const teams = arcadeRoundFits(game, null) ? null : { count: 2, formation: 'random' as const };
+      expect(arcadeDefinition(game, teams).nodes[0]?.stages[0]?.explain).toEqual({});
+      const again = arcadeDefinition(game, teams, undefined, false);
+      expect(() => assertExecutable(again)).not.toThrow();
+      expect(again.nodes[0]?.stages[0]?.explain).toBeUndefined();
     }
   });
 

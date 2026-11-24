@@ -115,6 +115,11 @@
   background: linear-gradient(transparent, var(--r-bg2) 45%); pointer-events: none; }
 .arcade-lobby-action > * { width: min(528px, 100%); pointer-events: auto; }
 .room .arcade-lobby-action button.big { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; margin: 0; font-size: 1.1rem; }
+/* Desktop: no thumb to reach for. The leader's Play sits right under the choices, centered and button-sized. */
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  .arcade-lobby-action.arcade-play { position: static; padding: 4px 0 0; background: none; }
+  .arcade-lobby-action.arcade-play > * { width: min(320px, 100%); }
+}
 .arcade-waiting { margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 16px; box-sizing: border-box; border-radius: 999px;
   background: var(--r-card-strong); border: 1px solid var(--r-line); color: var(--r-muted); font-weight: 700; text-align: center; }
 .arcade-waiting .fa-icon { color: var(--r-accent); }
@@ -151,3 +156,18 @@
 .room .arcade-graph-option { display: grid; gap: 2px; width: 100%; margin: 0; padding: 10px 14px; border-radius: 12px; border: 2px solid transparent; background: var(--r-card-strong); color: var(--r-text); font: inherit; text-align: left; }
 .room .arcade-graph-option[aria-pressed=true] { border-color: var(--r-accent); }
 .arcade-graph-option small { color: var(--r-muted); font-size: .85rem; }
+
+/* The game and its ⚙ settings side by side; a lit ⚙ when the game plays with its own settings. */
+.arcade-game-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
+.room .arcade-settings-button { height: auto; min-height: 44px; }
+.room .arcade-settings-button[data-changed] { border-color: var(--r-accent); color: var(--r-accent); }
+.arcade-game-settings { display: grid; gap: 12px; }
+.arcade-game-settings > .ghost { justify-self: start; display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+/* − value + : the label on its own line on narrow phones, beside the buttons when there is room. */
+.arcade-stepper { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(4.5rem, auto) 44px; gap: 8px; align-items: center; }
+.arcade-stepper-label { font-weight: 700; min-width: 0; }
+.room .arcade-stepper button { display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border-radius: 12px;
+  border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); }
+.arcade-stepper output { text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 360px) { .arcade-stepper { grid-template-columns: 44px minmax(0, 1fr) 44px; } .arcade-stepper-label { grid-column: 1 / -1; } }
+.arcade-felt { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0006; vertical-align: middle; }

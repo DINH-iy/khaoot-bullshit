@@ -39,6 +39,21 @@ describe('authoring drafts and publishing', () => {
     await expect(authoring.get(author.id, gameId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it('copies a whole game of your own with its card layout, leaving the original as it was', async () => {
+    const author = await creator(); const source = await authoring.create(author.id, { gameId: randomUUID(), title: 'Original', startFrom: 'friday-night-chaos' });
+    const layout = { positions: { opening: { x: 120, y: 48 }, 'group--opening': { x: 1, y: 0 } } };
+    const saved = await authoring.save(author.id, source.gameId, { expectedRevision: source.revision, definition: { ...(source.definition as object), editor: layout } });
+    const copy = await authoring.create(author.id, { gameId: randomUUID(), title: 'Original (copy)', startFrom: null, copyOf: source.gameId });
+    expect(copy.definition).toMatchObject({ ...(saved.definition as object), title: 'Original (copy)', editor: layout });
+    expect((await authoring.get(author.id, source.gameId)).definition).toMatchObject({ title: 'Original', editor: layout });
+    // Only your own, current games; and not a built-in and a copy at once.
+    const stranger = await creator();
+    await expect(authoring.create(stranger.id, { gameId: randomUUID(), title: 'Stolen', startFrom: null, copyOf: source.gameId })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(authoring.create(author.id, { gameId: randomUUID(), title: 'Both', startFrom: 'friday-night-chaos', copyOf: source.gameId })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await authoring.archive(author.id, source.gameId);
+    await expect(authoring.create(author.id, { gameId: randomUUID(), title: 'Gone', startFrom: null, copyOf: source.gameId })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
   it('saves invalid work in progress, lists each problem on its scene, and refuses to overwrite a newer save', async () => {
     const author = await creator(); const { gameId, definition } = await authoring.create(author.id, { gameId: randomUUID(), title: 'Branches', startFrom: 'friday-night-chaos' });
     const broken = structuredClone(definition) as { title: string; edges: { option?: string; from: string }[] };

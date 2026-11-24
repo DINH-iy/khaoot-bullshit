@@ -1,4 +1,4 @@
-import { HEAD_TO_HEAD_GAMES, MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, type ArcadeGame, type ArcadeTeams, type GraphData } from '@party/contracts';
+import { arcadeSettings, HEAD_TO_HEAD_GAMES, MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, type ArcadeGame, type ArcadeTeams, type GraphData } from '@party/contracts';
 import { parseDefinition, type GameDefinition } from '../game/definition.js';
 
 // The room's standard texts speak of a host; in the arcade the leader runs the round.
@@ -14,15 +14,17 @@ export const arcadeRoundFits = (game: ArcadeGame, teams: ArcadeTeams | null) => 
 /**
  * An arcade minigame uses standard settings and
  * "how to play" (the round waits until the leader starts it, so every phone has
- * arrived and read it), alone or in teams made for this round.
+ * arrived and read it), alone or in teams made for this round. A round played again skips "how to play": everyone
+ * just played the same game. `chosen`: the leader's settings for the game (arcadeSettings; the standard ones by default).
  */
-export function arcadeDefinition(game: ArcadeGame, teams: ArcadeTeams | null, chart?: { graph?: GraphData; question: string }): GameDefinition {
+export function arcadeDefinition(game: ArcadeGame, teams: ArcadeTeams | null, chart?: { graph?: GraphData; question: string }, explain = true,
+  chosen: { seconds: number | null; values: Record<string, unknown> } | null = arcadeSettings(game)): GameDefinition {
   if (isHeadToHeadKey(game)) {
     const name = HEAD_TO_HEAD_GAMES[game].name;
     return parseDefinition({
       formatVersion: 2, title: `Arcade: ${name}`, startNodeKey: 'play', edges: [],
       nodes: [{ key: 'play', stages: [{
-        key: 'play', kind: 'duel', prompt: name, pick: 'random', contest: { kind: 'game', game },
+        key: 'play', kind: 'duel', prompt: name, pick: 'random', contest: { kind: 'game', game, ...(chosen && Object.keys(chosen.values).length ? { settings: chosen.values } : {}) },
         durationMs: 15_000, betMilli: '1000',
       }] }],
     });
@@ -32,8 +34,8 @@ export function arcadeDefinition(game: ArcadeGame, teams: ArcadeTeams | null, ch
     formatVersion: 2, title: `Arcade: ${info.name}`, startNodeKey: 'play', presentation: { texts: LEADER_TEXTS },
     nodes: [{ key: 'play', stages: [{
       // Draw the Graph: a chart of the graph library (its own question); the stock sample has none of its own.
-      key: 'play', kind: 'minigame', prompt: chart?.graph ? chart.question : info.name, game, durationMs: info.defaultSeconds * 1000, explain: {},
-      ...(chart?.graph ? { settings: { graph: chart.graph } } : {}),
+      key: 'play', kind: 'minigame', prompt: chart?.graph ? chart.question : info.name, game, durationMs: (chosen?.seconds ?? info.defaultSeconds) * 1000, ...(explain ? { explain: {} } : {}),
+      settings: { ...(chosen?.values ?? info.defaults), ...(chart?.graph ? { graph: chart.graph } : {}) },
       ...(game === 'bus' ? { decide: 'vote', voteSeconds: 20 } : {}),
       ...(teams ? { play: { kind: 'teams', lineup: { kind: 'round', form: { split: { kind: 'count', teams: teams.count }, formation: teams.formation } }, answers: 'everyone', points: 'members' } } : {}),
     }] }],

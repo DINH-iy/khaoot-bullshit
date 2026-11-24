@@ -22,6 +22,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
   deleteOne: 'Delete “{title}”?', deleteMany: 'Delete {count} scenes?', deleteTextOne: 'The scene and its connections go. Undo (Ctrl/Cmd+Z) brings it back.',
   deleteTextMany: 'The scenes and their connections go. Undo (Ctrl/Cmd+Z) brings them back.', deleteScene: 'Delete scene', deleteScenes: 'Delete {count} scenes',
   selectedN: '{count} scenes selected', clear: 'Clear selection', multiHint: 'Drag any of them to move them together, or use the arrow keys. Shift-click a scene to add or remove it.',
+  selectTwoGroup: 'Select two or more scenes to group them (Shift-click or Shift-drag).', groupedN: 'Grouped {count} scenes. Click one to select them all; Alt-click takes one scene.', ungroupedNotice: 'Ungrouped. Each scene is selected on its own again.', groupThese: 'Group', ungroup: 'Ungroup', groupName: '{title} · {count} scenes', groupTitle: 'Select this group', tip6: '**Click** a grouped scene to select its group; **Alt-click** takes that scene alone. **Ctrl/⌘ + G** groups the selected scenes.',
   duplicateN: 'Duplicate {count} scenes', copyHint: 'Copy and paste also work: Ctrl/Cmd+C, then Ctrl/Cmd+V, even in another game.', yesDelete: 'Yes, delete {count} scenes', keepThem: 'Keep them',
 }, {
   nl: {
@@ -44,6 +45,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     deleteOne: '“{title}” verwijderen?', deleteMany: '{count} scènes verwijderen?', deleteTextOne: 'De scène en haar verbindingen verdwijnen. Ongedaan maken (Ctrl/Cmd+Z) haalt haar terug.',
     deleteTextMany: 'De scènes en hun verbindingen verdwijnen. Ongedaan maken (Ctrl/Cmd+Z) haalt ze terug.', deleteScene: 'Scène verwijderen', deleteScenes: '{count} scènes verwijderen',
     selectedN: '{count} scènes gekozen', clear: 'Keuze wissen', multiHint: 'Sleep er een om ze samen te verplaatsen, of gebruik de pijltjestoetsen. Shift-klik op een scène om hem toe te voegen of weg te halen.',
+    selectTwoGroup: 'Kies twee of meer scènes om ze te groeperen (Shift-klik of Shift-slepen).', groupedN: '{count} scènes gegroepeerd. Klik er één om ze allemaal te kiezen; Alt-klik kiest één scène.', ungroupedNotice: 'Groep losgemaakt. Elke scène wordt weer los gekozen.', groupThese: 'Groeperen', ungroup: 'Groep losmaken', groupName: '{title} · {count} scènes', groupTitle: 'Deze groep kiezen', tip6: '**Klik** een gegroepeerde scène om de groep te kiezen; **Alt-klik** kiest alleen die scène. **Ctrl/⌘ + G** groepeert de gekozen scènes.',
     duplicateN: '{count} scènes dupliceren', copyHint: 'Kopiëren en plakken werkt ook: Ctrl/Cmd+C, dan Ctrl/Cmd+V, zelfs in een ander spel.', yesDelete: 'Ja, {count} scènes verwijderen', keepThem: 'Laten staan',
   },
   de: {
@@ -66,6 +68,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     deleteOne: '„{title}“ löschen?', deleteMany: '{count} Szenen löschen?', deleteTextOne: 'Die Szene und ihre Verbindungen verschwinden. Rückgängig (Strg/Cmd+Z) holt sie zurück.',
     deleteTextMany: 'Die Szenen und ihre Verbindungen verschwinden. Rückgängig (Strg/Cmd+Z) holt sie zurück.', deleteScene: 'Szene löschen', deleteScenes: '{count} Szenen löschen',
     selectedN: '{count} Szenen ausgewählt', clear: 'Auswahl aufheben', multiHint: 'Ziehe eine davon, um sie zusammen zu verschieben, oder nutze die Pfeiltasten. Umschalt-Klick auf eine Szene fügt sie hinzu oder entfernt sie.',
+    selectTwoGroup: 'Wähle zwei oder mehr Szenen, um sie zu gruppieren (Umschalt-Klick oder Umschalt-Ziehen).', groupedN: '{count} Szenen gruppiert. Ein Klick wählt alle; Alt-Klick wählt eine Szene.', ungroupedNotice: 'Gruppe aufgelöst. Jede Szene wird wieder einzeln gewählt.', groupThese: 'Gruppieren', ungroup: 'Gruppe auflösen', groupName: '{title} · {count} Szenen', groupTitle: 'Diese Gruppe wählen', tip6: '**Klicke** eine gruppierte Szene, um ihre Gruppe zu wählen; **Alt-Klick** wählt nur diese Szene. **Strg/⌘ + G** gruppiert die gewählten Szenen.',
     duplicateN: '{count} Szenen duplizieren', copyHint: 'Kopieren und Einfügen geht auch: Strg/Cmd+C, dann Strg/Cmd+V, sogar in einem anderen Spiel.', yesDelete: 'Ja, {count} Szenen löschen', keepThem: 'Behalten',
   },
   ro: {
@@ -88,6 +91,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     deleteOne: 'Ștergi „{title}”?', deleteMany: 'Ștergi {count} scene?', deleteTextOne: 'Scena și conexiunile ei dispar. Anulează (Ctrl/Cmd+Z) o aduce înapoi.',
     deleteTextMany: 'Scenele și conexiunile lor dispar. Anulează (Ctrl/Cmd+Z) le aduce înapoi.', deleteScene: 'Șterge scena', deleteScenes: 'Șterge {count} scene',
     selectedN: '{count} scene alese', clear: 'Golește selecția', multiHint: 'Trage oricare dintre ele ca să le muți împreună sau folosește tastele săgeți. Shift-clic pe o scenă o adaugă sau o scoate.',
+    selectTwoGroup: 'Alege două sau mai multe scene ca să le grupezi (Shift-clic sau Shift-tragere).', groupedN: '{count} scene grupate. Un clic le alege pe toate; Alt-clic alege o singură scenă.', ungroupedNotice: 'Grup desfăcut. Fiecare scenă se alege din nou separat.', groupThese: 'Grupează', ungroup: 'Desface grupul', groupName: '{title} · {count} scene', groupTitle: 'Alege acest grup', tip6: '**Clic** pe o scenă grupată alege grupul; **Alt-clic** alege doar acea scenă. **Ctrl/⌘ + G** grupează scenele alese.',
     duplicateN: 'Dublează {count} scene', copyHint: 'Merg și copierea și lipirea: Ctrl/Cmd+C, apoi Ctrl/Cmd+V, chiar și în alt joc.', yesDelete: 'Da, șterge {count} scene', keepThem: 'Păstrează-le',
   },
 });

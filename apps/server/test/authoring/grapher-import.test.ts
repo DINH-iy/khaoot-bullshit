@@ -19,7 +19,7 @@ it('only imports for editors, maps a public chart to bounded Grapher requests, a
       method: 'POST', url: '/api/host/graph-import', payload: { url },
       headers: { 'x-party-request': '1', origin: config.PUBLIC_ORIGIN, ...(signedIn ? { cookie: `party_owner=${token}` } : {}) },
     });
-    const link = 'https://ourworldindata.org/grapher/life-expectancy?country=~NLD&time=2000..2022&ignored=1';
+    const link = 'https://ourworldindata.org/grapher/life-expectancy?country=~NLD&time=2000..2022&tab=map&ignored=1';
     expect((await post(link, false)).statusCode).toBe(401);
     for (const invalid of [
       'https://ourworldindata.org@example.org/grapher/life-expectancy',
@@ -34,7 +34,7 @@ it('only imports for editors, maps a public chart to bounded Grapher requests, a
     expect(fetch.mock.calls.map(([url]) => url.pathname)).toEqual(['/grapher/life-expectancy.csv', '/grapher/life-expectancy.metadata.json']);
     for (const [url, options] of fetch.mock.calls) {
       expect(url.origin).toBe('https://ourworldindata.org');
-      expect(Object.fromEntries(url.searchParams)).toEqual({ country: '~NLD', time: '2000..2022', v: '1', csvType: 'filtered', useColumnShortNames: 'true' });
+      expect(Object.fromEntries(url.searchParams)).toEqual({ country: '~NLD', time: '2000..2022', tab: 'line', v: '1', csvType: 'filtered', useColumnShortNames: 'true' });
       expect(options.redirect).toBe('error');
     }
     fetch.mockResolvedValueOnce(new Response('a'.repeat(512 * 1024 + 1)));
