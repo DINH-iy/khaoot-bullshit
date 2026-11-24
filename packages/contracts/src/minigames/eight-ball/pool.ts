@@ -36,6 +36,10 @@ export const POOL_MAX_MOTION_FRAMES = 181;
 export const POOL_STEPS_PER_FRAME = 8;
 export const POOL_AIM_STEP = .25;
 export const POOL_MATCH_MAX_SECONDS = 3600;
+/** Seconds each player has per shot; 0 turns the shot clock off. */
+export const POOL_SHOT_SECONDS = [0, 15, 30, 45, 60] as const;
+export const DEFAULT_POOL_SHOT_SECONDS = 30;
+export const PoolShotSecondsSchema = z.union(POOL_SHOT_SECONDS.map(seconds => z.literal(seconds)) as [z.ZodLiteral<0>, z.ZodLiteral<15>, z.ZodLiteral<30>, z.ZodLiteral<45>, z.ZodLiteral<60>]);
 export const PoolMatchSecondsSchema = z.number().int().min(1).max(POOL_MATCH_MAX_SECONDS);
 export const POOL_CUSTOM_RANGES = {
   rollingResistance: { min: .005, max: .12, step: .001 },
@@ -80,6 +84,20 @@ export const PoolShotSchema = z.strictObject({
   cue: PoolPositionSchema.optional(),
   spin: PoolSpinSchema.optional(),
 });
+/**
+ * The shooter's aim while they line up, relayed live (never stored) so the others see a ghost of it.
+ * `match` names the duel run or challenge; `pull` is how far the cue is drawn back in table units.
+ */
+export const PoolAimSchema = z.strictObject({
+  match: z.string().min(1).max(64), shot: z.number().int().min(0).max(POOL_MAX_SHOTS),
+  angle: z.number().min(0).max(360), pull: z.number().min(0).max(250), cue: PoolPositionSchema.optional(),
+});
+export type PoolAim = z.infer<typeof PoolAimSchema>;
+/** A relayed aim, with the sender's player id added by the server. */
+export const PoolAimNoticeSchema = PoolAimSchema.extend({ playerId: z.string().min(1).max(64) });
+export type PoolAimNotice = z.infer<typeof PoolAimNoticeSchema>;
+/** Sent by a player's phone when the shooter's time is up; the server checks the clock itself. */
+export const PoolTimeoutSchema = z.strictObject({ game: z.literal('eight-ball'), timeout: z.literal(true), shot: z.number().int().min(0).max(POOL_MAX_SHOTS - 1) });
 export const PoolBoardSchema = z.strictObject({
   game: z.literal('eight-ball'), balls: PoolFrameSchema, solids: z.union([z.literal(0), z.literal(1)]).nullable(),
   ballInHand: z.boolean(), foul: z.boolean(), shot: z.number().int().min(0).max(POOL_MAX_SHOTS),
@@ -90,6 +108,10 @@ export const PoolBoardSchema = z.strictObject({
   ballBehavior: PoolBallBehaviorSchema.optional(),
   start: ResolvedPoolStartSchema.optional(),
   felt: PoolFeltSchema.optional(),
+  /** The shot clock: seconds per shot and what was left when this view was made. */
+  shotClock: z.strictObject({ seconds: z.number().int().min(1).max(60), leftMs: z.number().int().min(0).max(70_000) }).optional(),
+  /** The last turn ended because the shooter ran out of time. */
+  shotTimedOut: z.boolean().optional(),
   potsBySeat: z.tuple([z.array(z.number().int().min(1).max(15)).max(15), z.array(z.number().int().min(1).max(15)).max(15)]).optional(),
 });
 

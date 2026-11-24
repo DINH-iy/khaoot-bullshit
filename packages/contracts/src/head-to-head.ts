@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolFeltSchema, PoolShotSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
+import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolFeltSchema, PoolShotSchema, PoolShotSecondsSchema, PoolStartSchema, PoolTimeoutSchema } from './minigames/eight-ball/pool.js';
 
 /**
  * Head-to-head games: two players, one board. Used by the duel scene (the two
@@ -27,7 +27,7 @@ const SETTINGS = {
   rps: z.object({ firstTo: z.number().int().min(1).max(5) }).strict(),
   tictactoe: z.object({}).strict(),
   chess: z.object({}).strict(),
-  'eight-ball': z.object({ ballBehavior: PoolBallBehaviorSchema.optional(), start: PoolStartSchema.optional(), felt: PoolFeltSchema.optional() }).strict(),
+  'eight-ball': z.object({ ballBehavior: PoolBallBehaviorSchema.optional(), start: PoolStartSchema.optional(), felt: PoolFeltSchema.optional(), shotSeconds: PoolShotSecondsSchema.optional() }).strict(),
   'creature-duel': z.object({ size: z.union([z.literal(1), z.literal(3)]) }).strict(),
 } satisfies Record<HeadToHeadKey, z.ZodType>;
 export type HeadToHeadSettings<K extends HeadToHeadKey = HeadToHeadKey> = z.infer<typeof SETTINGS[K]>;
@@ -51,8 +51,8 @@ const CreatureFrame = z.object({
 const Square = z.string().regex(/^[a-h][1-8]$/);
 export const RpsPickSchema = z.enum(['rock', 'paper', 'scissors']);
 /** One move. Resigning is not a move: it has its own command. */
-export const HeadToHeadMoveSchema = z.discriminatedUnion('game', [
-  PoolShotSchema,
+export const HeadToHeadMoveSchema = z.union([
+  PoolShotSchema, PoolTimeoutSchema,
   z.object({ game: z.literal('creature-duel'), pick: z.union([CreatureMove, z.number().int().min(0).max(2)]) }).strict(),
   z.object({ game: z.literal('rps'), pick: RpsPickSchema }).strict(),
   z.object({ game: z.literal('tictactoe'), cell: z.number().int().min(0).max(8) }).strict(),

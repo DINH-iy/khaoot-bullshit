@@ -34,6 +34,7 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
   if (duel.practicePlayerId && duel.contest.kind === 'game' && duel.contest.view) return <div className="duel duel-pool-playing" role="region" aria-label={p('duel')}>
     {(state.role !== 'player' || me === duel.practicePlayerId) ? <Suspense fallback={<p role="status">{p('opening')}</p>}>
       <HeadToHead view={duel.contest.view} names={[poolText('sideA'), poolText('sideB')]} showTurnName
+        live={{ match: stage.id, seats: [duel.practicePlayerId, duel.practicePlayerId] }}
         busy={disabled || state.view.status !== 'RUNNING'} onMove={move => send('duel.move', { stageRunId: stage.id, move })} />
     </Suspense> : <p className="duel-note">{poolText('watch')}</p>}
   </div>;
@@ -79,7 +80,7 @@ export function DuelPanel({ state, stage, disabled, send }: { state: RoomSnapsho
       : own ? <p className="duel-note">{t('duel.youBet', { name: name(own) })}</p>
       : canBet ? <p className="duel-note">{t('duel.bet')}</p> : null}
     {playing && showBoard && (stage.status === 'CLOSED' || winner) && <Suspense fallback={<p role="status">{p('opening')}</p>}>
-      <HeadToHead view={playing} names={[name(a), name(b)]} busy={disabled || Boolean(winner) || state.view.status !== 'RUNNING'}
+      <HeadToHead view={playing} names={[name(a), name(b)]} live={a && b ? { match: stage.id, seats: [a, b] } : undefined} busy={disabled || Boolean(winner) || state.view.status !== 'RUNNING'}
         onMove={(move: HeadToHeadMove) => send('duel.move', { stageRunId: stage.id, move })} onResign={() => send('duel.resign', { stageRunId: stage.id })} />
     </Suspense>}
     {host && !pool && !winner && duel.contest.kind === 'game' && duel.contest.view?.outcome?.kind === 'draw' && <p className="hint">{p('draw')}</p>}

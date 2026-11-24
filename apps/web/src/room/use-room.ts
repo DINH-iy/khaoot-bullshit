@@ -3,11 +3,12 @@ import { testSeat } from './test-seat.js';
 import { io, type Socket } from 'socket.io-client';
 import { createLiveStrokes } from '../drawing/live-strokes.js';
 import { createReactionStore } from '../room-extras/reactions.js';
+import { createPoolAimStore } from '../head-to-head/eight-ball/live-aim.js';
 import { translate } from '../i18n/texts.js';
 import { ROOM_TEXTS } from './room.text.js';
 import { isUnavailablePageError } from '../navigation.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
-import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, SessionChangedSchema, type GameCommand, type RoomReply, type RoomSnapshot } from '@party/contracts';
+import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, SessionChangedSchema, type GameCommand, type PoolAim, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
@@ -18,7 +19,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
   // Counts challenge updates pushed to this phone; the challenges sheet reloads when it changes.
   const [challengeTick, setChallengeTick] = useState(0);
   const [go, setGo] = useState<{ stageRunId: string; goAt: string; receivedAt: number } | null>(null); const [progress, setProgress] = useState<{ stageRunId: string; counts: { playerId: string; count: number }[] } | null>(null);
-  const [liveStrokes] = useState(createLiveStrokes); const [reactions] = useState(createReactionStore);
+  const [liveStrokes] = useState(createLiveStrokes); const [reactions] = useState(createReactionStore); const [poolAims] = useState(createPoolAimStore);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
   // What the host was looking at when acting: used to decide whether a conflicting action is still meant.
   const latestRef = useRef<RoomSnapshot | undefined>(undefined); const basisRef = useRef('');
@@ -135,6 +136,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('minigame.go', (data: { stageRunId?: unknown; goAt?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && typeof data.goAt === 'string') { setGo({ stageRunId: data.stageRunId, goAt: data.goAt, receivedAt: performance.now() }); requestSync(); } });
     socket.on('drawing.live', (data: unknown) => { if (mounted) liveStrokes.apply(data); });
     socket.on('room.reaction', (data: unknown) => { if (mounted) reactions.add(data); });
+    socket.on('room.pool-aim', (data: unknown) => { if (mounted) poolAims.add(data); });
     socket.on('minigame.progress', (data: { stageRunId?: unknown; counts?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && Array.isArray(data.counts)) setProgress({ stageRunId: data.stageRunId, counts: (data.counts as { playerId: string; count: number }[]).filter(entry => typeof entry?.playerId === 'string' && Number.isInteger(entry.count)).slice(0, 512) }); });
     socket.on('room.error', (error: { code: string }) => {
       if (!mounted) return;
@@ -146,12 +148,14 @@ export function useRoom(sessionId: string | undefined, display = false) {
     const foreground = () => { if (!document.hidden) { if (!socket.connected) socket.connect(); reconciled = false; requestSync(); void heartbeat(); } };
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
     return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
-  }, [sessionId, display, remember, storageKey, liveStrokes, reactions]);
+  }, [sessionId, display, remember, storageKey, liveStrokes, reactions, poolAims]);
   return { snapshot, denied: deniedSession !== undefined && deniedSession === sessionId, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress, challengeTick,
     /** A tap race's running count; fire-and-forget, the final result is the saved one. */
     // Not volatile: a report waits for a busy connection instead of being dropped, so the server sees every tap it can.
     sendTaps(stageRunId: string, count: number) { socketRef.current?.emit('minigame.taps', { stageRunId, count }); },
-    liveStrokes, reactions,
+    liveStrokes, reactions, poolAims,
+    /** The 8-ball shooter's aim while lining up; dropped when the connection is busy, the next one replaces it. */
+    sendPoolAim(aim: PoolAim) { socketRef.current?.volatile.emit('room.pool-aim', aim); },
     /** An emoji or sticker for the shared screen; fire-and-forget (the server limits the pace). */
     sendReaction(reaction: number) { socketRef.current?.volatile.emit('room.react', { reaction }); },
     /** A stroke of a Pass the pencil turn while it is drawn (others see it grow); `stroke: null` with a smaller `count` is an undo. */

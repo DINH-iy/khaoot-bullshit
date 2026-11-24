@@ -1,4 +1,5 @@
 import { Countdown } from '../minigames/shared/countdown.js';
+import { PoolAimContext } from '../head-to-head/eight-ball/live-aim.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { testSeat } from './test-seat.js';
 import { isSharedPrediction, answerMark, cleanRoomCode, formatRoomCode, GameCommandSchema, GameIdSchema, PLAYER_COMMANDS, ROOM_CODE_LENGTH, RoomLookSchema, type TextKey } from '@party/contracts';
@@ -340,6 +341,7 @@ export function RoomScreen() {
   };
   const connected = room.connection === 'Connected';
   const me = state?.players.find(player => player.id === state.selfPlayerId);
+  const poolAim = { store: room.poolAims, send: room.sendPoolAim };
   const minigameLive = { go: room.go, progress: room.progress, sendTaps: room.sendTaps, strokes: room.liveStrokes, sendStroke: room.sendStroke };
   const saved = t((stage?.kind === 'vote' || stage?.kind === 'route' ? (captainAnswers(stage?.teams ?? null) ? 'vote.savedTeam' : 'vote.saved') : captainAnswers(stage?.teams ?? null) ? 'answer.savedTeam' : 'answer.saved') as TextKey);
 
@@ -372,16 +374,16 @@ export function RoomScreen() {
 
   if (role === 'display' && state && poolDuel && stage?.status === 'CLOSED' && stage.duel?.contest.kind === 'game' &&
       stage.duel.contest.view && state.view.status !== 'FINISHED') {
-    return <LookContext.Provider value={look}><main ref={roomRoot} className={`room room-display pool-tv ${lookClass}`} style={lookStyle}>
+    return <LookContext.Provider value={look}><PoolAimContext.Provider value={poolAim}><main ref={roomRoot} className={`room room-display pool-tv ${lookClass}`} style={lookStyle}>
       <DuelPanel key={stage.id} state={state} stage={stage} disabled send={command} />
       <div className="pool-tv-clock"><StageTimer stage={stage} remaining={remaining} /></div>
-    </main></LookContext.Provider>;
+    </main></PoolAimContext.Provider></LookContext.Provider>;
   }
 
   // A player in a team: the page's top stripe is the team's colour (this round's team, else the game's).
   const myTeamColor = role === 'player' && state ? (stage?.teams?.teams.find(team => team.index === stage.teams!.ownTeamIndex)?.color
     ?? state.view.teamStandings.find(team => team.memberIds.includes(state.selfPlayerId ?? ''))?.color) : undefined;
-  return <LookContext.Provider value={look}><RoomSessionContext.Provider value={sessionId ?? null}><StageActionSlot.Provider value={actionSlot}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''}${myTeamColor ? ' in-team' : ''} ${lookClass}`} style={myTeamColor ? { ...lookStyle, '--my-team': myTeamColor } as React.CSSProperties : lookStyle}>
+  return <LookContext.Provider value={look}><PoolAimContext.Provider value={poolAim}><RoomSessionContext.Provider value={sessionId ?? null}><StageActionSlot.Provider value={actionSlot}><main ref={roomRoot} className={`room room-${role}${state?.view.status === 'LOBBY' ? ' in-lobby' : ''}${myTeamColor ? ' in-team' : ''} ${lookClass}`} style={myTeamColor ? { ...lookStyle, '--my-team': myTeamColor } as React.CSSProperties : lookStyle}>
     <header className="room-bar session-bar">
       <h1 className="visually-hidden">{state ? r(role === 'host' ? 'hostScreen' : role === 'display' ? 'sharedScreen' : 'yourPhone', { title: state.view.title }) : r('partyRoom')}</h1>
       <p className="brand">party<span>.</span></p>
@@ -588,7 +590,7 @@ export function RoomScreen() {
     {state && role === 'player' && <PointsCelebration customizable={state.view.phoneEffects === true} roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
     {state && role === 'display' && canSeeScores && !scoreMoment && state.view.status !== 'LOBBY' && stage?.revealed && <FloatingScores leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
     {state && role !== 'player' && state.settings.reactions && !scoreBubbles && <ReactionsOverlay state={state} store={room.reactions} />}
-  </main></StageActionSlot.Provider></RoomSessionContext.Provider></LookContext.Provider>;
+  </main></StageActionSlot.Provider></RoomSessionContext.Provider></PoolAimContext.Provider></LookContext.Provider>;
 }
 
 type StageInput = NonNullable<NonNullable<ReturnType<typeof useRoom>['snapshot']>['view']['stage']>['input'];

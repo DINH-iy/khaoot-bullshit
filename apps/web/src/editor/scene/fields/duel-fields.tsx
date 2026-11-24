@@ -1,4 +1,4 @@
-import { DEFAULT_POOL_START, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, placePoints, PoolBallBehaviorSchema, PoolFeltSchema, PoolMatchSecondsSchema, DEFAULT_POOL_FELT, POOL_MATCH_MAX_SECONDS, PoolStartSchema, type Places } from '@party/contracts';
+import { DEFAULT_POOL_START, HEAD_TO_HEAD_DEFAULTS, HEAD_TO_HEAD_KEYS, isHeadToHeadKey, placePoints, PoolBallBehaviorSchema, PoolFeltSchema, PoolShotSecondsSchema, POOL_SHOT_SECONDS, DEFAULT_POOL_SHOT_SECONDS, PoolMatchSecondsSchema, DEFAULT_POOL_FELT, POOL_MATCH_MAX_SECONDS, PoolStartSchema, type Places } from '@party/contracts';
 import { PlacesFields } from './places-fields.js';
 import { useState } from 'react';
 import { ChoiceDialog, type CardChoice } from '../../controls/choice-dialog.js';
@@ -37,6 +37,7 @@ export function DuelFields({ part, stage, onChange, addTeams }: { part: 'setting
   const ballBehavior = PoolBallBehaviorSchema.safeParse(settings['ballBehavior']);
   const poolStart = PoolStartSchema.safeParse(settings['start']);
   const felt = PoolFeltSchema.safeParse(settings['felt']);
+  const shotSeconds = PoolShotSecondsSchema.safeParse(settings['shotSeconds']).data ?? DEFAULT_POOL_SHOT_SECONDS;
   const set = (change: Partial<Stage>, field: string) => onChange({ ...stage, ...change }, field);
   const [picking, setPicking] = useState(false);
   const teamPool = game === 'eight-ball' && stage['pick'] === 'teams';
@@ -85,6 +86,9 @@ export function DuelFields({ part, stage, onChange, addTeams }: { part: 'setting
   </>;
   if (part === 'matchup') return <>
     {matchup}
+    <Segmented label={pool('shotClock')} value={String(shotSeconds)} choices={POOL_SHOT_SECONDS.map(seconds =>
+      ({ value: String(seconds), label: seconds ? pool('shotSeconds', { seconds }) : pool('shotOff') }))}
+      onChange={value => set({ contest: { kind: 'game', game: 'eight-ball', settings: { ...settings, shotSeconds: Number(value) } } }, 'shotSeconds')} />
     <label className="ed-inline">{pool('matchSeconds')}
       <input type="number" min={1} max={POOL_MATCH_MAX_SECONDS} placeholder={pool('unlimited')}
         value={typeof stage['matchSeconds'] === 'number' ? stage['matchSeconds'] : ''} onChange={event => {

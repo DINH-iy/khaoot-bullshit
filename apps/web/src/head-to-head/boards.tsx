@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { HEAD_TO_HEAD_GAMES, type HeadToHeadKey, type HeadToHeadMove, type HeadToHeadView } from '@party/contracts';
 import { CreatureBoard } from './creature-board.js';
 import { PoolBoard } from './eight-ball/pool-board.js';
+import type { PoolLive } from './eight-ball/live-aim.js';
 import { Replay } from './replay.js';
 import { PIECES, RPS_ICONS, squaresOf } from './pieces.js';
 import { h, listItem } from './h2h.text.js';
@@ -9,7 +10,7 @@ import { gameName } from '../presentation/catalog.text.js';
 import './head-to-head.css';
 
 type Board<K extends HeadToHeadKey> = Extract<HeadToHeadView['board'], { game: K }>;
-interface BoardProps<K extends HeadToHeadKey> { view: HeadToHeadView; board: Board<K>; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void; statusLabel?: string | undefined }
+interface BoardProps<K extends HeadToHeadKey> { view: HeadToHeadView; board: Board<K>; names: [string, string]; canMove: boolean; onMove: (move: HeadToHeadMove) => void; statusLabel?: string | undefined; live?: PoolLive | undefined }
 
 const RPS_ORDER = ['rock', 'paper', 'scissors'] as const;
 const pickName = (pick: typeof RPS_ORDER[number]) => listItem('picks', RPS_ORDER.indexOf(pick));
@@ -80,7 +81,7 @@ const BOARDS: { [K in HeadToHeadKey]: (props: BoardProps<K>) => ReactNode } = { 
  * A head-to-head game as one phone (or screen) sees it: whose turn, the board,
  * resigning, and once it is over the result and its replay.
  */
-export function HeadToHead({ view, names, busy, onMove, onResign, showTurnName = false }: { view: HeadToHeadView; names: [string, string]; busy: boolean; onMove: (move: HeadToHeadMove) => void; onResign?: () => void; showTurnName?: boolean }) {
+export function HeadToHead({ view, names, busy, onMove, onResign, showTurnName = false, live }: { view: HeadToHeadView; names: [string, string]; busy: boolean; onMove: (move: HeadToHeadMove) => void; onResign?: () => void; showTurnName?: boolean; live?: PoolLive | undefined }) {
   const [confirm, setConfirm] = useState(false);
   const Board = BOARDS[view.game] as (props: BoardProps<HeadToHeadKey>) => ReactNode;
   const turnText = view.outcome ? null : view.turn === 'both' ? h('bothPick') : view.turn === null ? null
@@ -90,7 +91,7 @@ export function HeadToHead({ view, names, busy, onMove, onResign, showTurnName =
     {view.game !== 'eight-ball' && <p className="h2h-title"><strong>{gameName(view.game) || HEAD_TO_HEAD_GAMES[view.game].name}</strong><span className="h2h-title-dot" aria-hidden="true"> · </span>{h('versus', { first: names[0], second: names[1] })}</p>}
     {view.game !== 'eight-ball' && turnText && <p className="h2h-turn" role="status">{turnText}</p>}
     {result && <p className="h2h-result" role="status">{result}</p>}
-    <Board view={view} board={view.board} names={names} canMove={!busy && view.seat !== null && !view.outcome} onMove={onMove} statusLabel={result ?? turnText ?? undefined} />
+    <Board view={view} board={view.board} names={names} canMove={!busy && view.seat !== null && !view.outcome} onMove={onMove} statusLabel={result ?? turnText ?? undefined} live={live} />
     {view.seat !== null && !view.outcome && onResign && (confirm
       ? <div className="actions"><button type="button" className="danger-outline" disabled={busy} onClick={() => { setConfirm(false); onResign(); }}>{h('yesGiveUp')}</button><button type="button" className="ghost" onClick={() => setConfirm(false)}>{h('keepPlaying')}</button></div>
       : <button type="button" className="ghost small-button" onClick={() => setConfirm(true)}>{h('giveUp')}</button>)}

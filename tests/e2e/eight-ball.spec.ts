@@ -131,6 +131,11 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect(shoot).toBeEnabled();
     await expect(aim).toHaveAttribute('aria-valuenow', '0');
+    // The other player sees the shooter's aim live, as a ghost.
+    await aim.press('ArrowRight');
+    await expect(incoming.getByRole('img', { name: 'Pool table' })).toHaveAttribute('data-ghost-angle', '0.25');
+    await aim.press('ArrowLeft');
+    await expect(incoming.getByRole('img', { name: 'Pool table' })).toHaveAttribute('data-ghost-angle', '0');
 
     let releaseMove!: () => void;
     const moveGate = new Promise<void>(resolve => { releaseMove = resolve; });

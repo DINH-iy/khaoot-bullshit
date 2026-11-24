@@ -179,6 +179,8 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
   rotations?: ReadonlyMap<number, BallRotation>;
   target?: PoolTarget | null; objectGuide?: boolean; start?: ResolvedPoolStart;
   sinking?: ReadonlyMap<number, number> | undefined; felt?: PoolFelt | undefined;
+  /** The other player's aim while they line up, drawn see-through. */
+  ghost?: { angle: number; pull: number } | undefined;
 } = {}) {
   const { aim, strike, eightPocket, placing, target, objectGuide, start = DEFAULT_POOL_START } = options;
   ctx.save();
@@ -200,8 +202,11 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
   ctx.setLineDash([]);
 
   const cue = balls.find(([id]) => id === 0);
-  if (aim && cue) {
-    const angle = aim.angle * Math.PI / 180;
+  const ghost = !aim && !strike && options.ghost ? { ...options.ghost, power: 0 } : undefined;
+  const guide = aim ?? ghost;
+  if (ghost) ctx.globalAlpha = .55;
+  if (guide && cue) {
+    const angle = guide.angle * Math.PI / 180;
     const [, x, y] = cue;
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
@@ -215,7 +220,7 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     ctx.moveTo(x + dx * Math.min(11, distance), y + dy * Math.min(11, distance));
     ctx.lineTo(contactX, contactY);
     if (hit) {
-      const path = objectGuide ? poolObjectPath(hit, contactX, contactY, balls) : null;
+      const path = objectGuide && !ghost ? poolObjectPath(hit, contactX, contactY, balls) : null;
       if (path) {
         const [, bx, by] = hit;
         if (path.distance > BALL_RADIUS + 2) {
@@ -262,7 +267,7 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     }
     ctx.restore();
   }
-  const cueAction = strike ?? aim;
+  const cueAction = strike ?? aim ?? ghost;
   if (cueAction && cue) {
     const radians = cueAction.angle * Math.PI / 180;
     const dx = Math.cos(radians), dy = Math.sin(radians);
@@ -279,6 +284,7 @@ export function paintPool(ctx: CanvasRenderingContext2D, balls: PoolFrame, optio
     ctx.stroke();
     ctx.restore();
   }
+  ctx.globalAlpha = 1;
   if (target || options.respottedEight) {
     for (const [id, x, y] of balls) {
       if (!(options.respottedEight && id === 8) && (!target || target === 'break' || target === 'open' || !isLegalPoolContact(target, id))) continue;

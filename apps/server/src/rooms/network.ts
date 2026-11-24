@@ -24,6 +24,7 @@ import { createLiveSignals } from '../minigames/tap-race/live.js';
 import { registerMinigameEvents } from './minigame-events.js';
 import { createRoomChat } from './chat.js';
 import { registerReactions } from './reactions.js';
+import { registerPoolAim } from './pool-aim.js';
 import { breakVotesNeeded, createBreaks } from './breaks.js';
 import { personCookie, personFromCookie } from '../people/identity.js';
 import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert, roomCookie, tokenHash } from './security.js';
@@ -40,6 +41,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const live = createLiveSignals();
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'), undefined, live.signals);
   const minigames = registerMinigameEvents(io, client, live, app.log);
+  const poolAim = registerPoolAim();
   const reactions = registerReactions(io, client); const chat = createRoomChat(client); const breaks = createBreaks(client, service);
   const failure = (error: unknown): RoomReply<never> => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
@@ -385,7 +387,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     if (original.role !== 'display') void client.gameSession.updateMany({
       where: { id, idleCloseAt: { not: null } }, data: { idleCloseAt: null },
     }).catch(() => app.log.warn({ event: 'idle_room_reset_failed' }, 'Could not reset empty room timer'));
-    const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original);
+    const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original); poolAim.connect(socket, original);
     const expiry = setTimeout(() => { socket.emit('room.error', { code: 'CREDENTIAL_EXPIRED' }); socket.disconnect(true); }, Math.max(1, original.expiresAt.getTime() - Date.now())); expiry.unref();
     let syncing = false; let commanding = false; let heartbeating = false; let receipting = false;
     const current = async () => {

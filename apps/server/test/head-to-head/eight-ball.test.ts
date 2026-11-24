@@ -1,5 +1,5 @@
 import { BALL_RADIUS, HeadToHeadViewSchema, POOL_HEIGHT, POOL_WIDTH, PoolFrameSchema, rackPool, shootPool, type PoolFrame } from '@party/contracts';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eightBall, finishPoolOnTime, settlePoolTie } from '../../src/head-to-head/eight-ball/rules.js';
 import { matchView, playMove, startMatch } from '../../src/head-to-head/match.js';
 
@@ -12,6 +12,7 @@ const shotAfterBreak = (frame: PoolFrame) => {
 
 describe('8-ball pool', () => {
   it('resolves the break on the server with bounded motion and the same board for players and spectators', () => {
+    vi.useFakeTimers({ now: 2_000_000 });
     const initial = startMatch('eight-ball', undefined)!;
     expect(() => playMove(initial, 1, shot(0))).toThrow('Not your turn');
     const match = playMove(initial, 0, { game: 'eight-ball', angle: 0, power: 100, shot: 0 });
@@ -23,6 +24,7 @@ describe('8-ball pool', () => {
     expect(player.board.motion[0]).not.toEqual(player.board.balls);
     expect(player.board.impacts?.length).toBeGreaterThan(0);
     expect(player.board.solids).toBeNull();
+    vi.useRealTimers();
   });
 
   it('leaves the table open on the break and on a scratch, then assigns a group on a legal pot', () => {
@@ -144,6 +146,45 @@ describe('8-ball pool', () => {
       return id !== 0 && (!after || Math.hypot(after[1] - x, after[2] - y) > 40);
     });
     expect(moved.length).toBeGreaterThanOrEqual(10);
+  });
+
+  describe('shot clock', () => {
+    afterEach(() => { vi.useRealTimers(); });
+    const timeout = (shot: number) => ({ game: 'eight-ball' as const, timeout: true as const, shot });
+
+    it('runs 30 seconds by default, refuses an early claim and lets the other player break when the breaker runs out', () => {
+      vi.useFakeTimers({ now: 1_000_000 });
+      const data = eightBall.start({});
+      expect(eightBall.board(data, null).shotClock).toEqual({ seconds: 30, leftMs: 30_000 });
+      vi.setSystemTime(1_000_000 + 20_000);
+      expect(() => eightBall.apply(data, 1, timeout(0))).toThrow('There is still time');
+      vi.setSystemTime(1_000_000 + 30_000);
+      const passed = eightBall.apply(data, 1, timeout(0));
+      expect(eightBall.turn(passed)).toBe(1);
+      expect(eightBall.board(passed, null)).toMatchObject({ shot: 0, ballInHand: false, shotTimedOut: true, shotClock: { leftMs: 30_000 } });
+      // The same claim again is refused: the new shooter's clock has only just started.
+      expect(() => eightBall.apply(passed, 0, timeout(0))).toThrow('There is still time');
+    });
+
+    it('gives ball in hand behind the line after a timeout later on, and restarts the clock after a shot once the balls settle', () => {
+      vi.useFakeTimers({ now: 5_000_000 });
+      const data = { ...shotAfterBreak(straightPot(1)), turnFrom: 5_000_000, shotSeconds: 15 };
+      vi.setSystemTime(5_000_000 + 15_000);
+      const fouled = eightBall.apply(data, 1, timeout(1));
+      expect(eightBall.turn(fouled)).toBe(1);
+      expect(eightBall.board(fouled, null)).toMatchObject({ shot: 2, foul: true, ballInHand: true, shotTimedOut: true });
+      expect(eightBall.board(fouled, null).balls.find(([id]) => id === 0)![1]).toBeLessThanOrEqual(200);
+      const played = eightBall.apply(fouled, 1, shot(270, 2));
+      const clock = eightBall.board(played, null);
+      expect(clock.shotClock!.leftMs).toBeGreaterThan(15_000);
+      expect(clock).not.toHaveProperty('shotTimedOut');
+    });
+
+    it('has no clock and refuses timeout claims when switched off', () => {
+      const data = eightBall.start({ shotSeconds: 0 });
+      expect(eightBall.board(data, null)).not.toHaveProperty('shotClock');
+      expect(() => eightBall.apply(data, 1, timeout(0))).toThrow('There is still time');
+    });
   });
 
   it('uses pots at expiry and switches to scratches when both sides are on the eight', () => {

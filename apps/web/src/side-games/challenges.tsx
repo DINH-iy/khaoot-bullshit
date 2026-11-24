@@ -45,7 +45,7 @@ export function Challenges({ sessionId, selfId, players, state, withChips }: {
       {current.stake > 0 && <p className="hint">{st('atStake', { amount: chips(current.stake), total: chips(current.stake * 2) })}</p>}
       {error && <p role="alert" className="error">{error}</p>}
       <Suspense fallback={<p role="status">{st('openingGame')}</p>}>
-        <HeadToHead view={current.view} names={names} busy={busy} onMove={(move: HeadToHeadMove) => act(`/challenges/${current.id}/move`, { move })} onResign={() => act(`/challenges/${current.id}/resign`)} />
+        <HeadToHead view={current.view} names={names} live={{ match: current.id, seats: [current.challengerId, current.opponentId] }} busy={busy} onMove={(move: HeadToHeadMove) => act(`/challenges/${current.id}/move`, { move })} onResign={() => act(`/challenges/${current.id}/resign`)} />
       </Suspense>
     </div>;
   }

@@ -14,9 +14,20 @@
 .room .pool-toolbar .pool-aim-assist[aria-pressed="true"] { border-color: var(--r-line); color: var(--r-text); }
 .pool-aim-assist[aria-pressed="true"] span { color: #9ef6e1; }
 .pool-pot-trays { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.pool-pot-tray { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 6px 8px; border-radius: 9px; background: var(--r-card); text-align: center; }
+.pool-pot-tray { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 6px 2.5rem 6px; border-radius: 9px; background: var(--r-card); text-align: center; }
 .pool-pot-tray strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8125rem; line-height: 1.2; }
 .pool-pot-tray[data-turn="true"] strong { color: var(--r-accent); }
+.pool-pot-tray { position: relative; overflow: hidden; }
+/* The shot clock sits over the tray (a bar along its bottom edge, seconds in the corner) so it never changes the layout. */
+.pool-shot-clock { position: absolute; inset: 0; pointer-events: none; }
+.pool-shot-clock > span { position: absolute; inset: auto 0 0; height: 4px; background: linear-gradient(90deg, var(--r-accent) var(--clock-left), #ffffff1f var(--clock-left)); }
+.pool-shot-clock small { position: absolute; top: 4px; right: 6px; font-size: .6875rem; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--r-muted); }
+.pool-shot-clock[data-low="true"] > span { background: linear-gradient(90deg, #f05454 var(--clock-left), #ffffff1f var(--clock-left)); }
+.pool-shot-clock[data-low="true"] small { color: #ff8080; }
+@media (prefers-reduced-motion: no-preference) {
+  .pool-shot-clock[data-low="true"] > span { animation: pool-clock-pulse 1s ease-in-out infinite; }
+}
+@keyframes pool-clock-pulse { 50% { opacity: .55; } }
 .pool-potted { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; align-items: center; min-height: 18px; }
 .pool-no-pots { color: var(--r-muted); font-size: .75rem; }
 .pool-potted-ball { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--ball-color); border: 1px solid #171c234d; }
