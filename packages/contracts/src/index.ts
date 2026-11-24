@@ -25,6 +25,7 @@ export * from './people.js';
 export * from './packs.js';
 export * from './side-games.js';
 export * from './prefabs.js';
+export * from './save-points.js';
 export * from './head-to-head.js';
 export * from './minigames/eight-ball/pool.js';
 export { shootPool } from './minigames/eight-ball/physics.js';

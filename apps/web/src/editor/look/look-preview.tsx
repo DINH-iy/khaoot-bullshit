@@ -11,6 +11,8 @@ const tx = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | nu
 import { Mark } from '../../presentation/mark-icons.js';
 import { ScenePreview } from '../scene/scene-preview.js';
 import { ClockFace } from '../../room/stage-timer.js';
+import { PhoneFrame } from '../../ui/phone-devices.js';
+import { FIELDS_TEXTS } from '../scene/fields.text.js';
 
 type Moment_ = 'scene' | 'join' | 'lobby' | 'question' | 'saved' | 'results' | 'scores';
 const MOMENTS_SHOWN = { scene: 'vScene', join: 'vJoin', lobby: 'vLobby', question: 'vQuestion', saved: 'vSaved', results: 'vResults', scores: 'vScores' } as const satisfies Record<Moment_, keyof typeof LOOK_TEXTS.en>;
@@ -63,7 +65,7 @@ export function LookPreview({ definition, scope, style, className, selected }: {
                 </RoundResultsCard>}
             </section>}
         </div></div></figure>
-      <figure className="look-phone"><figcaption>{tx('phone')}</figcaption>
+      <PhoneFrame className="look-phone" caption={tx('phone')} pickerLabel={translate(FIELDS_TEXTS, 'phoneModel')}>
         <div className={`room room-player room-preview ${className}`} style={style}><div ref={phoneRef} className="preview-body">
           {shown === 'join' ? <section className="join-card"><p className="brand">party<span>.</span></p><h2>{t('join.title')}</h2><p className="room-game">{definition.title}</p>
             <label>{t('join.code')}<input className="code-input" readOnly value="ABC-123" /></label><label>{t('join.name')}<input readOnly value="Sam" /></label><button className="primary" type="button">{t('join.button')}</button></section>
@@ -78,7 +80,7 @@ export function LookPreview({ definition, scope, style, className, selected }: {
                 </RoundResultsCard>
                 : <><h3>{t('scores.title')}</h3><p>{t('wait.screen')}</p></>}
             </section>}
-        </div></div></figure>
+        </div></div></PhoneFrame>
     </div>}
     <p className="hint">{tx('previewHint')}</p>
   </div>;

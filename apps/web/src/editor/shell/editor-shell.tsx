@@ -14,13 +14,15 @@ import { FieldLimit } from '../controls/field-limit.js';
 import { ActionMenu } from '../controls/action-menu.js';
 import { readMemory, rememberPlace } from './editor-memory.js';
 import { EditorTour, finishEditorTour, needsEditorTour, TOUR_TEXTS } from './editor-tour.js';
-import { editingAction, editingLabel, readZoomShortcuts, rememberZoomShortcuts, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
+import { editingAction, editingLabel, modLabel, readZoomShortcuts, rememberZoomShortcuts, type ZoomShortcuts } from '../flow/zoom-shortcuts.js';
 import { HelpPanel } from './help-panel.js';
 import { Icon } from '../controls/icons.js';
 import { pendingClaim, useMe } from '../../people/use-me.js';
 import { chooseTheme, currentTheme } from '../../theme.js';
 import { ProblemsPanel } from './problems-panel.js';
 import { HistoryPanel } from './history-panel.js';
+import { SavePointsPanel } from './save-points-panel.js';
+import { SAVE_POINT_TEXTS } from './save-points.text.js';
 import { MediaLibraryDialog } from '../scene/fields/media-field.js';
 import { MEDIA_TEXTS } from '../scene/fields/media.text.js';
 import { useTexts } from '../../i18n/texts.js';
@@ -55,7 +57,7 @@ function EditorPage({ gameId }: { gameId: string }) {
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
 function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: HostRole | null; historyIdentity: string | undefined }) {
   const d = useDraft(gameId, historyIdentity); const t = useTexts(SHELL_TEXTS);
-  const mediaText = useTexts(MEDIA_TEXTS); const tourText = useTexts(TOUR_TEXTS);
+  const mediaText = useTexts(MEDIA_TEXTS); const savePointText = useTexts(SAVE_POINT_TEXTS); const tourText = useTexts(TOUR_TEXTS);
   const [tour, setTour] = useState(needsEditorTour);
   const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
   const changeZoomShortcuts = (shortcuts: ZoomShortcuts) => { setZoomShortcuts(shortcuts); rememberZoomShortcuts(shortcuts); };
@@ -76,10 +78,12 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
   // A scene to bring into view on the map (from the problems box); `at` makes the same scene count again.
   const [focus, setFocus] = useState<{ key: string; at: number } | null>(null);
   const [exporting, setExporting] = useState(memory.panel === 'export'); const [settings, setSettings] = useState(memory.panel === 'settings'); const [inviting, setInviting] = useState(memory.panel === 'invite');
+  const [savePoints, setSavePoints] = useState(memory.panel === 'savePoints');
   // Remembered scenes that no longer exist (deleted meanwhile) are dropped once the game is loaded.
   const checked = useRef(false);
   useEffect(() => { if (!d.definition || checked.current) return; checked.current = true; const keys = new Set(d.definition.nodes.map(node => node.key)); setSelected(current => current.filter(key => keys.has(key))); }, [d.definition]);
-  useEffect(() => { rememberPlace(gameId, { view, selected, panel: settings ? 'settings' : inviting ? 'invite' : exporting ? 'export' : null }); }, [gameId, view, selected, settings, inviting, exporting]);
+  useEffect(() => { rememberPlace(gameId, { view, selected, panel: settings ? 'settings' : inviting ? 'invite' : exporting ? 'export' : savePoints ? 'savePoints' : null }); }, [gameId, view, selected, settings, inviting, exporting, savePoints]);
+  const openPanel = (panel: 'settings' | 'invite' | 'export' | 'savePoints') => { setSettings(panel === 'settings'); setInviting(panel === 'invite'); setExporting(panel === 'export'); setSavePoints(panel === 'savePoints'); };
   // What others see of you: the scenes you have selected (in the Scene editor, the one you are on).
   const first = useMemo(() => d.definition ? sceneOrder(d.definition).rows[0]?.node.key : undefined, [d.definition]);
   const working = useMemo(() => view === 'scene' ? [selected[0] ?? first].filter(key => key !== undefined) : selected, [view, selected, first]);
@@ -87,6 +91,8 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
   const setView = (next: View) => { setViewState(next); const url = new URL(location.href); url.searchParams.set('view', next); history.replaceState(null, '', url); };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      // Ctrl/⌘ + S anywhere (also while typing): the game saves itself, so this opens Save points to keep a copy.
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') { event.preventDefault(); openPanel('savePoints'); return; }
       if ((event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable]')) return;
       const action = editingAction(event, zoomShortcuts);
       if (action === 'help') { event.preventDefault(); setHelping(true); }
@@ -112,8 +118,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
   };
   const fromStart = blocking(definition.startNodeKey); const fromScene = blocking(selected[0]);
   const fix = (count: number) => t(count === 1 ? 'fixFirst' : 'fixFirstMany', { count });
-  const openPanel = (panel: 'settings' | 'invite' | 'export') => { setSettings(panel === 'settings'); setInviting(panel === 'invite'); setExporting(panel === 'export'); };
-  const toggleMode = () => d.setReadOnly(!d.readOnly);
+    const toggleMode = () => d.setReadOnly(!d.readOnly);
   const modeLabel = t(d.readOnly ? 'viewingSwitch' : 'editingSwitch');
   const overview = `${t('minutes', { minutes: estimateMinutes(definition) })} · ${t(nodes.length === 1 ? 'sceneOne' : 'sceneMany', { count: nodes.length })}${routes ? `, ${t(routes === 1 ? 'choiceOne' : 'choiceMany', { count: routes })}` : ''} · ${d.issues.length ? problemCount : t('noProblems')}`;
   return <div className={`editor${d.readOnly ? ' viewing' : ''}`}>
@@ -139,6 +144,8 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
         <ActionMenu label={t('playPublish')} text={t('playPublishText')} {...(d.issues.length || compactHeader ? { icon: compactHeader ? 'play' : 'warning' } : {})}
           intro={d.issues.length ? <span className="menu-warning" title={t('problemsTip')}><Icon name="warning" size={16} />{t('toFixFirst', { problems: problemCount })}</span> : t('rehearseIntro')} actions={[
           { label: t('rehearse'), disabled: d.busy || d.save !== 'saved', onSelect: () => setRehearsing(true) },
+          // The test bench: the draft from the start, with the host screen and virtual phones side by side in one tab.
+          { label: fromStart ? t('benchFix', { fix: fix(fromStart) }) : t('bench'), disabled: d.busy || d.save !== 'saved' || fromStart > 0, onSelect: () => d.rehearse(null, false, true) },
           { label: draft.published?.matchesDraft ? t('publishNothing') : d.issues.length ? t('publishFix', { problems: problemCount }) : d.save !== 'saved' ? t('publishSaving') : t('publish'),
             disabled: d.busy || !ready || Boolean(draft.published?.matchesDraft), onSelect: d.publish },
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
@@ -151,6 +158,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
             { label: t('redo'), icon: 'redo', disabled: !d.canRedo, onSelect: d.redo },
             { label: modeLabel, icon: d.readOnly ? 'eye' : 'edit', onSelect: toggleMode },
           ] : []),
+          { label: savePointText('menu'), icon: 'save', shortcut: `${modLabel} + S`, onSelect: () => openPanel('savePoints') },
           { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: editingLabel('help', zoomShortcuts.edits.help), onSelect: () => setHelping(true) },
           { label: tourText('title'), icon: 'help', onSelect: () => setTour(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
@@ -166,6 +174,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
     {tour && <EditorTour onClose={() => { finishEditorTour(); setTour(false); }} />}
     {helping && <HelpPanel zoomShortcuts={zoomShortcuts} onZoomShortcuts={changeZoomShortcuts} onClose={() => setHelping(false)} />}
     {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly} onClose={() => setLibraryOpen(false)} />}
+    {savePoints && <SavePointsPanel gameId={gameId} d={d} onClose={() => setSavePoints(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}
     {exporting && <ExportPanel text={JSON.stringify({ ...definition, editor: { positions: d.positions } }, null, 2)} title={definition.title} onClose={() => setExporting(false)} />}

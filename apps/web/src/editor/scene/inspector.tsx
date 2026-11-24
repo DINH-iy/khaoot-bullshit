@@ -336,11 +336,11 @@ export function Inspector({ definition, node, problems, onChange, onDelete, onCl
   useEffect(() => { setConfirming(false); setSaving(false); }, [node.key]);
   const text = cardText(definition, node); const start = definition.startNodeKey === node.key;
   const actions: MenuAction[] = [
-    ...(start ? [] : [{ label: t('startHere'), onSelect: () => onChange({ ...definition, startNodeKey: node.key }) }]),
-    ...(onDuplicate ? [{ label: t('duplicate'), onSelect: onDuplicate }] : []),
-    ...(prefab ? [{ label: t('savePrefab'), onSelect: () => setSaving(true) }] : []),
-    { label: replacement('action'), onSelect: () => setReplacing(true) },
-    { label: t('deleteScene'), danger: true, onSelect: () => setConfirming(true) }];
+    ...(start ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => onChange({ ...definition, startNodeKey: node.key }) }]),
+    ...(onDuplicate ? [{ label: t('duplicate'), icon: 'copy', onSelect: onDuplicate }] : []),
+    ...(prefab ? [{ label: t('savePrefab'), icon: 'prefab', onSelect: () => setSaving(true) }] : []),
+    { label: replacement('action'), icon: 'edit', onSelect: () => setReplacing(true) },
+    { label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }];
   return <aside className="inspector" aria-labelledby="inspector-heading">
     <div className="inspector-head">
       <span className={`ed-kind thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true"><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>

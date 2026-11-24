@@ -25,6 +25,7 @@ import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
 import { MinigamePractice } from './minigame-practice.js';
 import { ScenePractice } from './scene-practice.js';
+import { PhoneFrame } from '../../ui/phone-devices.js';
 import { PRACTICE_TEXTS } from './scene-practice.text.js';
 
 // `both`: the shared screen and the phone side by side (Look & feel's “This scene”).
@@ -36,8 +37,10 @@ interface CanvasControls {
   editMedia: () => void;
 }
 
-export function ScenePreview({ definition, node, index, device, canvas, interactive, compactIntro }: PreviewProps & {
+export function ScenePreview({ definition, node, index, device, canvas, interactive, compactIntro, phonePicker = true }: PreviewProps & {
   device: Device; canvas?: CanvasControls | undefined; interactive?: boolean; compactIntro?: boolean;
+  /** false: the phone model is chosen somewhere else on the page (the Scene editor's toolbar). */
+  phonePicker?: boolean;
 }) {
   const t = useTexts(FIELDS_TEXTS);
   const fields = useTexts(INSPECTOR_TEXTS);
@@ -125,8 +128,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
           onClick={() => canvas.edit(current => ({ ...current, input: { ...input, options: [...choices, { key: uniqueKey('answer', choices.map(option => option.key)), label: fields('newAnswer') }] } }), 'answers')}>{fields('addAnswer')}</button>}
         {stage.kind === 'scoreboard' && <ol className="tv-scores"><li>{t('playerOne')} <b>30</b></li><li>{t('playerTwo')} <b>20</b></li><li>{t('playerThree')} <b>10</b></li></ol>}
       </div></figure>}
-    {device !== 'sharedScreen' && <figure className="phone"><figcaption>{t('phone')}</figcaption>
-      <div className={`phone-screen room room-player ${classes}${compactPhone ? ' compact-game-preview' : ''}`} style={style}>
+    {device !== 'sharedScreen' && <PhoneFrame caption={t('phone')} pickerLabel={t('phoneModel')} picker={phonePicker}><div className={`phone-screen room room-player ${classes}${compactPhone ? ' compact-game-preview' : ''}`} style={style}>
         <SceneComposition layout={layout} media={contentMedia('player')}>
           <p className="phone-prompt">{phoneLabel}</p>
           {stage.kind === 'info' && <p className="phone-hint">{prompt}</p>}
@@ -144,7 +146,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
             })}
           </fieldset> : <div className="phone-list">{options.map(option => <span key={option.key}>{option.label}</span>)}</div>
           : <p className="phone-hint">{phoneHint}</p>)}
-      </div></figure>}
+      </div></PhoneFrame>}
   </div>;
 }
 

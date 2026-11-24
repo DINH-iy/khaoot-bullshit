@@ -2,7 +2,7 @@
 // the selected scenes, the open panel and the part of Look & feel. Kept in this browser
 // only (a convenience: without storage the editor simply opens as new).
 export type EditorTab = 'flow' | 'scene' | 'look';
-export type EditorPanel = 'settings' | 'invite' | 'export' | null;
+export type EditorPanel = 'settings' | 'invite' | 'export' | 'savePoints' | null;
 export interface EditorMemory { view?: EditorTab; selected?: string[]; panel?: EditorPanel; lookSection?: string }
 
 const key = (gameId: string) => `party-editor-place:${gameId}`;
@@ -15,7 +15,7 @@ export function readMemory(gameId: string): EditorMemory {
     return {
       ...(['flow', 'scene', 'look'].includes(memory['view'] as string) ? { view: memory['view'] as EditorTab } : {}),
       ...(Array.isArray(memory['selected']) ? { selected: (memory['selected'] as unknown[]).filter((entry): entry is string => typeof entry === 'string').slice(0, 200) } : {}),
-      ...(['settings', 'invite', 'export'].includes(memory['panel'] as string) ? { panel: memory['panel'] as EditorPanel } : {}),
+      ...(['settings', 'invite', 'export', 'savePoints'].includes(memory['panel'] as string) ? { panel: memory['panel'] as EditorPanel } : {}),
       ...(typeof memory['lookSection'] === 'string' ? { lookSection: memory['lookSection'] } : {}),
     };
   } catch { return {}; }

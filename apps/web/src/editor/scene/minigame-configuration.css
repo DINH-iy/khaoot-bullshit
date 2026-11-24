@@ -37,12 +37,7 @@
 .configuration-preview > .preview { width: 100%; justify-content: center; }
 .configuration-preview .preview > figure { min-width: 0; }
 .configuration-preview .preview > figure > figcaption { display: none; }
-.configuration-preview .phone { flex-basis: min(100%, 330px); }
-.configuration-preview .preview .phone-screen.compact-game-preview {
-  width: 100%;
-  min-height: min(19rem, max(12rem, calc(100dvh - 16rem)));
-  aspect-ratio: auto;
-}
+.configuration-preview .phone { --phone-max-h: max(320px, calc(100dvh - 280px)); }
 .configuration-preview .tv-screen:has(.scene-practice) { min-height: min(17rem, 40dvh); aspect-ratio: auto; }
 .configuration-preview .configuration-game-intro { background: transparent; border: 0; padding: 0 4px; }
 .configuration-preview .minigame-preview-copy p { margin: 0; }
@@ -96,5 +91,5 @@
   .minigame-configuration[data-game="draw-the-graph"] .configuration-window > header,
   .minigame-configuration[data-game="draw-the-graph"] .configuration-actions { padding-block: 6px; }
   .minigame-configuration[data-game="draw-the-graph"] .configuration-preview { gap: 8px; padding: 8px; }
-  .minigame-configuration[data-game="draw-the-graph"] .phone-screen.compact-game-preview { min-height: 0; padding: 8px; }
+  .minigame-configuration[data-game="draw-the-graph"] .configuration-preview .preview .phone-screen.compact-game-preview { min-height: 0; padding: 8px; }
 }

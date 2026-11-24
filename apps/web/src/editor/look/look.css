@@ -54,7 +54,7 @@
 .look-devices { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .look-devices figure { margin: 0; display: grid; gap: 6px; } .look-devices figcaption { font-weight: 700; color: var(--e-muted); }
 .room.room-preview { min-height: 0; padding: 16px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgb(30 20 70 / .2); }
-.look-tv .room-preview { min-height: 340px; } .look-phone .room-preview { min-height: 560px; border: 8px solid #15121f; border-radius: 28px; padding: 12px; }
+.look-tv .room-preview { min-height: 340px; } .look-phone { --phone-max-h: 72dvh; width: 100%; } .look-phone .room-preview { flex: 1; min-width: 0; min-height: 0; overflow: hidden; border-radius: 0; box-shadow: none; padding: calc(var(--phone-top, 0px) + 8px) 12px calc(var(--phone-bottom, 0px) + 12px); }
 /* The preview is a small copy of the room: same proportions, smaller type. */
 .room.room-preview { font-size: calc(13px * var(--r-scale)); }
 .room-preview h2 { font-size: 1.7em; margin: 0; overflow-wrap: anywhere; } .room-preview .timer { font-size: 1.3em; }
@@ -191,3 +191,5 @@
 .ed-dialog .style-change-actions button.primary { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1d1730); font-weight: 700; }
 .timer-samples { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--r-bg1, #241a4d); font-size: 1.2rem; }
 .timer-samples .timer-clock.up { animation: none; }
+/* "This scene" shows the shared screen and the phone side by side: the phone stays small so the screen keeps its room. */
+.look-scene .phone { --phone-cap-w: 230px; }

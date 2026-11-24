@@ -48,7 +48,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
   partsHint: 'Parts play one after another inside this scene, for example a question and then its scoreboard.', wheel: 'Wheel of fortune', spunHere: 'Spun here', notHere: 'Not on this scene',
   deleteAsk: 'Delete “{title}”?', deleteText: 'The scene and its connections go. Undo (Ctrl/Cmd+Z) brings it back.', deleteConfirm: 'Delete scene', next: 'Next', problemsHere: 'Problems in this scene', part: 'Part {number}: ',
   pWatch: 'Watching the shared screen', pHost: 'Follow the host', pMinigame: 'Minigame controls: big buttons to play', pVote: 'Vote for an answer', pType: 'Type an answer', pUpload: 'Upload a picture or video',
-  pDraw: 'Draw on the phone', pOrder: 'Put the items in order', pChoose: 'Choose an answer', sharedScreen: 'Shared screen', phone: 'Phone', playerOne: 'Player one', playerTwo: 'Player two', playerThree: 'Player three',
+  pDraw: 'Draw on the phone', pOrder: 'Put the items in order', pChoose: 'Choose an answer', sharedScreen: 'Shared screen', phone: 'Phone', phoneModel: 'Phone model', playerOne: 'Player one', playerTwo: 'Player two', playerThree: 'Player three',
 }, {
   nl: {
     revealEasing: 'Timing van de onthulling', 'ease-in': 'Rustig beginnen', 'ease-out': 'Rustig eindigen', 'ease-in-out': 'Rustig beginnen en eindigen', linear: 'Gelijkmatig', instant: 'Direct',
@@ -90,7 +90,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
     partsHint: 'Delen spelen na elkaar binnen deze scène, bijvoorbeeld een vraag en dan het scorebord.', wheel: 'Rad van fortuin', spunHere: 'Hier gedraaid', notHere: 'Niet in deze scène',
     deleteAsk: '“{title}” verwijderen?', deleteText: 'De scène en haar verbindingen verdwijnen. Ongedaan maken (Ctrl/Cmd+Z) haalt haar terug.', deleteConfirm: 'Scène verwijderen', next: 'Volgende', problemsHere: 'Problemen in deze scène', part: 'Deel {number}: ',
     pWatch: 'Kijkt naar het gedeelde scherm', pHost: 'Volg de host', pMinigame: 'Minigame-knoppen: grote knoppen om te spelen', pVote: 'Stem op een antwoord', pType: 'Typ een antwoord', pUpload: 'Upload een foto of video',
-    pDraw: 'Teken op de telefoon', pOrder: 'Zet de items op volgorde', pChoose: 'Kies een antwoord', sharedScreen: 'Gedeeld scherm', phone: 'Telefoon', playerOne: 'Speler een', playerTwo: 'Speler twee', playerThree: 'Speler drie',
+    pDraw: 'Teken op de telefoon', pOrder: 'Zet de items op volgorde', pChoose: 'Kies een antwoord', sharedScreen: 'Gedeeld scherm', phone: 'Telefoon', phoneModel: 'Telefoonmodel', playerOne: 'Speler een', playerTwo: 'Speler twee', playerThree: 'Speler drie',
   },
   de: {
     revealEasing: 'Tempo der Auflösung', 'ease-in': 'Langsam beginnen', 'ease-out': 'Langsam enden', 'ease-in-out': 'Langsam beginnen und enden', linear: 'Gleichmäßig', instant: 'Sofort',
@@ -132,7 +132,7 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
     partsHint: 'Teile laufen nacheinander innerhalb dieser Szene, zum Beispiel eine Frage und dann ihr Punktestand.', wheel: 'Glücksrad', spunHere: 'Hier gedreht', notHere: 'Nicht in dieser Szene',
     deleteAsk: '„{title}“ löschen?', deleteText: 'Die Szene und ihre Verbindungen verschwinden. Rückgängig (Strg/Cmd+Z) holt sie zurück.', deleteConfirm: 'Szene löschen', next: 'Weiter', problemsHere: 'Probleme in dieser Szene', part: 'Teil {number}: ',
     pWatch: 'Schaut auf den gemeinsamen Bildschirm', pHost: 'Dem Host folgen', pMinigame: 'Minispiel-Steuerung: große Knöpfe zum Spielen', pVote: 'Für eine Antwort stimmen', pType: 'Eine Antwort tippen', pUpload: 'Ein Bild oder Video hochladen',
-    pDraw: 'Auf dem Handy zeichnen', pOrder: 'Die Einträge ordnen', pChoose: 'Eine Antwort wählen', sharedScreen: 'Gemeinsamer Bildschirm', phone: 'Handy', playerOne: 'Spieler eins', playerTwo: 'Spieler zwei', playerThree: 'Spieler drei',
+    pDraw: 'Auf dem Handy zeichnen', pOrder: 'Die Einträge ordnen', pChoose: 'Eine Antwort wählen', sharedScreen: 'Gemeinsamer Bildschirm', phone: 'Handy', phoneModel: 'Handymodell', playerOne: 'Spieler eins', playerTwo: 'Spieler zwei', playerThree: 'Spieler drei',
   },
   ro: {
     revealEasing: 'Ritmul dezvăluirii', 'ease-in': 'Pornire lentă', 'ease-out': 'Oprire lentă', 'ease-in-out': 'Pornire și oprire lentă', linear: 'Liniar', instant: 'Imediat',
@@ -174,6 +174,6 @@ export const FIELDS_TEXTS = defineTexts('editor-fields', {
     partsHint: 'Părțile se joacă una după alta în această scenă, de exemplu o întrebare și apoi clasamentul ei.', wheel: 'Roata norocului', spunHere: 'Învârtită aici', notHere: 'Nu în această scenă',
     deleteAsk: 'Ștergi „{title}”?', deleteText: 'Scena și conexiunile ei dispar. Anulează (Ctrl/Cmd+Z) o aduce înapoi.', deleteConfirm: 'Șterge scena', next: 'Următoarea', problemsHere: 'Probleme în această scenă', part: 'Partea {number}: ',
     pWatch: 'Se uită la ecranul comun', pHost: 'Urmează gazda', pMinigame: 'Comenzile minijocului: butoane mari pentru joc', pVote: 'Votează un răspuns', pType: 'Scrie un răspuns', pUpload: 'Încarcă o poză sau un video',
-    pDraw: 'Desenează pe telefon', pOrder: 'Pune elementele în ordine', pChoose: 'Alege un răspuns', sharedScreen: 'Ecran comun', phone: 'Telefon', playerOne: 'Jucătorul unu', playerTwo: 'Jucătorul doi', playerThree: 'Jucătorul trei',
+    pDraw: 'Desenează pe telefon', pOrder: 'Pune elementele în ordine', pChoose: 'Alege un răspuns', sharedScreen: 'Ecran comun', phone: 'Telefon', phoneModel: 'Model de telefon', playerOne: 'Jucătorul unu', playerTwo: 'Jucătorul doi', playerThree: 'Jucătorul trei',
   },
 });

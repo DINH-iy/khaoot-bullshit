@@ -171,10 +171,30 @@
 .tv-options li { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgb(255 255 255 / .1); font-weight: 600; }
 .tv-options span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #b8a2ff; color: #1d1730; font-weight: 800; flex: none; }
 .tv-scores { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 1.1rem; } .tv-scores b { float: right; }
-.phone { flex: 0 0 220px; }
+/* A phone preview: the chosen model (ui/phone-devices.tsx) in its own proportions, at its real width where there is
+   room and smaller (never stretched) where there is not. `--phone-max-h` caps its height per place. */
+.phone { --phone-bezel: 7px;
+  /* How wide the screen is drawn: its real width, less when the height allows less, less again with --phone-cap-w. */
+  --phone-shown: min(calc(var(--phone-w, 393) * 1px), calc(var(--phone-max-h, 72dvh) * var(--phone-w, 393) / var(--phone-h, 852)), var(--phone-cap-w, 2000px));
+  flex: 0 1 calc(var(--phone-shown) + 2 * var(--phone-bezel)); min-width: 0; margin: 0; display: grid; justify-items: center; align-content: start; gap: 8px; }
+.phone > figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0;
+  width: min(100%, calc(var(--phone-shown) + 2 * var(--phone-bezel))); }
+.editor .phone .phone-device-picker { width: auto; max-width: 70%; min-height: 36px; padding: 4px 8px 4px 10px; font-size: .82rem; text-transform: none; letter-spacing: 0; }
+.phone-device { position: relative; box-sizing: content-box; display: flex; overflow: hidden; background: #000;
+  width: min(calc(100% - 2 * var(--phone-bezel)), var(--phone-shown));
+  aspect-ratio: var(--phone-w, 393) / var(--phone-h, 852); border: var(--phone-bezel) solid #111116; border-radius: 13% / 6%;
+  box-shadow: 0 0 0 1px var(--e-border), 0 12px 32px rgb(0 0 0 / .28); }
+.phone-device[data-cutout=none] { border-radius: 9% / 5%; }
+/* The camera in the screen, and the home bar of phones without a button. */
+.phone-device::before { content: ''; position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); background: #000; pointer-events: none; }
+.phone-device[data-cutout=island]::before { top: 1.3%; width: 32%; height: 4.3%; border-radius: 999px; }
+.phone-device[data-cutout=notch]::before { top: 0; width: 41%; height: 3.7%; border-radius: 0 0 18px 18px; }
+.phone-device[data-cutout=punch]::before { top: 1.4%; width: 3.4%; aspect-ratio: 1; border-radius: 50%; }
+.phone-device[data-cutout=none]::before { display: none; }
+.phone-device:is([data-cutout=island], [data-cutout=notch])::after { content: ''; position: absolute; z-index: 3; bottom: 1%; left: 50%; transform: translateX(-50%); width: 35%; height: 5px; border-radius: 999px; background: rgb(128 128 128 / .75); pointer-events: none; }
 .preview .room .timer { font-size: 1.3em; font-weight: 700; font-variant-numeric: tabular-nums; }
-.preview .phone-screen { width: min(100%, 260px); min-height: 0; aspect-ratio: 9 / 18; box-sizing: border-box; border-radius: 24px; border: 6px solid var(--e-border);
-  padding: 18px 12px; display: grid; gap: 12px; align-content: start; overflow: auto; }
+.preview .phone-screen { flex: 1; width: auto; min-width: 0; min-height: 0; aspect-ratio: auto; box-sizing: border-box; border: 0; border-radius: 0;
+  padding: calc(var(--phone-top, 0px) + 10px) 12px calc(var(--phone-bottom, 0px) + 12px); display: grid; gap: 12px; align-content: start; overflow: auto; }
 .phone-screen .stage-media.image img { max-height: 170px; }
 .phone-prompt { margin: 0; font-weight: 700; font-size: .95rem; overflow-wrap: anywhere; }
 .phone-tiles span, .phone-list span { overflow-wrap: anywhere; hyphens: auto; }
@@ -408,6 +428,10 @@
 .editor .action-menu-list button { justify-content: start; text-align: left; border: 0; background: transparent; min-height: 40px; padding: 8px 12px; border-radius: 8px; color: var(--e-text); }
 .editor .action-menu-list button:hover:not(:disabled), .editor .action-menu-list button:focus-visible { background: var(--e-accent-soft); }
 .editor .action-menu-list .danger-item { color: var(--e-danger); }
+/* A remove item is red all through: its icon too, and it glows red (not the accent) under the pointer or keyboard. */
+.editor .action-menu-list .danger-item .action-menu-icon { color: var(--e-danger); }
+.editor .action-menu-list .danger-item:hover:not(:disabled), .editor .action-menu-list .danger-item:focus-visible {
+  background: color-mix(in srgb, var(--e-danger) 16%, transparent); box-shadow: inset 0 0 0 1px var(--e-danger), 0 0 14px color-mix(in srgb, var(--e-danger) 45%, transparent); outline: none; }
 /* A popup with cards, for choices that need a description (minigame, duel, award). */
 .ed-dialog.choice-dialog {
   width: min(720px, calc(100% - 24px)); height: min(610px, calc(100dvh - 24px));
@@ -517,7 +541,7 @@
   .action-menu-list, .peer-me-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; min-width: 0; width: auto; max-height: 70dvh; overflow: auto; z-index: 70; }
   .editor-header :is(.action-menu, .peer-me) { position: static; }
   .editor .editor-header :is(.action-menu-list, .peer-me-popover) { position: absolute; inset: calc(100% + 4px) 12px auto; min-width: 0; width: auto; max-width: none; }
-  .invite-panel { position: fixed; grid-area: auto; inset: auto 12px 12px; width: auto; max-height: calc(100% - 24px); }
+  .invite-panel, .save-points-panel { position: fixed; grid-area: auto; inset: auto 12px 12px; width: auto; max-height: calc(100% - 24px); }
   /* The map: one row of tools (scrolls sideways if needed), a canvas that fills the screen, the scene panel as a bottom sheet. */
   .flow-tools { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 8px 12px; }
   .flow-tools .tool-label { display: none; } .flow-tools button { flex: none; }
@@ -525,8 +549,6 @@
   .inspector { position: fixed; z-index: 30; max-height: 65dvh; border-radius: 16px 16px 0 0; }
   /* The Scene editor: scenes (scrolling list), then the preview, then the scene's settings. */
   .scene-stage { padding: 12px; }
-  /* The rough phone preview: as wide as half the screen and not taller than its content needs. */
-  .phone { flex: 1 1 160px; } .phone-screen { width: 100%; aspect-ratio: auto; min-height: 200px; }
 }
 /* Help & shortcuts. */
 .editor .help-button { font-weight: 800; font-size: 1.05rem; }
@@ -805,7 +827,9 @@
 .scene-media-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 125px), 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--e-border); }
 .scene-media-layout > .choice { align-self: end; display: flex; align-items: center; min-height: 44px; }
 .scene-media-layout .hint { grid-column: 1 / -1; margin: 0; }
-.scene-canvas-tools { display: flex; justify-content: flex-end; }
+.scene-canvas-tools { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
+/* The phone model, in the same pill style as the Shared screen / Phone toggle beside it. */
+.editor .scene-canvas-tools .canvas-device-picker { width: auto; min-height: 36px; padding: 4px 10px 4px 14px; border-radius: 999px; border-color: var(--e-border); background: var(--e-panel); }
 .editor .scene-canvas-tools .small-button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
 .scene-canvas .tv, .scene-preview-dialog .tv { max-width: none; min-width: 0; }
 .scene-canvas .tv > figcaption { color: var(--e-muted); font-weight: 650; }
@@ -841,9 +865,7 @@
 .scene-preview-window header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .scene-preview-window h2 { margin: 0; font-size: 1.25rem; }
 .scene-preview-window .preview { justify-content: center; }
-.scene-preview-window .phone { flex-basis: min(260px, 100%); }
-.scene-preview-window .phone:has(.scene-practice) { flex-basis: min(100%, 350px); }
-.scene-preview-window .phone-screen:has(.scene-practice) { width: 100%; aspect-ratio: auto; }
+.scene-preview-window .phone { --phone-max-h: max(360px, calc(100dvh - 230px)); }
 .scene-preview-window .tv-screen:has(.scene-practice) { min-height: min(32rem, 55dvh); }
 .scene-preview-window .practice-note { color: var(--e-muted); margin: 0; font-size: .85rem; }
 .practice-parts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .9rem; }
@@ -921,7 +943,7 @@
 
 .scene-preview-window header, .media-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--e-border); }
 .scene-preview-window header .small-button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
-.scene-preview-dialog.phone-preview-dialog { width: min(420px, calc(100% - 24px)); }
+.scene-preview-dialog.phone-preview-dialog { width: min(500px, calc(100% - 24px)); }
 .scene-preview-window .segmented button { color: var(--e-text); background: var(--e-card); border-color: var(--e-border); }
 .scene-preview-window .segmented button[aria-pressed=true] { background: var(--e-accent-soft); color: var(--e-text); border-color: var(--e-accent); }
 .scene-media-edit { display: grid; gap: 12px; }
@@ -959,7 +981,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .scene-editor .scene-canvas, .scene-preview-dialog[open], .replace-scene-dialog[open] { animation: editor-panel-enter 150ms ease-out both; }
 }
-@keyframes editor-panel-enter { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+/* Ends on `none`, not translateY(0): a transform left on a dialog makes it the frame for fixed descendants, and dropdown lists opened in it were placed off by the dialog's own offset. */
+@keyframes editor-panel-enter { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
 .editor:has(> .editor-tour) { grid-template-rows: auto auto minmax(0, 1fr); }
 
@@ -976,8 +999,7 @@
 .scene-stage > .scene-canvas { flex: 1 0 auto; align-items: stretch; }
 .scene-stage .scene-canvas .tv { grid-template-rows: auto 1fr; }
 .scene-stage > .preview:has(.phone) { justify-content: center; }
-.scene-stage .phone { flex: 0 1 390px; min-width: 0; }
-.scene-stage .phone-screen { width: 100%; aspect-ratio: auto; min-height: min(570px, 70dvh); }
+.scene-stage .phone { --phone-max-h: max(380px, calc(100dvh - 250px)); }
 .scene-canvas-tools .segmented { flex-wrap: wrap; justify-content: end; }
 .minigame-preview { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px 18px; align-items: center; padding: clamp(12px, 3vw, 28px); border: 1px solid var(--r-line); border-radius: var(--r-radius); background: var(--r-card); overflow-wrap: anywhere; }
 .minigame-preview-symbol { display: grid; place-items: center; width: clamp(60px, 10vw, 104px); aspect-ratio: 1; border-radius: 18px; background: color-mix(in srgb, var(--r-surface) 80%, var(--r-accent)); color: var(--r-text); font-size: clamp(1.75rem, 5vw, 3.5rem); line-height: 1; font-weight: 750; }
@@ -1011,12 +1033,9 @@
 .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window { padding: 12px; gap: 8px; }
 .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window header { padding-bottom: 0; border-bottom: 0; }
 .scene-preview-dialog:has(.compact-game-preview) .practice-note { display: none; }
-.scene-preview-dialog .phone:has(.compact-game-preview) { min-width: 0; flex-basis: min(100%, 350px); }
 .scene-preview-dialog .phone:has(.compact-game-preview) > figcaption { display: none; }
 .scene-preview-dialog .phone-screen.compact-game-preview {
-  min-height: min(29rem, calc(100dvh - 10rem));
-  border-width: 4px;
-  padding: 12px;
+  padding: calc(var(--phone-top, 0px) + 8px) 12px calc(var(--phone-bottom, 0px) + 12px);
   gap: 8px;
   align-content: center;
   container-type: inline-size;
@@ -1046,8 +1065,7 @@
     align-items: center;
   }
   .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window > :is(.preview, .practice-parts) { grid-column: 1 / -1; }
-  .scene-preview-dialog .phone:has(.compact-game-preview) { flex-basis: 100%; }
-  .scene-preview-dialog .phone-screen.compact-game-preview { min-height: min(16rem, calc(100dvh - 6rem)); }
+  .scene-preview-dialog .phone:has(.compact-game-preview) { --phone-max-h: calc(100dvh - 6rem); }
   .compact-game-preview .practice-draw-the-graph:has(.graph-phone) {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
@@ -1068,4 +1086,35 @@
   .compact-game-preview .practice-draw-the-graph .graph-chart { max-width: 13.5rem; }
   .compact-game-preview .practice-draw-the-graph > .graph-chart { grid-column: 1; grid-row: 1 / span 2; }
   .compact-game-preview .practice-draw-the-graph > .practice-result { grid-area: 1 / 2; align-self: end; }
+}
+/* ---------- Save points (☰ menu → Save points): copies of the whole game to go back to ---------- */
+.save-points-panel { grid-area: 2 / 1; top: 8px; z-index: 40; margin: 0; }
+.save-point-form { display: grid; gap: 8px; }
+.save-point-form label { display: grid; gap: 6px; font-weight: 600; }
+.save-points-panel button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.save-point-count { margin: 4px 0 0; }
+.save-point-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.save-point { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--e-border); border-radius: 12px; background: var(--e-bg); }
+.save-point.automatic { border-style: dashed; }
+.save-point-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.save-point-text strong { overflow-wrap: anywhere; }
+.save-point-text small { color: var(--e-muted); }
+.save-point-actions { display: flex; gap: 8px; flex: none; }
+.save-points-panel .save-point-actions .icon-only { width: 44px; justify-content: center; padding: 0; }
+.save-point-empty { display: grid; gap: 8px; }
+@media (max-width: 520px) { .save-point { flex-wrap: wrap; } .save-point-actions { width: 100%; justify-content: flex-end; } }
+/* On a phone (or a very short window) the editor is already on a phone: no phone drawn inside it, the page fills the space. */
+@media (max-width: 600px), (max-height: 500px) {
+  .phone { --phone-bezel: 0px; flex-basis: 100%; }
+  .phone > figcaption { width: 100%; }
+  .phone-device { width: 100%; aspect-ratio: auto; border: 0; border-radius: 12px; box-shadow: 0 0 0 1px var(--e-border); background: none; }
+  .phone-device::before, .phone-device::after { display: none; }
+  .preview .phone-screen, .look-phone .room-preview { --phone-top: 0px; --phone-bottom: 0px; }
+  /* As tall as a game needs, as before: the page itself scrolls. */
+  .preview .phone-screen { min-height: 200px; }
+  .scene-preview-dialog .phone-screen.compact-game-preview { min-height: min(29rem, calc(100dvh - 10rem)); }
+  .configuration-preview .preview .phone-screen.compact-game-preview { min-height: min(19rem, max(12rem, calc(100dvh - 16rem))); }
+}
+@media (orientation: landscape) and (max-height: 480px) {
+  .scene-preview-dialog .phone-screen.compact-game-preview { min-height: min(16rem, calc(100dvh - 6rem)); }
 }

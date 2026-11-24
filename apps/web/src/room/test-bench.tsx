@@ -5,6 +5,7 @@ import { isUnavailablePageError, replaceWithHome } from '../navigation.js';
 import { hostMenuHref, useHostAccess } from '../owner/use-host-access.js';
 import { FaIcon } from '../presentation/icons.js';
 import { TryoutControls } from './tryout/controls.js';
+import { PhoneDevicePicker, usePhoneDevice } from '../ui/phone-devices.js';
 import './test-bench.css';
 
 const COUNT_KEY = 'party_bench_phones'; const REAL_KEY = 'party_bench_real';
@@ -65,7 +66,9 @@ export function TestBench({ sessionId }: { sessionId: string }) {
       <p className="bench-title"><strong>Test bench</strong>{benchRoom && <> · room <code>{formatRoomCode(benchRoom.code)}</code></>}</p>
       <p className="bench-hint">The host screen on the left; each phone is its own player and joins by itself. Add or remove phones with − and +.</p>
       {activeId !== sessionId ? <button type="button" className="bench-mode" onClick={() => changeRoom(sessionId)}>Back to test bench</button>
-        : hostHref && <a className="bench-back link-button" href={hostHref}>{hostAccess?.role === 'owner' ? 'Back to host menu' : 'Back to your games'}</a>}
+        : hostHref && <a className="bench-mode bench-back" href={hostHref}>{hostAccess?.role === 'owner' ? 'Back to host menu' : 'Back to your games'}</a>}
+      {/* Every phone takes the chosen model's screen size (the same choice as the editor's phone previews). */}
+      <PhoneDevicePicker className="bench-device" label="Phone model" />
       <label className="bench-real"><input type="checkbox" checked={real} onChange={event => changeReal(event.target.checked)} />Real phones can join too</label>
       <div className="bench-count" role="group" aria-label="Phones">
         <button type="button" className="bench-icon" aria-label="One phone less" disabled={count <= 1} onClick={() => changeCount(count - 1)}><FaIcon name="minus" /></button>
@@ -87,9 +90,9 @@ export function TestBench({ sessionId }: { sessionId: string }) {
 function BenchPhone({ seat, code, reloadKey, onReload }: { seat: number; code: string; reloadKey: number; onReload: () => void }) {
   const screen = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [landscape, setLandscape] = useState(false);
-  const width = landscape ? 844 : 390;
-  const height = landscape ? 390 : 844;
+  const [landscape, setLandscape] = useState(false); const [device] = usePhoneDevice();
+  const width = landscape ? device.height : device.width;
+  const height = landscape ? device.width : device.height;
   useLayoutEffect(() => {
     const wrapper = screen.current;
     if (!wrapper) return;
@@ -99,13 +102,13 @@ function BenchPhone({ seat, code, reloadKey, onReload }: { seat: number; code: s
     return () => observer.disconnect();
   }, [width]);
   const name = `Player ${seat}`;
-  return <figure className={`bench-phone${landscape ? ' bench-phone-landscape' : ''}`}>
+  return <figure className={`bench-phone${landscape ? ' bench-phone-landscape' : ''}`} style={{ '--phone-ratio': width / height } as React.CSSProperties} title={device.name}>
     <figcaption><span>{name}</span><div className="bench-phone-actions">
       <button type="button" className="bench-icon bench-orientation" aria-label={`Landscape for ${name}`} aria-pressed={landscape} onClick={() => setLandscape(value => !value)}>Landscape</button>
       <button type="button" className="bench-icon" aria-label={`Reload ${name}`} title="Reload this phone" onClick={onReload}><FaIcon name="rotate" /></button>
     </div></figcaption>
-    <div ref={screen} className="bench-screen" style={landscape ? { aspectRatio: `${width} / ${height}` } : undefined}>
-      <iframe key={reloadKey} name={`party-seat-${seat}`} title={`Phone of ${name}`} style={{ transform: `scale(${scale})`, ...(landscape ? { width, height } : {}) }} src={`/?code=${code}&name=${encodeURIComponent(name)}`} />
+    <div ref={screen} className="bench-screen" style={{ aspectRatio: `${width} / ${height}` }}>
+      <iframe key={reloadKey} name={`party-seat-${seat}`} title={`Phone of ${name}`} style={{ transform: `scale(${scale})`, '--bench-w': `${width}px`, '--bench-h': `${height}px` } as React.CSSProperties} src={`/?code=${code}&name=${encodeURIComponent(name)}`} />
     </div>
   </figure>;
 }

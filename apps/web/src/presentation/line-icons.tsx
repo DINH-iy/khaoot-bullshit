@@ -33,6 +33,8 @@ const paths: Record<string, string> = {
   send: 'M3 11l18-8-8 18-2-8z M11 13L21 3',
   // History: a clock with an arrow turning back.
   history: 'M3.5 12a8.5 8.5 0 1 0 2.5-6 M3 3.5v5h5 M12 7.5V12l3 2',
+  // A save point: a floppy disk.
+  save: 'M5 4h11l3 3v13H5z M8 4v5h7V4 M8 20v-6h8v6',
   // A warning: a triangle with an exclamation mark (problems to fix first).
   warning: 'M12 3.5L2.5 20h19L12 3.5z M12 10v4.5 M12 17.2h.01',
   // The game menu: settings (a gear), inviting people (a person with a plus), exporting (an arrow out of a tray).

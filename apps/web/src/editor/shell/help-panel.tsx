@@ -14,7 +14,7 @@ type Key = keyof typeof HELP_TEXTS.en;
 // except named keys such as Delete and the arrow keys). Each row: what to press, what it does.
 const MAP: [Key | '+', Key][] = [['kScroll', 'dScroll'], ['kShiftScroll', 'dShiftScroll'], ['kClick', 'dClick'], ['kShiftClick', 'dShiftClick'], ['kShiftDrag', 'dShiftDrag'], ['kDrag', 'dDrag'],
   ['kDouble', 'dDouble'], ['kDragPort', 'dDragPort'], ['+', 'dPlus'], ['kRight', 'dRight'], ['kArrow', 'dArrow'], ['kBend', 'dBend'], ['kBendPoint', 'dBendPoint']];
-const KEYS: [string | Key, Key][] = [['kArrows', 'dArrows'], ['Tab', 'dTab'], ['Esc', 'dEsc']];
+const KEYS: [string | Key, Key][] = [['kArrows', 'dArrows'], ['Tab', 'dTab'], ['Esc', 'dEsc'], ['kSave', 'dSave']];
 const EDIT_ACTION_TEXT = { undo: 'dUndo', redo: 'dRedo', selectAll: 'dAll', copy: 'dCopy', paste: 'dPaste', duplicate: 'dDuplicate', remove: 'dDelete', help: 'dHelp' } as const;
 
 /**

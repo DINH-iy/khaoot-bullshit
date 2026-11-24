@@ -14,6 +14,7 @@ import { isWheelScene, addScene, COLUMN_STEP, cardText, connect, deleteScene, fr
 import { translate, useTexts } from '../../i18n/texts.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
 import { ScenePreview, ScenePreviewDialog } from './scene-preview.js';
+import { PhoneDevicePicker } from '../../ui/phone-devices.js';
 import { FIELDS_TEXTS } from './fields.text.js';
 const t = (key: keyof typeof FIELDS_TEXTS.en, values?: Record<string, string | number>) => translate(FIELDS_TEXTS, key, values);
 import type { DraftState } from '../shell/use-draft.js';
@@ -192,8 +193,10 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
           {(['sharedScreen', 'phone'] as const).map(device => <button key={device} type="button" aria-pressed={canvasDevice === device}
             onClick={() => setCanvasDevice(device)}>{t(device)}</button>)}
         </div>
+        {/* Which phone the preview shows, next to the toggle: only while the phone is shown. */}
+        {canvasDevice === 'phone' && <PhoneDevicePicker className="canvas-device-picker" label={t('phoneModel')} />}
       </div>
-      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice}
+      <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice} phonePicker={false}
         canvas={canvasDevice === 'sharedScreen' ? {
           readOnly, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
         } : undefined} />

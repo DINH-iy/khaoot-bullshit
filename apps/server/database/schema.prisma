@@ -100,9 +100,10 @@ model Game {
   createdAt  DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
 
-  creator  Creator       @relation(fields: [creatorId], references: [id], onDelete: Restrict)
-  draft    GameDraft?
-  versions GameVersion[]
+  creator    Creator         @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  draft      GameDraft?
+  versions   GameVersion[]
+  savePoints GameSavePoint[]
 
   @@unique([creatorId, builtInKey])
   @@index([creatorId, archivedAt])
@@ -137,6 +138,26 @@ model GameVersion {
 
   @@unique([gameId, number])
   @@map("game_versions")
+}
+
+// Save points: copies of a game's whole draft (card positions included) made on purpose in the editor, to go
+// back to later. Going back puts the copy into the draft as an ordinary, validated save.
+model GameSavePoint {
+  id         String   @id @db.Uuid
+  gameId     String   @db.Uuid
+  name       String   @db.VarChar(80)
+  // Made by the editor just before going back to another save point.
+  automatic  Boolean  @default(false)
+  // The person's name when it was made; null for the owner.
+  savedBy    String?  @db.VarChar(80)
+  sceneCount Int
+  definition Json     @db.JsonB
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, createdAt])
+  @@map("game_save_points")
 }
 
 // Runtime: each session uses one immutable version, never the current draft.
