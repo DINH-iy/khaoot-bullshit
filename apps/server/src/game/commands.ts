@@ -6,7 +6,7 @@ import { effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stageP
 import { earned, revealAwards } from './scoring/place-awards.js';
 import { checkBet, decideDuel, duelists, duelPlay, endTimedPool, openDuel, openPoolTryout, openTeamPool, pickDuelists, pickTimedPoolWinner, readDuel } from './duel.js';
 import { matchOutcome } from '../head-to-head/match.js';
-import { judgeResult, readMinigameRun, startMinigame, usesSubmissionTime } from '../minigames/shared/rules.js';
+import { judgeResult, readMinigameRun, startMinigame } from '../minigames/shared/rules.js';
 import { CLOCK_SLACK_MS, NO_FAIRNESS } from '../minigames/shared/fairness.js';
 import { changeGraphPlayback } from '../minigames/draw-the-graph/playback.js';
 import { shiftDotWindow } from '../minigames/count-the-dots/dots.js';
@@ -708,7 +708,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       requireGame(!prior, 'ALREADY_SUBMITTED');
       // For games with a time tiebreak, save the receipt time from before the room lock.
       const submission = await tx.submission.create({ data: { id: randomUUID(), sessionId: session.id, stageRunId: stage.id, actorKey: by.actorKey,
-        playerId: by.playerId, teamId: by.teamId, value, ...(usesSubmissionTime(rules.game) ? { receivedAt: now } : {}) } });
+        playerId: by.playerId, teamId: by.teamId, value, ...(rules.tiebreak === 'faster' ? { receivedAt: now } : {}) } });
       // Lucky doors pay out the door's points straight away (shown at the reveal); other minigames pay by place at the reveal.
       const door = rules.game === 'lucky-doors' ? BigInt(run.doorsMilli![value.value]!) : 0n;
       return { stageRunId: stage.id, submissionId: submission.id,

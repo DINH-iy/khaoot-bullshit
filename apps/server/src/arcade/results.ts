@@ -1,4 +1,4 @@
-import { MINIGAMES, MINIGAME_KEYS, isArcadeGame, isMinigameKey, type ArcadeGame, type MinigameKey, type SessionView } from '@party/contracts';
+import { ARCADE_ROUND_HISTORY, MINIGAMES, MINIGAME_KEYS, isArcadeGame, isMinigameKey, type ArcadeGame, type MinigameKey, type SessionView } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
 import { rankValue } from '../minigames/shared/rules.js';
@@ -55,22 +55,31 @@ export async function recordResults(tx: Transaction, roundId: string, game: Arca
   await payArcadeWins(tx, round.sessionId, round.seats.map(seat => ({ playerId: seat.playerId, personId: winners.find(row => row.memberId === seat.memberId)!.personId })));
 }
 
-/** The lobby's running total (everyone who played a round here) and its last round's results. */
+/** The lobby's running total (everyone who played a round here) and its finished rounds' results, newest first. */
 export async function lobbyScores(client: PrismaClient, lobbyId: string) {
-  const [sums, wins, members, last] = await Promise.all([
+  const [sums, wins, members, finished] = await Promise.all([
     client.arcadeResult.groupBy({ by: ['memberId'], where: { round: { lobbyId } }, _sum: { pointsMilli: true }, _count: { _all: true } }),
     client.arcadeResult.groupBy({ by: ['memberId'], where: { round: { lobbyId }, place: 1 }, _count: { _all: true } }),
     client.arcadeMember.findMany({ where: { lobbyId }, select: { id: true, displayName: true, look: true } }),
-    client.arcadeRound.findFirst({ where: { lobbyId, endedAt: { not: null }, results: { some: {} } }, orderBy: { number: 'desc' }, include: { results: true } }),
+    client.arcadeRound.findMany({ where: { lobbyId, endedAt: { not: null }, results: { some: {} } }, orderBy: { number: 'desc' }, take: ARCADE_ROUND_HISTORY, include: { results: true } }),
   ]);
   const byId = new Map(members.map(member => [member.id, member]));
+  // Each player's running total after every round shown: summed in the database over all the lobby's rounds, kept for the shown ones.
+  const oldest = finished.at(-1)?.number ?? 0;
+  const running = oldest ? await client.$queryRaw<{ number: number; memberId: string; total: bigint }[]>`
+    SELECT number, "memberId", total FROM (
+      SELECT r.number, a."memberId"::text AS "memberId", SUM(a."pointsMilli") OVER (PARTITION BY a."memberId" ORDER BY r.number) AS total
+      FROM arcade_results a JOIN arcade_rounds r ON r.id = a."roundId" WHERE r."lobbyId" = ${lobbyId}::uuid
+    ) totals WHERE number >= ${oldest}` : [];
+  const totalAfter = new Map(running.map(row => [`${row.number}:${row.memberId}`, BigInt(row.total).toString()]));
   const totals = sums.flatMap(sum => { const member = byId.get(sum.memberId); return member ? [{ memberId: member.id, displayName: member.displayName, look: lookOf(member),
     pointsMilli: (sum._sum.pointsMilli ?? 0n).toString(), wins: wins.find(row => row.memberId === sum.memberId)?._count._all ?? 0, rounds: sum._count._all }] : []; })
     .sort((a, b) => BigInt(b.pointsMilli) === BigInt(a.pointsMilli) ? b.wins - a.wins : BigInt(b.pointsMilli) > BigInt(a.pointsMilli) ? 1 : -1);
-  const lastRound = last && isArcadeGame(last.game) ? { number: last.number, game: last.game, teams: last.teams,
-    results: last.results.flatMap(result => { const member = byId.get(result.memberId); return member ? [{ memberId: member.id, displayName: member.displayName, look: lookOf(member), place: result.place, pointsMilli: result.pointsMilli.toString(), value: result.value }] : []; })
-      .sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (BigInt(b.pointsMilli) > BigInt(a.pointsMilli) ? 1 : BigInt(b.pointsMilli) < BigInt(a.pointsMilli) ? -1 : 0)) } : null;
-  return { totals, lastRound };
+  const rounds = finished.flatMap(last => isArcadeGame(last.game) ? [{ number: last.number, game: last.game, teams: last.teams,
+    results: last.results.flatMap(result => { const member = byId.get(result.memberId); const totalMilli = totalAfter.get(`${last.number}:${member?.id}`);
+      return member ? [{ memberId: member.id, displayName: member.displayName, look: lookOf(member), place: result.place, pointsMilli: result.pointsMilli.toString(), ...(totalMilli === undefined ? {} : { totalMilli }), value: result.value }] : []; })
+      .sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (BigInt(b.pointsMilli) > BigInt(a.pointsMilli) ? 1 : BigInt(b.pointsMilli) < BigInt(a.pointsMilli) ? -1 : 0)) }] : []);
+  return { totals, lastRound: rounds[0] ?? null, rounds };
 }
 
 /** All-time leaderboards for people: the ten best results per minigame (played alone), and the most wins. */

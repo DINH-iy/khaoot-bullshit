@@ -823,6 +823,8 @@ model ArcadeLobby {
   // The last time any member was seen; the lobby closes after 15 quiet minutes.
   lastActiveAt DateTime  @default(now()) @db.Timestamptz(3)
   closedAt     DateTime? @db.Timestamptz(3)
+  // The leader's choice for the next round so far ({ game, teams }), shown read-only to everyone else.
+  pick         Json?     @db.JsonB
 
   members ArcadeMember[]
   rounds  ArcadeRound[]

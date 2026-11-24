@@ -1,4 +1,4 @@
-import { ARCADE_MAX_MEMBERS, CreateArcadeSchema, JoinArcadeSchema, PlayerLookSchema, defaultLook, type PlayerLook } from '@party/contracts';
+import { ARCADE_MAX_MEMBERS, CreateArcadeSchema, JoinArcadeSchema, PlayerLookSchema, defaultLook, type ArcadePick, type PlayerLook } from '@party/contracts';
 import { hashLobbyPassword, matchesLobbyPassword } from './password.js';
 import type { Config } from '../config.js';
 import type { PrismaClient, ArcadeMember } from '../generated/prisma/client.js';
@@ -128,6 +128,14 @@ export function createLobbies(client: PrismaClient) {
         await lockLobby(tx, member.lobbyId);
         roomAssert(await ensureLeader(tx, member.lobbyId, now) === member.id, 'FORBIDDEN');
         await tx.arcadeLobby.update({ where: { id: member.lobbyId }, data: { locked } });
+      });
+    },
+    /** Only the leader changes the next round's choice; the others see it as it changes. */
+    async setPick(member: ArcadeMember, pick: ArcadePick, now = new Date()) {
+      await client.$transaction(async tx => {
+        await lockLobby(tx, member.lobbyId);
+        roomAssert(await ensureLeader(tx, member.lobbyId, now) === member.id, 'FORBIDDEN');
+        await tx.arcadeLobby.update({ where: { id: member.lobbyId }, data: { pick } });
       });
     },
     async setPassword(member: ArcadeMember, password: string | null, now = new Date()) {

@@ -56,6 +56,9 @@ test('Match the Angle works in editor practice and in a live room with a touch c
     const y = box.y + box.height / 2;
     const touch = await mobile.newCDPSession(phone);
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x + 70, y }] });
+    // The ray follows the finger in tenths of a degree: no whole-degree steps to count.
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 70, y: y - 1 }] });
+    await expect(dial).toHaveAttribute('aria-valuenow', '0.8');
     await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - 70 }] });
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect(dial).toHaveAttribute('aria-valuenow', '90');

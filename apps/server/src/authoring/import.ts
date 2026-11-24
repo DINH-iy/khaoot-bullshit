@@ -1,5 +1,5 @@
 import { HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
-import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
+import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
 // seconds instead of milliseconds, points as plain numbers, answers as plain
@@ -135,6 +135,11 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const known = isMinigameKey(game);
       const points = Array.isArray(raw['points']) ? raw['points'].map(entry => milli(entry)).filter(entry => entry !== undefined).slice(0, 12) : [];
       const teamResult = ['best', 'average', 'total'].includes(text(raw['teamResult'])) ? { teamResult: text(raw['teamResult']) } : {};
+      // `tiebreak`: "faster" (who locked in first wins a tie) or "shared" (equal results share the place).
+      const tiebreak = (MINIGAME_TIEBREAKS as readonly string[]).includes(text(raw['tiebreak'])) ? { tiebreak: text(raw['tiebreak']) } : {};
+      // `scoring`: { "kind": "within" or "scale", "distance": in the game's unit, "points": 10 } gives points by closeness instead of by place.
+      const closeness = isObject(raw['scoring']) && (MINIGAME_SCORING_KINDS as readonly string[]).includes(text(raw['scoring']['kind'])) && typeof raw['scoring']['distance'] === 'number'
+        ? { scoring: { kind: text(raw['scoring']['kind']), distance: Math.round(raw['scoring']['distance']), pointsMilli: milli(raw['scoring']['points'] ?? 10) ?? '10000' } } : {};
       // A step game in a team round: how the team decides ("anyone", "vote", "captain") and the seconds per vote.
       const decide = ['anyone', 'vote', 'captain'].includes(text(raw['decide'])) ? { decide: text(raw['decide']) } : {};
       const voteSeconds = raw['voteSeconds'] !== undefined ? { voteSeconds: Math.round(Math.min(120, Math.max(5, Number(raw['voteSeconds']) || 20))) } : {};
@@ -142,7 +147,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const busSips = Array.isArray(raw['sips']) && raw['sips'].length === 4 ? raw['sips'].map(entry => Math.round(Math.min(20, Math.max(0, Number(entry) || 0)))) : null;
       const sips = game === 'bus' && (busSips || raw['rainbow'] === false) ? { settings: { sips: busSips ?? [1, 2, 3, 4], ...(raw['rainbow'] === false ? { rainbow: false } : {}) } } : {};
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...decide, ...voteSeconds, ...play };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play };
     }
     case 'duel': {
       // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.

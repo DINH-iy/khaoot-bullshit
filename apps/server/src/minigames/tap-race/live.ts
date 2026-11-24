@@ -1,5 +1,3 @@
-import { MAX_TAPS_PER_SECOND } from './judge.js';
-
 /**
  * Short-lived signals from connected phones that help the server judge
  * minigame results fairly: each phone's measured network delay, and the taps
@@ -28,8 +26,8 @@ export function createLiveSignals(now: () => number = Date.now) {
     },
     forgetPlayer(sessionId: string, playerId: string) { latency.delete(`${sessionId}:${playerId}`); },
     /**
-     * A phone's running tap count. Accepted only while the race runs, only going
-     * up, and never faster than a person can tap since the last report.
+     * A phone's running tap count. Accepted only while the race runs and only
+     * going up; there is no limit on how fast anyone taps.
      * Returns the count the server believes, or null when the report is refused.
      */
     recordTaps(stageRunId: string, startsAt: string, seconds: number, playerId: string, count: number): number | null {
@@ -39,9 +37,7 @@ export function createLiveSignals(now: () => number = Date.now) {
       if (!race || race.startsAt !== startsAt) { race = { startsAt, endsAt, counts: new Map(), touched: at }; races.set(stageRunId, race); evict(races, MAX_RACES_TRACKED); }
       race.touched = at;
       const previous = race.counts.get(playerId) ?? { count: 0, at: start };
-      // A small burst allowance covers taps that arrive together after a hiccup.
-      const possible = previous.count + Math.ceil(MAX_TAPS_PER_SECOND * Math.max(0, Math.min(at, endsAt) - previous.at) / 1000) + 3;
-      const accepted = Math.max(previous.count, Math.min(count, possible));
+      const accepted = Math.max(previous.count, count);
       race.counts.set(playerId, { count: accepted, at: Math.min(at, endsAt) });
       return accepted;
     },

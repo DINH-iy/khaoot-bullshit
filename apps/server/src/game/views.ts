@@ -128,6 +128,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         : rules.game === 'count-the-dots' ? { viewSeconds: (rules.settings as MinigameSettings<'count-the-dots'>).viewSeconds, ...revealSettings }
         : rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
         ...(run?.cutTarget === undefined ? {} : { cutTarget: run.cutTarget }),
+        ...(rules.tiebreak === 'faster' ? { tiebreak: 'faster' as const } : {}),
+        ...(rules.scoring ? { scoring: rules.scoring } : {}),
         ...(run?.angleTarget === undefined ? {} : { angleTarget: run.angleTarget }),
         ...(graphChart ? { graph: { chart: graphChart, ...(ownGraphHue === undefined ? {} : { hue: ownGraphHue }) } } : {}),
         ...(dotRun ? { dots: { guessAt: dotRun.guessAt, ...(showPattern ? { pattern: dotRun.pattern } : {}) } } : {}),

@@ -5,7 +5,7 @@ import { closeRoundsByHand } from './helpers.js';
 const token = process.env['LOCAL_OWNER_TOKEN'];
 if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
 
-test('Cut the Line takes a whole-percent cut on a phone and reveals its error', async ({ page: host, browser, baseURL }) => {
+test('Cut the Line takes a cut in tenths of a percent on a phone and reveals its error', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
   await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
@@ -33,7 +33,7 @@ test('Cut the Line takes a whole-percent cut on a phone and reveals its error', 
   expect(idleFrame!.height).toBeGreaterThan(380);
   await practice.getByRole('button', { name: 'Start practice' }).click();
   const practiceMarker = practice.getByRole('slider', { name: 'Cut position' });
-  await expect(practiceMarker).toHaveValue('50');
+  await expect(practiceMarker).toHaveValue('500'); // tenths of a percent
   await expect(practiceMarker).toHaveClass(/slider-blade/);
   const endpoints = practice.locator('.cut-endpoints span');
   await expect(endpoints).toHaveText(['0%', '100%']);
@@ -84,17 +84,19 @@ test('Cut the Line takes a whole-percent cut on a phone and reveals its error', 
     await expect(host.getByText('Cut at 24%', { exact: true })).toBeVisible();
     await marker.tap({ position: { x: 20, y: 24 } });
     const tapped = Number(await marker.inputValue());
-    expect(tapped).toBeLessThan(50);
+    expect(tapped).toBeLessThan(500);
     await marker.press('ArrowRight');
     await expect(marker).toHaveValue(String(tapped + 1));
+    // The marker moves in tenths of a percent, so it never snaps to countable whole percents.
     const cut = tapped + 1;
-    const difference = Math.abs(cut - 24);
+    const difference = Math.abs(cut - 240);
+    const percent = (tenths: number) => (tenths / 10).toLocaleString('en', { maximumFractionDigits: 1 });
     await phone.getByRole('button', { name: 'Lock in cut' }).tap();
-    await expect(phone.getByText(new RegExp(` · ${cut}%$`))).toBeVisible();
+    await expect(phone.getByText(new RegExp(` · ${percent(cut).replace('.', '\\.')}%$`))).toBeVisible();
     await expect(host.locator('.cut-result')).toHaveCount(0);
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
-    await expect(host.locator('.cut-result dd')).toHaveText(['24%', `${cut}%`]);
+    await expect(host.locator('.cut-result dd')).toHaveText(['24%', `${percent(cut)}%`]);
     await host.addStyleTag({ content: '.mg-results { width: 350px; max-width: 100%; }' });
     const row = host.locator('.mg-podium li').first();
     await expect(row.locator('.mg-result-name strong')).toHaveText('Ada');
@@ -105,8 +107,8 @@ test('Cut the Line takes a whole-percent cut on a phone and reveals its error', 
     });
     expect(namesFit).toBe(true);
     const phoneResult = phone.locator('.cut-result');
-    await expect(phoneResult.locator('dd')).toHaveText(['24%', `${cut}%`]);
-    await expect(phoneResult.locator('p')).toHaveText(difference === 0 ? 'Exact match' : difference === 1 ? '1 percentage point off' : `${difference} percentage points off`);
+    await expect(phoneResult.locator('dd')).toHaveText(['24%', `${percent(cut)}%`]);
+    await expect(phoneResult.locator('p')).toHaveText(difference === 0 ? 'Exact match' : difference === 10 ? '1 percentage point off' : `${percent(difference)} percentage points off`);
   } finally {
     await mobile.close();
   }

@@ -1,7 +1,7 @@
 import { AutoRevealSecondsSchema, ColorSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, isSharedPrediction, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES } from '@party/contracts';
+import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, isSharedPrediction, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -90,6 +90,10 @@ const stageSchema = z.discriminatedUnion('kind', [
   // scenes saved earlier keep their hash.
   z.object({ ...common, kind: z.literal('minigame'), game: z.string().trim().min(1).max(64), settings: z.record(z.string(), z.json()).optional(),
     placementMilli: z.array(AwardMilliSchema).min(1).max(12).optional(), places: PlacesSchema.optional(), teamResult: z.enum(['best', 'average', 'total']).optional(),
+    // `tiebreak`: how equal results are settled, for minigames that allow speed to settle them (the game's standard when left out).
+    tiebreak: z.enum(MINIGAME_TIEBREAKS).optional(),
+    // `scoring`: points by closeness (close enough, or a sliding scale) instead of by place, for target minigames.
+    scoring: MinigameScoringSchema.optional(),
     // Step games in a team round: how a team decides each move, and the seconds for a team vote.
     decide: z.enum(TEAM_DECIDES).optional(), voteSeconds: z.number().int().min(5).max(120).optional() }).strict(),
   // A duel: two players (picked at random or by the host) face off in the room while everyone
@@ -200,6 +204,7 @@ export const GameDefinitionSchema = z.object({
       if (stage.kind === 'minigame' && stage.game === 'clap-beat' && stage.durationMs !== null && stage.durationMs < CLAP_END_MS) {
         ctx.addIssue({ code: 'custom', message: 'Clap the beat needs at least 9 seconds', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'durationMs'] });
       }
+      if (stage.kind === 'minigame' && isMinigameKey(stage.game) && stage.scoring && !minigameScoring(stage.game, stage.scoring)) ctx.addIssue({ code: 'custom', message: MINIGAMES[stage.game].closeness ? 'The distance is too far for this minigame' : 'This minigame gives points by place only', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage), 'scoring'] });
       if (stage.kind === 'minigame' && isMinigameKey(stage.game) && !parseMinigameSettings(stage.game, stage.settings)) ctx.addIssue({ code: 'custom', message: 'Minigame settings are not valid', path: ['nodes', definition.nodes.indexOf(node), 'stages', node.stages.indexOf(stage)] });
       if (stage.kind === 'collect' && stage.scoring.kind === 'judged' && !['text', 'media', 'drawing'].includes(stage.input.kind)) at('Only open rounds are judged', stageIndex);
       if (stage.kind === 'collect' && stage.scoring.kind === 'correct-order') {
@@ -248,11 +253,14 @@ export const isShowOnly = (stage: StageDefinition) => stage.kind === 'info' || s
 export const unplayable = (definition: GameDefinition) => allStages(definition).filter(({ stage }) => stage.kind === 'minigame' && !isMinigameKey(stage.game));
 export type MinigameStage = Extract<StageDefinition, { kind: 'minigame' }>;
 /** A playable minigame scene's rules, with defaults filled in. */
-export function minigameRules(stage: MinigameStage): { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total'; decide: TeamDecides; voteSeconds: number } {
+export function minigameRules(stage: MinigameStage): { game: MinigameKey; settings: MinigameSettings; placementMilli: string[]; teamResult: 'best' | 'average' | 'total'; tiebreak: MinigameTiebreak; scoring: MinigameScoring | null; decide: TeamDecides; voteSeconds: number } {
   if (!isMinigameKey(stage.game)) throw new GameError('UNSUPPORTED_FEATURE');
   const settings = parseMinigameSettings(stage.game, stage.settings);
   if (!settings) throw new GameError('INVALID_DEFINITION');
+  // Closeness scoring gives equal results equal points, so the tie rule (which settles places) applies to points by place only.
+  const scoring = minigameScoring(stage.game, stage.scoring);
   return { game: stage.game, settings, placementMilli: stage.places ? placePoints(stage.places) : stage.placementMilli ?? [...STANDARD_PLACEMENT_MILLI], teamResult: stage.teamResult ?? 'average',
+    scoring, tiebreak: scoring ? 'shared' : minigameTiebreak(stage.game, stage.tiebreak),
     decide: stage.decide ?? 'anyone', voteSeconds: stage.voteSeconds ?? 20 };
 }
 export { MINIGAMES };

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ANIMATION_PRESETS, AWARD_RULES, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MinigameSettingsSchemas, MOMENTS, PHONE_MENU_ACTIONS, PHONE_MENU_GLYPHS, RevealEasingSchema, THEME_PRESETS, ThemeSchema } from '@party/contracts';
+import { ANIMATION_PRESETS, AWARD_RULES, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MinigameSettingsSchemas, MOMENTS, PHONE_MENU_ACTIONS, PHONE_MENU_GLYPHS, RevealEasingSchema, THEME_PRESETS, ThemeSchema } from '@party/contracts';
 
 // The instructions the app copies for an AI ("Copy instructions for an AI") must know every
 // feature an author can use, or AI-made games silently miss them. When a feature is added,
@@ -29,6 +29,10 @@ describe('the instructions for an AI know every feature', () => {
       expect(missing(Object.keys(MinigameSettingsSchemas[game].shape)), game).toEqual([]);
     }
     expect(missing(RevealEasingSchema.options)).toEqual([]);
+  });
+  it('the tie rule of minigames, closeness scoring and their choices', () => {
+    expect(missing(['tiebreak', ...MINIGAME_TIEBREAKS])).toEqual([]);
+    expect(missing(['scoring', ...MINIGAME_SCORING_KINDS, 'distance'])).toEqual([]);
   });
   it('the phone menu icon setting, actions and icon choices', () => {
     expect(missing(['phoneMenuIcons', ...PHONE_MENU_ACTIONS, ...PHONE_MENU_GLYPHS])).toEqual([]);

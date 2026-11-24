@@ -11,7 +11,7 @@ import { DrawBoard } from '../../room/minigame-draw.js';
 import { ClockFace } from '../../room/stage-timer.js';
 import { PLAY_TEXTS } from '../../room/play.text.js';
 import { buildLook, LookContext, themeClass, useThemeStyle } from '../../presentation/look.js';
-import { FaIcon } from '../../presentation/icons.js';
+import { GameSymbol } from '../../presentation/game-symbol.js';
 import { gameDescription, gameName } from '../../presentation/catalog.text.js';
 import { Mark } from '../../presentation/mark-icons.js';
 import { SceneComposition } from '../../presentation/scene-composition.js';
@@ -160,9 +160,7 @@ function MinigamePreview({ stage, game, text, compact }: { stage: Stage; game: k
     {game === 'speed-run' ? <SpeedRunBoard {...(settings?.course ? { course: settings.course } : {})} />
       : game === 'draw-the-graph' ? <GraphChart chart={GraphSettingsSchema.safeParse(settings).data?.graph ?? SAMPLE_GRAPH} />
       : <div className={`minigame-preview-symbol game-${game}`} aria-hidden="true">
-      {game === 'stop-clock' ? <FaIcon name="stopwatch" /> : game === 'perfect-circle' ? '◯'
-        : game === 'relay-drawing' ? '✎' : game === 'lucky-doors' ? '▮▮▮' : game === 'majority' ? '↔'
-        : game === 'cut-the-line' ? '┿' : game === 'match-the-angle' ? '∠' : game === 'count-the-dots' ? '•••' : game === 'red-or-black-roulette' ? '◉' : game === 'bus' ? <FaIcon name="heart" /> : <FaIcon name="bolt" />}
+      <GameSymbol game={game} />
     </div>}
     <div className="minigame-preview-copy">
       {!compact && <h3>{gameName(game)}</h3>}

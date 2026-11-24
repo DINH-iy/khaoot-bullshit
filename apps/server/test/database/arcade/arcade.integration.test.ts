@@ -147,6 +147,10 @@ describe('arcade lobbies', () => {
     const after = await view(lobbyId, bob);
     expect(after.round).toBeNull();
     expect(after.lastRound).toMatchObject({ number: 1, game: 'majority' });
+    // The history to look back through holds the same round (newest first).
+    expect(after.rounds).toEqual([after.lastRound]);
+    // After the first round, everyone's running total is that round's points.
+    for (const row of after.lastRound!.results) expect(row.totalMilli).toBe(row.pointsMilli);
     expect(after.totals).toEqual(expect.arrayContaining([
       expect.objectContaining({ displayName: 'Bob', pointsMilli: '10000', wins: 1, rounds: 1 }),
       expect.objectContaining({ displayName: 'Cleo', pointsMilli: '0', wins: 0, rounds: 1 })]));
@@ -155,6 +159,28 @@ describe('arcade lobbies', () => {
     const board = (await call('GET', '/api/arcade/leaderboard')).json().data;
     expect(board.wins.find((row: { name: string }) => row.name.startsWith('Ann'))).toMatchObject({ wins: 1, rounds: 1, pointsMilli: '10000' });
     expect(board.wins.some((row: { name: string }) => row.name === 'Bob')).toBe(false);
+
+    // A second round: Ann and Cleo win it. The history shows it first, with each player's total so far.
+    const second = randomUUID();
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/rounds`, { roundId: second, game: 'majority', teams: null }, leader)).statusCode).toBe(200);
+    const again = await Promise.all([leader, bob, cleo].map(async cookie => cookieOf(await call('POST', `/api/arcade/lobbies/${lobbyId}/enter`, {}, cookie))));
+    const secondStage = (await call('GET', `/api/rooms/${second}`, undefined, again[0])).json().data.view.stage.id;
+    expect((await call('POST', `/api/arcade/rounds/${second}/act`, { action: 'start', stageRunId: secondStage }, again[0])).statusCode).toBe(200);
+    await new Promise(resolve => setTimeout(resolve, 3200));
+    const secondSeats = await prisma.arcadeSeat.findMany({ where: { roundId: second }, include: { member: true } });
+    const secondSeat = (name: RegExp) => secondSeats.find(seat => name.test(seat.member.displayName))!.playerId;
+    for (const [playerId, option] of [[secondSeat(/^Ann/), 'right'], [secondSeat(/^Bob$/), 'left'], [secondSeat(/^Cleo$/), 'right']] as const) {
+      await service.execute({ role: 'player', playerId }, { formatVersion: 1, commandId: randomUUID(), sessionId: second, type: 'minigame.move', stageRunId: secondStage, step: 0, option });
+    }
+    expect((await call('POST', `/api/arcade/rounds/${second}/act`, { action: 'end', stageRunId: null }, again[0])).statusCode).toBe(200);
+    const later = await view(lobbyId, bob);
+    expect(later.rounds.map(round => round.number)).toEqual([2, 1]);
+    const totalOf = (round: number, name: RegExp) => later.rounds.find(entry => entry.number === round)!.results.find(row => name.test(row.displayName))!;
+    expect(totalOf(2, /^Ann/)).toMatchObject({ pointsMilli: '10000', totalMilli: '20000' });
+    expect(totalOf(2, /^Bob$/)).toMatchObject({ pointsMilli: '0', totalMilli: '10000' });
+    expect(totalOf(2, /^Cleo$/)).toMatchObject({ pointsMilli: '10000', totalMilli: '10000' });
+    // The earlier round keeps the totals as they were then.
+    expect(totalOf(1, /^Bob$/)).toMatchObject({ pointsMilli: '10000', totalMilli: '10000' });
   });
 
   it('requires two duelists and records a drawn duel without a win or points', async () => {

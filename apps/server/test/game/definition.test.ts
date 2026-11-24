@@ -17,6 +17,13 @@ describe('server-only game definitions', () => {
     }
     expect(() => parseDefinition({ ...preparedGame, nodes: [...preparedGame.nodes, preparedGame.nodes[0]] })).toThrow('INVALID_DEFINITION');
   });
+  it('accepts points by closeness only for target minigames, within what they can measure', () => {
+    const withMinigame = (stage: Record<string, unknown>) => { const game = structuredClone(preparedGame) as unknown as { nodes: { stages: Record<string, unknown>[] }[] };
+      game.nodes[0]!.stages[0] = { key: 'play', kind: 'minigame', prompt: 'Play', durationMs: 20_000, ...stage }; return () => parseDefinition(game); };
+    expect(withMinigame({ game: 'cut-the-line', scoring: { kind: 'scale', distance: 20, pointsMilli: '10000' } })).not.toThrow();
+    expect(withMinigame({ game: 'cut-the-line', scoring: { kind: 'within', distance: 101, pointsMilli: '10000' } })).toThrow('INVALID_DEFINITION');
+    expect(withMinigame({ game: 'tap-race', settings: { seconds: 10 }, scoring: { kind: 'within', distance: 5, pointsMilli: '10000' } })).toThrow('INVALID_DEFINITION');
+  });
   it('validates secret scoring, runs timed stages and drawing rounds, and fails closed on an unchosen minigame', () => {
     const game = structuredClone(preparedGame);
     const stage = game.nodes[0]!.stages[0]!;

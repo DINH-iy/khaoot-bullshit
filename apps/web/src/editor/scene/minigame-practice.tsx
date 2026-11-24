@@ -134,7 +134,7 @@ function PracticeAttempt({ game, settings, stage, attempt, shared }: {
     const { value, stroke } = result;
     if (game === 'stop-clock') return <ClockResult target={(settings as MinigameSettings<'stop-clock'>).targetMs} elapsed={value} />;
     if (cutTarget !== undefined) return <CutResult target={cutTarget} cut={value} />;
-    const label = angleTarget !== undefined ? minigameResult(game, angleError(value, angleTarget), settings, false, { angle: value })
+    const label = angleTarget !== undefined ? minigameResult(game, angleError(value, angleTarget * 10, 3600), settings, false, { angle: value })
       : minigameResult(game, stroke ? circleScore(stroke) : value, settings);
     return <p className="practice-result" role="status">{result.early ? t('minigame.tooSoon') : label}</p>;
   }

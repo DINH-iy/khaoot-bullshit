@@ -20,7 +20,7 @@ export function TapRace({ settings, startsAt, offset, disabled, onResult, onTaps
     return () => clearInterval(timer);
   }, [started, over, onTaps]);
   useEffect(() => { if (over && !sent.current) { sent.current = true; onTaps(count.current); onResult({ value: count.current }); } }, [over, onResult, onTaps]);
-  const tap = () => { if (over || disabled) return; count.current = Math.min(count.current + 1, settings.seconds * 16); setTaps(count.current); };
+  const tap = () => { if (over || disabled) return; count.current += 1; setTaps(count.current); };
   return <Countdown startsAt={startsAt} offset={offset}>
     <p className="mg-big" aria-live="off">{taps}</p>
     <p className="mg-sub">{t('timer.left', { time: `${Math.max(0, (end - now) / 1000).toFixed(1)} s` })}</p>

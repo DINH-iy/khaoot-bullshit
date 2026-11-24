@@ -23,7 +23,6 @@
 .room .arcade-tabs [aria-pressed=true] { background: var(--r-accent); color: var(--r-accent-ink); border-color: var(--r-accent); }
 .arcade-pick { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); }
 .arcade-pick label { gap: 6px; font-weight: 700; }
-.arcade-invite img { max-width: 100%; height: auto; justify-self: start; border-radius: 8px; background: #fff; }
 .arcade-join { margin: 24px auto; }
 .arcade-round { display: grid; gap: 12px; margin: 16px; }
 .room .arcade-round .arcade-next { display: inline-flex; gap: 10px; align-items: center; justify-content: center; width: 100%; min-height: 56px; font-size: 1.1rem; }
@@ -34,6 +33,111 @@
 
 .arcade .arcade-nav-button { display: inline-flex; align-items: center; gap: 8px; justify-content: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--r-line); border-radius: 12px; background: var(--r-card-strong); color: var(--r-text); text-decoration: none; font-weight: 650; }
 .arcade .arcade-nav-button:hover { border-color: var(--r-accent); }
-.arcade-password summary { cursor: pointer; font-weight: 700; }
-.arcade-password form { margin-top: 12px; }
+
+.arcade-password { display: grid; gap: 10px; }
+.arcade-password h3 { margin: 0; font-size: 1rem; }
 .arcade-password-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The lobby, as a party game's phone lobby: a short bar, one "next round" card, one pinned action. Lists open in sheets. */
+.arcade-lobby { min-height: 100dvh; display: flex; flex-direction: column; }
+.arcade-lobby-bar { position: sticky; top: 0; z-index: 6; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 6px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px; background: color-mix(in srgb, var(--r-bg2) 82%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--r-line); }
+.arcade-lobby-name { min-width: 0; }
+.arcade-lobby-name h1 { margin: 0; font-size: 1.15rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arcade-lobby-name p { margin: 2px 0 0; display: flex; align-items: center; gap: 5px; color: var(--r-muted); font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.arcade-lobby-name .fa-icon { width: .85em; height: .85em; }
+.room .arcade-icon-button { display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border-radius: 14px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); text-decoration: none; }
+.room .arcade-icon-button .fa-icon { width: 18px; height: 18px; }
+.room .arcade-players-button { display: inline-flex; align-items: center; gap: 6px; height: 44px; min-height: 44px; margin: 0; padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font-weight: 800; }
+.arcade-avatar-stack { display: inline-flex; }
+.arcade-avatar-stack > * { border-radius: 50%; box-shadow: 0 0 0 2px var(--r-card-strong); }
+.arcade-avatar-stack > * + * { margin-left: -12px; }
+.arcade-count { font-variant-numeric: tabular-nums; }
+
+.arcade-lobby-main { width: min(560px, 100%); box-sizing: border-box; margin: 0 auto; padding: 16px 16px 112px; display: grid; gap: 14px; align-content: start; flex: 1; }
+.room .arcade-next { display: grid; gap: 12px; margin: 0; padding: 16px; border-radius: var(--r-radius); background: var(--r-card); border: 1px solid var(--r-line); }
+.arcade-kicker { margin: 0; font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--r-muted); }
+.arcade-next .arcade-meta { display: flex; align-items: center; gap: 6px; font-size: .95rem; }
+.arcade-next .arcade-meta .fa-icon { color: var(--r-accent); }
+.room .arcade-game-tile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; width: 100%; min-height: 96px; margin: 0; padding: 14px; box-sizing: border-box;
+  border-radius: 18px; border: 2px solid color-mix(in srgb, var(--r-accent) 55%, transparent); background: var(--r-card-strong); color: var(--r-text); text-align: left; font: inherit; }
+.room .arcade-game-tile.static { grid-template-columns: auto minmax(0, 1fr); }
+.arcade-game-tile strong { display: block; font-size: 1.3rem; line-height: 1.2; }
+.arcade-game-tile small { display: block; margin-top: 4px; color: color-mix(in srgb, var(--r-text) 82%, transparent); font-size: .9rem; font-weight: 500; }
+.arcade-game-symbol { display: grid; place-items: center; width: 64px; aspect-ratio: 1; border-radius: 16px; background: var(--r-accent); color: var(--r-accent-ink); font-size: 1.7rem; font-weight: 900; line-height: 1; flex: none; }
+.arcade-game-symbol .fa-icon { width: 1em; height: 1em; }
+.arcade-change { padding: 6px 12px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-size: .85rem; font-weight: 800; }
+.arcade-segment-row { display: grid; gap: 6px; }
+.arcade-segment-label { font-size: .8rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--r-muted); }
+.arcade-segments { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--r-card-strong); border: 1px solid var(--r-line); }
+.room .arcade-segments button { flex: 1 1 0; min-width: 0; min-height: 40px; margin: 0; padding: 4px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--r-text); font-size: .95rem; font-weight: 700; white-space: nowrap; box-shadow: none; }
+.room .arcade-segments button[aria-pressed=true] { background: var(--r-accent); color: var(--r-accent-ink); }
+.room .arcade-segments button:disabled { opacity: 1; cursor: default; }
+.room .arcade-segments button:disabled:not([aria-pressed=true]) { color: var(--r-muted); }
+/* The team options grow out under "In teams". */
+.arcade-teams-more { display: grid; gap: 12px; padding: 12px; border-radius: 16px; background: color-mix(in srgb, var(--r-accent) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--r-accent) 40%, transparent);
+  animation: arcade-grow .2s ease-out; transform-origin: top; }
+@keyframes arcade-grow { from { opacity: 0; transform: scaleY(.85); } }
+@media (prefers-reduced-motion: reduce) { .arcade-teams-more { animation: none; } }
+
+.room .arcade-last { display: grid; gap: 10px; margin: 0; padding: 14px 16px; border-radius: var(--r-radius); background: var(--r-card); border: 1px solid var(--r-line); }
+.arcade-last-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+/* The rounds side by side, one card wide, snapping as you swipe; newest first, older to the right. */
+.arcade-rounds { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; border-radius: 12px; }
+.arcade-rounds::-webkit-scrollbar { display: none; }
+.arcade-rounds:focus-visible { outline: 3px solid var(--r-accent); outline-offset: 2px; }
+.arcade-round-slide { display: grid; gap: 10px; align-content: start; min-width: 0; scroll-snap-align: start; }
+.arcade-rounds-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.room .arcade-round-arrow { display: grid; place-items: center; width: 36px; height: 36px; min-height: 36px; margin: 0; padding: 0; border-radius: 50%; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); }
+.room .arcade-round-arrow:disabled { opacity: .35; }
+.arcade-round-arrow .fa-icon { width: 14px; height: 14px; }
+.arcade-round-dots { display: flex; justify-content: center; align-items: center; gap: 6px; color: var(--r-muted); font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.arcade-round-dots > span { width: 7px; height: 7px; border-radius: 50%; background: var(--r-line); transition: width .15s; }
+.arcade-round-dots > span.on { width: 18px; border-radius: 999px; background: var(--r-accent); }
+@media (prefers-reduced-motion: reduce) { .arcade-round-dots > span { transition: none; } }
+.arcade-last-head > .fa-icon { width: 20px; height: 20px; color: var(--r-accent); }
+.arcade-last-head h2 { margin: 0; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arcade-podium { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.arcade-podium li { display: grid; grid-template-columns: 1.6rem auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0; padding: 6px 10px; border-radius: 12px; background: var(--r-card-strong); }
+.arcade-podium li.mine { box-shadow: inset 0 0 0 2px var(--r-accent); }
+.arcade-place { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--r-line); font-weight: 900; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.arcade-place.first { background: var(--r-accent); color: var(--r-accent-ink); }
+.arcade-podium-name { min-width: 0; display: grid; }
+.arcade-podium-name strong, .arcade-podium-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arcade-podium-name small { color: var(--r-muted); font-size: .8rem; }
+.arcade-podium-points { display: grid; justify-items: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.arcade-podium-points strong { font-size: .95rem; }
+.arcade-podium-points small { color: var(--r-muted); font-size: .8rem; }
+.room .arcade-last-more { min-height: 36px; margin: 0; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font-size: .85rem; font-weight: 800; }
+
+/* Pinned to the bottom of the screen, above the safe area, fading the page out behind it. */
+.arcade-lobby-action { position: fixed; inset-inline: 0; bottom: 0; z-index: 5; display: grid; justify-items: center; padding: 20px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(transparent, var(--r-bg2) 45%); pointer-events: none; }
+.arcade-lobby-action > * { width: min(528px, 100%); pointer-events: auto; }
+.room .arcade-lobby-action button.big { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; margin: 0; font-size: 1.1rem; }
+.arcade-waiting { margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 16px; box-sizing: border-box; border-radius: 999px;
+  background: var(--r-card-strong); border: 1px solid var(--r-line); color: var(--r-muted); font-weight: 700; text-align: center; }
+.arcade-waiting .fa-icon { color: var(--r-accent); }
+
+/* Sheets: choosing a game, settings, players, invite, scores. */
+.arcade-game-group h3, .arcade-score-block h3 { margin: 0 0 8px; font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--r-muted); }
+.arcade-game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 8px; }
+.room .arcade-game-option { display: grid; justify-items: center; align-content: start; gap: 8px; min-height: 104px; margin: 0; padding: 12px 8px; border-radius: 14px;
+  border: 2px solid transparent; background: var(--r-card-strong); color: var(--r-text); font: inherit; font-weight: 700; text-align: center; }
+.room .arcade-game-option[aria-pressed=true] { border-color: var(--r-accent); background: color-mix(in srgb, var(--r-accent) 16%, var(--r-card-strong)); }
+.arcade-game-option .arcade-game-symbol { width: 44px; border-radius: 12px; font-size: 1.2rem; }
+.arcade-game-option small { display: block; color: var(--r-muted); font-size: .75rem; font-weight: 600; }
+.room .arcade-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin: 0; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); text-align: left; font: inherit; }
+.arcade-switch strong, .arcade-switch small { display: block; }
+.arcade-switch small { margin-top: 2px; color: var(--r-muted); font-size: .85rem; }
+.arcade-switch-track { flex: none; position: relative; width: 48px; height: 28px; border-radius: 999px; background: var(--r-line); transition: background .15s; }
+.arcade-switch-track > span { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: translate .15s; }
+.arcade-switch[aria-checked=true] .arcade-switch-track { background: var(--r-accent); }
+.arcade-switch[aria-checked=true] .arcade-switch-track > span { translate: 20px 0; }
+.arcade-member-list li.offline { opacity: .6; }
+.arcade-member-list .arcade-badge { font-size: .8rem; }
+.arcade-invite { display: grid; gap: 12px; justify-items: center; text-align: center; }
+.arcade-invite img { width: min(240px, 100%); height: auto; padding: 8px; border-radius: 12px; background: #fff; }
+.arcade-invite a { color: var(--r-muted); font-size: .9rem; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .arcade-switch-track, .arcade-switch-track > span { transition: none; } }

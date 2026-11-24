@@ -23,8 +23,8 @@ Play and tune one game at a time. Keep the current game under **In review**, and
 - [ ] **Clap the beat** — Test tapping and the optional microphone on a real phone. Check the beat windows and feedback.
 - [ ] **Speed run** — Try a stock course and a custom course. Check controls, restart, and finish timing.
 - [ ] **Perfect circle** — Draw at different speeds and sizes. Check that rankings match how round the drawings look.
-- [ ] **Cut the Line** — Check the shared target, 1% steps, and submission on a small screen.
-- [ ] **Match the Angle** — Check the angle direction, 1° snap, and fastest-submission tiebreak.
+- [ ] **Cut the Line** — Check the shared target, smooth tenth-of-a-percent movement, and submission on a small screen.
+- [ ] **Match the Angle** — Check the angle direction, smooth tenth-of-a-degree movement, and fastest-submission tiebreak.
 - [ ] **Count the Dots** — Check dot legibility on TV, submissions during and after viewing, and the compact phone result.
 - [ ] **Heads or Tails** — Check secret picks, the shared flip, and solo play with and without chips.
 - [ ] **Roulette** — Bet points on numbers and outside bets, check the stake limit (score or minimum stake), green zero, the rolling ball, and that wins and losses change the score. Check that arcade and solo Roulette (play chips) use the same table.
@@ -70,7 +70,7 @@ Every minigame scene exposes its prompt and the timing controls applicable to it
 | Lucky doors | Door values and shuffled or fixed order |
 | Perfect circle | Drawing time |
 | Cut the Line | Random, exact, or inclusive target range |
-| Match the Angle | Shared random target. The exclusion of easy angles and the 1° step are fixed rules. |
+| Match the Angle | Shared random target. The exclusion of easy angles and the tenth-of-a-degree resolution are fixed rules. |
 | Count the Dots | Display time, guess time, random or authored count, slight overlap, and reveal easing |
 | Draw the Graph | Stock or custom data, CSV or Grapher import, cutoff, axis labels, source, and reveal easing |
 | Heads or Tails | Award for a correct guess and guess time. Coin probabilities are fixed. |

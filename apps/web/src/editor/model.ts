@@ -174,6 +174,8 @@ export function minigameStage(game: MinigameKey, definition: Definition): Stage 
 export function withMinigame(stage: Stage, game: MinigameKey, definition: Definition): Stage {
   const old = String(stage['game'] ?? '');
   const copy: Stage = { ...stage, game, durationMs: MINIGAMES[game].defaultSeconds * 1000 }; delete copy['settings'];
+  // How points are given and the tie rule belong to the old game (its distances and units).
+  delete copy['scoring']; delete copy['tiebreak'];
   // The old game's standard title in any language counts as untouched.
   if (!stage.prompt || (old === 'draw-the-graph' ? isDefaultGraphQuestion(stage.prompt)
     : isMinigameKey(old) && LANGS.some(language => stage.prompt === `${translate(CATALOG_TEXTS, old, undefined, language)}!`))) copy.prompt = minigamePrompt(game);

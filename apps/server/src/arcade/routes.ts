@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, GameIdSchema, isArcadeGame, type RoomReply } from '@party/contracts';
+import { ArcadeLeaderboardSchema, ArcadeListSchema, ArcadeLobbyViewSchema, ArcadeLockSchema, ArcadePasswordUpdateSchema, ArcadePickSchema, GameIdSchema, isArcadeGame, type RoomReply } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { GameError } from '../game/errors.js';
@@ -57,7 +57,7 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
     }
     if (lobby.passwordHash && !member) return ArcadeLobbyViewSchema.parse({
       id: lobby.id, title: lobby.title, locked: lobby.locked, protected: true, closed,
-      me: null, members: [], round: null, totals: [], lastRound: null,
+      me: null, members: [], round: null, totals: [], lastRound: null, rounds: [],
     });
     const members = await client.arcadeMember.findMany({ where: { lobbyId, leftAt: null }, orderBy: { joinedAt: 'asc' } });
     const seated = new Set(round?.seats.map(seat => seat.memberId) ?? []);
@@ -69,6 +69,8 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
         connected: now.getTime() - entry.lastSeenAt.getTime() < CONNECTED_MS, leader: entry.id === lobby!.leaderId, playing: seated.has(entry.id) })),
       round: round && isArcadeGame(round.game) ? { number: round.number, game: round.game, teams: round.teams, seated: Boolean(member && seated.has(member.id)) } : null,
       ...scores,
+      // A stored choice of a game no longer offered is simply not shown.
+      pick: ArcadePickSchema.safeParse(lobby.pick).data ?? null,
     });
   }
 
@@ -111,6 +113,13 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
       guard(request, 'act', 240); const lobbyId = lobbyParam(request);
       const body = ArcadeLockSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       await lobbies.setLocked(await requireMember(request, lobbyId), body.data.locked); return { ok: true, data: {} };
+    } catch (error) { return fail(reply, error); }
+  });
+  app.post('/api/arcade/lobbies/:lobbyId/pick', async (request, reply) => {
+    try {
+      guard(request, 'act', 240); const lobbyId = lobbyParam(request);
+      const body = ArcadePickSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await lobbies.setPick(await requireMember(request, lobbyId), body.data); return { ok: true, data: {} };
     } catch (error) { return fail(reply, error); }
   });
   app.post('/api/arcade/lobbies/:lobbyId/password', async (request, reply) => {

@@ -328,13 +328,15 @@ describe('minigames', () => {
     expect((await readSessionView(prisma, { role: 'player', playerId: f.players[0]!.id }, f.sessionId)).stage!.minigame!.angleTarget).toBe(target);
     await expect(play(w, f, 0, stageRunId, target)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
     w.advance(3000);
-    await expect(play(w, f, 0, stageRunId, 361)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await expect(play(w, f, 0, stageRunId, 3601)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
     await expect(play(w, f, 0, stageRunId, 12.5)).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
 
-    // One guess crosses 0° on the shorter route. The other two have the same error.
-    const acrossZero = target < 180 ? 359 : 0;
-    const equalError = target < 180 ? target + 1 : 360 - target;
-    const sameDistance = (target + (target < 180 ? equalError : -equalError) + 360) % 360;
+    // Angles come in tenths of a degree (no whole-degree snapping). One guess crosses 0° on the shorter route
+    // (359.9°); the other two have the same error.
+    const exact = target * 10;
+    const acrossZero = target < 180 ? 3599 : 0;
+    const equalError = target < 180 ? exact + 1 : 3600 - exact;
+    const sameDistance = (exact + (target < 180 ? equalError : -equalError) + 3600) % 3600;
     await play(w, f, 0, stageRunId, acrossZero);
     await host(w, f, 'session.pause');
     w.advance(5000);
@@ -345,15 +347,15 @@ describe('minigames', () => {
     await host(w, f, 'stage.close', { stageRunId });
     await host(w, f, 'stage.reopen', { stageRunId, durationMs: 10_000 });
     expect((await view()).stage!.minigame!.angleTarget).toBe(target);
-    await play(w, f, 3, stageRunId, target);
+    await play(w, f, 3, stageRunId, exact);
     w.advance(12_000);
-    await expect(play(w, f, 4, stageRunId, target)).rejects.toMatchObject({ code: 'TOO_LATE' });
+    await expect(play(w, f, 4, stageRunId, exact)).rejects.toMatchObject({ code: 'TOO_LATE' });
     expect((await view()).stage!.reveal).toBeNull();
     await host(w, f, 'stage.close', { stageRunId });
     await host(w, f, 'stage.reveal', { stageRunId });
     const revealed = await view();
     expect(revealed.stage!.reveal!.answer).toMatchObject({ game: 'match-the-angle', entries: expect.arrayContaining([
-      { playerId: f.players[3]!.id, teamId: null, value: 0, angle: target, place: 1 },
+      { playerId: f.players[3]!.id, teamId: null, value: 0, angle: exact, place: 1 },
       { playerId: f.players[0]!.id, teamId: null, value: equalError, angle: acrossZero, place: 2 },
       { playerId: f.players[1]!.id, teamId: null, value: equalError, angle: sameDistance, place: 3 },
       { playerId: f.players[2]!.id, teamId: null, value: equalError, angle: sameDistance, place: 3 },
@@ -382,8 +384,10 @@ describe('minigames', () => {
     await expect(play(w, f, 0, stageRunId, target)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
 
     w.advance(3500);
-    await expect(play(w, f, 0, stageRunId, 101)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
-    await play(w, f, 0, stageRunId, target + 2);
+    // Cuts come in tenths of a percent (no whole-percent snapping).
+    const exact = target * 10;
+    await expect(play(w, f, 0, stageRunId, 1001)).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await play(w, f, 0, stageRunId, exact + 23);
     await host(w, f, 'session.pause');
     w.advance(5000);
     await host(w, f, 'session.resume');
@@ -391,8 +395,8 @@ describe('minigames', () => {
     await host(w, f, 'stage.close', { stageRunId });
     await host(w, f, 'stage.reopen', { stageRunId, durationMs: 10_000 });
     expect((await view()).stage!.minigame!.cutTarget).toBe(target);
-    await play(w, f, 1, stageRunId, target - 2);
-    await play(w, f, 2, stageRunId, target - 6);
+    await play(w, f, 1, stageRunId, exact - 23);
+    await play(w, f, 2, stageRunId, exact - 61);
     await expect(play(w, f, 0, stageRunId, target)).rejects.toMatchObject({ code: 'ALREADY_SUBMITTED' });
     w.advance(12_000);
     await expect(play(w, f, 3, stageRunId, target)).rejects.toMatchObject({ code: 'TOO_LATE' });
@@ -401,12 +405,13 @@ describe('minigames', () => {
     await host(w, f, 'stage.reveal', { stageRunId });
     const revealed = await view();
     expect(revealed.stage!.reveal!.answer).toMatchObject({ game: 'cut-the-line', entries: expect.arrayContaining([
-      { playerId: f.players[0]!.id, teamId: null, value: 2, cut: target + 2, place: 1 },
-      { playerId: f.players[1]!.id, teamId: null, value: 2, cut: target - 2, place: 1 },
-      { playerId: f.players[2]!.id, teamId: null, value: 6, cut: target - 6, place: 3 },
+      { playerId: f.players[0]!.id, teamId: null, value: 23, cut: exact + 23, place: 1 },
+      // As close as the first cut, but locked in later (after the reopen): second.
+      { playerId: f.players[1]!.id, teamId: null, value: 23, cut: exact - 23, place: 2 },
+      { playerId: f.players[2]!.id, teamId: null, value: 61, cut: exact - 61, place: 3 },
     ]) });
     expect(revealed.standings).toEqual(expect.arrayContaining([
-      ...f.players.slice(0, 2).map(player => ({ playerId: player.id, amountMilli: '10000' })),
+      { playerId: f.players[0]!.id, amountMilli: '10000' }, { playerId: f.players[1]!.id, amountMilli: '6000' },
       { playerId: f.players[2]!.id, amountMilli: '3000' },
     ]));
   });

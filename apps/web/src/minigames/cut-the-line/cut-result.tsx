@@ -1,4 +1,5 @@
 import { defineTexts, useTexts } from '../../i18n/texts.js';
+import { tenths } from '../shared/result-label.js';
 
 const TEXTS = defineTexts('cut result', {
   target: 'Target', cut: 'Your cut', winner: 'Closest cut', exact: 'Exact match', one: '1 percentage point off', off: '{value} percentage points off',
@@ -8,18 +9,19 @@ const TEXTS = defineTexts('cut result', {
   ro: { target: 'Țintă', cut: 'Tăietura ta', winner: 'Cea mai apropiată', exact: 'Potrivire exactă', one: 'La 1 punct procentual', off: 'La {value} puncte procentuale' },
 });
 
+/** `target` in whole percents, `cut` in tenths of a percent (as phones send it). */
 export function CutResult({ target, cut, shared = false }: { target: number; cut?: number | undefined; shared?: boolean }) {
   const t = useTexts(TEXTS);
-  const error = cut === undefined ? null : Math.abs(cut - target);
+  const error = cut === undefined ? null : Math.abs(cut - target * 10);
   return <div className="cut-result" role="status">
     <div className="cut-result-rail" aria-hidden="true" dir="ltr">
       <span className="cut-result-target" style={{ left: `${target}%` }} />
-      {cut !== undefined && <span className="cut-result-mark" style={{ left: `${cut}%` }} />}
+      {cut !== undefined && <span className="cut-result-mark" style={{ left: `${cut / 10}%` }} />}
     </div>
     <dl>
       <div><dt>{t('target')}</dt><dd>{target}%</dd></div>
-      {cut !== undefined && <div><dt>{t(shared ? 'winner' : 'cut')}</dt><dd>{cut}%</dd></div>}
+      {cut !== undefined && <div><dt>{t(shared ? 'winner' : 'cut')}</dt><dd>{tenths(cut)}%</dd></div>}
     </dl>
-    {error !== null && <p>{error === 0 ? t('exact') : error === 1 ? t('one') : t('off', { value: error })}</p>}
+    {error !== null && <p>{error === 0 ? t('exact') : error === 10 ? t('one') : t('off', { value: tenths(error) })}</p>}
   </div>;
 }

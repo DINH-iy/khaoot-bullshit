@@ -118,16 +118,13 @@ export function judgeResult(game: MinigameKey, settings: MinigameSettings, run: 
 
 /** A number to rank by (lower is better), or null when the result does not rank (false start). */
 export function rankValue(game: MinigameKey, settings: MinigameSettings, value: { value: number; early?: true | undefined }): number | null {
-  if (value.early) return null;
-  if (game === 'reaction' || game === 'speed-run' || game === 'cut-the-line' || usesSubmissionTime(game)) return value.value;
-  if (game === 'tap-race' || game === 'clap-beat') return -value.value;
+  // Pass the pencil is ranked by its votes (see minigameOutcome), not by one result per player.
+  if (value.early || game === 'relay-drawing') return null;
+  // Stop the clock keeps the stopped time as its result; it ranks by the distance from the target.
   if (game === 'stop-clock') return Math.abs(value.value - (settings as MinigameSettings<'stop-clock'>).targetMs);
-  if (game === 'perfect-circle') return -value.value;
-  if (game === 'bus') return value.value;
-  return null;
+  const { better } = MINIGAMES[game];
+  return better === 'lower' ? value.value : better === 'higher' ? -value.value : null;
 }
-
-export const usesSubmissionTime = (game: MinigameKey) => game === 'match-the-angle' || game === 'count-the-dots' || game === 'draw-the-graph';
 
 /** Places for ranked results: entries that tie on both criteria share a place. */
 export function places<T>(entries: T[], score: (entry: T) => number | null, tiebreak?: (entry: T) => number): Map<T, number> {

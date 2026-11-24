@@ -18,9 +18,11 @@ export async function libraryUsage(client: PrismaClient): Promise<{ games: Libra
     SELECT m."gameId"::text AS "gameId", m.id AS "mediaId" FROM mentioned m
     JOIN game_media media ON media.id::text = m.id
     WHERE media."removedAt" IS NULL AND media.kind <> 'FONT'`;
-  const byMedia = new Map<string, string[]>();
-  for (const { gameId, mediaId } of rows) byMedia.set(mediaId, [...byMedia.get(mediaId) ?? [], gameId]);
-  const games = await client.game.findMany({ where: { id: { in: [...new Set(rows.map(row => row.gameId))] } },
+  // Only games an author works on (they have a draft): a rehearsal's hidden copy ("Rehearsal · …") is not a game of its own here.
+  const games = await client.game.findMany({ where: { id: { in: [...new Set(rows.map(row => row.gameId))] }, draft: { isNot: null } },
     select: { id: true, title: true, archivedAt: true }, orderBy: [{ title: 'asc' }, { id: 'asc' }] });
+  const shown = new Set(games.map(game => game.id));
+  const byMedia = new Map<string, string[]>();
+  for (const { gameId, mediaId } of rows) if (shown.has(gameId)) byMedia.set(mediaId, [...byMedia.get(mediaId) ?? [], gameId]);
   return { games: games.map(game => ({ id: game.id, title: game.title, archived: game.archivedAt !== null })), byMedia };
 }

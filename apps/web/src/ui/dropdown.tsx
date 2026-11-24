@@ -26,6 +26,16 @@ export interface DropdownOption { value: string; label: string; group?: string; 
  * The list is drawn over the page (not clipped by a scrolling panel) and opens
  * upwards when there is no room below.
  */
+/** Where a fixed element's (0, 0) really is on screen: the window's corner, or that of a parent that became its frame. */
+function frameOrigin(node: HTMLElement | null): { left: number; top: number } {
+  if (!node) return { left: 0, top: 0 };
+  const style = node.style; const saved = [style.left, style.top, style.bottom, style.transform] as const;
+  style.left = '0px'; style.top = '0px'; style.bottom = 'auto'; style.transform = 'none';
+  const corner = node.getBoundingClientRect();
+  [style.left, style.top, style.bottom, style.transform] = saved;
+  return { left: corner.left, top: corner.top };
+}
+
 export function Dropdown({ id: buttonId, value, options, onChange, placeholder = t('choose'), className, disabled, label, title }: {
   id?: string; value: string; options: DropdownOption[]; onChange: (value: string) => void; placeholder?: string; className?: string; disabled?: boolean; label?: string; title?: string;
 }) {
@@ -52,8 +62,13 @@ export function Dropdown({ id: buttonId, value, options, onChange, placeholder =
       const bottomEdge = topEdge + (viewport?.height ?? window.innerHeight);
       const below = bottomEdge - box.bottom - 8; const above = box.top - topEdge - 8; const up = below < 220 && above > below;
       const width = Math.min(window.innerWidth - 16, Math.max(box.width, 220));
-      setPlace({ left: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)), width, maxHeight: Math.max(0, Math.min(320, up ? above : below)),
-        ...(up ? { bottom: window.innerHeight - box.top + 4 } : { top: box.bottom + 4 }) });
+      // A "fixed" list is placed against the window, unless a parent (a dialog with a transform, filter or backdrop
+      // filter, now or mid-animation) becomes its frame: then it lands off by that parent's position. Measure where
+      // the frame's corner really is and correct for it, so the list always opens right at its button.
+      const origin = frameOrigin(list.current);
+      const left = Math.max(8, Math.min(box.left, window.innerWidth - width - 8)) - origin.left;
+      setPlace({ left, width, maxHeight: Math.max(0, Math.min(320, up ? above : below)),
+        ...(up ? { top: box.top - 4 - origin.top, transform: 'translateY(-100%)' } : { top: box.bottom + 4 - origin.top }) });
     };
     position();
     window.addEventListener('resize', position); window.addEventListener('scroll', position, true);

@@ -7,6 +7,9 @@ import { ROULETTE_TEXTS } from '../red-or-black-roulette/roulette.js';
 import { GRAPH_TEXTS } from '../draw-the-graph/graph.text.js';
 import { BUS_TEXTS } from '../bus/bus.text.js';
 
+/** Cut the Line and Match the Angle measure in tenths: 473 → "47.3", 470 → "47". */
+export const tenths = (value: number) => (value / 10).toLocaleString(currentLanguage(), { maximumFractionDigits: 1 });
+
 export function minigameResult(game: MinigameKey, value: number | null, settings: MinigameSettings, team = false, guess?: { cut?: number | undefined; angle?: number | undefined; dotGuess?: number | undefined }): string {
   const t = (key: keyof typeof CONTROL_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROL_TEXTS, key, values);
   if (value === null) return t(game === 'reaction' && !team ? 'falseStart' : 'noResult');
@@ -24,12 +27,12 @@ export function minigameResult(game: MinigameKey, value: number | null, settings
   }
   if (game === 'perfect-circle') return t('round', { value: (value / 10).toLocaleString(currentLanguage(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
   if (game === 'cut-the-line') {
-    const off = t('cutOff', { value });
-    return guess?.cut === undefined ? off : `${guess.cut}% · ${off}`;
+    const off = t('cutOff', { value: tenths(value) });
+    return guess?.cut === undefined ? off : `${tenths(guess.cut)}% · ${off}`;
   }
   if (game === 'match-the-angle') {
-    const off = t('angleOff', { value });
-    return guess?.angle === undefined ? off : `${guess.angle}° · ${off}`;
+    const off = t('angleOff', { value: tenths(value) });
+    return guess?.angle === undefined ? off : `${tenths(guess.angle)}° · ${off}`;
   }
   if (game === 'draw-the-graph') return translate(GRAPH_TEXTS, 'error', {
     value: (value / 100).toLocaleString(currentLanguage(), { maximumFractionDigits: 2 }),

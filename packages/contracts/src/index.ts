@@ -8,6 +8,7 @@ export * from './presentation.js';
 export * from './fonts.js';
 export * from './styles.js';
 export * from './minigames/shared/catalog.js';
+export * from './minigames/shared/scoring.js';
 export * from './minigames/shared/number-choice.js';
 export * from './minigames/cut-the-line/target.js';
 export * from './minigames/count-the-dots/dot-pattern.js';

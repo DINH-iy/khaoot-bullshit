@@ -26,6 +26,9 @@ export function pointsAtStake(stage: Record<string, unknown>): StakePoints | nul
   // The host gives up to the maximum, or the points of the place they give.
   if (stage['kind'] === 'challenge') return round(stage['places'] ? firstPlace(stage['places']) : milli(stage['maxAwardMilli']), true);
   if (stage['kind'] === 'minigame') {
+    // Closeness scoring: the most a result can earn.
+    const scoring = stage['scoring'] as Record<string, unknown> | undefined;
+    if (scoring?.['kind'] === 'within' || scoring?.['kind'] === 'scale') return round(milli(scoring['pointsMilli']), true);
     const list = Array.isArray(stage['placementMilli']) && stage['placementMilli'].length ? stage['placementMilli'] : STANDARD_PLACEMENT_MILLI;
     return round(stage['places'] ? firstPlace(stage['places']) : milli(list[0]), true);
   }

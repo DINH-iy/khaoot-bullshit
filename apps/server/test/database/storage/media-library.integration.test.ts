@@ -154,6 +154,16 @@ describe('the media library', () => {
     const listed = (await json('GET', '/api/host/media')).json().data;
     expect(listed.items.find((entry: { id: string }) => entry.id === id).gameIds).toEqual([gameId]);
     expect(listed.games).toContainEqual({ id: gameId, title: 'Media game', archived: false });
+    // A rehearsal's hidden copy (a game without a draft, holding a version) is no game of its own in the library.
+    // A file of its own, since versions are kept for good and keep their files in use.
+    const rehearsed = (await upload(Buffer.concat([png, randomBytes(16)]), 'rehearsed.png')).json().data.id;
+    const game = await db.client.game.findUniqueOrThrow({ where: { id: gameId }, select: { creatorId: true } });
+    const hidden = await db.client.game.create({ data: { creatorId: game.creatorId, title: 'Rehearsal · Media game' } });
+    await db.client.gameVersion.create({ data: { gameId: hidden.id, number: 1, definition: { note: rehearsed }, contentHash: randomBytes(32).toString('hex'), createdById: game.creatorId } });
+    const withRehearsal = (await json('GET', '/api/host/media')).json().data;
+    expect(withRehearsal.items.find((entry: { id: string }) => entry.id === rehearsed).gameIds).toEqual([]);
+    expect(withRehearsal.items.find((entry: { id: string }) => entry.id === id).gameIds).toEqual([gameId]);
+    expect(withRehearsal.games.map((entry: { id: string }) => entry.id)).not.toContain(hidden.id);
     // Taken out of the scene again: no longer listed under the game, and now it can go, file first.
     expect((await json('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: saved.json().data.revision, definition: draft.definition })).statusCode).toBe(200);
     expect((await json('GET', '/api/host/media')).json().data.items.find((entry: { id: string }) => entry.id === id).gameIds).toEqual([]);

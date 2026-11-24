@@ -3,7 +3,8 @@ import { COIN_SIDES, CoinSideSchema } from '../heads-or-tails/coin.js';
 import { RoulettePocketSchema, RouletteTableBetsSchema } from '../red-or-black-roulette/roulette.js';
 import { DotGuessSchema, DotPatternSchema, DotSettingsSchema } from '../count-the-dots/dot-pattern.js';
 import { GraphHueSchema, GraphLineSchema, GraphRoundViewSchema, GraphSettingsSchema, GraphDataSchema } from '../draw-the-graph/graph.js';
-import { CutSettingsSchema, CutTargetSchema } from '../cut-the-line/target.js';
+import { CutGuessSchema, CutSettingsSchema, CutTargetSchema } from '../cut-the-line/target.js';
+import { MinigameScoringSchema, type Closeness, type MinigameScoring } from './scoring.js';
 import { COURSE_HEIGHT, COURSE_WIDTH, raceCourseHasRoute } from '../speed-run/course.js';
 
 const Milli = z.string().regex(/^(0|[1-9][0-9]{0,11})$/);
@@ -61,11 +62,13 @@ export const MINIGAME_COUNTDOWN_MS = 3000;
 export const ANGLE_TARGETS = Array.from({ length: 360 }, (_, angle) => angle).filter(angle =>
   [30, 45].every(step => Math.abs(angle - Math.round(angle / step) * step) > 5));
 export const AngleSchema = z.number().int().min(0).max(359);
+/** An aimed angle as phones send it: tenths of a degree (915 is 91.5°), so the ray never snaps to countable whole degrees. */
+export const AngleGuessSchema = z.number().int().min(0).max(3599);
 
-/** The smaller distance around the circle, including across 0°. */
-export function angleError(guess: number, target: number): number {
+/** The smaller distance around the circle, including across 0°; `turn` is a full circle in the same unit (3600 for tenths). */
+export function angleError(guess: number, target: number, turn = 360): number {
   const difference = Math.abs(guess - target);
-  return Math.min(difference, 360 - difference);
+  return Math.min(difference, turn - difference);
 }
 export const CLAP_BEATS_MS = [800, 2150, 3500, 4900, 6150, 7550] as const;
 export const CLAP_WINDOW_MS = 550;
@@ -79,7 +82,22 @@ export interface MinigameInfo {
   name: string; description: string; howToPlay: string;
   /** How results compare: higher, lower, or no ranking (points come straight from the game). */
   better: 'higher' | 'lower' | 'none';
+  /** `faster`: equal results can be settled by who submitted first (the server's receipt time). The scene's `tiebreak` may turn it off; without this, equal results always share a place. */
+  tiebreak?: 'faster';
+  /** A target game: points may also go by how close a result is (see MinigameScoringSchema), measured like this. */
+  closeness?: Closeness;
   defaults: MinigameSettings; defaultSeconds: number;
+}
+/** How equal results are settled: `shared` (they share the place and its points) or `faster` (the first submission ranks higher). */
+export const MINIGAME_TIEBREAKS = ['faster', 'shared'] as const;
+export type MinigameTiebreak = typeof MINIGAME_TIEBREAKS[number];
+/** The tie rule a scene plays with: its own choice when the game allows it, else the game's standard. */
+export const minigameTiebreak = (game: MinigameKey, chosen?: MinigameTiebreak): MinigameTiebreak =>
+  MINIGAMES[game].tiebreak === 'faster' && chosen !== 'shared' ? 'faster' : 'shared';
+/** A scene's closeness scoring when it fits the game (a target game, a distance it can measure), else null: points by place. */
+export function minigameScoring(game: MinigameKey, scoring: unknown): MinigameScoring | null {
+  const closeness = MINIGAMES[game].closeness; const parsed = MinigameScoringSchema.safeParse(scoring);
+  return closeness && parsed.success && parsed.data.distance <= closeness.max ? parsed.data : null;
 }
 export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: MinigameSettings<K> } } = {
   reaction: { name: 'Reaction duel', description: 'Wait for GO, then tap first.', howToPlay: 'Wait until your screen says GO, then tap as fast as you can. Tap too early and you are out.',
@@ -93,23 +111,23 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
     howToPlay: 'Use the arrows to go around the walls and reach the flag. Fastest finish wins.',
     better: 'lower', defaults: {}, defaultSeconds: 45 },
   'stop-clock': { name: 'Stop the clock', description: 'Stop a vanishing clock at exactly the target.', howToPlay: 'A clock starts counting. It disappears after a while. Tap Stop when you think it reaches the target.',
-    better: 'lower', defaults: { targetMs: 10_000, visibleMs: 3000 }, defaultSeconds: 30 },
+    better: 'lower', closeness: { unit: 'ms', perUnit: 1, max: 60_000, within: 250, scale: 2000 }, defaults: { targetMs: 10_000, visibleMs: 3000 }, defaultSeconds: 30 },
   'lucky-doors': { name: 'Lucky doors', description: 'Pick a door and hope for the best.', howToPlay: 'Choose one door. Each door hides a number of points. Nobody knows which is which.',
     better: 'none', defaults: { doorsMilli: ['0', '5000', '10000'] }, defaultSeconds: 20 },
   'perfect-circle': { name: 'Perfect circle', description: 'Draw the roundest circle.', howToPlay: 'Draw one circle with one finger, in one go. The roundest circle wins.',
     better: 'higher', defaults: { seconds: 10 }, defaultSeconds: 25 },
   'cut-the-line': { name: 'Cut the Line', description: 'Estimate a percentage on an unmarked bar.',
     howToPlay: 'Drag the marker to cut the bar at the target percentage, then lock in your cut. Closest wins.',
-    better: 'lower', defaults: {}, defaultSeconds: 20 },
+    better: 'lower', tiebreak: 'faster', closeness: { unit: 'percent', perUnit: 10, max: 100, within: 5, scale: 20 }, defaults: {}, defaultSeconds: 20 },
   'match-the-angle': { name: 'Match the Angle', description: 'Aim a ray at the target angle.',
-    howToPlay: 'Drag the ray to the target angle and lock it in. Angles start pointing right and increase counterclockwise. Closest wins, with faster submissions breaking ties.',
-    better: 'lower', defaults: {}, defaultSeconds: 20 },
+    howToPlay: 'Drag the ray to the target angle and lock it in. Angles start pointing right and increase counterclockwise. Closest wins.',
+    better: 'lower', tiebreak: 'faster', closeness: { unit: 'degrees', perUnit: 10, max: 180, within: 10, scale: 45 }, defaults: {}, defaultSeconds: 20 },
   'count-the-dots': { name: 'Count the Dots', description: 'Remember how many dots flashed on the shared screen.',
     howToPlay: 'Count the dots. Lock in your count on your phone.',
-    better: 'lower', defaults: { viewSeconds: 5 }, defaultSeconds: 15 },
+    better: 'lower', tiebreak: 'faster', closeness: { unit: 'dots', perUnit: 1, max: 500, within: 10, scale: 100 }, defaults: { viewSeconds: 5 }, defaultSeconds: 15 },
   'draw-the-graph': { name: 'Draw the Graph', description: 'Predict the missing half of a line graph.',
-    howToPlay: 'Start at the last dot and draw the rest of the graph. Closest wins, with faster submissions breaking ties.',
-    better: 'lower', defaults: {}, defaultSeconds: 30 },
+    howToPlay: 'Start at the last dot and draw the rest of the graph. Closest wins.',
+    better: 'lower', tiebreak: 'faster', closeness: { unit: 'percent', perUnit: 100, max: 100, within: 5, scale: 25 }, defaults: {}, defaultSeconds: 30 },
   'heads-or-tails': { name: 'Heads or Tails', description: 'Make a private prediction for one shared coin flip.',
     howToPlay: 'Pick a side. Correct guesses earn points.',
     better: 'none', defaults: {}, defaultSeconds: 15 },
@@ -147,8 +165,8 @@ export function formatMinigameResult(game: MinigameKey, value: number | null, se
   if (game === 'tap-race') return `${value} ${value === 1 ? 'tap' : 'taps'}`;
   if (game === 'stop-clock') { const off = Math.abs(value - (settings as MinigameSettings<'stop-clock'>).targetMs) / 1000; return `${(value / 1000).toFixed(2)} s · ${off.toFixed(2)} s off`; }
   if (game === 'perfect-circle') return `${(value / 10).toFixed(1)}% round`;
-  if (game === 'cut-the-line') return `${value} percentage points off`;
-  if (game === 'match-the-angle') return `${value}° off`;
+  if (game === 'cut-the-line') return `${value / 10} percentage points off`;
+  if (game === 'match-the-angle') return `${value / 10}° off`;
   if (game === 'count-the-dots') return `${value} off`;
   if (game === 'draw-the-graph') return `${(value / 100).toFixed(1)}% off`;
   if (game === 'heads-or-tails') return COIN_SIDES[value] === 'heads' ? 'Heads' : 'Tails';
@@ -226,9 +244,9 @@ export const DoorsViewSchema = z.object({ picked: z.number().int().min(0).nullab
 // `rainbow`: Drive the bus, the team's cards made a rainbow (the other teams drink).
 export const MinigameValueSchema = z.object({ kind: z.literal('minigame'), value: z.number().int().min(0).max(600_000), early: z.literal(true).optional(), rainbow: z.literal(true).optional(),
   stroke: z.array(z.number().int().min(0).max(1000)).min(2).max(800).optional(), teamId: z.string().uuid().optional(),
-  // The server records the original cut here and puts its distance from the target in value.
-  cut: z.number().int().min(0).max(100).optional(),
-  angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(),
+  // The server records the original cut (or angle) here, in tenths, and puts its distance from the target in value (tenths too).
+  cut: CutGuessSchema.optional(),
+  angle: AngleGuessSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(),
   // Roulette: the bets (value holds their total stake).
   bets: RouletteTableBetsSchema.optional() }).strict();
 
@@ -238,6 +256,10 @@ export const PublicMinigameSchema = z.object({
   // Server time: when the countdown ends and play begins (null while teams are being made), and for a reaction duel, when GO shows.
   startsAt: z.string().datetime().nullable(), goAt: z.string().datetime().nullable(),
   cutTarget: CutTargetSchema.optional(),
+  // Equal results are settled by who submitted first (said under "how to play").
+  tiebreak: z.literal('faster').optional(),
+  // Points by closeness instead of by place (said under "how to play").
+  scoring: MinigameScoringSchema.optional(),
   angleTarget: AngleSchema.optional(),
   graph: GraphRoundViewSchema.optional(),
   dots: z.object({ guessAt: z.string().datetime(), pattern: DotPatternSchema.optional() }).strict().optional(),
@@ -251,7 +273,7 @@ export const PublicMinigameSchema = z.object({
 export const MinigameRevealSchema = z.object({
   kind: z.literal('minigame'), game: z.enum(MINIGAME_KEYS as [MinigameKey, ...MinigameKey[]]),
   entries: z.array(z.object({ playerId: z.string().uuid().nullable(), teamId: z.string().uuid().nullable(), value: z.number().int().nullable(), place: z.number().int().min(1).nullable(),
-    stroke: z.array(z.number().int()).optional(), cut: z.number().int().min(0).max(100).optional(), angle: AngleSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(), graphHue: GraphHueSchema.optional(), bets: RouletteTableBetsSchema.optional() }).strict()),
+    stroke: z.array(z.number().int()).optional(), cut: CutGuessSchema.optional(), angle: AngleGuessSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(), graphHue: GraphHueSchema.optional(), bets: RouletteTableBetsSchema.optional() }).strict()),
   doorsMilli: z.array(Milli).nullable(), graph: GraphDataSchema.optional(), dotCount: z.number().int().positive().optional(), coin: CoinSideSchema.optional(), roulette: RoulettePocketSchema.optional(),
   dotReveal: z.strictObject({ pattern: DotPatternSchema, startedAt: z.string().datetime() }).optional(),
 }).strict();

@@ -1,10 +1,27 @@
-import { chooseOption } from './helpers.js';
 import { randomUUID } from 'node:crypto';
 import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS } from '@party/contracts';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 if (process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E environment required');
+
+/** The lobby keeps its lists in sheets: the invite link sits behind the Invite players button. */
+async function inviteLink(page: Page) {
+  await page.getByRole('button', { name: 'Invite players' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Invite players' });
+  const link = (await sheet.getByRole('link').textContent())!;
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  return link;
+}
+/** The leader taps the game tile and picks a game from the grid. */
+async function pickGame(page: Page, name: string) {
+  await page.getByRole('button', { name: /Change$/ }).click();
+  await page.getByRole('dialog', { name: 'Choose a game' }).getByRole('button', { name, exact: true }).click();
+}
+async function openScores(page: Page) {
+  await page.getByRole('button', { name: /Scores$/ }).click();
+  return page.getByRole('dialog', { name: 'Scores' });
+}
 
 test('an Arcade lobby can require a password, and its leader can remove it', async ({ browser, page, baseURL }) => {
   await page.goto('/?arcade');
@@ -19,8 +36,7 @@ test('an Arcade lobby can require a password, and its leader can remove it', asy
   await page.getByLabel('Lobby password (optional)').fill('game night');
   await page.getByRole('button', { name: 'Open a lobby' }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
-  const invite = page.getByRole('region', { name: 'Invite players' });
-  const url = (await invite.getByRole('link').textContent())!;
+  const url = await inviteLink(page);
   expect(url).toMatch(/\?arcade=[a-f0-9-]{36}$/);
   const context = await browser.newContext({ baseURL });
   const friend = await context.newPage();
@@ -33,11 +49,15 @@ test('an Arcade lobby can require a password, and its leader can remove it', asy
     await expect(friend.getByRole('alert')).toContainText('Enter the correct lobby password');
     await key.fill('game night');
     await friend.getByRole('button', { name: 'Join the lobby' }).click();
-    await expect(friend.getByRole('heading', { name: 'Players (2)' })).toBeVisible();
-    await page.getByText('Lobby password · On', { exact: true }).click();
-    await page.getByRole('button', { name: 'Remove password' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Lobby password removed' })).toBeVisible();
-    await expect(invite.getByText('Share the password', { exact: false })).toHaveCount(0);
+    await expect(friend.getByRole('button', { name: 'Players 2' })).toBeVisible();
+    await page.getByRole('button', { name: 'Lobby settings' }).click();
+    const settings = page.getByRole('dialog', { name: 'Lobby settings' });
+    await expect(settings.getByRole('heading', { name: 'Lobby password · On' })).toBeVisible();
+    await settings.getByRole('button', { name: 'Remove password' }).click();
+    await expect(settings.getByRole('status').filter({ hasText: 'Lobby password removed' })).toBeVisible();
+    await settings.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Invite players' }).click();
+    await expect(page.getByRole('dialog', { name: 'Invite players' }).getByText('Share the password', { exact: false })).toHaveCount(0);
   } finally { await context.close(); }
 });
 
@@ -59,32 +79,47 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
     await ann.page.getByLabel('Lobby name (optional)').fill(title);
     await ann.page.getByRole('button', { name: 'Open a lobby' }).click();
     await expect(ann.page.getByRole('heading', { name: title })).toBeVisible();
-    const link = (await ann.page.getByRole('region', { name: 'Invite players' }).getByRole('link').textContent())!;
+    const link = await inviteLink(ann.page);
     expect(link).toMatch(/\/\?arcade=[0-9a-f-]{36}$/);
 
     // Bo follows the link; Cy finds the lobby on the arcade page.
     await bo.page.goto(link);
     await bo.page.getByLabel('Your name').fill('Bo');
     await bo.page.getByRole('button', { name: 'Join the lobby' }).click();
-    await expect(bo.page.getByText('Waiting for Ann to pick a game…')).toBeVisible();
-    await expect(ann.page.getByRole('region', { name: /Players \(2\)/ })).toContainText('Bo');
+    // Bo sees the leader's picker read-only: Ann's choice, no way to change it or start the round.
+    await expect(bo.page.getByText('Ann is choosing', { exact: false })).toBeVisible();
+    await expect(bo.page.getByRole('button', { name: /Change$/ })).toHaveCount(0);
+    await expect(bo.page.getByRole('button', { name: /^Play / })).toHaveCount(0);
+    await expect(bo.page.getByRole('status').filter({ hasText: 'Waiting for Ann to start' })).toBeVisible();
+    // The players sit behind the avatar button in the bar.
+    await ann.page.getByRole('button', { name: 'Players 2' }).click();
+    await expect(ann.page.getByRole('dialog', { name: 'Players (2)' })).toContainText('Bo');
+    await ann.page.keyboard.press('Escape');
 
     // Locked: Cy cannot get in until Ann unlocks.
-    await ann.page.getByRole('button', { name: 'Open: lock' }).click();
+    const lockSwitch = async () => {
+      await ann.page.getByRole('button', { name: 'Lobby settings' }).click();
+      await ann.page.getByRole('switch', { name: /Lock the lobby/ }).click();
+      await ann.page.keyboard.press('Escape');
+    };
+    await lockSwitch();
     await cy.page.goto(`${baseURL}/?arcade`);
     const card = cy.page.getByRole('listitem').filter({ hasText: title });
     await expect(card).toContainText('locked');
     await expect(card.getByRole('button')).toHaveCount(0);
-    await ann.page.getByRole('button', { name: 'Locked: unlock' }).click();
+    await expect(ann.page.getByText('Locked', { exact: true })).toBeVisible();
+    await lockSwitch();
     await expect(card.getByRole('button', { name: 'Join' })).toBeEnabled({ timeout: 10_000 });
     await card.getByRole('button', { name: 'Join' }).click();
     await cy.page.getByLabel('Your name').fill('Cy');
     await cy.page.getByRole('button', { name: 'Join the lobby' }).click();
-    await expect(ann.page.getByRole('region', { name: /Players \(3\)/ })).toBeVisible();
+    await expect(ann.page.getByRole('button', { name: 'Players 3' })).toBeVisible();
     expect((await new AxeBuilder({ page: ann.page }).analyze()).violations).toEqual([]);
 
-    // Ann picks Left or right; every phone goes into the round by itself.
-    await chooseOption(ann.page.getByRole('combobox', { name: 'Game', exact: true }), { label: 'Left or right' });
+    // Ann picks Left or right, and the others see her choice change (the lobby checks in every few seconds).
+    await pickGame(ann.page, 'Left or right');
+    await expect(bo.page.getByRole('form', { name: 'Next round' })).toContainText('Left or right', { timeout: 10_000 });
+    // Every phone goes into the round by itself.
     await ann.page.getByRole('button', { name: 'Play Left or right' }).click();
     const players: Page[] = [ann.page, bo.page, cy.page];
     for (const page of players) await expect(page.getByRole('button', { name: 'Got it!' })).toBeVisible({ timeout: 15_000 });
@@ -111,11 +146,15 @@ test('the arcade: a guest opens a lobby, friends join by link, the leader locks 
 
     // Everyone is back in the lobby with the round's results and the running total.
     for (const page of players) {
-      const totals = page.getByRole('region', { name: 'Total in this lobby' });
-      await expect(totals).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('button', { name: /Scores$/ })).toBeVisible({ timeout: 15_000 });
+      const totals = (await openScores(page)).getByRole('region', { name: 'Total in this lobby' });
       await expect(totals.getByRole('listitem').first()).toContainText(/(Ann|Bo).*10 points · 1 win · 1 played/);
     }
-    await expect(cy.page.getByRole('region', { name: /Round 1: Left or right/ })).toContainText('Cy');
+    await expect(cy.page.getByRole('dialog', { name: 'Scores' }).getByRole('region', { name: /Round 1: Left or right/ })).toContainText('Cy');
+    // Without opening Scores, the lobby shows the round's top three.
+    await cy.page.keyboard.press('Escape');
+    await expect(cy.page.getByRole('article', { name: /Round 1: Left or right/ }).getByRole('listitem')).toHaveCount(3);
+    await cy.page.screenshot({ path: test.info().outputPath('lobby-after-round.png') });
   } finally { await Promise.all([ann, bo, cy].map(entry => entry.context.close())); }
 });
 
@@ -144,26 +183,25 @@ test('Arcade publishes the full game catalog and plays a pool duel and a TV-only
     await leader.goto('/?arcade');
     await leader.getByLabel('Your name').fill('Alex');
     await leader.getByRole('button', { name: 'Open a lobby' }).click();
-    const invite = leader.getByRole('region', { name: 'Invite players' });
-    await friend.goto((await invite.getByRole('link').textContent())!);
+    await friend.goto(await inviteLink(leader));
     await friend.getByLabel('Your name').fill('Jo');
     await friend.getByRole('button', { name: 'Join the lobby' }).click();
-    await expect(leader.getByRole('heading', { name: 'Players (2)' })).toBeVisible();
-    const picker = leader.getByRole('combobox', { name: 'Game', exact: true });
-    await picker.click();
-    await expect(leader.getByRole('group', { name: 'Minigames' }).getByRole('option')).toHaveCount(MINIGAME_KEYS.length);
-    await expect(leader.getByRole('group', { name: 'Head-to-head' }).getByRole('option')).toHaveCount(HEAD_TO_HEAD_KEYS.length);
-    await expect(leader.getByRole('option', { name: '8-ball pool', exact: true })).toHaveCount(1);
-    await leader.getByRole('option', { name: '8-ball pool', exact: true }).click();
+    await expect(leader.getByRole('button', { name: 'Players 2' })).toBeVisible();
+    await leader.getByRole('button', { name: /Change$/ }).click();
+    const choices = leader.getByRole('dialog', { name: 'Choose a game' });
+    await expect(choices.getByRole('group', { name: 'Minigames' }).getByRole('button')).toHaveCount(MINIGAME_KEYS.length);
+    await expect(choices.getByRole('group', { name: 'Head-to-head' }).getByRole('button')).toHaveCount(HEAD_TO_HEAD_KEYS.length);
+    await choices.getByRole('button', { name: '8-ball pool', exact: true }).click();
     await leader.getByRole('button', { name: 'Play 8-ball pool' }).click();
     await leader.getByRole('button', { name: 'Start duel' }).click();
     await expect(friend.getByRole('img', { name: 'Pool table' })).toBeVisible();
     await friend.getByRole('button', { name: 'Give up', exact: true }).click();
     await friend.getByRole('button', { name: 'Yes, give up' }).click();
     await leader.getByRole('button', { name: 'Back to the lobby' }).click();
-    await expect(leader.getByRole('region', { name: 'Round 1: 8-ball pool' })).toContainText(/1\. Alex/);
+    await expect((await openScores(leader)).getByRole('region', { name: 'Round 1: 8-ball pool' })).toContainText(/1\. Alex/);
+    await leader.keyboard.press('Escape');
 
-    await chooseOption(picker, 'count-the-dots');
+    await pickGame(leader, 'Count the Dots');
     await leader.getByRole('button', { name: 'Play Count the Dots' }).click();
     await expect(friend.getByRole('button', { name: 'Got it!' })).toBeVisible();
     const displayRoute = `${new URL(friend.url()).origin}/api/arcade/rounds/${new URL(friend.url()).searchParams.get('room')}/display`;

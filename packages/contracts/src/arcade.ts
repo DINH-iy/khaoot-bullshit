@@ -30,6 +30,9 @@ export const CreateArcadeSchema = z.object({ lobbyId: GameIdSchema, title: z.str
 export const JoinArcadeSchema = z.object({ displayName: NameSchema, look: PlayerLookSchema.optional(), password: z.string().max(ARCADE_PASSWORD_MAX).optional() }).strict();
 export const ArcadePasswordUpdateSchema = z.object({ password: PasswordSchema.nullable() }).strict();
 export const ArcadeLockSchema = z.object({ locked: z.boolean() }).strict();
+/** What the leader has chosen so far for the next round; everyone else watches it (read-only) until the round starts. */
+export const ArcadePickSchema = z.object({ game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable() }).strict();
+export type ArcadePick = z.infer<typeof ArcadePickSchema>;
 export const StartArcadeRoundSchema = z.object({ roundId: GameIdSchema, game: ArcadeGameSchema, teams: ArcadeTeamsSchema.nullable() }).strict();
 /** What the leader does in a round's room. `stageRunId` binds the action to the round step the leader saw. */
 export const ARCADE_ACTIONS = ['begin', 'resume', 'confirm-teams', 'shuffle-teams', 'start', 'close', 'reveal', 'end'] as const;
@@ -44,7 +47,11 @@ export const ArcadeLobbyCardSchema = z.object({
 export const ArcadeListSchema = z.object({ lobbies: z.array(ArcadeLobbyCardSchema) }).strict();
 export type ArcadeList = z.infer<typeof ArcadeListSchema>;
 
-const ResultRowSchema = z.object({ memberId: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, place: z.number().int().min(1).nullable(), pointsMilli: MilliSchema, value: z.number().int().nullable() }).strict();
+// `totalMilli`: the player's lobby total after this round (this round's points included), to see it grow round by round.
+const ResultRowSchema = z.object({ memberId: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, place: z.number().int().min(1).nullable(), pointsMilli: MilliSchema, totalMilli: MilliSchema.optional(), value: z.number().int().nullable() }).strict();
+/** How many finished rounds a lobby shows to look back through. */
+export const ARCADE_ROUND_HISTORY = 20;
+const RoundResultsSchema = z.object({ number: z.number().int().min(1), game: ArcadeGameSchema, teams: z.number().int().nullable(), results: z.array(ResultRowSchema) }).strict();
 export const ArcadeLobbyViewSchema = z.object({
   id: GameIdSchema, title: z.string(), locked: z.boolean(), protected: z.boolean().default(false), closed: z.boolean(),
   // Null: this browser is not a member (it sees the join form).
@@ -54,7 +61,11 @@ export const ArcadeLobbyViewSchema = z.object({
   round: z.object({ number: z.number().int().min(1), game: ArcadeGameSchema, teams: z.number().int().nullable(), seated: z.boolean() }).strict().nullable(),
   // The running total of this lobby: everyone who played a round here.
   totals: z.array(z.object({ memberId: GameIdSchema, displayName: z.string(), look: PlayerLookSchema, pointsMilli: MilliSchema, wins: z.number().int().min(0), rounds: z.number().int().min(0) }).strict()),
-  lastRound: z.object({ number: z.number().int().min(1), game: ArcadeGameSchema, teams: z.number().int().nullable(), results: z.array(ResultRowSchema) }).strict().nullable(),
+  lastRound: RoundResultsSchema.nullable(),
+  // Earlier rounds too, newest first (the last ARCADE_ROUND_HISTORY), to look back through how the lobby went.
+  rounds: z.array(RoundResultsSchema).max(ARCADE_ROUND_HISTORY).default([]),
+  // The leader's choice for the next round so far (null until they change it).
+  pick: ArcadePickSchema.nullable().default(null),
 }).strict();
 export type ArcadeLobbyView = z.infer<typeof ArcadeLobbyViewSchema>;
 

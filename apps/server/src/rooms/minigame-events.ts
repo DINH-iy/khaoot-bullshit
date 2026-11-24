@@ -12,7 +12,7 @@ import type { Transaction } from '../game/model.js';
 import type { Live } from '../minigames/tap-race/live.js';
 import type { Principal } from './gateway.js';
 
-const TapsSchema = z.object({ stageRunId: GameIdSchema, count: z.number().int().min(0).max(10_000) }).strict();
+const TapsSchema = z.object({ stageRunId: GameIdSchema, count: z.number().int().min(0).max(600_000) }).strict();
 // A stroke being drawn in Pass the pencil, sent while it grows. `count`: how many strokes the drawer has now (undo makes it smaller).
 const LiveStrokeSchema = z.object({ stageRunId: GameIdSchema, turn: z.number().int().min(0).max(63), strokeId: z.number().int().min(0).max(599), stroke: StrokeSchema.nullable(), count: z.number().int().min(0).max(600) }).strict();
 interface Running { stageRunId: string; game: string; seconds: number; startsAt: string; goAt: string | null; players: Set<string>; relay: { plan: ReturnType<typeof relayPlan>; teamOf: Map<string, string> } | null }

@@ -18,7 +18,7 @@ import { STEP_RENDERERS } from './steps/renderers.js';
 import { DrawingAnimation } from '../relay-drawing/animation-relay.js';
 import { CONTROL_TEXTS } from './controls.text.js';
 import { PHONE_RESULT_TEXTS } from './phone-result.text.js';
-import { minigameResult } from './result-label.js';
+import { minigameResult, tenths } from './result-label.js';
 import { MinigameResults } from './shared-result.js';
 import './phone-result.css';
 
@@ -81,8 +81,8 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label, offse
       break;
     case 'match-the-angle':
       if (stage.minigame?.angleTarget !== undefined) visual = <AngleComparison target={stage.minigame.angleTarget} guess={own?.angle} />;
-      facts = [[t('target'), stage.minigame?.angleTarget === undefined ? '—' : `${stage.minigame.angleTarget}°`], [t('angle'), own?.angle === undefined ? '—' : `${own.angle}°`]];
-      if (own?.value != null) note = c('angleOff', { value: own.value });
+      facts = [[t('target'), stage.minigame?.angleTarget === undefined ? '—' : `${stage.minigame.angleTarget}°`], [t('angle'), own?.angle === undefined ? '—' : `${tenths(own.angle)}°`]];
+      if (own?.value != null) note = c('angleOff', { value: tenths(own.value) });
       break;
     case 'cut-the-line':
       if (stage.minigame?.cutTarget !== undefined) visual = <CutResult target={stage.minigame.cutTarget} cut={own?.cut} />;

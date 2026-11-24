@@ -75,7 +75,7 @@ describe('drawings', () => {
     expect(new Date(plan.voteAt).toISOString()).toBe('2026-11-13T10:00:30.000Z');
     expect(plan.turnAt(Date.parse('2026-11-13T10:00:15.000Z'))).toBe(1);
     const vote = (playerId: string, teamId: string) => ({ playerId, teamId: null, value: { kind: 'minigame', value: 0, teamId } });
-    const outcome = minigameOutcome({ game: 'relay-drawing', settings: { secondsPerTurn: 10, voteSeconds: 30 }, placementMilli: ['10000', '5000'], teamResult: 'average' },
+    const outcome = minigameOutcome({ game: 'relay-drawing', settings: { secondsPerTurn: 10, voteSeconds: 30 }, placementMilli: ['10000', '5000'], teamResult: 'average', tiebreak: 'shared' },
       [vote(p(1), b), vote(p(2), b), vote(p(3), a)], context, 'c0000000-0000-4000-8000-000000000001');
     expect(outcome.entries).toEqual([{ playerId: null, teamId: b, value: 2, place: 1 }, { playerId: null, teamId: a, value: 1, place: 2 }]);
     expect(outcome.awards.map(award => [award.teamId, award.amountMilli])).toEqual([[a, 5000n], [b, 10000n]]);

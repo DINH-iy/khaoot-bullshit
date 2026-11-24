@@ -1,9 +1,9 @@
-import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, parseMinigameSettings, placePoints, PlacesSchema, ROULETTE_BET_FLOOR, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, minigameScoring, minigameTiebreak, parseMinigameSettings, placePoints, PlacesSchema, ROULETTE_BET_FLOOR, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
 import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
 import { SpeedRunCourseFields } from './speed-run-course.js';
 import { PlacesFields } from './places-fields.js';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { MINIGAME_GROUPS } from '../../controls/minigame-groups.js';
 import { ChoiceDialog } from '../../controls/choice-dialog.js';
 import { updateStage, withMinigame, type Definition, type Node, type Stage } from '../../model.js';
@@ -61,9 +61,14 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
     </span></label>;
   }
   if (part === 'points') return known && game !== 'lucky-doors' ? <>
-    <PlacesFields legend={t('byPlace')} hint={t('byPlaceHint')} required value={places} onChange={setPlaces} fallback={placement} />
+    {MINIGAMES[game].closeness ? <ClosenessFields game={game} stage={stage} placement={placement} edit={edit} places={<PlacesFields legend={t('byPlace')} hint={t('byPlaceHint')} required value={places} onChange={setPlaces} fallback={placement} />} />
+      : <PlacesFields legend={t('byPlace')} hint={t('byPlaceHint')} required value={places} onChange={setPlaces} fallback={placement} />}
     {game !== 'relay-drawing' && game !== 'draw-the-graph' && <Segmented label={t('teamResult')} value={String(stage['teamResult'] ?? 'average')} onChange={teamResult => edit(current => ({ ...current, teamResult }), 'team-result')}
       choices={[{ value: 'average', label: t('average') }, { value: 'best', label: t('best') }, ...(MINIGAMES[game].better === 'higher' ? [{ value: 'total', label: t('added') }] : [])]} />}
+    {/* Only for minigames where speed can settle a tie; leaving the standard removes the field. */}
+    {MINIGAMES[game].tiebreak && !minigameScoring(game, stage['scoring']) && <Segmented label={t('tiebreak')} value={minigameTiebreak(game, stage['tiebreak'] === 'shared' ? 'shared' : undefined)}
+      onChange={tiebreak => edit(current => { const copy: Stage = { ...current }; if (tiebreak === 'shared') copy['tiebreak'] = 'shared'; else delete copy['tiebreak']; return copy; }, 'tiebreak')}
+      choices={[{ value: 'faster', label: t('tieFaster') }, { value: 'shared', label: t('tieShared') }]} />}
   </> : null;
   return <div className="minigame-fields">
     {known ? <div className="configuration-game"><strong>{gameName(game)}</strong>
@@ -151,4 +156,39 @@ export function MinigameFields({ part, definition, node, index, onChange }: { pa
         onChange={event => edit(current => ({ ...current, voteSeconds: Math.round(Math.min(120, Math.max(5, Number(event.target.value) || 20))) }), 'vote-seconds')} />{t('sec')}</span></label>}
     </div>}
   </div>;
+}
+
+/**
+ * How a target minigame gives points: by place (the places fields), close enough (everyone within a
+ * distance gets the same points) or a sliding scale (fewer points the further off). Distances are in
+ * the game's unit; Stop the clock is edited in seconds and stored in milliseconds.
+ */
+function ClosenessFields({ game, stage, placement, edit, places }: { game: MinigameKey; stage: Stage; placement: string[]; places: ReactNode;
+  edit: (change: (current: Stage) => Stage, field: string) => void }) {
+  const closeness = MINIGAMES[game].closeness!; const scoring = minigameScoring(game, stage['scoring']);
+  const seconds = closeness.unit === 'ms';
+  const unit = closeness.unit === 'degrees' ? '°' : closeness.unit === 'dots' ? t('unitDots') : seconds ? t('unitSeconds') : '%';
+  const choose = (kind: string) => edit(current => {
+    const copy: Stage = { ...current };
+    if (kind === 'within' || kind === 'scale') copy['scoring'] = { kind, distance: closeness[kind], pointsMilli: scoring?.pointsMilli ?? placement[0] ?? '10000' };
+    else delete copy['scoring'];
+    return copy;
+  }, 'scoring');
+  const change = (next: Partial<NonNullable<typeof scoring>>) => edit(current => ({ ...current, scoring: { ...scoring!, ...next } }), 'scoring');
+  const lowest = scoring?.kind === 'scale' ? 1 : 0;
+  return <>
+    <Segmented label={t('scoring')} value={scoring?.kind ?? 'places'} onChange={choose}
+      choices={[{ value: 'places', label: t('byPlaceChoice') }, { value: 'within', label: t('closeEnough') }, { value: 'scale', label: t('slidingScale') }]} />
+    {scoring ? <>
+      <label className="ed-inline">{t(scoring.kind === 'within' ? 'withinPoints' : 'scalePoints')}<span className="ed-unit">
+        <input type="number" min={0} value={toPoints(scoring.pointsMilli)} onChange={event => change({ pointsMilli: toMilli(event.currentTarget.value) })} />{t('pts')}
+      </span></label>
+      <label className="ed-inline">{t(scoring.kind === 'within' ? 'withinDistance' : 'scaleDistance')}<span className="ed-unit">
+        <input type="number" min={seconds ? lowest / 1000 : lowest} max={seconds ? closeness.max / 1000 : closeness.max} step={seconds ? 0.05 : 1} value={seconds ? scoring.distance / 1000 : scoring.distance}
+          aria-describedby="closeness-hint"
+          onChange={event => { const typed = Number(event.currentTarget.value); if (Number.isFinite(typed)) change({ distance: Math.min(closeness.max, Math.max(lowest, Math.round(seconds ? typed * 1000 : typed))) }); }} />{unit}
+      </span></label>
+      <p className="hint" id="closeness-hint">{t(scoring.kind === 'within' ? 'withinHint' : 'scaleHint')}</p>
+    </> : places}
+  </>;
 }

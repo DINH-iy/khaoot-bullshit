@@ -27,8 +27,8 @@ describe('importing a game from text', () => {
     expect(game.edges.filter(edge => edge.from === 'choose')).toEqual([expect.objectContaining({ to: 'music', option: 'music' }), expect.objectContaining({ to: 'sculpture', option: 'physical' })]);
     expect(game.edges.filter(edge => edge.to === 'finale').map(edge => edge.from).sort()).toEqual(['sculpture', 'sprint']);
     expect(stage('sprint')).toMatchObject({ kind: 'minigame', game: 'speed-run', durationMs: 45_000, settings: { course: ['S...#..', '.##...#', '....#..', '##.#...', '......F'] } });
-    expect(stage('cut')).toMatchObject({ kind: 'minigame', game: 'cut-the-line', durationMs: 20_000, presentation: { theme: { font: 'serif' } }, settings: { target: { mode: 'exact', value: 37 } }, placementMilli: ['10000', '6000', '3000'] });
-    expect(stage('angle')).toMatchObject({ kind: 'minigame', game: 'match-the-angle', durationMs: 20_000, placementMilli: ['10000', '6000', '3000'] });
+    expect(stage('cut')).toMatchObject({ kind: 'minigame', game: 'cut-the-line', durationMs: 20_000, presentation: { theme: { font: 'serif' } }, settings: { target: { mode: 'exact', value: 37 } }, scoring: { kind: 'within', distance: 5, pointsMilli: '10000' } });
+    expect(stage('angle')).toMatchObject({ kind: 'minigame', game: 'match-the-angle', durationMs: 20_000, tiebreak: 'shared', placementMilli: ['10000', '6000', '3000'] });
     expect(stage('dots')).toMatchObject({ kind: 'minigame', game: 'count-the-dots', durationMs: 15_000, countdownSeconds: 3, settings: { viewSeconds: 6, count: { mode: 'range', min: 1, max: 500 }, allowOverlap: true, revealEasing: 'ease-in' } });
     expect(stage('coin')).toMatchObject({ kind: 'minigame', game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['10000'] });
     expect(stage('graph')).toMatchObject({ kind: 'minigame', game: 'draw-the-graph', durationMs: 30_000,

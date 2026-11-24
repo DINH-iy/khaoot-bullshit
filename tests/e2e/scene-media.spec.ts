@@ -264,6 +264,15 @@ test('the Game menu opens the shared media library from the Flow editor', async 
   await library.locator('input[type=file]').setInputFiles({ name: 'Library photo.png', mimeType: 'image/png', buffer: PNG });
   await expect(library.getByRole('img', { name: 'Library photo.png' })).toBeVisible();
   await expect(library.getByRole('button', { name: 'Use this' })).toHaveCount(0);
+  // A dropdown in the (animated) dialog opens right under its button, not shifted by the dialog's frame.
+  const filter = library.locator('.media-game-filter');
+  await filter.click();
+  const list = page.locator(`[id=${JSON.stringify(await filter.getAttribute('aria-controls'))}]`);
+  await expect(list).toBeVisible();
+  const [field, opened] = [(await filter.boundingBox())!, (await list.boundingBox())!];
+  expect(Math.abs(opened.y - (field.y + field.height + 4))).toBeLessThan(2);
+  expect(Math.abs(opened.x - field.x)).toBeLessThan(2);
+  await page.keyboard.press('Escape');
   await library.getByRole('tab', { name: 'Pictures' }).click();
   await expect(library.getByText('Library song.wav', { exact: true })).toHaveCount(0);
   await expect(library.getByText('Library clip.mp4', { exact: true })).toHaveCount(0);

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ANGLE_TARGETS, DOT_RADIUS, DotPatternSchema, DotSettingsSchema, MINIGAMES, ROULETTE_OUTSIDE, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteBetLimit, rouletteColor, rouletteMatches, rouletteNet, rouletteReturn } from '@party/contracts';
-import { judgeResult, places, startMinigame, teamValue } from '../../src/minigames/shared/rules.js';
+import { ANGLE_TARGETS, DOT_RADIUS, DotPatternSchema, DotSettingsSchema, MINIGAMES, minigameScoring, minigameTiebreak, ROULETTE_OUTSIDE, ROULETTE_POCKETS, ROULETTE_ORDER, rouletteBetLimit, rouletteColor, rouletteMatches, rouletteNet, rouletteReturn } from '@party/contracts';
+import { judgeResult, places, rankValue, startMinigame, teamValue } from '../../src/minigames/shared/rules.js';
 import { FASTEST_REACTION_MS } from '../../src/minigames/reaction/judge.js';
 import { TAP_TAIL } from '../../src/minigames/tap-race/judge.js';
 import { networkAllowance } from '../../src/minigames/shared/fairness.js';
 import { createLiveSignals } from '../../src/minigames/tap-race/live.js';
 import { minigameOutcome, type MinigameRules } from '../../src/minigames/shared/outcome.js';
+import { closenessPoints } from '../../src/minigames/shared/closeness.js';
 import { GameError } from '../../src/game/errors.js';
 import type { TeamContext } from '../../src/game/teams/teams.js';
 
@@ -13,7 +14,7 @@ const now = new Date('2026-11-13T10:00:00.000Z');
 const at = (ms: number) => new Date(now.getTime() + ms);
 const ids = ['10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004'] as const;
 const row = (playerId: string, value: number, early?: true) => ({ playerId, teamId: null, value: { kind: 'minigame', value, ...(early ? { early } : {}) } });
-const rules = (game: MinigameRules['game'], extra: Partial<MinigameRules> = {}): MinigameRules => ({ game, settings: MINIGAMES[game].defaults, placementMilli: ['10000', '6000', '3000'], teamResult: 'average', ...extra });
+const rules = (game: MinigameRules['game'], extra: Partial<MinigameRules> = {}): MinigameRules => ({ game, settings: MINIGAMES[game].defaults, placementMilli: ['10000', '6000', '3000'], teamResult: 'average', tiebreak: minigameTiebreak(game), ...extra });
 const rejected = (run: () => void) => { try { run(); } catch (error) { return error instanceof GameError && error.code === 'INVALID_SUBMISSION'; } return false; };
 
 describe('minigame rules', () => {
@@ -92,7 +93,13 @@ describe('minigame rules', () => {
       }
     }
     const run = startMinigame('match-the-angle', {}, now, () => 0);
-    expect(judgeResult('match-the-angle', {}, run, { value: 360 }, at(3000))).toEqual({ angle: 0, value: 6 });
+    // Tenths of a degree: a full turn (3600) is 0°, and 0.5° counts as 5.
+    expect(judgeResult('match-the-angle', {}, run, { value: 3600 }, at(3000))).toEqual({ angle: 0, value: 60 });
+    expect(judgeResult('match-the-angle', {}, run, { value: 65 }, at(3000))).toEqual({ angle: 65, value: 5 });
+    expect(() => judgeResult('match-the-angle', {}, run, { value: 3601 }, at(3000))).toThrow();
+    const cut = startMinigame('cut-the-line', { target: { mode: 'exact', value: 37 } }, now);
+    expect(judgeResult('cut-the-line', {}, cut, { value: 373 }, at(3000))).toEqual({ cut: 373, value: 3 });
+    expect(() => judgeResult('cut-the-line', {}, cut, { value: 1001 }, at(3000))).toThrow();
   });
 
   it('starts after a countdown, hides GO between the set waits and shuffles every door', () => {
@@ -108,7 +115,7 @@ describe('minigame rules', () => {
     const reaction = startMinigame('reaction', { minWaitMs: 2000, maxWaitMs: 2000 }, now, () => 0); // GO at +5 s
     expect(rejected(() => judgeResult('reaction', MINIGAMES.reaction.defaults, reaction, { value: FASTEST_REACTION_MS - 1 }, at(6000)))).toBe(true);
     const race = startMinigame('tap-race', { seconds: 10 }, now);
-    expect(rejected(() => judgeResult('tap-race', { seconds: 10 }, race, { value: 161 }, at(13000)))).toBe(true); // over 16 taps a second
+    expect(judgeResult('tap-race', { seconds: 10 }, race, { value: 400 }, at(13000))).toEqual({ value: 400 }); // no tap-rate limit
     expect(rejected(() => judgeResult('tap-race', { seconds: 10 }, race, { value: 80 }, at(5000)))).toBe(true); // race not over
     expect(rejected(() => judgeResult('tap-race', { seconds: 10 }, race, { value: 80, early: true }, at(13000)))).toBe(true);
     const doors = startMinigame('lucky-doors', { doorsMilli: ['0', '5000'] }, now);
@@ -144,8 +151,8 @@ describe('minigame rules', () => {
     const report = (playerId: string, count: number, ms: number) => { time = now.getTime() + ms; return live.recordTaps('race', race.startsAt, 10, playerId, count); };
     expect(report(ids[0], 5, 1000)).toBeNull(); // before the start
     expect(report(ids[0], 10, 4000)).toBe(10);
-    expect(report(ids[0], 500, 5000)).toBe(29); // 1 s later: at most 16 more (+3)
-    expect(report(ids[0], 20, 6000)).toBe(29); // never goes down
+    expect(report(ids[0], 50, 5000)).toBe(50); // no limit on how fast anyone taps
+    expect(report(ids[0], 20, 6000)).toBe(50); // never goes down
     expect(report(ids[0], 60, 14_000)).toBe(60);
     expect(report(ids[0], 70, 15_000)).toBeNull(); // the race is long over
     const fair = (playerId: string) => ({ latencyMs: 50, taps: live.signals.taps('race', race.startsAt, playerId) });
@@ -197,6 +204,29 @@ describe('minigame rules', () => {
     expect(minigameOutcome(rules('match-the-angle', { teamResult: 'best' }), rows, context, 'stage').entries[0]?.teamId).toBe(left);
     expect(minigameOutcome(rules('match-the-angle'), rows, context, 'stage').entries[0]?.teamId).toBe(right);
   });
+
+  it('breaks equal cuts by who locked in first', () => {
+    const rows = ids.map((id, index) => ({ ...row(id, [2, 2, 1, 2][index]!), receivedAt: at([6000, 4000, 9000, 4000][index]!) }));
+    const places = new Map(minigameOutcome(rules('cut-the-line'), rows, null, 'stage').entries.map(entry => [entry.playerId, entry.place]));
+    expect([ids[2], ids[1], ids[3], ids[0]].map(id => places.get(id))).toEqual([1, 2, 2, 4]); // closest first; equal distance and time share a place
+  });
+
+  it('lets equal cuts share the place when the scene says so, and never uses time for games without a speed tie-break', () => {
+    const rows = ids.map((id, index) => ({ ...row(id, [2, 2, 1, 2][index]!), receivedAt: at([6000, 4000, 9000, 4000][index]!) }));
+    const placesOf = (outcome: ReturnType<typeof minigameOutcome>) => [ids[2], ids[1], ids[3], ids[0]].map(id => outcome.entries.find(entry => entry.playerId === id)?.place);
+    expect(placesOf(minigameOutcome(rules('cut-the-line', { tiebreak: 'shared' }), rows, null, 'stage'))).toEqual([1, 2, 2, 2]);
+    expect(minigameTiebreak('cut-the-line', 'shared')).toBe('shared');
+    expect(minigameTiebreak('stop-clock', 'faster')).toBe('shared'); // the stopped time is the result: speed does not settle it
+    expect(minigameTiebreak('count-the-dots')).toBe('faster');
+  });
+
+  it('ranks every game the way the catalog says is better', () => {
+    expect(rankValue('tap-race', MINIGAMES['tap-race'].defaults, { value: 40 })).toBe(-40); // higher is better
+    expect(rankValue('reaction', MINIGAMES.reaction.defaults, { value: 240 })).toBe(240); // lower is better
+    expect(rankValue('stop-clock', { targetMs: 10_000, visibleMs: 3000 }, { value: 9_700 })).toBe(300); // distance from the target
+    expect(rankValue('lucky-doors', MINIGAMES['lucky-doors'].defaults, { value: 1 })).toBeNull();
+    expect(rankValue('relay-drawing', MINIGAMES['relay-drawing'].defaults, { value: 3 })).toBeNull(); // ranked by votes instead
+  });
 });
 
 describe('authored precision targets', () => {
@@ -237,5 +267,47 @@ describe('authored precision targets', () => {
     expect(DotSettingsSchema.safeParse({ viewSeconds: 5, count: { mode: 'exact', value: 501 } }).success).toBe(false);
     expect(startMinigame('count-the-dots', { viewSeconds: 5 }, now, () => 0).dots!.pattern).toHaveLength(50);
     expect(startMinigame('count-the-dots', { viewSeconds: 5 }, now, max => max - 1).dots!.pattern).toHaveLength(500);
+  });
+});
+
+describe('points by closeness', () => {
+  const within = { kind: 'within' as const, distance: 5, pointsMilli: '10000' };
+  const scale = { kind: 'scale' as const, distance: 20, pointsMilli: '10000' };
+
+  it('pays everyone close enough the same, and a sliding scale less the further off, in whole points', () => {
+    // Cut the Line measures in tenths of a percent; the author's distance is in percent.
+    expect([0, 50, 51].map(off => closenessPoints('cut-the-line', within, off))).toEqual([10_000n, 10_000n, 0n]);
+    expect([0, 30, 100, 190, 200, 600].map(off => closenessPoints('cut-the-line', scale, off))).toEqual([10_000n, 9000n, 5000n, 1000n, 0n, 0n]);
+    expect(closenessPoints('cut-the-line', scale, null)).toBe(0n); // no result, no points
+    // Draw the Graph measures in hundredths of a percent; the author's distance is in percent.
+    expect(closenessPoints('draw-the-graph', { ...within, distance: 5 }, 500)).toBe(10_000n);
+    expect(closenessPoints('draw-the-graph', { ...within, distance: 5 }, 501)).toBe(0n);
+    // Fractional points are never rounded up past the most a result can earn.
+    expect(closenessPoints('cut-the-line', { ...scale, pointsMilli: '2500' }, 0)).toBe(2500n);
+  });
+
+  it('only fits target minigames and distances they can measure', () => {
+    expect(minigameScoring('match-the-angle', { kind: 'within', distance: 180, pointsMilli: '5000' })).not.toBeNull();
+    expect(minigameScoring('match-the-angle', { kind: 'within', distance: 181, pointsMilli: '5000' })).toBeNull();
+    expect(minigameScoring('cut-the-line', { kind: 'scale', distance: 0, pointsMilli: '5000' })).toBeNull(); // a scale needs room to shrink
+    expect(minigameScoring('tap-race', within)).toBeNull();
+    expect(minigameScoring('stop-clock', { kind: 'within', distance: 250, pointsMilli: '5000' })).not.toBeNull();
+  });
+
+  it('pays every player by their own distance, ignoring places and the tie rule', () => {
+    const rows = ids.map((id, index) => ({ ...row(id, [0, 30, 30, 300][index]!), receivedAt: at([4000, 5000, 3000, 2000][index]!) }));
+    const paid = (scoring: typeof within | typeof scale) => ids.map(id => minigameOutcome(rules('cut-the-line', { scoring, tiebreak: 'shared' }), rows, null, 'stage').awards.find(award => award.playerId === id)?.amountMilli ?? 0n); // no award row for 0
+    expect(paid(within)).toEqual([10_000n, 10_000n, 10_000n, 0n]);
+    expect(paid(scale)).toEqual([10_000n, 9000n, 9000n, 0n]);
+  });
+
+  it('pays a team by its combined result, like its place', () => {
+    const context: TeamContext = { lineupId: 'lineup', answers: 'everyone', points: 'team',
+      teamOf: new Map([[ids[0], 'a'], [ids[1], 'a'], [ids[2], 'b'], [ids[3], 'b']]), members: new Map([['a', [ids[0], ids[1]]], ['b', [ids[2], ids[3]]]]), captainOf: new Map() };
+    const rows = ids.map((id, index) => ({ ...row(id, [20, 120, 40, 40][index]!), receivedAt: at(3000) }));
+    const teamPoints = (teamResult: 'average' | 'best') => Object.fromEntries(minigameOutcome(rules('cut-the-line', { scoring: within, tiebreak: 'shared', teamResult }), rows, context, 'stage').awards
+      .filter(award => award.teamId && !award.playerId).map(award => [award.teamId, award.amountMilli]));
+    expect(teamPoints('average')).toEqual({ b: 10_000n }); // a: 7% off on average, so nothing
+    expect(teamPoints('best')).toEqual({ a: 10_000n, b: 10_000n });
   });
 });

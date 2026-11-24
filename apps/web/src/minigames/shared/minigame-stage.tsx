@@ -1,12 +1,13 @@
 import { useCallback, useRef } from 'react';
 import type { Stroke } from '@party/contracts';
 import type { LiveStrokes } from '../../drawing/live-strokes.js';
-import { defaultLook, howToPlayKey, isStepMinigame, MinigameValueSchema, ROULETTE_BET_FLOOR, rouletteBetLimit, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { defaultLook, isStepMinigame, MinigameValueSchema, ROULETTE_BET_FLOOR, rouletteBetLimit, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import { useTexts } from '../../i18n/texts.js';
 import { CATALOG_TEXTS } from '../../presentation/catalog.text.js';
-import { minigameResult } from './result-label.js';
+import { minigameResult, tenths } from './result-label.js';
 import { CONTROL_TEXTS } from './controls.text.js';
 import { useText } from '../../presentation/look.js';
+import { howToPlay } from './how-to-play.js';
 import { Avatar } from '../../players/avatar.js';
 import { formatPoints } from '../../room/results.js';
 import type { Result } from './countdown.js';
@@ -59,7 +60,7 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
       const [before, after] = c('dotSaved', { guess: '{guess}' }).split('{guess}');
       return <p className="mg-guessed" role="status">{before}<strong>{own.data.value}</strong>{after}</p>;
     }
-    if (own?.success && minigame.game === 'cut-the-line') return <p className="mg-sub" role="status">{t('minigame.played')} · {own.data.cut ?? own.data.value}%</p>;
+    if (own?.success && minigame.game === 'cut-the-line') return <p className="mg-sub" role="status">{t('minigame.played')} · {tenths(own.data.cut ?? own.data.value)}%</p>;
     if (own?.success && minigame.graph) return <>
       <GraphChart chart={minigame.graph.chart} portrait
         traces={own.data.graphLine ? [{ id: 'own', line: own.data.graphLine, hue: minigame.graph.hue ?? 210 }] : []} />
@@ -68,7 +69,7 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
     if (own?.success && own.data.bets) return <div className="mg-done" role="status"><p className="mg-big">{betSummary(own.data.bets)}</p><p>{rouletteText('locked')}</p></div>;
     if (own?.success) return <div className={`mg-done${own.data.early ? ' reaction-early' : ''}`} role="status"><p className="mg-big">{own.data.early ? t('minigame.tooSoon') : minigameResult(minigame.game, own.data.value, settings, false, own.data)}</p><p>{t('minigame.played')}</p></div>;
     if (state.view.status === 'PAUSED') return <p className="mg-paused" role="status">{t('phase.paused')}</p>;
-    if (!canPlay || !minigame.startsAt) return <p className="wait-note">{t(howToPlayKey(minigame.game))}</p>;
+    if (!canPlay || !minigame.startsAt) return <p className="wait-note">{howToPlay(t, minigame)}</p>;
     // With no screen watching, the phone also shows what the screen would (the dots come along in the view; the race bars here).
     const race = minigame.game === 'tap-race' && !state.screenConnected && live.progress?.stageRunId === stage.id && live.progress.counts.length > 0;
     // Roulette stakes: the score this phone can see, or the round's minimum stake when that is higher (the server checks the same).

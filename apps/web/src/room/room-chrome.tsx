@@ -1,10 +1,11 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { howToPlayKey, isStepMinigame, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
+import { isStepMinigame, type MinigameKey, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import { FaIcon, type IconName } from '../presentation/icons.js';
 import './room-chrome.css';
 import { StageTimer } from './stage-timer.js';
 import { useText } from '../presentation/look.js';
+import { howToPlay } from '../minigames/shared/how-to-play.js';
 import { translate } from '../i18n/texts.js';
 import { CONNECTION_KEYS, ROOM_TEXTS } from './room.text.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
@@ -97,7 +98,7 @@ function roundDetails(stage: Stage, t: ReturnType<typeof useText>): [IconName, s
   if (stage.teams && !stage.teams.forming) rows.push(['users', r('teamRound', { who: r(stage.teams.answers === 'captain' ? 'captainsAnswer' : 'everyoneAnswers') })]);
   const minigame = stage.minigame;
   if (minigame) {
-    const game = minigame.game as MinigameKey; rows.push(['circle-info', t(howToPlayKey(game))]);
+    const game = minigame.game as MinigameKey; rows.push(['circle-info', howToPlay(t, { ...minigame, game })]);
     if (isStepMinigame(game) && stage.teams && minigame.steps) rows.push(['users', r(minigame.steps.decides === 'vote' ? 'stepsVote' : minigame.steps.decides === 'captain' ? 'stepsCaptain' : 'stepsAnyone')]);
     if (game === 'bus') {
       const settings = minigame.settings as MinigameSettings<'bus'>;

@@ -1,7 +1,8 @@
-import { howToPlayKey, type MinigameKey, type RoomSnapshot, type StakePoints } from '@party/contracts';
+import { type MinigameKey, type RoomSnapshot, type StakePoints } from '@party/contracts';
 import { StageMedia } from './stage-media.js';
 import { formatPoints } from './results.js';
 import { useText } from '../presentation/look.js';
+import { howToPlay } from '../minigames/shared/how-to-play.js';
 import { Avatar } from '../players/avatar.js';
 import { translate } from '../i18n/texts.js';
 import { EXTRAS_TEXTS } from './extras.text.js';
@@ -20,7 +21,7 @@ export function ExplainPanel({ state, stage, disabled, send }: { state: RoomSnap
   const t = useText(); const explain = stage.explain; if (!explain) return null;
   if (explain.screenOnly && state.role === 'player') return <section className="explain-panel"><p className="wait-note" role="status"><FaIcon name="tv" /> {t('explain.lookUp')}</p></section>;
   // The scene's own text, or the minigame's “how to play” from this game's texts.
-  const text = explain.text ?? (stage.minigame ? t(howToPlayKey(stage.minigame.game as MinigameKey)) : '');
+  const text = explain.text ?? (stage.minigame ? howToPlay(t, { ...stage.minigame, game: stage.minigame.game as MinigameKey }) : '');
   const ready = new Set(explain.readyIds); const mine = state.selfPlayerId ? ready.has(state.selfPlayerId) : false;
   const count = state.players.filter(player => ready.has(player.id)).length;
   return <section className="explain-panel" aria-labelledby={text ? 'explain-heading' : undefined} aria-label={text ? undefined : t('explain.atStake')}>
