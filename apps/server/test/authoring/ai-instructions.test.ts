@@ -54,6 +54,9 @@ describe('the instructions for an AI know every feature', () => {
   it('the intro before a round: its points, picture and shared-screen-only setting', () => {
     expect(missing(['explain', 'showPoints', 'screenOnly', 'picture'])).toEqual([]);
   });
+  it('how team captains are picked', () => {
+    expect(missing(['captains', 'elected'])).toEqual([]);
+  });
   it('the game\'s starting room settings and each of them', () => {
     expect(missing(['room', ...Object.keys(GameRoomSettingsSchema.shape)])).toEqual([]);
   });

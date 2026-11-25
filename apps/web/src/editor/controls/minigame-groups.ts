@@ -10,5 +10,6 @@ export const MINIGAME_GROUPS: { key: string; name: string; games: MinigameKey[] 
   { key: 'precision', get name() { return t('gPrecision'); }, games: ['cut-the-line', 'match-the-angle', 'count-the-dots'] },
   { key: 'skill', get name() { return t('gDrawing'); }, games: ['perfect-circle', 'draw-the-graph', 'relay-drawing'] },
   { key: 'luck', get name() { return t('gLuck'); }, games: ['lucky-doors', 'majority', 'heads-or-tails', 'red-or-black-roulette'] },
+  { key: 'words', get name() { return t('gWords'); }, games: ['hangman', 'undercover'] },
   { key: 'drinking', get name() { return t('gDrinking'); }, games: ['bus'] },
 ];

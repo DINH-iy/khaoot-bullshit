@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ChatModerationSchema, ChatSendSchema, HOST_PHONE_COMMANDS, ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
+import { RoomWordsSchema, ChatModerationSchema, ChatSendSchema, HOST_PHONE_COMMANDS, ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenVerifier } from '../auth/auth.js';
@@ -109,6 +109,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, chat: state.chat, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(lockedRoomSettings(state, session.status).length ? { locked: lockedRoomSettings(state, session.status) } : {}), ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
         ...(principal.role === 'host' || hostPhone ? { autoRevealSeconds: state.autoRevealSeconds } : {}) },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
+      ...(principal.role === 'host' ? { ownWords: state.ownWords } : {}),
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], ...roomPeople, nextRoom: state.nextRoom, roomClosed: state.roomClosed, arcade });
   };
 
@@ -196,6 +197,15 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const body = RoomSettingsSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       reactions.settingsChanged(id); await seats.setSettings(id, principal, Object.fromEntries(Object.entries(body.data).filter(([, value]) => value !== undefined)));
       if (body.data.chat === false) chat.clear(id);
+      return { ok: true, data: {} };
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
+  });
+  // The host's own words for Galgje and Undercover (host only; players never receive them).
+  app.post('/api/rooms/:sessionId/words', async (request, reply) => {
+    try {
+      requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
+      const body = RoomWordsSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
+      await seats.setWords(id, principal, body.data);
       return { ok: true, data: {} };
     } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });

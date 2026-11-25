@@ -111,6 +111,21 @@ export function ArcadeGameSettingsFields({ game, chosen, disabled, onChange }: {
         onChange={value => setValues({ rainbow: value === 'on' })} />);
       break;
     }
+    case 'hangman':
+      add(<Stepper key="lives" label="Wrong letters allowed" value={Number(values['lives'] ?? 7)} min={3} max={12} disabled={disabled} onChange={lives => setValues({ lives })} />);
+      add(<Choice key="words" label="Words in" value={String(values['wordLanguage'] ?? 'en')} disabled={disabled}
+        options={[{ value: 'en', text: 'EN', name: 'English words' }, { value: 'nl', text: 'NL', name: 'Dutch words' }, { value: 'de', text: 'DE', name: 'German words' }, { value: 'ro', text: 'RO', name: 'Romanian words' }]}
+        onChange={wordLanguage => setValues({ wordLanguage })} />);
+      break;
+    case 'undercover':
+      add(<Choice key="undercovers" label="Undercover players" value={Number(values['undercovers'] ?? 1)} disabled={disabled} options={[1, 2, 3].map(value => ({ value, text: String(value), name: `${value} undercover` }))} onChange={undercovers => setValues({ undercovers })} />);
+      add(<Choice key="white" label="Mr. White" value={values['mrWhite'] === false ? 'off' : 'on'} disabled={disabled} options={[{ value: 'on', text: 'On', name: 'Mr. White on' }, { value: 'off', text: 'Off', name: 'Mr. White off' }]} onChange={value => setValues({ mrWhite: value === 'on' })} />);
+      add(<Stepper key="turn" label="Time per clue" value={Number(values['turnSeconds'] ?? 30)} min={10} max={120} step={5} unit="s" disabled={disabled} onChange={turnSeconds => setValues({ turnSeconds })} />);
+      add(<Stepper key="vote" label="Voting time" value={Number(values['voteSeconds'] ?? 45)} min={15} max={180} step={5} unit="s" disabled={disabled} onChange={voteSeconds => setValues({ voteSeconds })} />);
+      add(<Choice key="words" label="Words in" value={String(values['wordLanguage'] ?? 'en')} disabled={disabled}
+        options={[{ value: 'en', text: 'EN', name: 'English words' }, { value: 'nl', text: 'NL', name: 'Dutch words' }, { value: 'de', text: 'DE', name: 'German words' }, { value: 'ro', text: 'RO', name: 'Romanian words' }]}
+        onChange={wordLanguage => setValues({ wordLanguage })} />);
+      break;
     case 'red-or-black-roulette': add(<Stepper key="floor" label="Everyone may bet at least" value={Number(values['betFloor'] ?? ROULETTE_BET_FLOOR)} min={0} max={1000} step={5} unit="pts" disabled={disabled} onChange={betFloor => setValues({ betFloor })} />); break;
     case 'rps': add(<Choice key="first" label="First to" value={Number(values['firstTo'])} disabled={disabled} options={[1, 2, 3, 4, 5].map(value => ({ value, text: String(value), name: `First to ${value} wins` }))} onChange={firstTo => setValues({ firstTo })} />); break;
     case 'creature-duel': add(<Choice key="size" label="Creatures" value={Number(values['size'])} disabled={disabled} options={[{ value: 1, text: 'One' }, { value: 3, text: 'Team of 3' }]} onChange={size => setValues({ size })} />); break;

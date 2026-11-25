@@ -1,3 +1,4 @@
+import { translate } from '../../i18n/texts.js';
 import { CLAP_BEATS_MS, DEFAULT_REVEAL_EASING, MINIGAMES, RevealEasingSchema, rouletteColor, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import type { ReactNode } from 'react';
 import { useLanguage } from '../../i18n/language.js';
@@ -13,6 +14,9 @@ import { DotPhoneResult } from '../count-the-dots/count-dots.js';
 import { GraphChart } from '../draw-the-graph/graph-chart.js';
 import { CoinReveal } from '../heads-or-tails/coin.js';
 import { betSummary, ROULETTE_TEXTS, RouletteReveal } from '../red-or-black-roulette/roulette.js';
+import { HANGMAN_TEXTS } from '../hangman/hangman.text.js';
+import { WordTiles } from '../hangman/board.js';
+import { UndercoverReveal } from '../undercover/undercover.js';
 import { DotReveal } from '../count-the-dots/dot-reveal.js';
 import { STEP_RENDERERS } from './steps/renderers.js';
 import { DrawingAnimation } from '../relay-drawing/animation-relay.js';
@@ -36,8 +40,9 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label, offse
   const game = answer.game;
   const settings = (stage.minigame?.settings ?? MINIGAMES[game].defaults) as MinigameSettings;
   const team = stage.teams?.teams.find(candidate => state.selfPlayerId && candidate.memberIds.includes(state.selfPlayerId));
-  const own = answer.entries.find(entry => entry.playerId !== null && entry.playerId === state.selfPlayerId);
   const teamEntry = team && answer.entries.find(entry => !entry.playerId && entry.teamId === team.teamId);
+  // When a captain answers, the team's row holds the answer (the drawn circle, the cut, the bets…) for every member.
+  const own = answer.entries.find(entry => entry.playerId !== null && entry.playerId === state.selfPlayerId) ?? (stage.teams?.answers === 'captain' ? teamEntry : undefined);
   const entry = own ?? teamEntry;
   const personalAward = reveal.awards.find(award => award.playerId === state.selfPlayerId);
   const teamAward = team && reveal.teamAwards.find(award => award.teamId === team.teamId);
@@ -104,6 +109,13 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label, offse
         [roulette('yourBets'), own?.bets ? betSummary(own.bets) : '—']];
       break;
     }
+    case 'hangman':
+      if (answer.word) visual = <div className="hangman-reveal"><p>{translate(HANGMAN_TEXTS, 'theWord')}</p><WordTiles pattern={answer.word} label={`${translate(HANGMAN_TEXTS, 'theWord')}: ${answer.word.toUpperCase()}`} /></div>;
+      facts = [[translate(HANGMAN_TEXTS, 'wrongLetters'), value == null ? translate(HANGMAN_TEXTS, 'hanged') : String(value)]];
+      break;
+    case 'undercover':
+      if (answer.undercover) visual = <UndercoverReveal state={state} reveal={answer.undercover} />;
+      break;
     case 'lucky-doors': facts = [[t('door'), value == null ? '—' : minigameResult(game, value, settings)]]; break;
     case 'majority': {
       const winner = answer.entries.find(row => row.place === 1)?.value;

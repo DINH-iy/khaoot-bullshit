@@ -213,3 +213,11 @@
   animation: fade-only 4.2s forwards;
 }
 .score-reaction.sticker { background: var(--r-accent); color: var(--r-accent-ink); font-weight: 850; }
+/* The host's own Galgje words and Undercover pairs. */
+.room-words { grid-column: 1 / -1; padding: 8px; border-radius: 9px; border: 1px solid var(--r-line); }
+.room-words .hint { margin: 0; font-size: .85rem; }
+.room-words summary { cursor: pointer; font-weight: 700; font-size: .88rem; }
+.room-words[open] { display: grid; gap: 8px; }
+.room-words label { display: grid; gap: 4px; font-size: .88rem; }
+.room-words textarea { width: 100%; min-height: 5em; resize: vertical; }
+.room-words-count { color: var(--r-muted); font-weight: 600; }

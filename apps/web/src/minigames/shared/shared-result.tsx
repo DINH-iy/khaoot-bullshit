@@ -1,3 +1,4 @@
+import { translate } from '../../i18n/texts.js';
 import { useMemo, type CSSProperties } from 'react';
 import { defaultLook, DEFAULT_REVEAL_EASING, RevealEasingSchema, GRAPH_REVEAL_MS, graphPlaybackPosition, MINIGAMES, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
 import { useTexts } from '../../i18n/texts.js';
@@ -16,6 +17,9 @@ import { GRAPH_TEXTS } from '../draw-the-graph/graph.text.js';
 import { CoinReveal } from '../heads-or-tails/coin.js';
 import { COIN_TEXTS } from '../heads-or-tails/coin.text.js';
 import { ROULETTE_TEXTS, RouletteReveal } from '../red-or-black-roulette/roulette.js';
+import { HANGMAN_TEXTS } from '../hangman/hangman.text.js';
+import { WordTiles } from '../hangman/board.js';
+import { UndercoverReveal } from '../undercover/undercover.js';
 import { DrawingAnimation } from '../relay-drawing/animation-relay.js';
 import { STEP_RENDERERS } from './steps/renderers.js';
 import { minigameResult } from './result-label.js';
@@ -116,6 +120,8 @@ export function MinigameResults({ state, stage, reveal, answer, offset, standing
     className={playback ? 'mg-results graph-results' : 'mg-results'} style={graphTiming}>
     {coin && <CoinReveal coin={coin} animate />}
     {answer.roulette !== undefined && <RouletteReveal pocket={answer.roulette} animate={animateRoulette} />}
+    {answer.undercover && <UndercoverReveal state={state} reveal={answer.undercover} />}
+    {answer.word && <div className="hangman-reveal"><p>{translate(HANGMAN_TEXTS, 'theWord')}</p><WordTiles pattern={answer.word} label={`${translate(HANGMAN_TEXTS, 'theWord')}: ${answer.word.toUpperCase()}`} /></div>}
     {minigame?.cutTarget !== undefined && <CutResult target={minigame.cutTarget} cut={cut} shared />}
     {minigame?.angleTarget !== undefined && <AngleTarget target={minigame.angleTarget} />}
     {answer.graph && <>

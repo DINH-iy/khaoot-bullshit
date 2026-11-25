@@ -15,6 +15,8 @@ export * from './minigames/count-the-dots/dot-pattern.js';
 export * from './minigames/shared/reveal-easing.js';
 export * from './minigames/draw-the-graph/graph.js';
 export * from './minigames/heads-or-tails/coin.js';
+export * from './minigames/hangman/hangman.js';
+export * from './minigames/undercover/undercover.js';
 export * from './minigames/red-or-black-roulette/roulette.js';
 export * from './phone-menu.js';
 export * from './minigames/speed-run/course.js';

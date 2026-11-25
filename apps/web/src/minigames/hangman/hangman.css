@@ -1,0 +1,23 @@
+/* Galgje: the gallows, the word as tiles and a letter keyboard of 7 columns. */
+.hangman-board { display: flex; align-items: center; gap: 12px; }
+.hangman-board.mine { gap: 16px; margin-bottom: 8px; }
+.hangman-gallows { width: 72px; height: 82px; flex: none; fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.hangman-gallows.small { width: 44px; height: 50px; stroke-width: 5; }
+.hangman-gallows.hanged { color: var(--r-bad, #e8505b); }
+.hangman-side { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.hangman-word { display: flex; flex-wrap: nowrap; gap: 3px; margin: 0; }
+.hangman-tile { display: inline-grid; place-items: center; flex: 0 1 1.6em; min-width: .7em; height: 1.9em; border-bottom: 3px solid currentColor; font-size: 1.2rem; font-weight: 900; }
+.hangman-tile.blank { opacity: .7; }
+.hangman-tile.dash { border-bottom-color: transparent; }
+.hangman-gap { flex: 0 1 .8em; }
+.hangman-gallows .todo { opacity: .14; }
+.hangman-count, .hangman-missed, .hangman-progress { margin: 0; color: var(--r-muted); font-weight: 700; }
+.hangman-missed { letter-spacing: .2em; text-decoration: line-through; }
+.hangman-ok { color: var(--r-ok); } .hangman-out { color: var(--r-bad, #e8505b); }
+.step-hangman .step-options { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.room .step-hangman .step-option { min-height: 38px; padding: 0; font-size: 1.05rem; }
+.step-hangman .step-question { gap: 6px; }
+@media (min-height: 700px) { .hangman-gallows { width: 96px; height: 110px; } .room .step-hangman .step-option { min-height: 44px; } }
+.mg-hangman .step-sides .hangman-board { justify-content: center; }
+.hangman-reveal { display: grid; justify-items: center; gap: 6px; margin: 0 0 12px; }
+.hangman-reveal p { margin: 0; color: var(--r-muted); font-weight: 700; }

@@ -1,9 +1,9 @@
-import { DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, minigameScoring, minigameTiebreak, parseMinigameSettings, placePoints, PlacesSchema, ROULETTE_BET_FLOOR, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
+import { HangmanWordSchema, normalizeHangmanWord, UndercoverPairSchema, DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, minigameScoring, minigameTiebreak, parseMinigameSettings, placePoints, PlacesSchema, ROULETTE_BET_FLOOR, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
 import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
 import { SpeedRunCourseFields } from './speed-run-course.js';
 import { PlacesFields } from './places-fields.js';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { MINIGAME_GROUPS } from '../../controls/minigame-groups.js';
 import { ChoiceDialog } from '../../controls/choice-dialog.js';
 import { updateStage, withMinigame, type Definition, type Node, type Stage } from '../../model.js';
@@ -161,6 +161,8 @@ export function MinigameFields({ part, definition, node, index, onChange, inDraw
       <p className="hint">{t('busHint')}</p>
     </div>; })()}
     {game === 'majority' && <p className="hint">{t('majorityHint')}</p>}
+    {game === 'undercover' && settings && <UndercoverFields settings={settings as MinigameSettings<'undercover'>} onChange={(next, field) => setSettings(next, field)} />}
+    {game === 'hangman' && settings && <HangmanFields settings={settings as MinigameSettings<'hangman'>} onChange={(next, field) => setSettings(next, field)} />}
     {/* A step game in a team round: how the team decides each move, and the time for a team vote. */}
     {known && isStepMinigame(game) && inTeams && <div className="step-decide-fields">
       <Segmented label={t('teamDecides')} stacked value={String(stage['decide'] ?? 'anyone')} onChange={decide => edit(current => { const copy: Stage = { ...current }; if (decide === 'anyone') delete copy['decide']; else copy['decide'] = decide; return copy; }, 'decide')}
@@ -205,4 +207,54 @@ function ClosenessFields({ game, stage, placement, edit, places }: { game: Minig
       <p className="hint" id="closeness-hint">{t(scoring.kind === 'within' ? 'withinHint' : 'scaleHint')}</p>
     </> : places}
   </>;
+}
+
+/** Galgje: wrong letters allowed, the author's own words (one per line), or the built-in list's language. */
+function HangmanFields({ settings, onChange }: { settings: MinigameSettings<'hangman'>; onChange: (next: MinigameSettings<'hangman'>, field: string) => void }) {
+  const stored = (settings.words ?? []).join('\n');
+  const [text, setText] = useState(stored);
+  useEffect(() => { if (text.split('\n').map(normalizeHangmanWord).filter(Boolean).join('\n') !== stored) setText(stored); }, [stored]);
+  const setWords = (raw: string) => {
+    setText(raw);
+    const words = raw.split('\n').map(line => HangmanWordSchema.safeParse(line)).flatMap(word => word.success ? [word.data] : []).slice(0, 200);
+    const next: MinigameSettings<'hangman'> = { ...settings }; if (words.length) next.words = words; else delete next.words;
+    onChange(next, 'words');
+  };
+  return <div className="hangman-fields">
+    <label className="ed-inline">{t('livesLabel')}<input type="number" min={3} max={12} value={settings.lives}
+      onChange={event => onChange({ ...settings, lives: Math.round(Math.min(12, Math.max(3, Number(event.target.value) || 7))) }, 'lives')} /></label>
+    <label>{t('ownWords')}<textarea rows={4} value={text} aria-describedby="hangman-words-hint" onChange={event => setWords(event.target.value)} /></label>
+    <p className="hint" id="hangman-words-hint">{t('ownWordsHint')}</p>
+    {!settings.words?.length && <Segmented label={t('wordLanguage')} value={settings.wordLanguage ?? 'en'} onChange={wordLanguage => onChange({ ...settings, wordLanguage: wordLanguage as MinigameSettings<'hangman'>['wordLanguage'] }, 'word-language')}
+      choices={[{ value: 'en', label: t('langEn') }, { value: 'nl', label: t('langNl') }, { value: 'de', label: t('langDe') }, { value: 'ro', label: t('langRo') }]} />}
+    <p className="hint">{t('hangmanHint')}</p>
+  </div>;
+}
+
+/** Undercover / Mr. White: how many undercover players, Mr. White, the clue and vote times, and the word pairs. */
+function UndercoverFields({ settings, onChange }: { settings: MinigameSettings<'undercover'>; onChange: (next: MinigameSettings<'undercover'>, field: string) => void }) {
+  const stored = (settings.pairs ?? []).map(pair => pair.join(', ')).join('\n');
+  const [text, setText] = useState(stored);
+  const parse = (raw: string) => raw.split('\n').map(line => UndercoverPairSchema.safeParse(line.split(',').map(part => part.trim()))).flatMap(pair => pair.success ? [pair.data] : []).slice(0, 100);
+  useEffect(() => { if (parse(text).map(pair => pair.join(', ')).join('\n') !== stored) setText(stored); }, [stored]);
+  const setPairs = (raw: string) => {
+    setText(raw); const pairs = parse(raw);
+    const next: MinigameSettings<'undercover'> = { ...settings }; if (pairs.length) next.pairs = pairs; else delete next.pairs;
+    onChange(next, 'pairs');
+  };
+  const seconds = (value: string, min: number, max: number, fallback: number) => Math.round(Math.min(max, Math.max(min, Number(value) || fallback)));
+  return <div className="undercover-fields">
+    <Segmented label={t('ucUndercovers')} value={String(settings.undercovers)} onChange={value => onChange({ ...settings, undercovers: Number(value) }, 'undercovers')}
+      choices={[{ value: '1', label: '1' }, { value: '2', label: '2' }, { value: '3', label: '3' }]} />
+    <label className="choice"><input type="checkbox" checked={settings.mrWhite} onChange={event => onChange({ ...settings, mrWhite: event.target.checked }, 'mr-white')} />{t('ucWhite')}</label>
+    <div className="field-pair">
+      <label>{t('ucTurn')}<span className="ed-unit"><input type="number" min={10} max={120} value={settings.turnSeconds} onChange={event => onChange({ ...settings, turnSeconds: seconds(event.target.value, 10, 120, 30) }, 'turn')} />{t('sec')}</span></label>
+      <label>{t('ucVote')}<span className="ed-unit"><input type="number" min={15} max={180} value={settings.voteSeconds} onChange={event => onChange({ ...settings, voteSeconds: seconds(event.target.value, 15, 180, 45) }, 'vote')} />{t('sec')}</span></label>
+    </div>
+    <label>{t('ucPairs')}<textarea rows={4} value={text} aria-describedby="undercover-pairs-hint" onChange={event => setPairs(event.target.value)} /></label>
+    <p className="hint" id="undercover-pairs-hint">{t('ucPairsHint')}</p>
+    {!settings.pairs?.length && <Segmented label={t('wordLanguage')} value={settings.wordLanguage ?? 'en'} onChange={wordLanguage => onChange({ ...settings, wordLanguage: wordLanguage as MinigameSettings<'undercover'>['wordLanguage'] }, 'word-language')}
+      choices={[{ value: 'en', label: t('langEn') }, { value: 'nl', label: t('langNl') }, { value: 'de', label: t('langDe') }, { value: 'ro', label: t('langRo') }]} />}
+    <p className="hint">{t('ucHint')}</p>
+  </div>;
 }

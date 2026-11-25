@@ -1,5 +1,6 @@
 import { SettingToggle } from './setting-toggle.js';
 import { RoomChat } from './chat.js';
+import { RoomWords } from './room-words.js';
 import { CHAT_TEXTS } from './chat.text.js';
 import { useState } from 'react';
 import { MAX_OPEN_INVITES, REACTIONS, type RoomSnapshot } from '@party/contracts';
@@ -71,6 +72,7 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
       })}</div>
     </details>}
     {!shown.showScores && <p className="hint">{h('scoresSecret')}</p>}
+    {state.role === 'host' && <RoomWords state={state} sessionId={sessionId} />}
   </fieldset>;
 }
 

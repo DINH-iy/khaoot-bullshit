@@ -6,6 +6,8 @@ import { GraphHueSchema, GraphLineSchema, GraphRoundViewSchema, GraphSettingsSch
 import { CutGuessSchema, CutSettingsSchema, CutTargetSchema } from '../cut-the-line/target.js';
 import { MinigameScoringSchema, type Closeness, type MinigameScoring } from './scoring.js';
 import { COURSE_HEIGHT, COURSE_WIDTH, raceCourseHasRoute } from '../speed-run/course.js';
+import { HangmanSettingsSchema } from '../hangman/hangman.js';
+import { UNDERCOVER_ROLES, UndercoverOwnSchema, UndercoverRevealSchema, UndercoverSettingsSchema, UndercoverViewSchema } from '../undercover/undercover.js';
 
 const Milli = z.string().regex(/^(0|[1-9][0-9]{0,11})$/);
 
@@ -51,6 +53,10 @@ export const MinigameSettingsSchemas = {
   bus: z.object({ sips: z.array(z.number().int().min(0).max(20)).length(4), rainbow: z.boolean().optional() }).strict(),
   // Left or right: everyone picks left or right in secret (no talking); the majority wins. A tie: nobody wins.
   majority: z.object({}).strict(),
+  // Galgje (Hangman): guess the secret word letter by letter before the gallows is drawn (see hangman.ts).
+  hangman: HangmanSettingsSchema,
+  // Undercover / Mr. White: secret words, clues out loud, vote one player out each round (see undercover.ts).
+  undercover: UndercoverSettingsSchema,
 } as const;
 export type MinigameKey = keyof typeof MinigameSettingsSchemas;
 export type MinigameSettings<K extends MinigameKey = MinigameKey> = z.infer<typeof MinigameSettingsSchemas[K]>;
@@ -144,9 +150,17 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
   majority: { name: 'Left or right', description: 'Pick left or right without talking; the majority wins.',
     howToPlay: 'Choose left or right, in secret: no talking, no signs. Everyone who chose what most people chose wins. A tie: nobody wins.',
     better: 'none', defaults: {}, defaultSeconds: 20 },
+  hangman: { name: 'Hangman', description: 'Guess the secret word letter by letter before the gallows is finished.',
+    howToPlay: 'Tap letters to guess the word. A wrong letter adds to the gallows; when it is finished you are out. Fewest wrong letters wins.',
+    better: 'lower', tiebreak: 'faster', defaults: { lives: 7, wordLanguage: 'en' }, defaultSeconds: 120 },
+  undercover: { name: 'Undercover', description: 'Everyone has a secret word, but someone’s is different, and Mr. White has none. Give clues, then vote them out.',
+    howToPlay: 'Your phone shows your secret word. In turns, say one clue about it out loud, without saying the word. Then vote out who you think has another word. Civilians win when every impostor is out; impostors win when they are as many as the civilians. A voted-out Mr. White may guess the word to win.',
+    better: 'none', defaults: { undercovers: 1, mrWhite: true, turnSeconds: 30, voteSeconds: 45, wordLanguage: 'en' }, defaultSeconds: 900 },
 };
 /** Minigames that only work as a team round. */
 export const TEAM_MINIGAMES: readonly MinigameKey[] = ['relay-drawing', 'bus'];
+/** Minigames always played alone, also in a team game (each player for themselves). */
+export const SOLO_MINIGAMES: readonly MinigameKey[] = ['draw-the-graph', 'heads-or-tails', 'red-or-black-roulette', 'undercover'];
 /** Games that require a host or shared display, unavailable in phone-only Arcade lobbies. */
 export const SHARED_SCREEN_MINIGAMES: readonly MinigameKey[] = ['count-the-dots', 'draw-the-graph', 'heads-or-tails', 'red-or-black-roulette'];
 export const isSharedPrediction = (game: string) => game === 'heads-or-tails' || game === 'red-or-black-roulette';
@@ -160,7 +174,7 @@ export function parseMinigameSettings(game: string, settings: unknown): Minigame
 
 /** A result in words, for screens: "231 ms", "57 taps", "0.12 s off", "Door 2". */
 export function formatMinigameResult(game: MinigameKey, value: number | null, settings: MinigameSettings): string {
-  if (value === null) return game === 'reaction' ? 'False start' : 'No result';
+  if (value === null) return game === 'reaction' ? 'False start' : game === 'hangman' ? 'Hanged' : 'No result';
   if (game === 'reaction') return `${value} ms`;
   if (game === 'speed-run') return `${(value / 1000).toFixed(2)} s`;
   if (game === 'clap-beat') return `${value}/${CLAP_BEATS_MS.length} beats`;
@@ -176,6 +190,8 @@ export function formatMinigameResult(game: MinigameKey, value: number | null, se
   if (game === 'relay-drawing') return `${value} ${value === 1 ? 'vote' : 'votes'}`;
   if (game === 'bus') return `${value} ${value === 1 ? 'sip' : 'sips'}`;
   if (game === 'majority') return value === 0 ? 'Left' : 'Right';
+  if (game === 'hangman') return `${value} wrong`;
+  if (game === 'undercover') return UNDERCOVER_ROLES[value] === 'white' ? 'Mr. White' : UNDERCOVER_ROLES[value] === 'undercover' ? 'Undercover' : 'Civilian';
   return `Door ${value + 1}`;
 }
 
@@ -223,7 +239,7 @@ export const ANIMATION_WORDS = ['rocket', 'turtle', 'volcano', 'skateboard', 'oc
  * them all (apps/server/src/minigames/shared/steps): a game plugs in its rules; playing, how a team decides,
  * saving, ranking and points are shared. A side plays: a team in a team round, else each player.
  */
-export const STEP_MINIGAMES: readonly MinigameKey[] = ['bus', 'lucky-doors', 'majority', 'speed-run'];
+export const STEP_MINIGAMES: readonly MinigameKey[] = ['bus', 'lucky-doors', 'majority', 'speed-run', 'hangman'];
 export const isStepMinigame = (game: string) => (STEP_MINIGAMES as readonly string[]).includes(game);
 /**
  * How a team decides each move (a scene setting): anyone in the team taps it; the team votes (each
@@ -241,6 +257,8 @@ export const StepSideViewSchema = z.object({
   captainId: z.string().uuid().nullable(), voteEndsAt: z.string().datetime().nullable(),
   votes: z.array(z.object({ option: z.string(), count: z.number().int().min(0) }).strict()), voters: z.array(z.string().uuid()),
   view: z.unknown(),
+  // What only the side's own phones get (Galgje: its letters); absent for everyone else, the host and the shared screen.
+  own: z.unknown().optional(),
 }).strict();
 export type StepSideView = z.infer<typeof StepSideViewSchema>;
 // What Lucky doors shows of a side: the door it picked (the points behind the doors stay secret until the reveal).
@@ -255,7 +273,9 @@ export const MinigameValueSchema = z.object({ kind: z.literal('minigame'), value
   cut: CutGuessSchema.optional(),
   angle: AngleGuessSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(),
   // Roulette: the bets (value holds their total stake).
-  bets: RouletteTableBetsSchema.optional() }).strict();
+  bets: RouletteTableBetsSchema.optional(),
+  // Undercover: written by the server when the game ends; `value` is the role's place in UNDERCOVER_ROLES, `won` marks the winning side.
+  won: z.literal(true).optional() }).strict();
 
 /** The minigame as a screen sees it while it runs. Never contains secret parts (which door hides what). */
 export const PublicMinigameSchema = z.object({
@@ -273,6 +293,8 @@ export const PublicMinigameSchema = z.object({
   // Pass the pencil: the turns, who draws when, each team's parts so far (everyone may watch), and when voting starts.
   // A team step game (Drive the bus…): how teams decide, and every team's progress.
   steps: z.object({ decides: z.enum(TEAM_DECIDES), sides: z.array(StepSideViewSchema) }).strict().nullable().optional(),
+  // Undercover: the table everyone sees, and this phone's own word (never another's).
+  undercover: z.object({ view: UndercoverViewSchema, own: UndercoverOwnSchema.optional() }).strict().optional(),
   relay: z.object({ guessUntil: z.string().datetime().optional(), animation: z.object({ prompt: z.number().int().min(0).max(ANIMATION_WORDS.length - 1), targetTeamId: z.string().uuid().nullable() }).strict().optional(), turns: z.number().int().min(1), voteAt: z.string().datetime().nullable(),
     teams: z.array(z.object({ teamId: z.string().uuid(), name: z.string(), word: z.number().int().min(0).max(ANIMATION_WORDS.length - 1).optional(), drawers: z.array(z.string().uuid()), parts: z.array(z.object({ turn: z.number().int().min(0), assetId: z.string().uuid() }).strict()) }).strict()) }).strict().nullable(),
 }).strict();
@@ -281,6 +303,6 @@ export const MinigameRevealSchema = z.object({
   kind: z.literal('minigame'), game: z.enum(MINIGAME_KEYS as [MinigameKey, ...MinigameKey[]]),
   entries: z.array(z.object({ playerId: z.string().uuid().nullable(), teamId: z.string().uuid().nullable(), value: z.number().int().nullable(), place: z.number().int().min(1).nullable(),
     stroke: z.array(z.number().int()).optional(), cut: CutGuessSchema.optional(), angle: AngleGuessSchema.optional(), dotGuess: DotGuessSchema.optional(), graphLine: GraphLineSchema.optional(), graphHue: GraphHueSchema.optional(), bets: RouletteTableBetsSchema.optional() }).strict()),
-  doorsMilli: z.array(Milli).nullable(), graph: GraphDataSchema.optional(), dotCount: z.number().int().positive().optional(), coin: CoinSideSchema.optional(), roulette: RoulettePocketSchema.optional(),
+  doorsMilli: z.array(Milli).nullable(), graph: GraphDataSchema.optional(), word: z.string().max(30).optional(), undercover: UndercoverRevealSchema.optional(), dotCount: z.number().int().positive().optional(), coin: CoinSideSchema.optional(), roulette: RoulettePocketSchema.optional(),
   dotReveal: z.strictObject({ pattern: DotPatternSchema, startedAt: z.string().datetime() }).optional(),
 }).strict();

@@ -207,9 +207,12 @@ test('Arcade publishes the full game catalog and plays a pool duel and a TV-only
     const displayRoute = `${new URL(friend.url()).origin}/api/arcade/rounds/${new URL(friend.url()).searchParams.get('room')}/display`;
     const denied = await friend.request.post(displayRoute, { headers: { 'x-party-request': '1', origin: baseURL! }, data: {} });
     expect(denied.ok()).toBe(false);
+    // The shared screen is set up from the TV button in the round bar.
+    await leader.getByRole('button', { name: 'Shared screen' }).click();
     await leader.getByRole('button', { name: 'Set up shared screen' }).click();
     const screen = await tvContext.newPage();
     await screen.goto((await leader.getByRole('link', { name: 'Open shared screen' }).getAttribute('href'))!);
+    await leader.keyboard.press('Escape');
     await friend.getByRole('button', { name: 'Got it!' }).click();
     await leader.getByRole('button', { name: 'Got it!' }).click();
     await leader.getByRole('button', { name: 'Start (2 of 2 ready)' }).click();

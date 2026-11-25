@@ -14,6 +14,7 @@ import { Avatar } from '../../players/avatar.js';
 import { formatPoints } from '../../room/results.js';
 import type { Result } from './countdown.js';
 import { RelayDrawing } from '../relay-drawing/relay-drawing.js';
+import { UndercoverTable, type UndercoverAct } from '../undercover/undercover.js';
 import { StepPhone, StepScreen, type SendMove } from './steps/step-game.js';
 import { useServerNow } from './clock.js';
 import { ClapCue } from '../clap-beat/clap-beat.js';
@@ -36,7 +37,7 @@ export interface MinigameLive { strokes: LiveStrokes; sendStroke: (message: { st
  * A running minigame. Phones get the controls (or their own result once sent);
  * the shared screen and host see how to play, the countdown and GO.
  */
-export function MinigameStage({ state, stage, offset, canPlay, disabled, onResult, live, onPart, onMove }: { state: RoomSnapshot; stage: Stage; offset: number; canPlay: boolean; disabled: boolean; onResult: (result: Result) => void; live: MinigameLive; onPart: (turn: number, assetId: string) => void ; onMove: SendMove }) {
+export function MinigameStage({ state, stage, offset, canPlay, disabled, onResult, live, onPart, onMove, onUndercover }: { state: RoomSnapshot; stage: Stage; offset: number; canPlay: boolean; disabled: boolean; onResult: (result: Result) => void; live: MinigameLive; onPart: (turn: number, assetId: string) => void ; onMove: SendMove; onUndercover: UndercoverAct }) {
   const t = useText(); const minigame = stage.minigame!;
   const c = useTexts(CONTROL_TEXTS);
   const graphText = useTexts(GRAPH_TEXTS);
@@ -57,6 +58,9 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
   const settings = minigame.settings as MinigameSettings;
   if (minigame.game === 'relay-drawing') return state.view.status === 'PAUSED' ? <p className="mg-paused" role="status">{t('phase.paused')}</p>
     : <RelayDrawing state={state} stage={stage} offset={offset} canPlay={canPlay} disabled={disabled} onVote={(teamId, value = 0) => send({ value, teamId })} onPart={onPart} live={live} />;
+  // Undercover / Mr. White: one table for everyone, each phone with its own secret word.
+  if (minigame.game === 'undercover') return state.view.status === 'PAUSED' ? <p className="mg-paused" role="status">{t('phase.paused')}</p>
+    : <UndercoverTable state={state} stage={stage} offset={offset} disabled={disabled} onAct={onUndercover} />;
   // A step game (Drive the bus, Lucky doors, Left or right…): the shared step frame with the game's own drawing.
   if (isStepMinigame(minigame.game)) return state.role === 'player' ? <StepPhone state={state} stage={stage} offset={offset} canPlay={canPlay} disabled={disabled} onMove={onMove} />
     : <StepScreen state={state} stage={stage} offset={offset} />;

@@ -67,7 +67,7 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
           requireGame(session.gameVersion.definitionFormat === definition.formatVersion && contentHash(definition) === session.gameVersion.contentHash, 'INVALID_DEFINITION');
           assertExecutable(definition);
           const effect = await applyCommand(tx, session, definition, actor.data, command, receivedAt, live);
-          if ((command.type === 'submission.submit' || command.type === 'minigame.move' || command.type === 'minigame.decide') && effect.stageRunId) await closeSoonWhenAllIn(tx, session, definition, effect.stageRunId, receivedAt);
+          if ((command.type === 'submission.submit' || command.type === 'minigame.move' || command.type === 'minigame.decide' || command.type === 'undercover.act') && effect.stageRunId) await closeSoonWhenAllIn(tx, session, definition, effect.stageRunId, receivedAt);
           const revision = session.revision + 1;
           const result = CommandReceiptSchema.parse({ formatVersion: 1, commandId: command.commandId, sessionId: session.id, revision, type: command.type, stageRunId: effect.stageRunId, submissionId: effect.submissionId });
           const saved = await tx.gameCommand.create({ data: { sessionId: session.id, commandKey: command.commandId, actorKey: key, type, requestHash, result } });

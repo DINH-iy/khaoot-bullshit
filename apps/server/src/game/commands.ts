@@ -1,7 +1,8 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import type { PoolBallBehavior, PoolStart } from '@party/contracts';
-import { ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
+import { UNDERCOVER_ROLES, ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
+import { withRoomWords } from './room-settings.js';
 import { drawnStage, effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
 import { earned, revealAwards } from './scoring/place-awards.js';
 import { checkBet, decideDuel, duelists, duelPlay, endTimedPool, openDuel, openPoolTryout, openTeamPool, pickDuelists, pickTimedPoolWinner, readDuel } from './duel.js';
@@ -12,6 +13,7 @@ import { changeGraphPlayback } from '../minigames/draw-the-graph/playback.js';
 import { shiftDotWindow } from '../minigames/count-the-dots/dots.js';
 import { relayPlan, TURN_GRACE_MS } from '../minigames/relay-drawing/relay.js';
 import { stepDecide, stepMove } from '../minigames/shared/steps/engine.js';
+import { dealUndercover, readUndercover, undercoverMove, undercoverWinners } from '../minigames/undercover/rules.js';
 import type { LiveSignals } from '../minigames/tap-race/live.js';
 import { spinWheel } from './show/wheel.js';
 import { firstStage, locateStage, nextStage, type Located, locateRunStage } from './graph.js';
@@ -105,7 +107,7 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   // A scene that explains itself first waits, untimed (and a minigame unstarted), until the host starts it.
   if (explainsFirst(entry.stage)) { presentation = { ...presentation, explain: { readyIds: [] } }; timed = false; }
   // A minigame starts (after its countdown) as soon as players can play it.
-  if (timed) presentation = { ...presentation, ...countdownPresentation(entry.stage, now) };
+  if (timed) presentation = { ...presentation, ...countdownPresentation(entry.stage, now, eligible, (await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId }, select: { state: true } })).state) };
   const poolSeconds = duelStartsImmediately && !teamDuelUnavailable && entry.stage.kind === 'duel' ? poolTryout?.seconds ?? entry.stage.matchSeconds : undefined;
   const duration = poolSeconds !== undefined ? poolSeconds * 1000 : timed ? await startedDuration(tx, entry.stage, lineupId, presentation, now) : null;
   const stage = await tx.stageRun.create({ data: { sessionId, number, nodeKey: entry.nodeKey, stageKey: entry.stage.key, openedAt: now, presentation, lineupId,
@@ -115,12 +117,19 @@ async function openStage(tx: Transaction, sessionId: string, number: number, ent
   return stage;
 }
 
-const startOf = (stage: Extract<StageDefinition, { kind: 'minigame' }>, now: Date) => {
+// `roomState`: the room's own state, for the host's own words (Galgje, Undercover) at the start of a round.
+const startOf = (stage: Extract<StageDefinition, { kind: 'minigame' }>, now: Date, roomState?: unknown) => {
   const rules = minigameRules(stage);
-  return startMinigame(rules.game, rules.settings, now, undefined, stage.countdownSeconds === undefined ? MINIGAME_COUNTDOWN_MS : stage.countdownSeconds * 1000);
+  return startMinigame(rules.game, withRoomWords(rules.game, rules.settings, roomState), now, undefined, stage.countdownSeconds === undefined ? MINIGAME_COUNTDOWN_MS : stage.countdownSeconds * 1000);
 };
-function countdownPresentation(stage: StageDefinition, now: Date) {
-  if (stage.kind === 'minigame') return { minigame: startOf(stage, now) };
+/** A run started again (after a pause, or with a new timer) keeps what was drawn for it: Galgje's word. */
+const keepDrawn = (run: { hangmanWord?: string | undefined } | null | undefined) => run?.hangmanWord ? { hangmanWord: run.hangmanWord } : {};
+function countdownPresentation(stage: StageDefinition, now: Date, playerIds: string[] = [], roomState?: unknown) {
+  if (stage.kind === 'minigame') {
+    const minigame = startOf(stage, now, roomState); const rules = minigameRules(stage);
+    // Undercover: the words and roles are dealt now, kept next to the run (so a pause or a new timer keeps them).
+    return { minigame, ...(rules.game === 'undercover' ? { undercover: dealUndercover(withRoomWords(rules.game, rules.settings, roomState) as MinigameSettings<'undercover'>, playerIds, new Date(minigame.startsAt), randomInt) } : {}) };
+  }
   if (stage.kind === 'collect' && stage.input.kind === 'drawing' && stage.countdownSeconds)
     return { drawingStartsAt: new Date(now.getTime() + stage.countdownSeconds * 1000).toISOString() };
   return {};
@@ -305,7 +314,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
         const rules0 = minigameRules(entry.stage);
         const countdownMs = entry.stage.countdownSeconds === undefined ? MINIGAME_COUNTDOWN_MS : entry.stage.countdownSeconds * 1000;
         const steps = run.steps ? Object.fromEntries(Object.entries(run.steps).map(([key, side]) => [key, side.voteEndsAt ? { ...side, voteEndsAt: new Date(now.getTime() + countdownMs + rules0.voteSeconds * 1000).toISOString() } : side])) : null;
-        let started = { ...startOf(entry.stage, now), doorsMilli: run.doorsMilli, ...(run.coin ? { coin: run.coin } : {}), ...(run.roulette === undefined ? {} : { roulette: run.roulette }), ...(run.raceElapsedMs === undefined ? {} : { raceElapsedMs: run.raceElapsedMs }), ...(run.relayPrompts === undefined ? {} : { relayPrompts: run.relayPrompts }), ...(steps ? { steps } : {}) };
+        let started = { ...startOf(entry.stage, now), ...keepDrawn(run), doorsMilli: run.doorsMilli, ...(run.coin ? { coin: run.coin } : {}), ...(run.roulette === undefined ? {} : { roulette: run.roulette }), ...(run.raceElapsedMs === undefined ? {} : { raceElapsedMs: run.raceElapsedMs }), ...(run.relayPrompts === undefined ? {} : { relayPrompts: run.relayPrompts }), ...(steps ? { steps } : {}) };
         // Pass the pencil continues at the first turn some team has not drawn yet, with a fresh countdown.
         const rules = minigameRules(entry.stage); const context = rules.game === 'relay-drawing' ? await teamContext(tx, active) : null;
         if (run.relayPausedAt && run.relayPrompts) {
@@ -459,13 +468,13 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   const forming = readForming(stage.presentation);
   if (command.type.startsWith('teams.')) {
     requireGame(stage.status === 'ACTIVE' && forming, 'INVALID_STATE');
-    if (command.type === 'teams.choose') requireGame(actor.role === 'player', 'FORBIDDEN');
-    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
+    if (command.type === 'teams.choose' || command.type === 'teams.vote') requireGame(actor.role === 'player', 'FORBIDDEN');
+    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
     const { forming: _done, ...rest } = stage.presentation as Record<string, unknown>;
     if ('lineupId' in result) {
       // Confirmed: the round starts now, with its timer, for the players in a team (after its explanation, if it has one).
       const explaining = Boolean(readExplain(rest));
-      const started = explaining ? rest : { ...rest, ...countdownPresentation(entry.stage, now) };
+      const started = explaining ? rest : { ...rest, ...countdownPresentation(entry.stage, now, [], session.state) };
       await tx.stageRun.update({ where: { id: stage.id }, data: { lineupId: result.lineupId, presentation: started as object, eligibility: { formatVersion: 1, playerIds: result.playerIds }, ...(explaining ? {} : timerColumns(await startedDuration(tx, entry.stage, result.lineupId, started, now), false, now)) } });
     } else await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...rest, forming: result.forming } as object } });
     return { ...empty, stageRunId: stage.id };
@@ -481,7 +490,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     // The host starts the round: its timer runs from now and a minigame starts its countdown. Teams come first.
     requireGame(stage.status === 'ACTIVE' && explaining && !forming, 'INVALID_STATE');
     const rest = withoutExplain(stage.presentation);
-    const started = { ...rest, ...countdownPresentation(entry.stage, now) };
+    const started = { ...rest, ...countdownPresentation(entry.stage, now, EligibilitySchema.safeParse(stage.eligibility).data?.playerIds ?? [], session.state) };
     await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: started as object, ...timerColumns(await startedDuration(tx, entry.stage, stage.lineupId, started, now), false, now) } });
     return { ...empty, stageRunId: stage.id };
   }
@@ -555,7 +564,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
         ? { ...previousGame, ...shiftDotWindow(previousGame.startsAt, previousGame.dots, stage.closedAt.getTime(), now) }
         : previousGame && (previousGame.cutTarget !== undefined || previousGame.angleTarget !== undefined || previousGame.graph)
         ? { ...previousGame, startsAt: now.toISOString() }
-        : { ...startOf(entry.stage, now), ...raceTimer, ...(steps ? { steps } : {}) };
+        : { ...startOf(entry.stage, now), ...keepDrawn(previousGame), ...raceTimer, ...(steps ? { steps } : {}) };
       if (run.dots && duration !== null) duration += Math.max(0, Date.parse(run.dots.guessAt) - now.getTime());
       const relayContext = previousGame?.relayPrompts ? await teamContext(tx, stage) : null;
       if (previousGame?.relayPrompts && relayContext) {
@@ -627,6 +636,23 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(!stage.deadlineAt || now.getTime() <= acceptsUntil(stage.deadlineAt, graceFor(entry.stage)), 'TOO_LATE');
     const moved = await stepMove(play, actor.playerId, command.step, command.option, command.decide === true);
     return { ...empty, stageRunId: stage.id, awards: moved.awards, ...(moved.submissionId ? { submissionId: moved.submissionId } : {}) };
+  }
+  if (command.type === 'undercover.act') {
+    // Undercover / Mr. White: a clue given, a vote, Mr. White's guess, or moving on (see minigames/undercover/rules.ts).
+    requireGame(stage.status === 'ACTIVE' && entry.stage.kind === 'minigame' && !explaining, 'INVALID_STATE');
+    const rules = minigameRules(entry.stage); const table = readUndercover(stage.presentation); const run = readMinigameRun(stage.presentation);
+    requireGame(rules.game === 'undercover' && table && run && now.getTime() >= Date.parse(run.startsAt) - CLOCK_SLACK_MS, 'INVALID_STATE');
+    requireGame(actor.role === 'host' || (actor.role === 'player' && eligible.data.playerIds.includes(actor.playerId)), 'INELIGIBLE');
+    const next = undercoverMove(table!, rules.settings as MinigameSettings<'undercover'>, command, actor.role === 'player' ? actor.playerId : null, now);
+    await tx.stageRun.update({ where: { id: stage.id }, data: { presentation: { ...(stage.presentation as object), undercover: next } as object } });
+    if (next.phase !== 'done') return { ...empty, stageRunId: stage.id };
+    // Over: every player's role is their result, the winning side marked; the round then closes like any other.
+    const winners = undercoverWinners(next);
+    for (const [playerId, role] of Object.entries(next.roles)) {
+      await tx.submission.create({ data: { id: randomUUID(), sessionId: session.id, stageRunId: stage.id, actorKey: `player:${playerId}`, playerId,
+        value: { kind: 'minigame', value: UNDERCOVER_ROLES.indexOf(role), ...(winners.has(playerId) ? { won: true } : {}) } } });
+    }
+    return { ...empty, stageRunId: stage.id };
   }
   if (command.type === 'submission.submit') {
     requireGame(actor.role === 'player', 'FORBIDDEN');

@@ -210,6 +210,7 @@ function PickTeamsFields({ definition, node, stage, onChange }: { definition: De
     <FormFields form={form} onChange={next => set('form', withNames(next))} />
     <TeamNameFields form={form} onChange={next => set('form', next)} />
     <label className="choice"><input type="checkbox" checked={stage['captains'] === true} onChange={event => set('captains', event.target.checked ? true : undefined)} />{t('captains')}</label>
+    {stage['captains'] === true && <CaptainPickField form={form} onChange={next => set('form', next)} />}
     <Segmented label={t('colorsBy')} value={form.colors === 'teams' ? 'teams' : 'host'} choices={[{ value: 'host', label: t('colorsHost') }, { value: 'teams', label: t('colorsTeams') }]}
       onChange={value => { const next = { ...form }; if (value === 'teams') next.colors = 'teams'; else delete next.colors; set('form', next); }} />
     {form.colors === 'teams' && <p className="hint">{t('colorsHint')}</p>}
@@ -278,11 +279,18 @@ function PlayFields({ definition, node, index, onChange }: { definition: Definit
       {(play.lineup?.kind === 'round' || play.lineup?.kind === 'reform') && <FormFields form={play.lineup.form ?? defaultForm} onChange={form => set({ ...play, lineup: { ...play.lineup, form } })} />}
       {play.lineup?.kind === 'reform' && <Segmented label={t('teamScores')} stacked value={play.lineup.carryover ?? 'fresh'} choices={carryover()} onChange={carryover => set({ ...play, lineup: { ...play.lineup, carryover } })} />}
       <Segmented label={t('whoAnswers')} value={play.answers ?? 'everyone'} choices={[{ value: 'everyone', label: t('everyone') }, { value: 'captain', label: t('oneCaptain') }]} onChange={answers => set({ ...play, answers })} />
+      {play.answers === 'captain' && (play.lineup?.kind === 'round' || play.lineup?.kind === 'reform') && <CaptainPickField form={play.lineup.form ?? defaultForm} onChange={form => set({ ...play, lineup: { ...play.lineup, form } })} />}
       <Segmented label={t('pointsGo')} value={play.points ?? 'both'} choices={[{ value: 'both', label: t('teamAndMembers') }, { value: 'team', label: t('theTeam') }, { value: 'members', label: t('eachMember') }]} onChange={points => set({ ...play, points })} />
     </>}
   </fieldset>;
 }
-type Form = { split: { kind: 'count'; teams: number } | { kind: 'sizes'; sizes: (number | 'rest')[] }; formation: string; names?: string[]; colors?: 'host' | 'teams' };
+type Form = { split: { kind: 'count'; teams: number } | { kind: 'sizes'; sizes: (number | 'rest')[] }; formation: string; names?: string[]; colors?: 'host' | 'teams'; captainPick?: 'elected' };
+/** How captains are picked: assigned (the host, else at random; the default, left out) or elected by teammates. */
+function CaptainPickField({ form, onChange }: { form: Form; onChange: (form: Form) => void }) {
+  return <Segmented label={t('captainPick')} stacked value={form.captainPick === 'elected' ? 'elected' : 'assigned'}
+    choices={[{ value: 'assigned', label: t('captainAssigned'), hint: t('captainAssignedHint') }, { value: 'elected', label: t('captainElected'), hint: t('captainElectedHint') }]}
+    onChange={value => { const next = { ...form }; if (value === 'elected') next.captainPick = 'elected'; else delete next.captainPick; onChange(next); }} />;
+}
 /** How teams are made: a number of teams or exact sizes like "1, rest" or "2, 2"; random, by the host, or by the players. */
 export function FormFields({ form, onChange }: { form: Form; onChange: (form: Form) => void }) {
   const sizes = form.split.kind === 'sizes' ? form.split.sizes.join(', ') : '';

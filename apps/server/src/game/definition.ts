@@ -1,7 +1,7 @@
 import { AutoRevealSecondsSchema, ColorSchema, GameRoomSettingsSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, isSharedPrediction, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
+import { CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -30,6 +30,8 @@ export const FormationSchema = z.object({
   names: z.array(z.string().trim().min(1).max(30)).max(12).optional(),
   // Who picks the team colours while teams are made: the host (left out), or each team for itself (the host still can).
   colors: z.enum(['host', 'teams']).optional(),
+  // How captains are picked when the teams have captains: assigned (left out: the host picks, else one at random) or elected by their teammates.
+  captainPick: z.enum(CAPTAIN_PICKS).optional(),
 }).strict().superRefine((form, ctx) => {
   if (form.names && (form.names.length < teamCount(form) || new Set(form.names.map(name => name.toLowerCase())).size !== form.names.length)) ctx.addIssue({ code: 'custom', message: 'Give every team a unique name' });
 });
@@ -294,7 +296,8 @@ export function minigameRules(stage: MinigameStage): { game: MinigameKey; settin
 export { MINIGAMES };
 export function effectivePlay(definition: GameDefinition, stage: StageDefinition): Play {
   if (stage.kind === 'route' || stage.kind === 'info' || stage.kind === 'scoreboard' || stage.kind === 'duel' || stage.kind === 'teams') throw new GameError('INVALID_STATE');
-  if (stage.kind === 'minigame' && (isSharedPrediction(stage.game) || stage.game === 'draw-the-graph')) return { kind: 'solo' };
+  // Some minigames are always played alone (each player for themselves), also in a team game.
+  if (stage.kind === 'minigame' && (SOLO_MINIGAMES as readonly string[]).includes(stage.game)) return { kind: 'solo' };
   return stage.play ?? definition.play ?? { kind: 'solo' };
 }
 /** Points by place for a stage that has them (fastest correct, most votes, host places), or null. */

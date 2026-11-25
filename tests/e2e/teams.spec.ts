@@ -33,6 +33,18 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
       if (await put.count()) await put.click(); else await forming.getByRole('button', { name: new RegExp(`^${name}`) }).click();
       await expect(forming.locator('.team-column', { hasText: team })).toContainText(name);
     }
+    // Captains can be elected instead: the host switches, and teammates vote on their phones.
+    await forming.getByRole('button', { name: 'Elected', exact: true }).click();
+    await expect(ben.getByText('Vote for your captain: tap a teammate.')).toBeVisible();
+    await expect(ben.getByRole('button', { name: 'Vote for Ben as captain' })).toHaveCount(0);
+    await ben.getByRole('button', { name: 'Vote for Ada as captain' }).click();
+    await expect(ben.getByText('You vote for Ada.', { exact: false })).toBeVisible();
+    await expect(forming).toContainText('captain: Ada');
+    await expect(forming.getByLabel('1 votes')).toBeVisible();
+    if (process.env['TEAM_SHOTS']) { await ben.setViewportSize({ width: 390, height: 844 }); await ben.screenshot({ path: `${process.env['TEAM_SHOTS']}/phone-vote.png` }); await forming.screenshot({ path: `${process.env['TEAM_SHOTS']}/host-elected.png` }); }
+    // Back to assigned: the votes are gone and the host names the captain.
+    await forming.getByRole('button', { name: 'Assigned', exact: true }).click();
+    await expect(ben.getByText('Vote for your captain: tap a teammate.')).toHaveCount(0);
     await forming.getByRole('button', { name: /^Ada/ }).click();
     await forming.getByRole('button', { name: 'Make Ada captain' }).click();
     await expect(forming).toContainText('captain: Ada');

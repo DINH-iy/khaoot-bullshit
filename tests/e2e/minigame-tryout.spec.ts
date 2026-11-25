@@ -90,7 +90,9 @@ test('every hosted minigame opens and reveals a compact phone result in the benc
     'stop-clock': '.mg-pad.stop', 'lucky-doors': '.step-options', 'perfect-circle': '.drawing-pad', 'cut-the-line': '.mg-cut-line',
     'match-the-angle': '.mg-match-angle', 'count-the-dots': '.mg-dot-form', 'draw-the-graph': '.graph-phone',
     'heads-or-tails': '.coin-choices', 'red-or-black-roulette': '.roulette-table',
-    'relay-drawing': '.mg-relay', bus: '.step-options', majority: '.step-options',
+    'relay-drawing': '.mg-relay', bus: '.step-options', majority: '.step-options', hangman: '.step-options',
+    // Two bench phones are too few for Undercover: it says so (the three-phone game is tested below).
+    undercover: '.uc-few',
   };
   const overflow = (node: Element) => ({
     horizontal: node.scrollWidth - node.clientWidth,
@@ -221,4 +223,85 @@ test('8-ball free play lets one phone shoot for both sides in landscape', async 
   await panel.getByLabel('Starting side').selectOption('right');
   await panel.getByRole('button', { name: 'Replay' }).click();
   await expect(phone.getByRole('slider', { name: 'Aim' })).toHaveAttribute('aria-valuenow', '180');
+});
+
+test('Galgje: the phone guesses letters of a hidden word; the host screen sees only the gallows and how many letters were found', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'The bench is exercised on the desktop.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('button', { name: 'Minigame Tryout', exact: true }).click();
+  const panel = page.getByRole('region', { name: 'Minigame Tryout' });
+  await panel.getByRole('combobox', { name: 'Minigame' }).selectOption('hangman');
+  await panel.getByRole('button', { name: 'Play selected' }).click();
+  const phone = page.frameLocator('iframe[title="Phone of Player 1"]');
+  const host = page.frameLocator('iframe[title="Host screen"]');
+  await expect(phone.getByText('Pick a letter.')).toBeVisible({ timeout: 15_000 });
+  for (const letter of ['E', 'A', 'Q']) await phone.getByRole('button', { name: `Letter ${letter}`, exact: true }).click();
+  // A guessed letter is no longer offered; the phone shows its word tiles and the gallows.
+  await expect(phone.getByRole('button', { name: 'Letter E', exact: true })).toHaveCount(0);
+  await expect(phone.getByRole('img', { name: /^Gallows: \d of 7 wrong$/ })).toBeVisible();
+  await expect(phone.locator('.hangman-word')).toBeVisible();
+  await expect(host.getByText(/of \d+ letters found/).first()).toBeVisible();
+  await expect(host.locator('.hangman-word')).toHaveCount(0);
+  await expect(host.getByText(/^[1-9]\d* of \d+ letters found$/).or(host.getByText(/^0 of \d+ letters found$/)).first()).toBeVisible();
+  if (process.env['TEAM_SHOTS']) { await page.waitForTimeout(800); await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/hangman-bench.png` }); }
+});
+
+test('Undercover: three phones each see their own word, give clues in turn and vote; the host can always move on', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'The bench is exercised on the desktop.');
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('button', { name: 'Minigame Tryout', exact: true }).click();
+  await page.getByRole('button', { name: 'One phone more' }).click();
+  await expect(page.locator('iframe[title="Phone of Player 3"]')).toBeVisible();
+  // The third phone joins by itself before the game is dealt.
+  await expect(page.frameLocator('iframe[title="Host screen"]').getByText('3 players', { exact: false }).first()).toBeVisible({ timeout: 15_000 }).catch(() => page.waitForTimeout(3000));
+  const panel = page.getByRole('region', { name: 'Minigame Tryout' });
+  await panel.getByRole('combobox', { name: 'Minigame' }).selectOption('undercover');
+  await panel.getByRole('button', { name: 'Play selected' }).click();
+  const phones = [1, 2, 3].map(number => page.frameLocator(`iframe[title="Phone of Player ${number}"]`));
+  const host = page.frameLocator('iframe[title="Host screen"]');
+  // Each phone hides its word until tapped; the host screen never has one.
+  for (const phone of phones) {
+    await phone.getByRole('button', { name: 'Show my word' }).click({ timeout: 15_000 });
+    await expect(phone.locator('.uc-word-text strong')).toHaveText(/\S/);
+  }
+  await expect(host.locator('.uc-word')).toHaveCount(0);
+  await expect(host.getByRole('button', { name: 'Skip' })).toBeVisible();
+  // Clues in turn: whoever's turn it is taps that they gave theirs.
+  for (let tries = 0; tries < 40 && !await phones[0]!.getByText(/Vote someone out/).count(); tries++) {
+    for (const phone of phones) {
+      const button = phone.getByRole('button', { name: 'I gave my clue' });
+      if (await button.count()) { await button.click(); await expect(button).toHaveCount(0); break; }
+    }
+    await page.waitForTimeout(250);
+  }
+  await expect(phones[0]!.getByText(/Vote someone out/)).toBeVisible();
+  await phones[0]!.getByRole('button', { name: /^Player 2/ }).click();
+  await expect(phones[0]!.getByText('You voted for Player 2.', { exact: false })).toBeVisible();
+  await expect(host.getByText('1 of 3 voted', { exact: false })).toBeVisible();
+  if (process.env['TEAM_SHOTS']) { await page.waitForTimeout(500); await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/undercover-bench.png` }); }
+  // The host counts the votes now: Player 2 is out and their role shows to everyone. With three players that decides the game.
+  await host.getByRole('button', { name: 'Skip' }).click();
+  await expect(phones[2]!.getByText(/Player 2 is out: (Civilian|Undercover)/)).toBeVisible();
+  await expect(phones[2]!.getByText(/The (civilians|impostors) win!/)).toBeVisible();
+});
+
+test('the host types their own Galgje words and Undercover pairs in Room settings; lines that cannot be played are left out and said so', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'The bench is exercised on the desktop.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await page.getByRole('radio', { name: /Timed quiz/ }).check();
+  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await openHostFold(page, 'Room settings');
+  await page.getByText('Your words (Galgje, Undercover)').click();
+  await page.getByLabel('Galgje: one word or short phrase per line').fill('q\nquiz');
+  await page.getByLabel(/^Undercover: one pair per line/).fill('zon, maan\nonly one');
+  await page.getByRole('button', { name: 'Save my words' }).click();
+  // "q" is too short to play and "only one" has no second word: both are left out, and said so.
+  await expect(page.getByText('Saved. The next round uses your words. Left out: 2', { exact: false })).toBeVisible();
+  await expect(page.getByText('Galgje 1 · Undercover 1', { exact: false })).toBeVisible();
+  if (process.env['TEAM_SHOTS']) await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/room-words.png` });
+  await expect(page.getByRole('button', { name: 'Use the game’s words again' })).toBeVisible();
 });

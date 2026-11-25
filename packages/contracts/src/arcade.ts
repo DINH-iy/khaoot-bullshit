@@ -43,7 +43,8 @@ export const ArcadeGameSettingsSchema = z.object({
 }).strict();
 export type ArcadeGameSettings = z.infer<typeof ArcadeGameSettingsSchema>;
 // Picked in the game's own way, never from the settings sheet: the graph library's chart, a drawn speed-run course.
-const NOT_IN_ARCADE = ['graph', 'course'];
+// Galgje's own words and Undercover's word pairs stay out: the lobby shows the leader's choices to everyone, and one of them would be the answer.
+const NOT_IN_ARCADE = ['graph', 'course', 'words', 'pairs'];
 /** What a round of this game plays with (the standard settings filled in), or null when the chosen ones do not fit the game. */
 export function arcadeSettings(game: ArcadeGame, chosen?: ArcadeGameSettings): { seconds: number | null; values: Record<string, unknown> } | null {
   const values = Object.fromEntries(Object.entries(chosen?.values ?? {}).filter(([key]) => !NOT_IN_ARCADE.includes(key)));

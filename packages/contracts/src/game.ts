@@ -10,6 +10,9 @@ import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
 
+/** How team captains are picked: assigned (by the host, else at random) or elected by their teammates. */
+export const CAPTAIN_PICKS = ['assigned', 'elected'] as const;
+export type CaptainPick = typeof CAPTAIN_PICKS[number];
 export const GameKeySchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/);
 export const GameIdSchema = z.string().uuid().transform(value => value.toLowerCase());
 export const RevisionSchema = z.number().int().min(0).max(2_147_483_646);
@@ -130,6 +133,10 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('teams.shuffle'), stageRunId: GameIdSchema, method: z.literal('skill').optional() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.assign'), stageRunId: GameIdSchema, playerId: GameIdSchema, teamIndex: z.number().int().min(0).max(11).nullable() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.captain'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
+  // Captains assigned (the host picks; otherwise one at random) or elected (each player votes for a teammate). The host can switch while teams are made.
+  z.object({ ...hostEnvelope, type: z.literal('teams.captainPick'), stageRunId: GameIdSchema, pick: z.enum(CAPTAIN_PICKS) }).strict(),
+  // An elected captain: a player's vote for a teammate (changeable until the teams are confirmed).
+  z.object({ ...envelope, type: z.literal('teams.vote'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.confirm'), stageRunId: GameIdSchema }).strict(),
   // A scene that explains itself first: the host starts it once everyone has read it (players tap “Got it”).
   z.object({ ...hostEnvelope, type: z.literal('stage.explained'), stageRunId: GameIdSchema }).strict(),
@@ -172,13 +179,17 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   // `decide`: count the votes cast so far now (only someone who voted).
   z.object({ ...envelope, type: z.literal('minigame.move'), stageRunId: GameIdSchema, step: z.number().int().min(0).max(63), option: z.string().min(1).max(40), decide: z.literal(true).optional() }).strict(),
   // A team vote's time ran out (sent by the server's timer), or the host decides it now: the votes cast decide.
+  // Undercover: `clued` (the speaker gave their clue), `vote` for `playerId`, `guess` (a voted-out Mr. White guesses the word), or `next`
+  // (move on: the host any time, a player once the clue, vote or guess time is up).
+  z.object({ ...envelope, type: z.literal('undercover.act'), stageRunId: GameIdSchema, action: z.enum(['clued', 'vote', 'guess', 'next']), round: z.number().int().min(1).max(64),
+    playerId: GameIdSchema.optional(), guess: z.string().trim().min(1).max(60).optional() }).strict(),
   z.object({ ...envelope, type: z.literal('minigame.decide'), stageRunId: GameIdSchema, side: z.string().min(1).max(80), step: z.number().int().min(0).max(63), now: z.literal(true).optional() }).strict(),
 ]);
 export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Round commands available to the phone holding delegated host controls. */
 export const HOST_PHONE_COMMANDS = ['session.start', 'session.pause', 'session.resume', 'stage.close', 'stage.advance', 'stage.explained', 'stage.reveal', 'stage.nextResult'] as const;
 /** Commands available to an ordinary player. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'teams.color', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'duel.move', 'duel.resign'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'teams.color', 'teams.vote', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'undercover.act', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),
@@ -225,8 +236,11 @@ export const StageTeamsSchema = z.object({
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
   // `color`: the team's colour (picked by the host, or by the team when the scene allows it). `colorsBy`: who may pick it now.
   colorsBy: z.enum(['host', 'teams']).optional(),
+  // While forming with captains: how they are picked. Elected: each team's votes per teammate, and whom this viewer voted for.
+  captainPick: z.enum(CAPTAIN_PICKS).optional(), ownCaptainVote: GameIdSchema.nullable().optional(),
   teams: z.array(z.object({ index: z.number().int().min(0), name: z.string().min(1).max(30), color: TeamColorSchema, teamId: GameIdSchema.nullable(), targetSize: z.number().int().min(1).nullable(),
-    memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable() }).strict()),
+    memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable(),
+    captainVotes: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(1) }).strict()).optional() }).strict()),
   unassignedIds: z.array(GameIdSchema), ownTeamIndex: z.number().int().min(0).nullable(),
 }).strict();
 // A route choice as a screen sees it. Never contains where routes lead, later

@@ -9,6 +9,7 @@ import { duelView } from './duel.js';
 import { readMinigameRun } from '../minigames/shared/rules.js';
 import { readGraphPlayback } from '../minigames/draw-the-graph/playback.js';
 import { graphHue } from '../minigames/draw-the-graph/graph.js';
+import { readUndercover, undercoverOwn, undercoverView } from '../minigames/undercover/rules.js';
 import { relayPlan } from '../minigames/relay-drawing/relay.js';
 import { wheelView } from './show/wheel.js';
 import { finaleSlides } from './show/finale.js';
@@ -123,10 +124,15 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
       // A step game: every side's progress (secrets never; a team's vote counts only for its own members and the host).
       const steps = rules && isStepMinigame(rules.game) && current ? await stepView(tx, current, rules, context, eligible?.success ? eligible.data.playerIds : [], { playerId: viewer, host: actor.data.role === 'host' }) : null;
       const relay = rules?.game === 'relay-drawing' && run && context && current ? await relayView(tx, current.id, relayPlan(context, rules.settings as MinigameSettings<'relay-drawing'>, run), context.teamOf, viewer, revealed) : null;
+      // Undercover: the table everyone sees, and only this viewer's own word.
+      const undercoverTable = rules?.game === 'undercover' && current ? readUndercover(current.presentation) : null;
       const revealSettings = revealEasing === undefined ? {} : { revealEasing };
       const minigame = rules ? { game: rules.game, settings: rules.game === 'draw-the-graph' ? revealSettings
         : rules.game === 'count-the-dots' ? { viewSeconds: (rules.settings as MinigameSettings<'count-the-dots'>).viewSeconds, ...revealSettings }
-        : rules.settings, relay, steps, startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
+        // Galgje: never the author's word list (one of them is the answer).
+        : rules.game === 'hangman' ? { lives: (rules.settings as MinigameSettings<'hangman'>).lives }
+        : rules.game === 'undercover' ? (({ pairs: _pairs, ...shown }) => shown)(rules.settings as MinigameSettings<'undercover'>)
+        : rules.settings, relay, steps, ...(undercoverTable ? { undercover: { view: undercoverView(undercoverTable), ...(viewer && undercoverOwn(undercoverTable, viewer) ? { own: undercoverOwn(undercoverTable, viewer)! } : {}) } } : {}), startsAt: current?.status === 'ACTIVE' ? run?.startsAt ?? null : null, // GO is never sent ahead of time, so a phone cannot tap at a known moment.
         ...(run?.cutTarget === undefined ? {} : { cutTarget: run.cutTarget }),
         ...(rules.tiebreak === 'faster' ? { tiebreak: 'faster' as const } : {}),
         ...(rules.scoring ? { scoring: rules.scoring } : {}),
@@ -143,6 +149,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         } } : {}),
         ...(run?.coin ? { coin: run.coin } : {}),
         ...(run?.roulette === undefined ? {} : { roulette: run.roulette }),
+        ...(run?.hangmanWord ? { word: run.hangmanWord } : {}),
+        ...(undercoverTable ? { undercover: { words: undercoverTable.words, roles: Object.entries(undercoverTable.roles).map(([playerId, role]) => ({ playerId, role })), winner: undercoverTable.winner, ...(undercoverTable.guess ? { guess: undercoverTable.guess } : {}) } } : {}),
         entries: minigameOutcome(rules, await tx.submission.findMany({ where: { stageRunId: current!.id, slotKey: 'answer' }, select: { playerId: true, teamId: true, value: true, receivedAt: true }, orderBy: { receivedAt: 'asc' } }), context, current!.id, run).entries.map(result => {
           const hue = result.playerId ? graphColors?.get(result.playerId) : undefined;
           return hue === undefined ? result : { ...result, graphHue: hue };

@@ -1,7 +1,7 @@
 import { defaultTeamColor } from '@party/contracts';
 import type { StageRun } from '../../generated/prisma/client.js';
 import type { Transaction } from '../model.js';
-import { LineupInfoSchema, readForming, readStagePlay, teamContext, type TeamContext } from './teams.js';
+import { captainTally, electionLeader, LineupInfoSchema, readForming, readStagePlay, teamContext, type TeamContext } from './teams.js';
 
 const revealedOnly = { OR: [{ stageRunId: null }, { stage: { revealedAt: { not: null } } }] };
 
@@ -10,10 +10,16 @@ export async function stageTeams(tx: Transaction, stage: StageRun, viewerPlayerI
   const forming = readForming(stage.presentation);
   if (forming) {
     const present = (await tx.sessionPlayer.findMany({ where: { sessionId: stage.sessionId, leftAt: null }, select: { id: true }, orderBy: { joinedAt: 'asc' } })).map(player => player.id);
+    // Elected captains: the votes per teammate, and the captain so far (the host's pick, else the one leader).
+    const elected = forming.answers === 'captain' && forming.captainPick === 'elected';
     const teams = forming.teams.map((team, index) => ({ index, name: team.name, color: team.color ?? defaultTeamColor(team.name, index), teamId: null, targetSize: team.targetSize,
-      memberIds: present.filter(id => forming.assignment[id] === index), captainId: forming.captains[String(index)] ?? null }));
+      memberIds: present.filter(id => forming.assignment[id] === index), captainId: forming.captains[String(index)] ?? (elected ? electionLeader(forming, index, present) : null),
+      ...(elected ? { captainVotes: captainTally(forming, index, present) } : {}) }));
     const own = viewerPlayerId ? forming.assignment[viewerPlayerId] : undefined;
+    const ownVote = viewerPlayerId ? forming.captainVotes?.[viewerPlayerId] : undefined;
     return { forming: true, formation: forming.formation, colorsBy: forming.colorsBy ?? 'host', scope: forming.scope, answers: forming.answers, points: forming.points, teams,
+      ...(forming.answers === 'captain' ? { captainPick: elected ? 'elected' as const : 'assigned' as const } : {}),
+      ...(elected && viewerPlayerId ? { ownCaptainVote: ownVote && own !== undefined && own !== null && forming.assignment[ownVote] === own ? ownVote : null } : {}),
       unassignedIds: present.filter(id => forming.assignment[id] === undefined || forming.assignment[id] === null), ownTeamIndex: own ?? null };
   }
   const play = readStagePlay(stage.presentation);

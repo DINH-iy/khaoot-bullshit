@@ -146,6 +146,46 @@ describe('team rounds', () => {
     await expect(hostCommand(again, 'teams.add', { stageRunId: run })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
   });
 
+  it('elects captains: teammates vote (never for themselves), a moved player’s votes drop, a tie stays open, and the host can overrule or switch', async () => {
+    const pick = { key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players', captainPick: 'elected' }, captains: true }] };
+    const f = await fixture(5, game([pick, quiz('a', teams('captain', 'team'))]));
+    const id = (index: number) => f.players[index]!.id;
+    const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
+    expect((await hostView(f)).stage!.teams).toMatchObject({ forming: true, captainPick: 'elected' });
+    for (const [index, team] of [[0, 0], [1, 0], [2, 0], [3, 1], [4, 1]] as const) await act(f, index, 'teams.choose', { stageRunId, teamIndex: team });
+    // Only the host switches; assigned captains take no votes, and switching back starts the votes again.
+    await expect(act(f, 0, 'teams.captainPick', { stageRunId, pick: 'assigned' })).rejects.toThrow();
+    await act(f, 0, 'teams.vote', { stageRunId, playerId: id(1) });
+    await hostCommand(f, 'teams.captainPick', { stageRunId, pick: 'assigned' });
+    expect((await hostView(f)).stage!.teams!.captainPick).toBe('assigned');
+    await expect(act(f, 0, 'teams.vote', { stageRunId, playerId: id(1) })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await hostCommand(f, 'teams.captainPick', { stageRunId, pick: 'elected' });
+    expect((await hostView(f)).stage!.teams!.teams[0]!.captainVotes).toEqual([]);
+    // Not for yourself, not for another team's player.
+    await expect(act(f, 0, 'teams.vote', { stageRunId, playerId: id(0) })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await expect(act(f, 0, 'teams.vote', { stageRunId, playerId: id(3) })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await act(f, 0, 'teams.vote', { stageRunId, playerId: id(2) });
+    await act(f, 0, 'teams.vote', { stageRunId, playerId: id(1) }); // a changed vote replaces the first
+    await act(f, 2, 'teams.vote', { stageRunId, playerId: id(1) });
+    await act(f, 3, 'teams.vote', { stageRunId, playerId: id(4) });
+    await act(f, 4, 'teams.vote', { stageRunId, playerId: id(3) });
+    const voting = (await view(f, 0)).stage!.teams!;
+    expect(voting.ownCaptainVote).toBe(id(1));
+    expect(voting.teams[0]).toMatchObject({ captainId: id(1), captainVotes: [{ playerId: id(1), count: 2 }] });
+    expect(voting.teams[1]!.captainId).toBeNull();
+    expect(voting.teams[1]!.captainVotes).toHaveLength(2);
+    expect(voting.teams[1]!.captainVotes).toEqual(expect.arrayContaining([{ playerId: id(3), count: 1 }, { playerId: id(4), count: 1 }]));
+    // Moving to another team drops that player's vote; the votes cast for them drop too.
+    await act(f, 2, 'teams.choose', { stageRunId, teamIndex: 1 });
+    expect((await hostView(f)).stage!.teams!.teams[0]!.captainVotes).toEqual([{ playerId: id(1), count: 1 }]);
+    // The host settles Blue's tie; Red keeps its elected captain.
+    await hostCommand(f, 'teams.captain', { stageRunId, playerId: id(3) });
+    await hostCommand(f, 'teams.confirm', { stageRunId });
+    expect((await hostView(f)).stage!.teams!.teams.map(team => [team.name, team.captainId])).toEqual([['Red', id(1)], ['Blue', id(3)]]);
+    // Votes close with the teams.
+    await expect(act(f, 0, 'teams.vote', { stageRunId, playerId: id(1) })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+  });
+
   it('gives teams colours: the host picks any colour, a team picks a swatch for itself when allowed; two teams never share one, and the colour stays', async () => {
     const pickScene = (colors?: 'teams') => ({ key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players', ...(colors ? { colors } : {}) } }] });
     const f = await fixture(3, game([pickScene('teams'), quiz('a', teams('everyone', 'team'))]));

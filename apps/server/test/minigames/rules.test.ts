@@ -194,6 +194,18 @@ describe('minigame rules', () => {
     expect(teamValue('reaction', 'total', [200, 300])).toBe(250); // a total of reaction times would punish bigger teams
   });
 
+  it('lists a captain\u2019s answer once, as the team\u2019s row, with what the captain drew or aimed', () => {
+    const context: TeamContext = { lineupId: 'lineup', answers: 'captain', points: 'team',
+      teamOf: new Map([[ids[0], 'left'], [ids[1], 'left'], [ids[2], 'right'], [ids[3], 'right']]),
+      members: new Map([['left', [ids[0], ids[1]]], ['right', [ids[2], ids[3]]]]), captainOf: new Map([['left', ids[0]], ['right', ids[2]]]) };
+    const team = (teamId: string, value: number, angle: number) => ({ playerId: null, teamId, value: { kind: 'minigame', value, angle } });
+    const result = minigameOutcome(rules('match-the-angle'), [team('left', 30, 480), team('right', 80, 530)], context, 'stage');
+    expect(result.entries).toEqual([
+      { playerId: null, teamId: 'left', value: 30, place: 1, angle: 480 },
+      { playerId: null, teamId: 'right', value: 80, place: 2, angle: 530 },
+    ]);
+  });
+
   it('uses the first matching best guess or the last included average guess for team angle ties', () => {
     const left = 'left';
     const right = 'right';

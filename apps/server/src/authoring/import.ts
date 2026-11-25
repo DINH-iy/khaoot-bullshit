@@ -123,9 +123,11 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const how = ['random', 'skill', 'host', 'players'].includes(text(raw['how'] ?? raw['formation'])) ? text(raw['how'] ?? raw['formation']) : 'players';
       const count = Math.max(2, Math.min(12, Math.round(Number(raw['teams']) || 2)));
       return { key, kind: 'teams', prompt: text(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how, ...(text(raw['colors']) === 'teams' ? { colors: 'teams' } : {}),
+          // `"captains": "elected"`: each team votes for its captain (`true`: the host assigns them, or at random).
+          ...(raw['captains'] === 'elected' ? { captainPick: 'elected' } : {}),
           // `names`: the teams' own names, one per team (the standard colour names fill any missing ones).
           ...(Array.isArray(raw['names']) && raw['names'].length ? { names: Array.from({ length: count }, (_, index) => text((raw['names'] as unknown[])[index]).slice(0, 30) || DEFAULT_TEAM_NAMES[index]!) } : {}) },
-        ...(raw['captains'] === true ? { captains: true } : {}) };
+        ...(raw['captains'] === true || raw['captains'] === 'elected' ? { captains: true } : {}) };
     }
     case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
     case 'minigame': {
@@ -155,8 +157,20 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const sips = game === 'bus' && (busSips || raw['rainbow'] === false) ? { settings: { sips: busSips ?? [1, 2, 3, 4], ...(raw['rainbow'] === false ? { rainbow: false } : {}) } } : {};
       // Heads or Tails: `"flip": "host"` waits for the host to flip the coin once the guesses are in.
       const coinFlip = game === 'heads-or-tails' && text(raw['flip']) === 'host' ? { settings: { ...(isObject(raw['settings']) ? raw['settings'] : {}), flip: 'host' } } : {};
+      // Galgje: `"words": ["fiets", "molen"]` (one drawn per round), `"lives": 7`, `"wordLanguage": "nl"` for the built-in list.
+      const own = isObject(raw['settings']) ? raw['settings'] : {};
+      const hangman = game === 'hangman' ? { settings: { ...own, lives: Math.round(Math.min(12, Math.max(3, Number(raw['lives'] ?? own['lives']) || 7))),
+        ...(Array.isArray(raw['words']) ? { words: raw['words'].map(entry => text(entry)).filter(Boolean).slice(0, 200) } : {}),
+        ...(['en', 'nl', 'de', 'ro'].includes(text(raw['wordLanguage'])) ? { wordLanguage: text(raw['wordLanguage']) } : {}) } } : {};
+      // Undercover: `"pairs": [["coffee", "tea"]]`, `"undercovers"`, `"mrWhite"`, `"turnSeconds"`, `"voteSeconds"`, `"wordLanguage"`; the rest from the standard settings.
+      const count = (value: unknown, min: number, max: number) => value === undefined ? undefined : Math.round(Math.min(max, Math.max(min, Number(value) || min)));
+      const undercover = game === 'undercover' ? { settings: { ...MINIGAMES.undercover.defaults, ...own,
+        ...(count(raw['undercovers'], 1, 3) === undefined ? {} : { undercovers: count(raw['undercovers'], 1, 3) }), ...(typeof raw['mrWhite'] === 'boolean' ? { mrWhite: raw['mrWhite'] } : {}),
+        ...(count(raw['turnSeconds'], 10, 120) === undefined ? {} : { turnSeconds: count(raw['turnSeconds'], 10, 120) }), ...(count(raw['voteSeconds'], 15, 180) === undefined ? {} : { voteSeconds: count(raw['voteSeconds'], 15, 180) }),
+        ...(Array.isArray(raw['pairs']) ? { pairs: raw['pairs'].filter(Array.isArray).map(pair => (pair as unknown[]).slice(0, 2).map(entry => text(entry).slice(0, 30))).slice(0, 100) } : {}),
+        ...(['en', 'nl', 'de', 'ro'].includes(text(raw['wordLanguage'])) ? { wordLanguage: text(raw['wordLanguage']) } : {}) } } : {};
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...coinFlip, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...coinFlip, ...hangman, ...undercover, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
     }
     case 'duel': {
       // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.

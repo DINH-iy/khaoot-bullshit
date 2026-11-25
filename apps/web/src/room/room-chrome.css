@@ -31,6 +31,7 @@
 /* A tools menu after the ⓘ: also at the right end, its panel opening under the bar. */
 .room .round-tools { position: static; margin-left: auto; }
 .room .round-about + .round-tools { margin-left: 0; }
+.room .round-screen + .round-tools { margin-left: 0; }
 .round-tools .popover-panel { right: 16px; left: auto; top: calc(100% + 4px); }
 .round-tools .popover-panel button { display: inline-flex; gap: 10px; align-items: center; justify-content: flex-start; width: 100%; }
 .round-details { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }

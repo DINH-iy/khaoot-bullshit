@@ -57,11 +57,9 @@ export function ArcadeLeaderNext({ state, disabled }: { state: RoomSnapshot; dis
   if (state.view.status === 'FINISHED') return <p role="status" className="arcade-round">Back to the lobby…</p>;
   if (!arcade.leader) return stage?.revealed ? <p className="arcade-round wait-note">Waiting for the leader to go back to the lobby… <button type="button" className="ghost" onClick={() => navigate(`/?arcade=${arcade.lobbyId}`, { replace: true })}>Go now</button></p> : null;
   const next = waitingStep(state);
-  const needsDisplay = stage?.minigame && SHARED_SCREEN_MINIGAMES.includes(stage.minigame.game);
-  if (!next && !error && !needsDisplay) return null;
+  if (!next && !error) return null;
   return <div className="arcade-round" role="group" aria-label="Leader">
     {error && <p role="alert" className="error">{error}</p>}
-    {needsDisplay && <ArcadeDisplayLink sessionId={state.view.sessionId} />}
     {next && <button type="button" className="primary arcade-next" disabled={disabled || busy || next.blocked} onClick={() => act(next.action)}>
       {NEXT_ICON[next.action] && <FaIcon name={NEXT_ICON[next.action]!} />}{next.label}</button>}
     {/* After the results: the same game once more, with new values (another graph, new dots, a new target…). */}
@@ -102,15 +100,20 @@ export function ArcadeLeaderMenu({ state, disabled }: { state: RoomSnapshot; dis
   const { act, busy, error } = useLeaderStep(state); const [stopping, setStopping] = useState(false);
   const stage = state.view.stage; const off = disabled || busy;
   const playing = state.view.status === 'RUNNING' && stage?.status === 'ACTIVE' && !stage.teams?.forming && !stage.explain;
-  return <Popover label="Leader tools" icon="bars" className="round-tools" closeOnAction>
+  // A shared screen: a TV button in the round bar, for minigames drawn on a screen and for duels.
+  const screen = Boolean(stage?.duel || (stage?.minigame && SHARED_SCREEN_MINIGAMES.includes(stage.minigame.game)));
+  return <>{screen && <Popover label="Shared screen" icon="tv" className="round-tools round-screen">
+    <p className="arcade-round-label"><FaIcon name="tv" /> Show this round on a TV or laptop</p>
+    <ArcadeDisplayLink sessionId={state.view.sessionId} />
+  </Popover>}
+  <Popover label="Leader tools" icon="bars" className="round-tools" closeOnAction>
     <p className="arcade-round-label"><FaIcon name="star" /> You lead this round</p>
     {error && <p role="alert" className="error">{error}</p>}
     {stage?.teams?.forming && stage.teams.formation === 'random' && <button type="button" disabled={off} onClick={() => act('shuffle-teams')}><FaIcon name="rotate" /> Shuffle the teams</button>}
-    {stage?.duel && <ArcadeDisplayLink sessionId={state.view.sessionId} />}
     {playing && !stage?.duel && <button type="button" disabled={off} onClick={() => act('close')}><FaIcon name="stopwatch" /> End now and count the results</button>}
     {!stopping ? <button type="button" className="ghost" data-keep-open disabled={off} onClick={() => setStopping(true)}><FaIcon name="xmark" /> Stop the round</button>
       // Stopping asks first: one tap too many must not end everyone's round.
       : <div className="arcade-round-confirm" role="group" aria-label="Stop the round"><p>Stop this round for everyone and go back to the lobby?</p>
         <div className="actions"><button type="button" className="danger" disabled={off} onClick={() => { setStopping(false); act('end'); }}>Yes, stop</button><button type="button" className="ghost" data-keep-open onClick={() => setStopping(false)}>Keep playing</button></div></div>}
-  </Popover>;
+  </Popover></>;
 }

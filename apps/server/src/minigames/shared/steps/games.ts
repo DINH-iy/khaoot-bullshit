@@ -4,6 +4,7 @@ import { bus } from '../../bus/rules.js';
 import { doors } from '../../lucky-doors/rules.js';
 import { majority } from '../../majority/rules.js';
 import { speedRun } from '../../speed-run/rules.js';
+import { hangman } from '../../hangman/rules.js';
 
 /**
  * A step game's rules, as pure functions over its own JSON state per side (a team, or a
@@ -21,6 +22,8 @@ export interface StepGame<State> {
   result(state: State, settings: MinigameSettings, run: MinigameRun, now: Date): number | null;
   /** What screens may see of the side while the game runs: never the secrets. `extra`: added to its result by other sides (see `extras`). */
   view(state: State, settings: MinigameSettings, run: MinigameRun, extra: number): unknown;
+  /** What only the side's own members see besides `view` (Galgje: its letters), never the host or the shared screen. With it, others do not see the side's options either. */
+  ownView?(state: State, settings: MinigameSettings, run: MinigameRun): unknown;
   /** Points paid at once when the side is done (instead of by place), if any. */
   payoutMilli?(state: State, settings: MinigameSettings, run: MinigameRun): bigint;
   /** The result stays secret until the reveal (a choice others must not see). */
@@ -33,4 +36,5 @@ export interface StepGame<State> {
 
 export const STEP_GAMES: Record<string, StepGame<unknown>> = {
   bus: bus as StepGame<unknown>, 'lucky-doors': doors as StepGame<unknown>, majority: majority as StepGame<unknown>, 'speed-run': speedRun as StepGame<unknown>,
+  hangman: hangman as StepGame<unknown>,
 };

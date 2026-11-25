@@ -14,6 +14,7 @@ import { clapBeat } from '../clap-beat/judge.js';
 import { tapRace } from '../tap-race/judge.js';
 import { stopClock } from '../stop-clock/judge.js';
 import { perfectCircle } from '../perfect-circle/judge.js';
+import { drawHangmanWord } from '../hangman/rules.js';
 import { CLOCK_SLACK_MS, NO_FAIRNESS, type Fairness } from './fairness.js';
 import type { ClaimedResult, JudgedResult, ResultJudge } from './judging.js';
 
@@ -31,6 +32,8 @@ export const MinigameRunSchema = z.object({ startsAt: z.string().datetime(), goA
   graph: GraphRunSchema.optional(),
   coin: CoinSideSchema.optional(),
   roulette: RoulettePocketSchema.optional(),
+  // Galgje: the round's secret word (only in the reveal's view once revealed).
+  hangmanWord: z.string().max(30).optional(),
   steps: z.record(z.string(), StepSideSchema).optional(), raceElapsedMs: z.number().int().min(0).optional(), relayPausedAt: z.string().datetime().optional(), relayPrompts: z.array(z.number().int().min(0).max(ANIMATION_WORDS.length - 1)).length(ANIMATION_WORDS.length).optional() }).strict();
 export type MinigameRun = z.infer<typeof MinigameRunSchema>;
 export const readMinigameRun = (presentation: unknown): MinigameRun | null => {
@@ -57,6 +60,7 @@ export function startMinigame(game: MinigameKey, settings: MinigameSettings, now
   if (game === 'draw-the-graph') run.graph = startGraph(settings as MinigameSettings<'draw-the-graph'>, random);
   if (game === 'heads-or-tails') run.coin = flipCoin(random);
   if (game === 'red-or-black-roulette') run.roulette = random(ROULETTE_POCKETS);
+  if (game === 'hangman') run.hangmanWord = drawHangmanWord(settings as MinigameSettings<'hangman'>, random);
   if (game === 'count-the-dots') {
     const dots = settings as MinigameSettings<'count-the-dots'>;
     run.dots = { pattern: createDotPattern(random, dots), guessAt: new Date(startsAt + dots.viewSeconds * 1000).toISOString() };

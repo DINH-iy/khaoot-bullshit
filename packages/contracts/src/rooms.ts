@@ -1,3 +1,5 @@
+import { HangmanWordSchema } from './minigames/hangman/hangman.js';
+import { UndercoverPairSchema } from './minigames/undercover/undercover.js';
 import { z } from 'zod';
 import { GameIdSchema, GameErrorCodeSchema, SessionViewSchema } from './game.js';
 import { PlayerLookSchema } from './players.js';
@@ -65,6 +67,8 @@ export const RoomSnapshotSchema = z.object({
   // Host only (empty for others): people the host added to this room, whether they have a seat yet, and phones asking to sign in as one of them.
   expected: z.array(z.object({ personId: GameIdSchema, name: z.string(), joined: z.boolean() }).strict()).optional(),
   nameRequests: z.array(z.object({ requestId: GameIdSchema, personId: GameIdSchema, requestedAt: z.string().datetime() }).strict()).optional(),
+  // Host only: the host's own words for Galgje and Undercover in this room (absent for everyone else).
+  ownWords: z.object({ words: z.array(z.string()), pairs: z.array(z.tuple([z.string(), z.string()])) }).strict().optional(),
   // The host went back to the lobby: this room has ended and everyone moves into this one (phones and the shared screen follow by themselves).
   nextRoom: GameIdSchema.nullable(),
   roomClosed: z.boolean().optional(),
@@ -108,6 +112,12 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
 export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();
+/**
+ * The host's own words for this room: Galgje words and Undercover word pairs. The next Galgje or Undercover
+ * round that starts uses them instead of its scene's words (empty: the scene's). Only the host ever sees them.
+ */
+export const RoomWordsSchema = z.object({ words: z.array(HangmanWordSchema).max(200), pairs: z.array(UndercoverPairSchema).max(100) }).strict();
+export type RoomWords = z.output<typeof RoomWordsSchema>;
 export type RoomSnapshot = z.infer<typeof RoomSnapshotSchema>;
 import { MediaKindSchema } from './game.js';
 import { GameSummarySchema } from './authoring.js';

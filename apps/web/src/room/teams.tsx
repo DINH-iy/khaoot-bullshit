@@ -36,12 +36,20 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
   const teams = stage.teams; if (!teams?.forming) return null;
   const host = state.role === 'host'; const chooser = state.role === 'player' && teams.formation === 'players' && stage.status === 'ACTIVE';
   const captains = teams.answers === 'captain';
+  // Elected captains: a player taps a teammate to vote; everyone sees the votes so far.
+  const elected = captains && teams.captainPick === 'elected';
+  const voter = elected && state.role === 'player' && stage.status === 'ACTIVE';
   const pickedTeam = picked === null ? undefined : teams.teams.find(team => team.memberIds.includes(picked));
   const assign = (playerId: string, teamIndex: number | null) => { send('teams.assign', { stageRunId: stage.id, playerId, teamIndex }); setPicked(null); };
   // A player chip: for the host a button to pick that player (and drag with a mouse); for everyone else a picture and a name.
   const chip = (id: string, team?: Teams['teams'][number]) => {
+    const votes = team?.captainVotes?.find(entry => entry.playerId === id)?.count;
     const label = <><Avatar look={lookOf(state, id)} size={host ? 40 : 48} /><span>{nameOf(state, id)}{id === state.selfPlayerId ? ' (you)' : ''}</span>
-      {team?.captainId === id && captains && <span className="team-crown" role="img" aria-label="captain">👑</span>}</>;
+      {team?.captainId === id && captains && <span className="team-crown" role="img" aria-label="captain">👑</span>}
+      {votes ? <span className="team-votes" aria-label={p('voteCount', { count: votes })}><span aria-hidden="true">🗳 {votes}</span></span> : null}</>;
+    // A teammate in an elected team: tap to vote for them as captain.
+    if (voter && team && team.index === teams.ownTeamIndex && id !== state.selfPlayerId) return <li key={id}><button type="button" className="team-chip team-vote" aria-pressed={teams.ownCaptainVote === id}
+      aria-label={p('voteFor', { name: nameOf(state, id) })} disabled={disabled} onClick={() => send('teams.vote', { stageRunId: stage.id, playerId: id })}>{label}</button></li>;
     return <li key={id}>{host ? <button type="button" className="team-chip" aria-pressed={picked === id} disabled={disabled} draggable={!disabled}
       onDragStart={event => { event.dataTransfer.setData('text/plain', id); event.dataTransfer.effectAllowed = 'move'; }}
       onClick={() => setPicked(picked === id ? null : id)}>{label}</button> : <span className="team-chip">{label}</span>}</li>;
@@ -54,7 +62,14 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
     <div className="team-forming-head">
       <h3>{p(teams.scope === 'game' ? 'forGame' : 'forRound')}</h3>
       <p>{host ? (picked ? p(captains && pickedTeam ? 'tapTeamOrCaptain' : 'tapTeamFor', { name: nameOf(state, picked) }) : p('tapPlayer')) : state.arcade && teams.formation === 'random' ? p('leaderShuffle') : p(how[teams.formation])}
-        {' '}{p(captains ? 'captainsAnswer' : 'everyoneAnswers')} {p(pointsText[teams.points])}</p>
+        {' '}{p(captains ? 'captainsAnswer' : 'everyoneAnswers')} {p(pointsText[teams.points])}{host && elected ? ` ${p('electHint')}` : ''}</p>
+      {/* The host chooses how captains are picked: assigned (the host, else at random) or elected by each team. */}
+      {host && captains && <div className="team-captain-pick"><span id={`captain-pick-${stage.id}`}>{p('captainsBy')}</span>
+        <div className="team-segments" role="group" aria-labelledby={`captain-pick-${stage.id}`}>{(['assigned', 'elected'] as const).map(pick =>
+          <button key={pick} type="button" aria-pressed={(teams.captainPick ?? 'assigned') === pick} disabled={disabled}
+            onClick={() => { if ((teams.captainPick ?? 'assigned') !== pick) send('teams.captainPick', { stageRunId: stage.id, pick }); }}>{p(pick === 'assigned' ? 'captainsAssigned' : 'captainsElected')}</button>)}</div></div>}
+      {voter && teams.ownTeamIndex !== null && (() => { const mine = teams.teams.find(team => team.index === teams.ownTeamIndex);
+        return mine && mine.memberIds.length > 1 ? <p className="team-vote-note" role="status">{teams.ownCaptainVote ? p('votedFor', { name: nameOf(state, teams.ownCaptainVote) }) : p('voteCaptain')}</p> : null; })()}
     </div>
     <ul className="team-columns">{teams.teams.map(team => {
       const color = team.color; const mine = teams.ownTeamIndex === team.index;

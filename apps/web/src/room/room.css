@@ -342,6 +342,15 @@
 .room button.team-chip { min-height: 0; border: 2px solid transparent; cursor: grab; }
 .room button.team-chip[aria-pressed=true] { border-color: #fff; background: var(--r-card-strong); }
 .team-crown { font-size: 1rem; }
+.team-votes { padding: 1px 8px; border-radius: 999px; background: rgb(0 0 0 / .28); font-size: .85rem; font-weight: 800; white-space: nowrap; }
+.room button.team-chip.team-vote { cursor: pointer; border-color: color-mix(in srgb, var(--r-text) 35%, transparent); }
+.room button.team-chip.team-vote[aria-pressed=true] { border-color: var(--r-accent); background: color-mix(in srgb, var(--r-accent) 22%, var(--r-card-strong)); }
+.team-vote-note { margin: 8px 0 0; font-weight: 700; color: var(--r-text); }
+.team-captain-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.team-captain-pick > span { font-size: .8rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--r-muted); }
+.team-segments { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--r-card-strong); border: 1px solid var(--r-line); }
+.room .team-segments button { min-height: 36px; margin: 0; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--r-text); font-weight: 700; white-space: nowrap; box-shadow: none; }
+.room .team-segments button[aria-pressed=true] { background: var(--r-accent); color: var(--r-accent-ink); }
 .team-empty { margin: 0; color: var(--r-muted); font-size: .9rem; }
 .room .team-put { min-height: 40px; background: var(--team-strong, var(--r-card)); color: #fff; border: 0; font-weight: 800; }
 .room .team-join { min-height: 64px; font-size: 1.2rem; font-weight: 900; border: 0; background: var(--team-strong); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .35); }
@@ -648,7 +657,7 @@
 .room-player.in-team { border-top: 6px solid var(--my-team); }
 /* Team colours: the host's colour button on a team, and the swatches a team picks from. */
 /* The host's colour button: a round chip of the team colour in front of the name. */
-.room .team-column-head .color-trigger.team-color-pick { flex: none; min-height: 32px; padding: 0; gap: 0; border-radius: 50%; }
+.room .team-column-head .color-trigger.team-color-pick { flex: none; min-height: 32px; margin-right: 10px; padding: 0; gap: 0; border-radius: 50%; }
 .room .team-column-head .team-color-pick > .color-chip { width: 28px; height: 28px; border-radius: 50%; box-shadow: 0 0 0 2px #fff; }
 .team-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .room .team-swatches button { width: 36px; min-height: 36px; padding: 0; border-radius: 50%; border: 2px solid rgb(255 255 255 / .6); }

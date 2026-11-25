@@ -6,13 +6,15 @@ import { COIN_TEXTS } from '../heads-or-tails/coin.text.js';
 import { ROULETTE_TEXTS } from '../red-or-black-roulette/roulette.js';
 import { GRAPH_TEXTS } from '../draw-the-graph/graph.text.js';
 import { BUS_TEXTS } from '../bus/bus.text.js';
+import { HANGMAN_TEXTS } from '../hangman/hangman.text.js';
 
 /** Cut the Line and Match the Angle measure in tenths: 473 → "47.3", 470 → "47". */
 export const tenths = (value: number) => (value / 10).toLocaleString(currentLanguage(), { maximumFractionDigits: 1 });
 
 export function minigameResult(game: MinigameKey, value: number | null, settings: MinigameSettings, team = false, guess?: { cut?: number | undefined; angle?: number | undefined; dotGuess?: number | undefined }): string {
   const t = (key: keyof typeof CONTROL_TEXTS.en, values?: Record<string, string | number>) => translate(CONTROL_TEXTS, key, values);
-  if (value === null) return t(game === 'reaction' && !team ? 'falseStart' : 'noResult');
+  if (value === null) return game === 'hangman' ? translate(HANGMAN_TEXTS, 'hanged') : t(game === 'reaction' && !team ? 'falseStart' : 'noResult');
+  if (game === 'hangman') return translate(HANGMAN_TEXTS, 'wrongCount', { count: value });
   if (game === 'heads-or-tails') return translate(COIN_TEXTS, COIN_SIDES[value] ?? 'heads');
   if (game === 'red-or-black-roulette') return value === 0 ? translate(ROULETTE_TEXTS, 'freePick') : translate(ROULETTE_TEXTS, 'bet', { amount: value });
   if (game === 'reaction') return `${value} ms`;

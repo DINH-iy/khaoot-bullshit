@@ -139,13 +139,17 @@ export async function stepView(tx: Transaction, stage: StageRun, rules: StepRule
     const options = run ? game.options(state, rules.settings, run) : null; const step = record?.step ?? 0;
     const answer = rows.find(row => row.slotKey === 'answer' && (side.teamId ? row.teamId === side.teamId : row.playerId === side.playerId));
     const votes = rows.filter(row => row.slotKey === `vote-${step}` && row.playerId && side.members.includes(row.playerId));
-    const seesCounts = viewer.host || (viewer.playerId !== null && side.members.includes(viewer.playerId));
+    const member = viewer.playerId !== null && side.members.includes(viewer.playerId);
+    const seesCounts = viewer.host || member;
+    // A game with private letters (Galgje): only the side's members get them, and its options (which letters are left).
+    const own = game.ownView && member && run ? { own: game.ownView(state, rules.settings, run) } : {};
+    const shownOptions = options && game.ownView && !member ? [] : options;
     const counts = new Map<string, number>(); for (const vote of votes) { const option = (vote.value as { choiceKey: string }).choiceKey; counts.set(option, (counts.get(option) ?? 0) + 1); }
     return { teamId: side.teamId, playerId: side.playerId, name: side.teamId ? teamNames.get(side.teamId) ?? 'Team' : playerNames.get(side.playerId!) ?? 'Player', step,
-      options: answer ? null : options ? [...options] : null, result: answer && !game.secret ? ((answer.value as { value: number; early?: boolean }).early ? null : (answer.value as { value: number }).value + extra) : null,
+      options: answer ? null : shownOptions ? [...shownOptions] : null, result: answer && !game.secret ? ((answer.value as { value: number; early?: boolean }).early ? null : (answer.value as { value: number }).value + extra) : null,
       captainId: record?.captainId ?? captainFor(stage.id, side, rules, context), voteEndsAt: options && record?.voteEndsAt ? record.voteEndsAt : null,
       votes: seesCounts ? [...counts.entries()].map(([option, count]) => ({ option, count })) : [], voters: votes.map(vote => vote.playerId!),
-      view: run ? game.view(state, rules.settings, run, extra) : null };
+      view: run ? game.view(state, rules.settings, run, extra) : null, ...own };
   }) };
 }
 

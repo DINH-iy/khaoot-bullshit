@@ -61,16 +61,16 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
   // With no screen watching, the phone also shows how the other sides are doing, as the screen would.
   const others = !state.screenConnected && steps.sides.length > 1
     ? <StepSides state={state} game={game} settings={settings} sides={steps.sides.filter(entry => entry !== side)} now={now} compact /> : null;
-  if (!side.options) return <div className="step-phone">{head}
+  if (!side.options) return <div className={`step-phone step-${game}`}>{head}
     <p className="mg-big" role="status">{side.result !== null ? minigameResult(game, side.result, settings) : game === 'speed-run' ? minigameResult(game, null, settings) : c('saved')}</p><p>{t('minigame.played')}</p>{others}</div>;
-  if (!canPlay || !minigame.startsAt) return <div className="step-phone">{head}<p className="wait-note">{t(howToPlayKey(game))}</p>{others}</div>;
+  if (!canPlay || !minigame.startsAt) return <div className={`step-phone step-${game}`}>{head}<p className="wait-note">{t(howToPlayKey(game))}</p>{others}</div>;
   // The countdown everyone starts together after (as in every minigame).
-  if (starts !== null && now < starts) return <div className="step-phone">{head}<p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil((starts - now) / 1000)}</p></div>;
+  if (starts !== null && now < starts) return <div className={`step-phone step-${game}`}>{head}<p className="mg-big" role="timer" aria-label={c('starts')}>{Math.ceil((starts - now) / 1000)}</p></div>;
   const who = canMove(state, stage, side, steps.decides);
   const left = side.voteEndsAt ? Math.max(0, Math.ceil((Date.parse(side.voteEndsAt) - now) / 1000)) : null;
   const team = stage.teams?.teams.find(entry => entry.teamId === side.teamId);
   const total = team?.memberIds.length ?? 1; const counted = side.votes.reduce((sum, vote) => sum + vote.count, 0);
-  return <div className="step-phone">{head}
+  return <div className={`step-phone step-${game}`}>{head}
     <div className="step-question">
       <p className="step-ask">{renderer.question(side.view, side.step, settings)}</p>
       {renderer.stake && <div className="step-stake">{renderer.stake(side.step, settings, side.view)}</div>}

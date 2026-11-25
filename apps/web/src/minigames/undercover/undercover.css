@@ -1,0 +1,28 @@
+/* Undercover / Mr. White: the own word card, the round line, and the table of players. */
+.uc-table { display: grid; gap: 10px; }
+.uc-word { display: grid; justify-items: center; gap: 8px; padding: 12px; border-radius: 14px; background: var(--r-card-strong); border: 1px solid var(--r-line); text-align: center; }
+.uc-word-text { display: grid; gap: 4px; margin: 0; }
+.uc-word-text strong { font-size: 1.7rem; font-weight: 900; }
+.uc-word-text small { color: var(--r-muted); }
+.room .uc-reveal { width: 100%; min-height: 56px; border: 2px dashed var(--r-line); background: transparent; color: var(--r-text); font-weight: 800; }
+.uc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.uc-time { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--r-muted); }
+.uc-ask, .uc-note, .uc-last { margin: 0; }
+.uc-last { padding: 8px 12px; border-radius: 12px; background: var(--r-card-strong); font-weight: 700; }
+.uc-winner { margin: 0; font-size: 1.4rem; font-weight: 900; color: var(--r-ok); }
+.room .uc-main { width: 100%; }
+.room .uc-next { justify-self: start; }
+.uc-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.uc-player { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--r-card-strong); border: 2px solid transparent; color: var(--r-text); font-weight: 700; text-align: left; }
+.room button.uc-player { margin: 0; box-shadow: none; }
+.room button.uc-player[aria-pressed=true] { border-color: var(--r-accent); background: color-mix(in srgb, var(--r-accent) 22%, var(--r-card-strong)); }
+.uc-players li.speaking .uc-player { border-color: var(--r-accent); }
+.uc-players li.gone .uc-player { opacity: .55; }
+.uc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uc-badge { font-size: .95rem; }
+.uc-role { padding: 1px 8px; border-radius: 999px; background: rgb(0 0 0 / .28); font-size: .75rem; font-weight: 800; white-space: nowrap; }
+.uc-guess { display: grid; gap: 8px; }
+.uc-reveal-box { display: grid; gap: 6px; margin-bottom: 12px; }
+.uc-reveal-box p { margin: 0; }
+.uc-roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.uc-roles li { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 2px; border-radius: 999px; background: var(--r-card-strong); }

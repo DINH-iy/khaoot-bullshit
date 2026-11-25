@@ -49,6 +49,31 @@ describe('step games: one engine for games played move by move', () => {
     expect(await prisma.scoreEntry.findMany({ where: { sessionId: f.sessionId }, select: { recipientPlayerId: true, amountMilli: true } })).toEqual([{ recipientPlayerId: f.players[0]!.id, amountMilli: 7000n }]);
   });
 
+  it('Galgje: everyone guesses the same word; only the side itself sees its letters; fewest wrong letters wins; the word shows at the reveal', async () => {
+    const w = world(); const f = await fixture(3, game({ game: 'hangman', settings: { lives: 3, words: ['Fiets'] }, placementMilli: ['10000', '6000'] }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!; w.advance(3500);
+    expect((await runOf(stageRunId)).hangmanWord).toBe('fiets');
+    const guess = async (index: number, letters: string) => { for (const letter of letters) { const step = (await viewOf(f, index)).stage!.minigame!.steps!.sides.find(side => side.playerId === f.players[index]!.id)!.step; await move(w, f, index, stageRunId, step, letter); } };
+    await guess(0, 'fx');
+    const mine = (await viewOf(f, 0)).stage!.minigame!;
+    // The author's word list never reaches a screen; the own phone sees its letters, another phone only its progress.
+    expect(mine.settings).toEqual({ lives: 3 });
+    expect(mine.steps!.sides.find(side => side.playerId === f.players[0]!.id)).toMatchObject({ own: { pattern: 'f____', guessed: ['f', 'x'] }, view: { mask: '_____', found: 1, wrong: 1 } });
+    const watched = (await viewOf(f, 1)).stage!.minigame!.steps!.sides.find(side => side.playerId === f.players[0]!.id)!;
+    expect(watched.own).toBeUndefined(); expect(watched.options).toEqual([]);
+    expect(JSON.stringify((await viewOf(f, 1)).stage)).not.toMatch(/fiets|f____/);
+    await expect(move(w, f, 0, stageRunId, 2, 'f')).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await guess(0, 'iets'); // found with 1 wrong
+    await guess(1, 'abc'); // hanged after 3 wrong letters: no more letters to pick
+    await expect(move(w, f, 1, stageRunId, 3, 'd')).rejects.toMatchObject({ code: 'ALREADY_SUBMITTED' });
+    expect((await viewOf(f, 1)).stage!.minigame!.steps!.sides.find(side => side.playerId === f.players[1]!.id)).toMatchObject({ options: null, view: { hanged: true } });
+    await guess(2, 'fiets'); // found with none wrong
+    await host(w, f, 'stage.close', { stageRunId }); await host(w, f, 'stage.reveal', { stageRunId });
+    const reveal = (await viewOf(f, 1)).stage!.reveal!.answer as { word?: string; entries: { playerId: string | null; value: number | null; place: number | null }[] };
+    expect(reveal.word).toBe('fiets');
+    expect(reveal.entries.map(entry => [entry.playerId, entry.value, entry.place])).toEqual([[f.players[2]!.id, 0, 1], [f.players[0]!.id, 1, 2], [f.players[1]!.id, null, null]]);
+  });
+
   it('Drive the bus: a team guesses its four cards (anyone taps), sees each card only once guessed, and the fewest sips win', async () => {
     const w = world(); const f = await fixture(4, game({ game: 'bus', settings: { sips: [1, 2, 3, 4], rainbow: false }, placementMilli: ['10000'], ...inTeams(2) }));
     const { stageRunId, teamOf } = await startTeams(w, f, 2); const teamA = await teamOf(0); const teamB = await teamOf(2);

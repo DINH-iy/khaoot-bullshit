@@ -479,7 +479,8 @@ export function RoomScreen() {
             canPlay={role === 'player' && !answerBlock && stage.status === 'ACTIVE' && running}
             onResult={result => command('submission.submit', { stageRunId: stage.id, value: { kind: 'minigame', ...result } })}
             live={minigameLive} onPart={(turn, assetId) => command('minigame.part', { stageRunId: stage.id, turn, assetId })}
-            onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })} /></div>}
+            onMove={(step, option, decide) => command('minigame.move', { stageRunId: stage.id, step, option, ...(decide ? { decide: true } : {}) })}
+            onUndercover={(action, round, extra) => command('undercover.act', { stageRunId: stage.id, action, round, ...extra })} /></div>}
           {stage.kind === 'route' && <div ref={routeRef}>{stage.route?.method === 'draw' ? <MinigameDraw state={state} stage={stage} offset={room.clockOffset} disabled={disabled} send={command} />
             : <RouteChoice state={state} stage={stage} disabled={disabled} send={command} />}</div>}
           {stage.kind === 'duel' && <div ref={duelRef}><DuelPanel key={stage.id} state={state} stage={stage} disabled={disabled || (poolDuel && stage.status === 'CLOSED' && timeUp && Boolean(stage.deadlineAt))} send={command} /></div>}

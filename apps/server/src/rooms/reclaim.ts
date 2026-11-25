@@ -55,6 +55,8 @@ export const RoomStateSchema = z.object({
   tryout: z.boolean().default(false),
   // The game a rehearsal room practises (set only by the rehearse route): rehearsing it again replaces this room (restart.ts).
   rehearsalOf: GameIdSchema.nullable().default(null),
+  // The host's own words for Galgje and Undercover rounds in this room (RoomWordsSchema); never shown to players.
+  ownWords: z.object({ words: z.array(z.string().max(30)).max(200), pairs: z.array(z.tuple([z.string().max(30), z.string().max(30)])).max(100) }).strict().default({ words: [], pairs: [] }),
   expected: z.array(GameIdSchema).max(100).default([]),
   nameRequests: z.array(z.object({ id: GameIdSchema, personId: GameIdSchema, status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'USED']), requestedAt: z.string().datetime() }).strict()).max(50).default([]),
 }).strict();
@@ -145,6 +147,16 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
         return approved ? request.playerId : null;
       });
       if (playerId) kick(sessionId, playerId);
+    },
+    /** The host's own words for this room's Galgje and Undercover rounds (only rounds that start afterwards use them). */
+    async setWords(sessionId: string, principal: Principal, words: RoomState['ownWords']) {
+      roomAssert(principal.role === 'host', 'FORBIDDEN');
+      await client.$transaction(async tx => {
+        await lockRoom(tx, sessionId);
+        const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId } }); await authorize(tx, session, principal.actor);
+        await save(tx, sessionId, { ...readRoomState(session.state), ownWords: words });
+        await recordRoomChange(tx, sessionId, 'room.settings');
+      });
     },
     async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'chat' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'signup' | 'testBench' | 'keepOpen' | 'autoRevealSeconds'>>) {
       const updated = Object.keys(settings);

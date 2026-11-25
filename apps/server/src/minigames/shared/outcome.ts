@@ -69,6 +69,13 @@ export function minigameOutcome(rules: MinigameRules, rows: Row[], context: Team
       awardKey: `minigame:${stageRunId}:${entry.playerId}`, reason: 'Correct coin guess' }, { playerId: entry.playerId }, null));
     return { entries, awards };
   }
+  if (rules.game === 'undercover') {
+    // Undercover: everyone on the winning side shares 1st place and its points; the value is each player's role.
+    const entries = results.filter(row => row.playerId).map(row => ({ playerId: row.playerId, teamId: null, value: row.result.value, place: row.result.won ? 1 : null }))
+      .sort((a, b) => (a.place ?? 2) - (b.place ?? 2));
+    const awards = entries.filter(entry => entry.place === 1).flatMap(entry => route({ amountMilli: pointsFor(1), stageRunId, awardKey: `minigame:${stageRunId}:${entry.playerId}`, reason: 'Undercover win' }, { playerId: entry.playerId }, null));
+    return { entries, awards };
+  }
   if (rules.game === 'bus' && context) {
     // Drive the bus: each team's sips plus the last round's sips for every other team's rainbow; fewest sips win.
     const lastSips = (rules.settings as { sips: number[]; rainbow?: boolean }).sips[3] ?? 0;
@@ -115,13 +122,17 @@ export function minigameOutcome(rules: MinigameRules, rows: Row[], context: Team
         ? Math.min(...scored.filter(entry => entry.value === score).map(entry => submittedAt(entry.row)))
         : Math.max(...scored.map(entry => submittedAt(entry.row)));
     }
-    return { teamId, score, time };
+    // A captain's answer is the team's own row (playerId null): its details (stroke, cut, angle…) go on the team row.
+    const captainRow = own.find(row => !row.playerId && row.teamId === teamId);
+    return { teamId, score, time, captainRow };
   });
   const placed = places(teams, team => team.score, timedTiebreak ? team => team.time : undefined);
   const magnitude = (score: number | null) => score === null ? null : Math.abs(score);
   const entries = [
-    ...teams.map(team => ({ playerId: null, teamId: team.teamId, value: magnitude(team.score), place: placed.get(team) ?? null })).sort((a, b) => (a.place ?? 999) - (b.place ?? 999)),
-    ...results.map(row => ({ playerId: row.playerId, teamId: row.teamId ?? (row.playerId ? context.teamOf.get(row.playerId) ?? null : null), value: raw(row.result), place: null, ...details(row.result) })),
+    ...teams.map(team => ({ playerId: null, teamId: team.teamId, value: team.captainRow ? raw(team.captainRow.result) : magnitude(team.score), place: placed.get(team) ?? null,
+      ...(team.captainRow ? details(team.captainRow.result) : {}) })).sort((a, b) => (a.place ?? 999) - (b.place ?? 999)),
+    // Each player's own result; a captain's answer is already the team's row.
+    ...results.filter(row => row.playerId).map(row => ({ playerId: row.playerId, teamId: row.teamId ?? (row.playerId ? context.teamOf.get(row.playerId) ?? null : null), value: raw(row.result), place: null, ...details(row.result) })),
   ];
   // A team's closeness points come from its combined result, like its place.
   const awards = teams.flatMap(team => route({ amountMilli: earned(placed.get(team), team.score), stageRunId, awardKey: `minigame:${stageRunId}:team:${team.teamId}`, reason }, { teamId: team.teamId }, context));

@@ -1,3 +1,4 @@
+import { HangmanWordSchema } from '@party/contracts';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { importDefinition } from '../../src/authoring/import.js';
@@ -101,6 +102,29 @@ describe('importing a game from text', () => {
     // A round in teams with no Pick teams scene before it is a problem to fix, not a silent team game.
     const solo = check(JSON.stringify({ title: 'Oops', scenes: [{ id: 'q', type: 'quiz', question: 'Q?', answers: ['A', 'B'], correct: 'A', inTeams: true }] }));
     expect(solo.issues.map(issue => issue.message).join(' ')).toContain('Pick teams');
+    // Elected captains: the teams have captains, and each team votes for its own.
+    const elected = check(JSON.stringify({ title: 'Vote night', scenes: [{ id: 'teams', type: 'pick-teams', captains: 'elected' }, { id: 'q', type: 'quiz', question: 'Q?', answers: ['A', 'B'], correct: 'A', inTeams: true, captain: true }] }));
+    expect(elected.issues).toEqual([]);
+    expect((elected.definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]).toMatchObject({ captains: true, form: { captainPick: 'elected' } });
+  });
+
+  it('imports Undercover with its own word pairs and counts, the rest from the standard settings', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Spies', scenes: [{ id: 'a', type: 'minigame', game: 'undercover', pairs: [['koffie', 'thee']], undercovers: 2, mrWhite: false, seconds: 900 }] }));
+    expect(issues).toEqual([]);
+    expect((definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]).toMatchObject({ game: 'undercover', durationMs: 900_000,
+      settings: { undercovers: 2, mrWhite: false, turnSeconds: 30, voteSeconds: 45, pairs: [['koffie', 'thee']] } });
+  });
+
+  it('imports Galgje with its own words (kept as written; played without accents) and lives, or the built-in words of a language', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Words', scenes: [
+      { id: 'a', type: 'minigame', game: 'hangman', words: ['Crème brûlée', 'fiets'], lives: 5 },
+      { id: 'b', type: 'minigame', game: 'Hangman', wordLanguage: 'nl' },
+    ] }));
+    expect(issues).toEqual([]);
+    const [a, b] = (definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes.map(node => node.stages[0]!);
+    expect(a).toMatchObject({ game: 'hangman', settings: { lives: 5, words: ['Crème brûlée', 'fiets'] } });
+    expect(HangmanWordSchema.parse('Crème brûlée')).toBe('creme brulee');
+    expect(b).toMatchObject({ game: 'hangman', settings: { lives: 7, wordLanguage: 'nl' } });
   });
 
   it('accepts the answer wrapped in code fences with chatter around it', () => {
