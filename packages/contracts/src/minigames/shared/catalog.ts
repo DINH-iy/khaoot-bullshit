@@ -38,14 +38,16 @@ export const MinigameSettingsSchemas = {
   'match-the-angle': z.object({}).strict(),
   'count-the-dots': DotSettingsSchema,
   'draw-the-graph': GraphSettingsSchema,
-  'heads-or-tails': z.object({}).strict(),
+  // `flip`: "host" keeps the coin in the air once guesses close, until the host flips it (Reveal); otherwise it lands at once.
+  'heads-or-tails': z.object({ flip: z.enum(['auto', 'host']).optional() }).strict(),
   // Roulette: players bet their points. `betFloor`: what a player may bet when their score is lower (ROULETTE_BET_FLOOR when absent).
   'red-or-black-roulette': z.object({ betFloor: z.number().int().min(0).max(10_000).optional() }).strict(),
   // Pass the pencil: each team draws one picture, members taking turns; then everyone votes for the best (not their own).
   'relay-drawing': z.object({ secondsPerTurn: z.number().int().min(5).max(60), voteSeconds: z.number().int().min(10).max(120), animation: z.boolean().optional() }).strict(),
   // Drive the bus (the Dutch drinking game "bussen", without the final bus): each team guesses four cards
   // together; a wrong guess costs every member that round's sips. Fewest sips wins.
-  // `rainbow`: a team whose four cards are four different suits makes the other teams drink the last round's sips.
+  // `rainbow`: when the first three cards are three different suits, round 4 also offers *Rainbow*: a team that calls it
+  // and is right (the fourth card is the missing suit) makes the other teams drink the last round's sips; wrong, it drinks them.
   bus: z.object({ sips: z.array(z.number().int().min(0).max(20)).length(4), rainbow: z.boolean().optional() }).strict(),
   // Left or right: everyone picks left or right in secret (no talking); the majority wins. A tie: nobody wins.
   majority: z.object({}).strict(),
@@ -185,8 +187,10 @@ export const PlayingCardSchema = z.object({ rank: z.number().int().min(2).max(14
 export type PlayingCard = z.infer<typeof PlayingCardSchema>;
 // The four rounds and what a team may guess in each.
 export const BUS_GUESSES = [['red', 'black'], ['higher', 'lower'], ['inside', 'outside'], [...SUITS]] as const;
-export type BusGuess = typeof BUS_GUESSES[number][number];
-export const BusGuessSchema = z.enum(['red', 'black', 'higher', 'lower', 'inside', 'outside', ...SUITS]);
+/** Round 4's extra guess, offered only when a rainbow is still possible (see `busRainbowOpen`). */
+export const BUS_RAINBOW = 'rainbow';
+export type BusGuess = typeof BUS_GUESSES[number][number] | typeof BUS_RAINBOW;
+export const BusGuessSchema = z.enum(['red', 'black', 'higher', 'lower', 'inside', 'outside', ...SUITS, BUS_RAINBOW]);
 /**
  * Whether a guess about card `round` is right, given the cards before it. Equal is wrong:
  * the same rank is neither higher nor lower, and a card on the edge is neither inside nor outside.
@@ -197,10 +201,13 @@ export function busGuessRight(round: number, guess: BusGuess, cards: PlayingCard
   if (round === 1) { const first = cards[0]!.rank; return guess === 'higher' ? card.rank > first : card.rank < first; }
   if (round === 2) { const low = Math.min(cards[0]!.rank, cards[1]!.rank); const high = Math.max(cards[0]!.rank, cards[1]!.rank);
     return guess === 'inside' ? card.rank > low && card.rank < high : card.rank < low || card.rank > high; }
-  return card.suit === guess;
+  return guess === BUS_RAINBOW ? isRainbow(cards) : card.suit === guess;
 }
 /** A rainbow: four cards of four different suits. */
 export const isRainbow = (cards: PlayingCard[]) => cards.length === 4 && new Set(cards.map(card => card.suit)).size === 4;
+/** Whether round 4 offers *Rainbow*: the rule is on and the first three cards are three different suits. */
+export const busRainbowOpen = (cards: PlayingCard[], settings: { rainbow?: boolean | undefined }) =>
+  settings.rainbow !== false && cards.length >= 3 && new Set(cards.slice(0, 3).map(card => card.suit)).size === 3;
 // What Drive the bus shows of a team: its cards so far (only those guessed), its guesses, right or wrong, its sips (its own wrong
 // guesses plus `extra` from other teams' rainbows), and whether its own cards made a rainbow.
 export const BusViewSchema = z.object({ cards: z.array(PlayingCardSchema), guesses: z.array(BusGuessSchema), right: z.array(z.boolean()), sips: z.number().int().min(0),

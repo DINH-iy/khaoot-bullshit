@@ -94,3 +94,9 @@ Starting again later: `npm run db:up` (if you stopped the databases), then optio
 | The test link does not open at all | `npm run status`; if it says "not reachable", `npm run stop` and start option B again |
 | "address already in use" | Something is already running: `npm run status`, then `npm run stop` |
 | Database errors when starting | Is Docker running? `npm run db:up`, then `npm run db:migrate:deploy` |
+
+## On Windows
+
+- Docker Desktop must be running. `npm run db:env` makes the ignored `.env` with new local credentials; an older local database may need them.
+- After pulling: `npm run db:migrate:deploy` applies pending migrations.
+- Run tests from an uppercase `C:\Projects\khaoot-bullshit` path. From `c:\…` Vitest loads twice and every database suite fails with "failed to find the current suite".

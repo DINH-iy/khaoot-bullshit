@@ -330,10 +330,12 @@ export function nextSummary(definition: Definition, node: Node): string {
  * and where it leads; its content and settings are edited in the Scene editor
  * ("Edit this scene"). The scene's actions are in the ☰ menu next to Close.
  */
-export function Inspector({ definition, node, problems, onChange, onDelete, onClose, onOpen, onDuplicate, prefab, readOnly = false }: { definition: Definition; node: Node; problems: DefinitionIssue[]; onChange: Change; onDelete: (next: Definition) => void; onClose: () => void; onOpen: () => void; onDuplicate?: () => void; readOnly?: boolean; prefab?: { content: () => PrefabContent; defaultName: string } }) {
+export function Inspector({ definition, node, problems, onChange, onDelete, onClose, onOpen, onDuplicate, prefab, readOnly = false, asked = null, onAsked }: { definition: Definition; node: Node; problems: DefinitionIssue[]; onChange: Change; onDelete: (next: Definition) => void; onClose: () => void; onOpen: () => void; onDuplicate?: () => void; readOnly?: boolean; prefab?: { content: () => PrefabContent; defaultName: string }; asked?: 'replace' | 'prefab' | null; onAsked?: () => void }) {
   const replacement = useTexts(REPLACE_TEXTS); const [replacing, setReplacing] = useState(false);
   const [confirming, setConfirming] = useState(false); const [saving, setSaving] = useState(false);
   useEffect(() => { setConfirming(false); setSaving(false); }, [node.key]);
+  // Replace or Save as prefab chosen elsewhere (the scene's right-click menu on the map) opens here.
+  useEffect(() => { if (!asked || readOnly) return; if (asked === 'replace') setReplacing(true); else setSaving(true); onAsked?.(); }, [asked, readOnly, onAsked]);
   const text = cardText(definition, node); const start = definition.startNodeKey === node.key;
   const actions: MenuAction[] = [
     ...(start ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => onChange({ ...definition, startNodeKey: node.key }) }]),

@@ -437,8 +437,10 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     requireGame(!readForming(stage.presentation), 'INVALID_STATE');
     // Automatic closing can never end a stage early or override a pause/extension.
     if (command.type === 'stage.timeout') requireGame(stage.deadlineAt && now.getTime() >= closesAt(stage.deadlineAt, graceFor(entry.stage)), 'INVALID_STATE');
-    const flip = entry.stage.kind === 'minigame' && isSharedPrediction(entry.stage.game);
-    if (flip) {
+    const prediction = entry.stage.kind === 'minigame' && isSharedPrediction(entry.stage.game);
+    // Heads or Tails may wait for the host to flip (Reveal) instead of landing as the guesses close.
+    const flip = prediction && !hostFlips(entry.stage);
+    if (prediction) {
       const run = readMinigameRun(stage.presentation);
       requireGame(run?.coin !== undefined || run?.roulette !== undefined, 'INVALID_STATE');
     }
@@ -524,7 +526,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     if (command.type === 'stage.autoReveal') {
       const delay = (session.state as { autoRevealSeconds?: number | null } | null)?.autoRevealSeconds;
       requireGame(typeof delay === 'number' && stage.closedAt && now.getTime() >= stage.closedAt.getTime() + delay * 1000 &&
-        !isShowOnly(entry.stage) && entry.stage.kind !== 'teams' && !readExplain(stage.presentation), 'INVALID_STATE');
+        !isShowOnly(entry.stage) && entry.stage.kind !== 'teams' && !readExplain(stage.presentation) && !hostFlips(entry.stage), 'INVALID_STATE');
       if (entry.stage.kind === 'challenge') {
         const eligible = EligibilitySchema.parse(stage.eligibility).playerIds;
         requireGame(await tx.stageJudgment.count({ where: { stageRunId: stage.id, playerId: { in: eligible } } }) === eligible.length, 'INVALID_STATE');
@@ -736,4 +738,9 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
       awards: result ? route({ ...result, stageRunId: stage.id, awardKey: `answer:${submission.id}` }, { playerId: by.playerId ?? actor.playerId, teamId: by.teamId }, context) : [] };
   }
   throw new GameError('INVALID_COMMAND');
+}
+
+/** Heads or Tails set to wait for the host: the coin is flipped by the host's Reveal, never by closing or auto-reveal. */
+function hostFlips(stage: { kind: string; game?: string; settings?: unknown }): boolean {
+  return stage.kind === 'minigame' && stage.game === 'heads-or-tails' && (stage.settings as { flip?: string } | undefined)?.flip === 'host';
 }

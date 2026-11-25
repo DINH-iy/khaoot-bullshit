@@ -9,10 +9,10 @@ import { newId, roomApi } from '../../room/api.js';
  * "Save as prefab": keeps the selected scenes (and the connections between them)
  * to insert into any game later, from the add menu's Prefabs. One request id per
  * opened form, so a repeated click saves it once. With `onClose` (opened from a
- * menu) the form starts open and Cancel closes it there.
+ * menu) the form starts open and Cancel closes it there; with `startOpen` it starts open but keeps its own button.
  */
-export function SavePrefab({ content, defaultName, onClose }: { content: () => PrefabContent; defaultName: string; onClose?: () => void }) {
-  const [open, setOpen] = useState(Boolean(onClose)); const [name, setName] = useState(defaultName); const [prefabId, setPrefabId] = useState(newId);
+export function SavePrefab({ content, defaultName, onClose, startOpen = false }: { content: () => PrefabContent; defaultName: string; onClose?: () => void; startOpen?: boolean }) {
+  const [open, setOpen] = useState(Boolean(onClose) || startOpen); const [name, setName] = useState(defaultName); const [prefabId, setPrefabId] = useState(newId);
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const start = () => { setName(defaultName); setPrefabId(newId()); setMessage(null); setOpen(true); };
   const save = (event: React.FormEvent) => {

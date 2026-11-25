@@ -63,6 +63,44 @@ function extra(kind: PlayerLook['extra'], layer: 'under' | 'over'): ReactNode {
     default: return null;
   }
 }
+const HAIR = '#4a2e1a'; const INKED = '#1f2b55'; const METAL = '#f2c230';
+/** Facial hair, drawn on the face before the mouth (so the mouth stays visible). */
+function beard(kind: PlayerLook['beard']): ReactNode {
+  switch (kind) {
+    case 'stubble': return <g fill={HAIR} opacity=".55">{[[30, 70], [34, 76], [38, 80], [44, 83], [50, 84], [56, 83], [62, 80], [66, 76], [70, 70], [36, 72], [42, 78], [58, 78], [64, 72], [47, 80], [53, 80], [28, 64], [72, 64]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.2" />)}</g>;
+    case 'goatee': return <path fill={HAIR} d="M43 79q7 4 14 0l-2 9q-5 5-10 0z" />;
+    case 'full': return <path fill={HAIR} fillRule="evenodd" d="M22 56q0 34 28 36 28-2 28-36l-6 0q-2 12-10 14-12 4-24 0-8-2-10-14z M38 66q12 6 24 0l1 12q-13 6-26 0z" />;
+    case 'handlebar': return <path fill={HAIR} d="M50 64c-5-3-11-3-15 1-3 3-6 3-8 0 0 5 5 8 10 6 5-2 9-4 13-4 4 0 8 2 13 4 5 2 10-1 10-6-2 3-5 3-8 0-4-4-10-4-15-1z" />;
+    case 'chops': return <g fill={HAIR}><path d="M19 48q-1 18 10 26l6-4q-6-8-6-22z" /><path d="M81 48q1 18-10 26l-6-4q6-8 6-22z" /></g>;
+    default: return null;
+  }
+}
+/** Piercings: gold rings and studs (gold reads on every body colour), drawn last on the face. */
+function piercing(kind: PlayerLook['piercing']): ReactNode {
+  const ring = { fill: 'none', stroke: METAL, strokeWidth: 3 };
+  switch (kind) {
+    case 'nose': return <circle {...ring} cx="56" cy="63" r="3.6" />;
+    case 'septum': return <path {...ring} d="M45 63q5 7 10 0" />;
+    case 'lip': return <circle {...ring} cx="58" cy="79" r="3.8" />;
+    case 'brow': return <g fill={METAL}><circle cx="66" cy="38" r="2.6" /><circle cx="72" cy="45" r="2.6" /><path stroke={METAL} strokeWidth="2" d="M66 38l6 7" /></g>;
+    case 'studs': return <g fill={METAL} stroke={shade(METAL, 40)} strokeWidth="1"><circle cx="29" cy="68" r="2.8" /><circle cx="71" cy="68" r="2.8" /></g>;
+    default: return null;
+  }
+}
+/** Tattoos and marks on the skin, drawn before the eyes and mouth. Tattoo ink has a light edge so it shows on dark colours too. */
+function marks(kind: PlayerLook['marks']): ReactNode {
+  const ink = { fill: INKED, stroke: '#fff', strokeOpacity: 0.6, strokeWidth: 1, strokeLinejoin: 'round' as const };
+  switch (kind) {
+    case 'heart': return <path {...ink} d="M25 72c-4.5-3-8-5.5-8-9 0-2.6 1.8-4.5 4.4-4.5 1.8 0 2.8 1 3.6 2.6.8-1.6 1.8-2.6 3.6-2.6 2.6 0 4.4 1.9 4.4 4.5 0 3.5-3.5 6-8 9z" />;
+    case 'star': return <path {...ink} d="M73 60l2.4 5 5.5.6-4.1 3.7 1.2 5.4-5-2.9-5 2.9 1.2-5.4-4.1-3.7 5.5-.6z" />;
+    case 'tear': return <path {...ink} d="M64 59q-4.5 5.5-4.5 8.5a4.5 4.5 0 0 0 9 0q0-3-4.5-8.5z" />;
+    case 'bolt': return <path {...ink} d="M75 60l-10 12h6l-4 11 12-14h-6l4-9z" />;
+    case 'scar': return <g stroke="#c0504a" strokeLinecap="round"><path strokeWidth="3" d="M29 39l16 25" /><path strokeWidth="2" d="M30 47l6-3 M34 53l6-3 M38 59l6-3" /></g>;
+    case 'mole': return <circle cx="62" cy="70" r="2.6" fill="#3a2216" />;
+    case 'unibrow': return <path fill="none" stroke={HAIR} strokeWidth="5" strokeLinecap="round" d="M28 42q11-6 22 0 11-6 22 0" />;
+    default: return null;
+  }
+}
 function hat(kind: PlayerLook['hat']): ReactNode {
   switch (kind) {
     case 'none': return null;
@@ -96,6 +134,6 @@ export function Avatar({ look, size = 40, label, className }: { look: PlayerLook
         : <StoredDrawing sessionId={sessionId} assetIds={[look.picture.assetId]} label="" />}</span>;
   }
   return <svg className={`avatar${className ? ` ${className}` : ''}`} viewBox="0 0 100 100" width={size} height={size} {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}>
-    {body(look.body, fill)}{extra(look.extra, 'under')}{eyes(look.eyes)}{mouth(look.mouth)}{extra(look.extra, 'over')}{hat(look.hat)}
+    {body(look.body, fill)}{extra(look.extra, 'under')}{marks(look.marks)}{beard(look.beard)}{eyes(look.eyes)}{mouth(look.mouth)}{piercing(look.piercing)}{extra(look.extra, 'over')}{hat(look.hat)}
   </svg>;
 }

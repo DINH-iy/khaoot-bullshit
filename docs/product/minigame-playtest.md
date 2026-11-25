@@ -6,10 +6,6 @@ Play and tune one game at a time. Keep the current game under **In review**, and
 
 ### Draw the Graph
 
-- [x] Import a CSV or paste spreadsheet data, preview the chart, and choose the last visible period.
-- [x] Give the phone a nearly full-width, taller plot with one instruction and a compact row of buttons.
-- [x] Show the graph question and live period and value while drawing. At reveal, draw the actual and predicted lines together and show rankings on the main screen.
-- [x] Add Our World in Data URL import with a series picker and attribution. See the [source comparison](graph-data-sources.md).
 - [ ] Try a real search-interest series and a dataset with raw counts. Check that the axis and cutoff make sense in both cases.
 - [ ] Draw with one thumb on a small phone. Check that it is easy to reach the right edge, clear the line, and submit.
 - [ ] Replay several crossing guesses and pause and resume on the TV from the host controls. Check color contrast, name labels, the real line, and the winner.
@@ -26,11 +22,11 @@ Play and tune one game at a time. Keep the current game under **In review**, and
 - [ ] **Cut the Line** — Check the shared target, smooth tenth-of-a-percent movement, and submission on a small screen.
 - [ ] **Match the Angle** — Check the angle direction, smooth tenth-of-a-degree movement, and fastest-submission tiebreak.
 - [ ] **Count the Dots** — Check dot legibility on TV, submissions during and after viewing, and the compact phone result.
-- [ ] **Heads or Tails** — Check secret picks, the shared flip, and solo play with and without chips.
+- [ ] **Heads or Tails** — Check secret picks, the shared flip (both when guesses close and when the host flips), and solo play with and without chips.
 - [ ] **Roulette** — Bet points on numbers and outside bets, check the stake limit (score or minimum stake), green zero, the rolling ball, and that wins and losses change the score. Check that arcade and solo Roulette (play chips) use the same table.
 - [ ] **Lucky doors** — Check that the reveal and points match the selected door in shuffled and fixed modes.
 - [ ] **Pass the pencil** — Check turn handoff, live drawing, voting, and the animation variant.
-- [ ] **Drive the bus** — Check every choice and the captain and voting flows in a team round.
+- [ ] **Drive the bus** — Check every choice and the captain and voting flows in a team round, and calling a rainbow (right and wrong) in round 4.
 - [ ] **Left or right** — Check private picks, the majority reveal, and what happens when the room splits evenly.
 - [ ] **Slot machine** — Check reel pacing, the final symbols, payout display, and reduced motion.
 - [ ] **Blackjack** — Check card and button readability, chip bets, and resuming a hand.
@@ -56,61 +52,7 @@ Play and tune one game at a time. Keep the current game under **In review**, and
 | Heads or Tails | Shortened the countdown and gave the coin a tumbling toss, bounce and settle. | Check both landing faces on the TV and try the solo flip with reduced motion. |
 | Drive the bus | Tightened the phone results and put each team’s sips next to its name. | Check long team names in a narrow phone view. |
 
-## Scene settings audit
-
-Every minigame scene exposes its prompt and the timing controls applicable to its rules. The points panel shows places for ranked games and a single award for correct shared predictions. Step games that support team play also offer a team decision method.
-
-| Scene | Settings specific to the game |
-| --- | --- |
-| Reaction duel | Shortest and longest wait before GO |
-| Tap race | Race length |
-| Clap the beat | Round timer. The beat sequence is fixed and microphone use is a player choice. |
-| Speed run | Stock or custom obstacle course |
-| Stop the Clock | Target time and when the clock hides |
-| Lucky doors | Door values and shuffled or fixed order |
-| Perfect circle | Drawing time |
-| Cut the Line | Random, exact, or inclusive target range |
-| Match the Angle | Shared random target. The exclusion of easy angles and the tenth-of-a-degree resolution are fixed rules. |
-| Count the Dots | Display time, guess time, random or authored count, slight overlap, and reveal easing |
-| Draw the Graph | Stock or custom data, CSV or Grapher import, cutoff, axis labels, source, and reveal easing |
-| Heads or Tails | Award for a correct guess and guess time. Coin probabilities are fixed. |
-| Roulette | Minimum stake (`betFloor`) and betting time. Wheel pockets and odds are fixed. |
-| Pass the pencil | Time per turn, voting time, and animation mode |
-| Drive the bus | Sips per step, rainbow rule, and team decision method |
-| Left or right | Vote time and places. Majority and tie rules are fixed. |
-
-Solo phone games use the side-game and chip settings in Game settings. Duel settings belong to their separate scene type.
-
-## Hosted minigame UI pass
-
-The phone has one round result with the player's own measurement, guess, or team outcome and a single points line. The host and TV carry placements, group results, and shared reveals. The result table includes points in the same row when the award belongs to that player or team. In narrow panes, measurements move beneath the player's name to leave room for both the name and points.
-
-| Minigame | Main play control | What the phone reveals |
-| --- | --- | --- |
-| Reaction duel | Wait/GO pad | Reaction time or false start |
-| Tap race | Tap pad and live count | Tap count |
-| Clap the beat | Lit tap pad with optional microphone | Beats hit |
-| Speed run | Course and direction buttons | Finish time |
-| Stop the Clock | Stop button and optional elapsed reading | Target, stop time, and difference |
-| Lucky doors | Compact door choices | Chosen door and payout |
-| Perfect circle | Square drawing area | Own circle and roundness |
-| Cut the Line | Endpoint labels and lock-in button | Target and cut markers |
-| Match the Angle | Dial and lock-in button | Target and guess on one dial, with the difference below |
-| Count the Dots | Numeric entry | Actual count and own guess |
-| Draw the Graph | Plot, Clear, and Lock in | Own trace against the actual line |
-| Heads or Tails | Two coin faces | Landed face and own pick |
-| Roulette | Betting table with chips | Rolling ball, landed pocket, own bets and points won or lost |
-| Pass the pencil | Turn drawing area and paged ballot | Own team's drawing and votes or accuracy |
-| Drive the bus | Cards and current choice | Own team's cards and total sips |
-| Left or right | Direction choices | Own pick and majority or tie |
-
-Waiting rounds give a short status, and the phone removes play controls when answers close. The compact editor preview also applies to every hosted minigame. Device and input coverage belongs in the verification notes for each playtest.
-
-Hosts can open **Configure minigame** in the Scene editor to change settings and preview the draft on a phone or shared screen before applying it. Count the Dots reveals the original pattern one dot at a time. Draw the Graph uses the same **Reveal easing** choices for its line sweep. Both default to Ease in and respect reduced motion.
-
-## Follow-up requested after the UI pass
+## Still to build (requested after the UI pass)
 
 - Extend team play to each minigame. Give the captain the team submission and let the host choose whether captains are assigned or elected on phones. Define the team rules for games that currently play individually.
-- Let the host choose whether Heads or Tails flips automatically after guesses lock or waits for a host action.
-- Replace the compact drawing color dropdown with swatches, simplify the Pass the Pencil ballot and host timer controls, and tighten the Left or Right prompt. Remove redundant dot indicators while keeping the Count the Dots board used for play.
-- Let a team that earns a rainbow in Drive the Bus choose the opposing team that takes the sips.
+- Simplify the Pass the Pencil ballot and host timer controls, and tighten the Left or Right prompt. Remove redundant dot indicators while keeping the Count the Dots board used for play.

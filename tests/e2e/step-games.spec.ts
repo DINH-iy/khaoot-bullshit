@@ -39,11 +39,17 @@ test('Bar games: teams drive the bus by voting on each guess, then everyone pick
   await host.getByRole('button', { name: 'Start the round' }).click();
 
   // Drive the bus: each team votes on its guess; a vote of everyone in the team decides at once.
-  for (const phone of phones) await expect(phone.getByText(/Round 1 of 4 · Red or black\?/)).toBeVisible({ timeout: 15_000 });
-  await expect(ada.getByText(/Vote for your team’s choice/)).toBeVisible();
+  for (const phone of phones) await expect(phone.getByText('Red or black?', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(ada.getByText(/Team vote/)).toBeVisible();
   expect((await new AxeBuilder({ page: ada }).analyze()).violations).toEqual([]);
   const guesses = [['Red', 'Black'], ['Higher', 'Lower'], ['Inside', 'Outside'], [/Hearts/, /Spades/]] as const;
   for (const [round, [forAda, forBo]] of guesses.entries()) {
+    if (round === 3) {
+      // Round 4 offers Rainbow exactly when the three turned cards are three different suits (the cards are dealt at random).
+      const suits = (await ada.locator('.bus-cards.big .bus-card:not(.down)').evaluateAll(cards => cards.map(card => card.getAttribute('aria-label') ?? '')))
+        .map(name => name.match(/of (\w+)/)?.[1]);
+      await expect(ada.getByRole('button', { name: 'Rainbow' })).toHaveCount(new Set(suits).size === 3 ? 1 : 0);
+    }
     await ada.getByRole('button', { name: forAda }).click(); await bo.getByRole('button', { name: forBo }).click();
     // Each guessed card is turned on the phone (and only then).
     await expect(ada.locator('.bus-cards.big .bus-card:not(.down)')).toHaveCount(round + 1);

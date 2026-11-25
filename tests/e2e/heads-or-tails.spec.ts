@@ -85,3 +85,44 @@ test('Heads or Tails settles a solo stake and reveals one shared coin after priv
     await display.close();
   }
 });
+
+test('Heads or Tails can wait for the host to flip the coin after the guesses close', async ({ page: host, browser, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'The playing phone uses a separate narrow touch context.');
+  await host.goto(`${baseURL}/?host=1#owner=${token}`);
+  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  const gameId = randomUUID(); const roomId = randomUUID();
+  const games = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
+  const draft = (await (await host.request.post(games, { headers, data: { gameId, title: 'Host flips', startFrom: 'timed-quiz' } })).json()).data;
+  const definition = {
+    formatVersion: 2, title: 'Host flips', startNodeKey: 'coin', edges: [],
+    nodes: [{ key: 'coin', stages: [{ key: 'main', kind: 'minigame', prompt: 'Pick a side', game: 'heads-or-tails', settings: { flip: 'host' },
+      durationMs: 15_000, countdownSeconds: 1, placementMilli: ['5000'] }] }],
+  };
+  const saved = (await (await host.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).json()).data;
+  // The editor shows the setting as a switch.
+  await host.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  await host.getByRole('button', { name: 'Configure minigame' }).click();
+  await expect(host.getByRole('group', { name: 'The coin flips' }).getByRole('button', { name: 'When the host flips' })).toHaveAttribute('aria-pressed', 'true');
+  expect((await host.request.post(`${games}/${gameId}/publish`, { headers, data: { expectedRevision: saved.revision } })).ok()).toBe(true);
+  expect((await host.request.post(`${baseURL}/api/host/rooms`, { headers, data: { gameId, sessionId: roomId, commandId: randomUUID() } })).ok()).toBe(true);
+  await host.goto(`${baseURL}/?room=${roomId}`);
+  const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+  await closeRoundsByHand(host);
+  const mobile = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
+  try {
+    const phone = await mobile.newPage();
+    await phone.goto(`${baseURL}/?code=${code}`);
+    await phone.getByLabel('Your name').fill('Bo');
+    await phone.getByRole('button', { name: 'Join room', exact: true }).click();
+    await host.getByRole('button', { name: 'Start the game' }).click();
+    await phone.getByRole('button', { name: 'Heads', exact: true }).tap();
+    await host.getByRole('button', { name: 'Close answers' }).click();
+    // Closed, but the coin is still in the air: nothing has landed, and the phone says the host flips it.
+    await expect(phone.getByText('Your guess is locked in. The host flips the coin.')).toBeVisible();
+    await expect(host.getByText(/^It landed on (Heads|Tails)$/)).toHaveCount(0);
+    await host.getByRole('button', { name: 'Flip the coin' }).click();
+    await expect(phone.getByText(/^It landed on (Heads|Tails)$/)).toBeVisible();
+  } finally {
+    await mobile.close();
+  }
+});

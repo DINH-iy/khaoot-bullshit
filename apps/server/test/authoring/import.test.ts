@@ -30,7 +30,7 @@ describe('importing a game from text', () => {
     expect(stage('cut')).toMatchObject({ kind: 'minigame', game: 'cut-the-line', durationMs: 20_000, presentation: { theme: { font: 'serif' } }, settings: { target: { mode: 'exact', value: 37 } }, scoring: { kind: 'within', distance: 5, pointsMilli: '10000' } });
     expect(stage('angle')).toMatchObject({ kind: 'minigame', game: 'match-the-angle', durationMs: 20_000, tiebreak: 'shared', placementMilli: ['10000', '6000', '3000'] });
     expect(stage('dots')).toMatchObject({ kind: 'minigame', game: 'count-the-dots', durationMs: 15_000, countdownSeconds: 3, settings: { viewSeconds: 6, count: { mode: 'range', min: 1, max: 500 }, allowOverlap: true, revealEasing: 'ease-in' } });
-    expect(stage('coin')).toMatchObject({ kind: 'minigame', game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['10000'] });
+    expect(stage('coin')).toMatchObject({ kind: 'minigame', game: 'heads-or-tails', durationMs: 15_000, placementMilli: ['10000'], settings: { flip: 'host' } });
     expect(stage('graph')).toMatchObject({ kind: 'minigame', game: 'draw-the-graph', durationMs: 30_000,
       settings: { revealEasing: 'ease-out', graph: { visible: [10, 20, 35, 50], hidden: [55, 65, 62, 80], yLabel: 'Visitors', scale: { min: 0, max: 1000 }, splitAt: 0.4, source: 'Example dataset', sourceUrl: 'https://example.org/museum-visits', sourceNote: 'Annual admissions.' } } });
     expect(stage('roulette')).toMatchObject({ kind: 'minigame', game: 'red-or-black-roulette', durationMs: 30_000, settings: { betFloor: 50 } });

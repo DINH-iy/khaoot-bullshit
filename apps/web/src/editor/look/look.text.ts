@@ -6,7 +6,8 @@ import { defineTexts } from '../../i18n/texts.js';
 export const LOOK_TEXTS = defineTexts('editor-look', {
   look: 'Look & feel', lookOf: 'Change the look of', wholeGame: 'The whole game', onlyScene: 'Only this scene', partN: ' · part {number}',
   gameHint: 'Changes here apply to every scene, unless a scene has its own.', sceneHint: 'Changes here apply only to this scene; everything else follows the whole game.',
-  ownLookOne: '{count} scene has its own look (marked ✎).', ownLookMany: '{count} scenes have their own look (marked ✎).', partOfLook: 'Part of the look',
+  ownLookOne: '{count} scene has its own look.', ownLookMany: '{count} scenes have their own look.', partOfLook: 'Part of the look',
+  ownLookTag: 'Own look', ownLookHint: 'Changes to the whole game do not show on scenes with their own look.', resetAll: 'Use the game’s look everywhere', resetAllAsk: 'Use the game’s look in every scene?', resetAllText: 'The {count} scenes with their own look lose it (colours, style, texts and animations) and follow the whole game. Undo brings it back.', resetAllConfirm: 'Use the game’s look', sceneOwn: 'This scene has its own look, so changes to the whole game do not show here.', editSceneLook: 'Edit this scene’s look', useGameLook: 'Use the game’s look', resetDone: 'Every scene now follows the game’s look.', resetOneDone: 'This scene now follows the game’s look.',
   tabTheme: 'Colours & style', tabTexts: 'Texts', tabAnimations: 'Animations', previewLabel: 'Preview of the look',
   sliders: 'Sliders', sliderBlade: 'Blade', sliderNotch: 'Notch', sliderRing: 'Ring', sliderDial: 'Dial', sliderDemo: 'Try the dial',
   tabPhoneMenu: 'Phone menu',
@@ -70,7 +71,8 @@ export const LOOK_TEXTS = defineTexts('editor-look', {
   nl: {
     look: 'Uiterlijk', lookOf: 'Het uiterlijk veranderen van', wholeGame: 'Het hele spel', onlyScene: 'Alleen deze scène', partN: ' · deel {number}',
     gameHint: 'Wijzigingen hier gelden voor elke scène, behalve als een scène een eigen uiterlijk heeft.', sceneHint: 'Wijzigingen hier gelden alleen voor deze scène; de rest volgt het hele spel.',
-    ownLookOne: '{count} scène heeft een eigen uiterlijk (gemarkeerd met ✎).', ownLookMany: '{count} scènes hebben een eigen uiterlijk (gemarkeerd met ✎).', partOfLook: 'Deel van het uiterlijk',
+    ownLookOne: '{count} scène heeft een eigen uiterlijk.', ownLookMany: '{count} scènes hebben een eigen uiterlijk.', partOfLook: 'Deel van het uiterlijk',
+    ownLookTag: 'Eigen uiterlijk', ownLookHint: 'Wijzigingen voor het hele spel zie je niet op scènes met een eigen uiterlijk.', resetAll: 'Overal het uiterlijk van het spel gebruiken', resetAllAsk: 'In elke scène het uiterlijk van het spel gebruiken?', resetAllText: 'De {count} scènes met een eigen uiterlijk raken dat kwijt (kleuren, stijl, teksten en animaties) en volgen het hele spel. Ongedaan maken haalt het terug.', resetAllConfirm: 'Uiterlijk van het spel gebruiken', sceneOwn: 'Deze scène heeft een eigen uiterlijk, dus wijzigingen voor het hele spel zie je hier niet.', editSceneLook: 'Uiterlijk van deze scène bewerken', useGameLook: 'Uiterlijk van het spel gebruiken', resetDone: 'Elke scène volgt nu het uiterlijk van het spel.', resetOneDone: 'Deze scène volgt nu het uiterlijk van het spel.',
     tabTheme: 'Kleuren & stijl', tabTexts: 'Teksten', tabAnimations: 'Animaties', previewLabel: 'Voorbeeld van het uiterlijk',
     sliders: 'Schuifregelaars', sliderBlade: 'Mes', sliderNotch: 'Inkeping', sliderRing: 'Ring', sliderDial: 'Draaischijf', sliderDemo: 'Probeer de schuifregelaar',
     tabPhoneMenu: 'Telefoonmenu',
@@ -129,7 +131,8 @@ export const LOOK_TEXTS = defineTexts('editor-look', {
   de: {
     look: 'Aussehen', lookOf: 'Das Aussehen ändern von', wholeGame: 'Dem ganzen Spiel', onlyScene: 'Nur dieser Szene', partN: ' · Teil {number}',
     gameHint: 'Änderungen hier gelten für jede Szene, außer eine Szene hat ein eigenes Aussehen.', sceneHint: 'Änderungen hier gelten nur für diese Szene; alles andere folgt dem ganzen Spiel.',
-    ownLookOne: '{count} Szene hat ein eigenes Aussehen (mit ✎ markiert).', ownLookMany: '{count} Szenen haben ein eigenes Aussehen (mit ✎ markiert).', partOfLook: 'Teil des Aussehens',
+    ownLookOne: '{count} Szene hat ein eigenes Aussehen.', ownLookMany: '{count} Szenen haben ein eigenes Aussehen.', partOfLook: 'Teil des Aussehens',
+    ownLookTag: 'Eigenes Aussehen', ownLookHint: 'Änderungen für das ganze Spiel sieht man nicht auf Szenen mit eigenem Aussehen.', resetAll: 'Überall das Aussehen des Spiels verwenden', resetAllAsk: 'In jeder Szene das Aussehen des Spiels verwenden?', resetAllText: 'Die {count} Szenen mit eigenem Aussehen verlieren es (Farben, Stil, Texte und Animationen) und folgen dem ganzen Spiel. Rückgängig holt es zurück.', resetAllConfirm: 'Aussehen des Spiels verwenden', sceneOwn: 'Diese Szene hat ein eigenes Aussehen, daher sieht man Änderungen für das ganze Spiel hier nicht.', editSceneLook: 'Aussehen dieser Szene bearbeiten', useGameLook: 'Aussehen des Spiels verwenden', resetDone: 'Jede Szene folgt jetzt dem Aussehen des Spiels.', resetOneDone: 'Diese Szene folgt jetzt dem Aussehen des Spiels.',
     tabTheme: 'Farben & Stil', tabTexts: 'Texte', tabAnimations: 'Animationen', previewLabel: 'Vorschau des Aussehens',
     sliders: 'Schieberegler', sliderBlade: 'Klinge', sliderNotch: 'Kerbe', sliderRing: 'Ring', sliderDial: 'Skala', sliderDemo: 'Skala ausprobieren',
     tabPhoneMenu: 'Handymenü',
@@ -188,7 +191,8 @@ export const LOOK_TEXTS = defineTexts('editor-look', {
   ro: {
     look: 'Aspect', lookOf: 'Schimbă aspectul pentru', wholeGame: 'Tot jocul', onlyScene: 'Doar această scenă', partN: ' · partea {number}',
     gameHint: 'Modificările de aici se aplică fiecărei scene, dacă scena nu are aspect propriu.', sceneHint: 'Modificările de aici se aplică doar acestei scene; restul urmează tot jocul.',
-    ownLookOne: '{count} scenă are aspect propriu (marcată cu ✎).', ownLookMany: '{count} scene au aspect propriu (marcate cu ✎).', partOfLook: 'Parte a aspectului',
+    ownLookOne: '{count} scenă are aspect propriu.', ownLookMany: '{count} scene au aspect propriu.', partOfLook: 'Parte a aspectului',
+    ownLookTag: 'Aspect propriu', ownLookHint: 'Schimbările pentru tot jocul nu se văd pe scenele cu aspect propriu.', resetAll: 'Folosește aspectul jocului peste tot', resetAllAsk: 'Folosești aspectul jocului în fiecare scenă?', resetAllText: 'Cele {count} scene cu aspect propriu îl pierd (culori, stil, texte și animații) și urmează tot jocul. Anularea îl aduce înapoi.', resetAllConfirm: 'Folosește aspectul jocului', sceneOwn: 'Scena aceasta are aspect propriu, așa că schimbările pentru tot jocul nu se văd aici.', editSceneLook: 'Editează aspectul acestei scene', useGameLook: 'Folosește aspectul jocului', resetDone: 'Fiecare scenă urmează acum aspectul jocului.', resetOneDone: 'Scena aceasta urmează acum aspectul jocului.',
     tabTheme: 'Culori și stil', tabTexts: 'Texte', tabAnimations: 'Animații', previewLabel: 'Previzualizarea aspectului',
     sliders: 'Cursoare', sliderBlade: 'Lamă', sliderNotch: 'Crestătură', sliderRing: 'Inel', sliderDial: 'Cadran', sliderDemo: 'Încearcă selectorul',
     tabPhoneMenu: 'Meniul telefonului',

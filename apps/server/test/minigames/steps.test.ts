@@ -54,20 +54,50 @@ describe('Lucky doors: which door hides what', () => {
   });
 });
 
-describe('Drive the bus: a rainbow', () => {
+describe('Drive the bus: a rainbow is called, not found', () => {
   const bus = STEP_GAMES['bus']!;
-  const card = (rank: number, suit: string) => ({ rank, suit });
-  const done = (suits: string[]) => ({ state: { cards: suits.map((suit, index) => card(index + 2, suit)), guesses: ['red', 'higher', 'inside', 'hearts'] }, done: true });
-  it('four different suits make every other team drink the last round’s sips', () => {
-    const settings = { sips: [1, 2, 3, 4], rainbow: true };
-    const rainbow = done(['hearts', 'diamonds', 'clubs', 'spades']); const plain = done(['hearts', 'hearts', 'clubs', 'spades']);
-    expect(bus.extras!([rainbow, plain], settings)).toEqual([0, 4]);
-    expect(bus.extras!([rainbow, rainbow], settings)).toEqual([4, 4]);
-    expect(bus.resultFlags!(rainbow.state, settings, { startsAt: '', goAt: null, doorsMilli: null })).toEqual({ rainbow: true });
+  const run = { startsAt: '', goAt: null, doorsMilli: null };
+  const settings = { sips: [1, 2, 3, 4], rainbow: true };
+  const cards = (suits: string[]) => suits.map((suit, index) => ({ rank: index + 2, suit }));
+  // Rounds 1–3 guessed right for these cards (2, 3, 4, 5: red/black by suit, higher, outside), then `last`.
+  const played = (suits: string[], last: string) => ({ cards: cards(suits), guesses: [suits[0] === 'hearts' || suits[0] === 'diamonds' ? 'red' : 'black', 'higher', 'outside', last] });
+  const done = (suits: string[], last: string) => ({ state: played(suits, last), done: true });
+  const rainbow = ['hearts', 'clubs', 'diamonds', 'spades'];
+
+  it('offers Rainbow in round 4 only while three different suits are showing and the rule is on', () => {
+    const before = (suits: string[]) => ({ ...played(suits, 'hearts'), guesses: played(suits, 'hearts').guesses.slice(0, 3) });
+    expect(bus.options(before(rainbow), settings, run)).toEqual(['hearts', 'diamonds', 'clubs', 'spades', 'rainbow']);
+    expect(bus.options(before(['hearts', 'hearts', 'clubs', 'spades']), settings, run)).toEqual(['hearts', 'diamonds', 'clubs', 'spades']);
+    expect(bus.options(before(rainbow), { ...settings, rainbow: false }, run)).toEqual(['hearts', 'diamonds', 'clubs', 'spades']);
+    expect(bus.options({ ...before(rainbow), guesses: ['red', 'higher'] }, settings, run)).toEqual(['inside', 'outside']);
   });
+
+  it('a right call makes every other team drink the last round’s sips; the caller drinks nothing', () => {
+    const called = done(rainbow, 'rainbow'); const plain = done(['hearts', 'hearts', 'clubs', 'spades'], 'spades');
+    expect(bus.result(called.state, settings, run, new Date())).toBe(0);
+    expect(bus.extras!([called, plain], settings)).toEqual([0, 4]);
+    expect(bus.extras!([called, called], settings)).toEqual([4, 4]);
+    expect(bus.resultFlags!(called.state, settings, run)).toEqual({ rainbow: true });
+  });
+
+  it('a wrong call costs the caller the last round’s sips, and nobody else', () => {
+    const missed = done(['hearts', 'clubs', 'diamonds', 'hearts'], 'rainbow');
+    expect(bus.result(missed.state, settings, run, new Date())).toBe(4);
+    expect(bus.resultFlags!(missed.state, settings, run)).toEqual({});
+    expect(bus.extras!([missed, done(rainbow, 'spades')], settings)).toEqual([0, 0]);
+  });
+
+  it('four suits without calling it are an ordinary suit guess: no rainbow', () => {
+    const guessed = done(rainbow, 'spades'); const wrong = done(rainbow, 'hearts');
+    expect(bus.result(guessed.state, settings, run, new Date())).toBe(0);
+    expect(bus.result(wrong.state, settings, run, new Date())).toBe(4);
+    expect(bus.resultFlags!(guessed.state, settings, run)).toEqual({});
+    expect(bus.extras!([guessed, wrong], settings)).toEqual([0, 0]);
+  });
+
   it('can be switched off, and does not count before the fourth card', () => {
-    expect(bus.extras!([done(['hearts', 'diamonds', 'clubs', 'spades']), done(['hearts', 'hearts', 'clubs', 'spades'])], { sips: [1, 2, 3, 4], rainbow: false })).toEqual([0, 0]);
-    expect(bus.extras!([{ ...done(['hearts', 'diamonds', 'clubs', 'spades']), done: false }, done(['hearts', 'hearts', 'hearts', 'hearts'])], { sips: [1, 2, 3, 4] })).toEqual([0, 0]);
+    expect(bus.extras!([done(rainbow, 'rainbow'), done(['hearts', 'hearts', 'clubs', 'spades'], 'spades')], { ...settings, rainbow: false })).toEqual([0, 0]);
+    expect(bus.extras!([{ ...done(rainbow, 'rainbow'), done: false }, done(['hearts', 'hearts', 'hearts', 'hearts'], 'hearts')], settings)).toEqual([0, 0]);
   });
 });
 

@@ -10,16 +10,18 @@
 .drawing-pad.disabled .drawing-surface { cursor: not-allowed; opacity: .75; }
 .drawing-pad.blind .drawing-surface { background: repeating-linear-gradient(45deg, #f1eef9 0 12px, #fff 12px 24px); }
 .drawing-note { margin: 0; text-align: center; color: var(--r-muted, #555); }
-.drawing-tools { display: grid; gap: 8px; }
-.drawing-colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-.room .drawing-colors button, .drawing-colors button { min-height: 34px; padding: 0; border-radius: 50%; aspect-ratio: 1; border: 2px solid rgb(0 0 0 / .25); }
+.drawing-tools { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+/* The colours and tools shrink with the screen: never wider than the pad (Firefox otherwise keeps each round
+   button at least its minimum height wide, and a narrow phone's sheet ran off the screen). */
+.drawing-colors { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.room .drawing-colors button, .drawing-colors button { width: 100%; min-width: 0; min-height: 0; height: auto; padding: 0; border-radius: 50%; aspect-ratio: 1; border: 2px solid rgb(0 0 0 / .25); }
 .room .drawing-colors button[aria-checked=true], .drawing-colors button[aria-checked=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: 2px; }
 .drawing-widths { display: flex; gap: 6px; }
 .room .drawing-widths button, .drawing-widths button { flex: 1; min-height: 40px; display: grid; place-items: center; padding: 0; }
 .drawing-widths button[role=radio] span { display: block; border-radius: 50%; box-shadow: 0 0 0 1px rgb(255 255 255 / .6); }
 .room .drawing-widths button[aria-checked=true], .drawing-widths button[aria-checked=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: -1px; }
 .drawing-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.drawing-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.drawing-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: 0; }
 /* The eraser is a toggle: clearly on while it is the tool, and the size dots show the paper colour with an edge. */
 .room .drawing-widths .drawing-eraser, .drawing-widths .drawing-eraser { flex: 1.6; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; font-size: .875rem; white-space: nowrap; }
 .room .drawing-widths .drawing-eraser[aria-pressed=true], .drawing-widths .drawing-eraser[aria-pressed=true] { outline: 3px solid var(--r-accent, #6d3fd6); outline-offset: -1px; }
@@ -38,7 +40,8 @@
 .blind-banner strong { font-size: 1.6rem; letter-spacing: .08em; color: #ffcf4a; line-height: 1.1; }
 .blind-banner small { font-size: .9rem; opacity: .9; }
 /* Sizes and eraser in one row; undo and start over below (or, on a short screen, all in one row as icons). */
-.drawing-row { display: grid; gap: 8px; }
+.drawing-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.drawing-row > *, .room .drawing-widths button, .drawing-widths button, .room .drawing-actions button, .drawing-actions button { min-width: 0; }
 .drawing-actions button .tool-label, .drawing-eraser .tool-label { margin-inline-start: 6px; }
 /* On a phone the square is sized to the height left over (measured in drawing-pad.tsx), so the colours, sizes and
    buttons stay on screen with it, above the floating menu bar. */
@@ -47,7 +50,7 @@
 @media (max-height: 760px) {
   .drawing-row { display: flex; gap: 6px; }
   .drawing-row .drawing-widths { flex: 5; }
-  .drawing-row .drawing-actions { flex: 2; flex-wrap: nowrap; gap: 6px; }
+  .drawing-row .drawing-actions { flex: none; flex-wrap: nowrap; gap: 6px; }
   .drawing-row .tool-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .room .drawing-widths .drawing-eraser, .drawing-widths .drawing-eraser { flex: 1; padding: 0; }
   .drawing-row .drawing-actions button { flex: 1; min-width: 40px; padding: 0; justify-content: center; }

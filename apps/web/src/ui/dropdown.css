@@ -7,6 +7,9 @@
 .ed-dropdown-option { padding: 9px 12px 9px 30px; border-radius: 8px; cursor: pointer; position: relative; line-height: 1.3; overflow-wrap: anywhere; }
 .ed-dropdown-option.active { background: var(--e-accent-soft, color-mix(in srgb, var(--r-accent, #9a7bea) 18%, transparent)); }
 .ed-dropdown-option[aria-selected=true] { font-weight: 600; }
+/* A short tag after an option ("Own look"). */
+.ed-dropdown-badge { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: .78em; font-weight: 700; vertical-align: 1px; white-space: nowrap;
+  background: var(--e-accent-soft, color-mix(in srgb, var(--r-accent, #9a7bea) 18%, transparent)); color: var(--e-accent, var(--r-accent, light-dark(#6440bb, #b9a2ff))); }
 .ed-dropdown-check { position: absolute; left: 10px; color: var(--e-accent, var(--r-accent, light-dark(#6440bb, #b9a2ff))); }
 .ed-dropdown-option[aria-disabled=true] { color: var(--e-muted, var(--r-muted, light-dark(#625a71, #c2b9d3))); cursor: default; }
 .ed-dropdown-group { padding: 8px 12px 4px; font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--e-muted, var(--r-muted, light-dark(#625a71, #c2b9d3))); }

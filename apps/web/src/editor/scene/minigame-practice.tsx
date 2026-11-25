@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   ANGLE_TARGETS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, chooseCutTarget, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_BET_FLOOR, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
-  DEFAULT_REVEAL_EASING, SAMPLE_GRAPH, graphError, angleError, busGuessRight, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteMatches, rouletteNet, isSharedPrediction,
+  DEFAULT_REVEAL_EASING, SAMPLE_GRAPH, graphError, angleError, busGuessRight, busRainbowOpen, BUS_RAINBOW, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteMatches, rouletteNet, isSharedPrediction,
   type BusGuess, type Drawing, type MinigameKey, type MinigameSettings, type StepSideView,
 } from '@party/contracts';
 import { DrawingPad } from '../../drawing/drawing-pad.js';
@@ -164,11 +164,13 @@ function StepPractice({ game, settings, starts, expired }: { game: MinigameKey; 
   const step = played.length;
   const course = (settings as MinigameSettings<'speed-run'>).course ?? SPEED_RUN_COURSE;
   const moves = game === 'speed-run' ? raceOptions(course, cell) : [];
-  const options = game === 'bus' ? BUS_GUESSES[step] : game === 'lucky-doors' ? (step === 0 ? doors.map((_, index) => String(index)) : null)
+  const busRules = settings as MinigameSettings<'bus'>;
+  // Round 4 also offers Rainbow while the first three cards are three different suits (as on the server).
+  const options = game === 'bus' ? (step === 3 && busRainbowOpen(cards, busRules) ? [...BUS_GUESSES[3], BUS_RAINBOW] : BUS_GUESSES[step]) : game === 'lucky-doors' ? (step === 0 ? doors.map((_, index) => String(index)) : null)
     : game === 'majority' ? (step === 0 ? ['left', 'right'] : null) : (finished === null && step < 64 ? moves.map(move => move.direction) : null);
   const right = game === 'bus' ? played.map((guess, index) => busGuessRight(index, guess as BusGuess, cards)) : [];
   const sips = right.reduce((total, correct, index) => total + (correct ? 0 : (settings as MinigameSettings<'bus'>).sips[index] ?? 0), 0);
-  const view = game === 'bus' ? { cards: cards.slice(0, step), guesses: played, right, sips, rainbow: step === 4 && (settings as MinigameSettings<'bus'>).rainbow !== false && isRainbow(cards) }
+  const view = game === 'bus' ? { cards: cards.slice(0, step), guesses: played, right, sips, rainbow: busRules.rainbow !== false && played[3] === BUS_RAINBOW && isRainbow(cards) }
     : game === 'lucky-doors' ? { picked: step ? Number(played[0]) : null } : game === 'speed-run' ? { cell } : { chosen: step > 0 };
   const value = game === 'bus' ? sips : game === 'speed-run' ? finished : game === 'majority' ? (played[0] === 'left' ? 0 : 1) : Number(played[0]);
   const side: StepSideView = { name: '', playerId: null, teamId: null, captainId: null, voteEndsAt: null, voters: [], votes: [], view,
@@ -187,7 +189,7 @@ function StepPractice({ game, settings, starts, expired }: { game: MinigameKey; 
     {renderer.board?.(side, settings, true)}
     {options && !expired ? <div className="step-question">
       <p className="step-ask">{renderer.question(view, step, settings)}</p>
-      {renderer.stake && <p className="step-stake">{renderer.stake(step, settings)}</p>}
+      {renderer.stake && <div className="step-stake">{renderer.stake(step, settings, view)}</div>}
       <StepChoices renderer={renderer} options={options} view={view} settings={settings} disabled={false} onChoose={choose} />
     </div> : <p role="status" className="practice-result">{options ? text('timer.up') : game === 'lucky-doors'
       ? t('points', { points: formatPoints(doors[Number(played[0])]!) }) : minigameResult(game, value, settings)}</p>}

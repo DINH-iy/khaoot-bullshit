@@ -43,6 +43,9 @@ const paths: Record<string, string> = {
   export: 'M4 14v6h16v-6 M12 3v12 M8 7l4-4 4 4',
   // Copy: two overlapping sheets; Copied: a tick.
   copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
+  // Clipboard: copying to it, and pasting from it (with an arrow out).
+  clipboard: 'M9 3h6v3H9z M9 4.5H6V21h12V4.5h-3 M9 11h6 M9 15h4',
+  paste: 'M9 3h6v3H9z M9 4.5H6V21h12V4.5h-3 M12 10v7 M9 14l3 3 3-3',
   check: 'M5 12l5 5L20 7',
   close: 'M6 6l12 12 M18 6L6 18',
   sound: 'M4 9h4l5-4v14l-5-4H4z M16 9a4 4 0 0 1 0 6 M19 6a8 8 0 0 1 0 12',

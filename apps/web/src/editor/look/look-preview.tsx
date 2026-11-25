@@ -32,7 +32,8 @@ function sampleStage(definition: Definition, scope: Scope): { prompt: string; op
 }
 
 /** The shared screen and a phone, drawn with the real room styles and the chosen look. */
-export function LookPreview({ definition, scope, style, className, selected }: { definition: Definition; scope: Scope; style: CSSProperties; className: string; selected?: string | undefined }) {
+export function LookPreview({ definition, scope, style, className, selected, ownLook }: { definition: Definition; scope: Scope; style: CSSProperties; className: string; selected?: string | undefined;
+  ownLook?: { edit: (nodeKey: string, stageIndex: number) => void; follow: (nodeKey: string, stageIndex: number) => void } | undefined }) {
   // “This scene” first: the scene being styled (or the one selected in the editor, or the first), as it really looks.
   const look = useLook(); const t = look.text; const [shown, setShown] = useState<Moment_>('scene');
   const sceneNode = definition.nodes.find(node => node.key === (scope.kind === 'scene' ? scope.nodeKey : selected)) ?? definition.nodes.find(node => node.key === definition.startNodeKey) ?? definition.nodes[0];
@@ -47,6 +48,12 @@ export function LookPreview({ definition, scope, style, className, selected }: {
   return <div className="look-preview">
     <div className="segmented" role="group" aria-label={tx('showMoment')}>{(Object.keys(MOMENTS_SHOWN) as Moment_[]).map(key => <button key={key} aria-pressed={shown === key} onClick={() => replay(key)}>{tx(MOMENTS_SHOWN[key])}</button>)}
       <button className="small-button" onClick={() => replay(shown)}>{tx('playAgain')}</button></div>
+    {/* Styling the whole game while the scene shown has its own look: say why it does not change, and offer the way out. */}
+    {shown === 'scene' && scope.kind === 'game' && sceneNode && Boolean(sceneNode.stages[sceneIndex]?.['presentation']) && <div className="own-look-banner" role="note">
+      <p>{tx('sceneOwn')}</p>
+      {ownLook && <div className="actions"><button type="button" className="small-button" onClick={() => ownLook.edit(sceneNode.key, sceneIndex)}>{tx('editSceneLook')}</button>
+        <button type="button" className="small-button" onClick={() => ownLook.follow(sceneNode.key, sceneIndex)}>{tx('useGameLook')}</button></div>}
+    </div>}
     {shown === 'scene' ? <div ref={tvRef} className="look-scene">{sceneNode ? <ScenePreview key={`${sceneNode.key}:${sceneIndex}`} definition={definition} node={sceneNode} index={sceneIndex} device="both" /> : <p className="hint">{tx('sceneFallback')}</p>}</div>
     : <div className="look-devices">
       <figure className="look-tv"><figcaption>{tx('sharedScreen')}</figcaption>

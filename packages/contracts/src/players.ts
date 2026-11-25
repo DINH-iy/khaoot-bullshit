@@ -12,11 +12,16 @@ export const LOOK_PARTS = {
   mouth: ['smile', 'grin', 'open', 'tongue', 'flat', 'o', 'teeth', 'smirk'],
   hat: ['none', 'crown', 'cap', 'party', 'beanie', 'horns', 'bow', 'halo', 'tophat', 'antenna'],
   extra: ['none', 'glasses', 'shades', 'mustache', 'blush', 'freckles', 'eyepatch', 'bandaid'],
+  // Added 25 November 2026; optional in a look (older looks have none).
+  beard: ['none', 'stubble', 'goatee', 'full', 'handlebar', 'chops'],
+  piercing: ['none', 'nose', 'septum', 'lip', 'brow', 'studs'],
+  marks: ['none', 'heart', 'star', 'tear', 'bolt', 'scar', 'mole', 'unibrow'],
 } as const;
 export type LookPart = keyof typeof LOOK_PARTS;
 const part = <K extends LookPart>(key: K) => z.enum(LOOK_PARTS[key] as unknown as [typeof LOOK_PARTS[K][number], ...typeof LOOK_PARTS[K][number][]]);
 export const PlayerLookSchema = z.object({
   color: z.number().int().min(0).max(LOOK_COLORS.length - 1), body: part('body'), eyes: part('eyes'), mouth: part('mouth'), hat: part('hat'), extra: part('extra'),
+  beard: part('beard').optional(), piercing: part('piercing').optional(), marks: part('marks').optional(),
   // Optional: a photo taken on the phone or a drawing, shown instead of the character. Stored by the server; the character stays as the fallback.
   picture: z.object({ assetId: z.string().uuid(), kind: z.enum(['photo', 'drawing']) }).strict().optional(),
 }).strict();
@@ -29,6 +34,9 @@ export const LOOK_PART_NAMES: { [K in LookPart]: { title: string; names: Record<
   mouth: { title: 'Mouth', names: { smile: 'Smile', grin: 'Big grin', open: 'Laughing', tongue: 'Tongue out', flat: 'Unimpressed', o: 'Surprised', teeth: 'Toothy', smirk: 'Smirk' } },
   hat: { title: 'Hat', names: { none: 'No hat', crown: 'Crown', cap: 'Cap', party: 'Party hat', beanie: 'Beanie', horns: 'Horns', bow: 'Bow', halo: 'Halo', tophat: 'Top hat', antenna: 'Antenna' } },
   extra: { title: 'Extra', names: { none: 'Nothing', glasses: 'Glasses', shades: 'Sunglasses', mustache: 'Moustache', blush: 'Blush', freckles: 'Freckles', eyepatch: 'Eye patch', bandaid: 'Plaster' } },
+  beard: { title: 'Facial hair', names: { none: 'No facial hair', stubble: 'Stubble', goatee: 'Goatee', full: 'Full beard', handlebar: 'Handlebar moustache', chops: 'Mutton chops' } },
+  piercing: { title: 'Piercings', names: { none: 'No piercings', nose: 'Nose ring', septum: 'Septum ring', lip: 'Lip ring', brow: 'Eyebrow bar', studs: 'Cheek studs' } },
+  marks: { title: 'Tattoos & marks', names: { none: 'Nothing', heart: 'Heart tattoo', star: 'Star tattoo', tear: 'Teardrop tattoo', bolt: 'Lightning tattoo', scar: 'Scar', mole: 'Beauty mark', unibrow: 'Unibrow' } },
 };
 
 /** Every player has a look from the start, made from their ID; they can change it whenever they like. */

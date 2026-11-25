@@ -17,6 +17,7 @@ import { translate } from '../../i18n/texts.js';
 import { LOOK_TEXTS } from './look.text.js';
 const t = (key: keyof typeof LOOK_TEXTS.en, values?: Record<string, string | number>) => translate(LOOK_TEXTS, key, values);
 import { readMemory, rememberPlace } from '../shell/editor-memory.js';
+import { ConfirmDialog } from '../controls/confirm-dialog.js';
 
 type Section = 'theme' | 'texts' | 'animations' | 'phoneMenu';
 const SECTIONS = { theme: 'tabTheme', texts: 'tabTexts', animations: 'tabAnimations', phoneMenu: 'tabPhoneMenu' } as const satisfies Record<Section, keyof typeof LOOK_TEXTS.en>;
@@ -40,14 +41,25 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
   const look = buildLook({ ...mergePresentationTexts(game, live.kind === 'scene' ? layer : undefined), animations: { ...game.animations, ...(live.kind === 'scene' ? layer.animations : {}) }, themes: [game.theme, live.kind === 'scene' ? layer.theme : undefined].filter(Boolean) }, section === 'texts' && textLanguage ? textLanguage : editorLanguage);
   const style = useThemeStyle(look.theme);
   const changedScenes = definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ node, index, stage }))).filter(entry => entry.stage['presentation']);
+  // Scenes with their own look ignore the game's: they can follow it again, one at a time or all at once (one undo step).
+  const [askReset, setAskReset] = useState(false);
+  const followGame = (scenes: { nodeKey: string; stageIndex: number }[], notice: string) => {
+    let next = definition; for (const scene of scenes) next = withLayer(next, { kind: 'scene', ...scene }, {});
+    d.change(next as Definition, undefined, 'look:follow-game'); d.setNotice(notice);
+  };
   return <div className="look-editor">
     <aside className="look-controls" aria-labelledby="look-heading">
       <h2 id="look-heading">{t('look')}</h2>
       <label>{t('lookOf')}<Dropdown disabled={section === 'phoneMenu'} value={scopeValue(live)} onChange={value => { if (value === 'game') setScope({ kind: 'game' }); else { const [nodeKey, index] = value.split('|') as [string, string]; setScope({ kind: 'scene', nodeKey, stageIndex: Number(index) }); } }}
         options={[{ value: 'game', label: t('wholeGame') }, ...definition.nodes.flatMap(node => node.stages.map((stage, index) => ({ value: `${node.key}|${index}`, group: t('onlyScene'),
-          label: `${short(cardText(definition, node).title || node.key)}${node.stages.length > 1 ? t('partN', { number: index + 1 }) : ''}${stage['presentation'] ? ' ✎' : ''}` })))]} /></label>
+          label: `${short(cardText(definition, node).title || node.key)}${node.stages.length > 1 ? t('partN', { number: index + 1 }) : ''}`, ...(stage['presentation'] ? { badge: t('ownLookTag') } : {}) })))]} /></label>
       <p className="hint">{t(live.kind === 'game' ? 'gameHint' : 'sceneHint')}</p>
-      {live.kind === 'game' && changedScenes.length > 0 && <p className="hint">{t(changedScenes.length === 1 ? 'ownLookOne' : 'ownLookMany', { count: changedScenes.length })}</p>}
+      {live.kind === 'game' && changedScenes.length > 0 && <div className="own-look-note">
+        <p className="hint">{t(changedScenes.length === 1 ? 'ownLookOne' : 'ownLookMany', { count: changedScenes.length })} {t('ownLookHint')}</p>
+        {!d.readOnly && <button type="button" className="small-button" onClick={() => setAskReset(true)}>{t('resetAll')}</button>}
+      </div>}
+      {askReset && <ConfirmDialog title={t('resetAllAsk')} text={t('resetAllText', { count: changedScenes.length })} confirm={t('resetAllConfirm')}
+        onConfirm={() => { setAskReset(false); followGame(changedScenes.map(entry => ({ nodeKey: entry.node.key, stageIndex: entry.index })), t('resetDone')); }} onCancel={() => setAskReset(false)} />}
       <div className="tabs" role="tablist" aria-label={t('partOfLook')}>{(Object.keys(SECTIONS) as Section[]).map(key => <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}>{t(SECTIONS[key])}</button>)}</div>
       <fieldset className="view-lock" disabled={d.readOnly}>
       {section === 'theme' && <ThemePanel theme={layer.theme} below={live.kind === 'game' ? [] : [game.theme]} title={definition.title} onChange={theme => update({ theme }, 'theme')} />}
@@ -57,7 +69,8 @@ export function LookView({ d, selected, gameId }: { d: DraftState; selected: str
       </fieldset>
     </aside>
     <section className="look-preview-area" aria-label={t('previewLabel')}>
-      <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={style} className={themeClass(look.theme)} selected={selected.length === 1 ? selected[0] : undefined} /></LookContext.Provider>
+      <LookContext.Provider value={look}><LookPreview definition={definition} scope={live} style={style} className={themeClass(look.theme)} selected={selected.length === 1 ? selected[0] : undefined}
+        ownLook={d.readOnly ? undefined : { edit: (nodeKey, stageIndex) => setScope({ kind: 'scene', nodeKey, stageIndex }), follow: (nodeKey, stageIndex) => followGame([{ nodeKey, stageIndex }], t('resetOneDone')) }} /></LookContext.Provider>
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
     </section>
   </div>;

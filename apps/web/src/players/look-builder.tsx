@@ -17,9 +17,16 @@ export function savedLook(): PlayerLook | undefined {
 export function rememberLook(look: PlayerLook) { const { picture: _picture, ...parts } = look; try { localStorage.setItem(SAVED, JSON.stringify(parts)); } catch { /* only a convenience */ } }
 
 type Tab = 'color' | LookPart | 'photo' | 'draw';
-const PARTS = ['body', 'color', 'eyes', 'mouth', 'hat', 'extra'] as const;
+const PARTS = ['body', 'color', 'eyes', 'mouth', 'hat', 'extra', 'beard', 'piercing', 'marks'] as const;
 const MODES = ['body', 'photo', 'draw'] as const;
 const withoutPicture = (look: PlayerLook): PlayerLook => { const { picture: _picture, ...parts } = look; return parts; };
+/** "Surprise me": a random character, now and then with facial hair, a piercing or a tattoo. */
+function surprise(): PlayerLook {
+  const pick = <K extends 'beard' | 'piercing' | 'marks'>(key: K) => { const list = (LOOK_PARTS[key] as readonly string[]).filter(entry => entry !== 'none'); return (Math.random() < 0.3 ? list[Math.floor(Math.random() * list.length)] : undefined) as PlayerLook[K]; };
+  const look: PlayerLook = defaultLook(`${Date.now()}-${Math.random()}`);
+  const beard = pick('beard'); const piercing = pick('piercing'); const marks = pick('marks');
+  return { ...look, ...(beard ? { beard } : {}), ...(piercing ? { piercing } : {}), ...(marks ? { marks } : {}) };
+}
 
 /**
  * A square photo for the player's picture: cropped from the middle and drawn
@@ -62,7 +69,7 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, 
   const options: { key: string; label: string; look: PlayerLook }[] = tab === 'photo' || tab === 'draw' ? [] : tab === 'color'
     ? LOOK_COLORS.map((_, index) => ({ key: String(index), label: t('colorNumber', { number: index + 1 }), look: { ...character, color: index } }))
     : LOOK_PARTS[tab].map(value => ({ key: value, label: partName(tab, value), look: { ...character, [tab]: value } as PlayerLook }));
-  const chosen = tab === 'color' ? String(look.color) : tab === 'photo' || tab === 'draw' ? '' : look[tab];
+  const chosen = tab === 'color' ? String(look.color) : tab === 'photo' || tab === 'draw' ? '' : look[tab] ?? 'none';
   const attempt = async (work: () => Promise<string>, kind: 'photo' | 'drawing') => {
     setWorking(true); setError('');
     try {
@@ -105,7 +112,7 @@ export function LookBuilder({ initial, name, busy, sessionId, onSave, onCancel, 
     <div className="look-content">
       {mode !== 'draw' && <div className="look-hero"><Avatar look={shown} size={90} label={`${name}: ${describeLook(shown)}`} />
         <div className="actions">{shown.picture ? <button type="button" className="ghost" onClick={() => { setDraftPhoto(undefined); setLook(character); }}>{t('character')}</button>
-          : <button type="button" className="ghost" onClick={() => setLook(defaultLook(`${Date.now()}-${Math.random()}`))}>{t('surprise')}</button>}</div></div>}
+          : <button type="button" className="ghost" onClick={() => setLook(surprise())}>{t('surprise')}</button>}</div></div>}
       {mode === 'body' && <div className="look-tabs look-parts" role="tablist" aria-label={t('part')}>{PARTS.map(entry =>
         <button key={entry} type="button" role="tab" aria-selected={tab === entry} onClick={() => {
           lastPart.current = entry;

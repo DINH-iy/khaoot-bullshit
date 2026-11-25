@@ -222,3 +222,15 @@
 .look-scene .tv { max-width: none; }
 .look-scene .phone { --phone-max-h: 72dvh; width: 100%; }
 @media (max-width: 900px) { .look-scene .preview { grid-template-columns: 1fr; } }
+/* Scenes with their own look: a note under the scope, and a banner over a preview that ignores the game's look. */
+.own-look-note { display: grid; gap: 8px; justify-items: start; }
+.own-look-note .hint { margin: 0; }
+.own-look-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--e-accent);
+  background: var(--e-accent-soft); color: var(--e-text); }
+.own-look-banner p { margin: 0; flex: 1 1 18rem; font-weight: 600; }
+.own-look-banner .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.own-look-banner .small-button, .own-look-note .small-button { margin: 0; }
+.own-look-banner .small-button { min-height: 36px; padding: 6px 14px; border-radius: 10px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); font-weight: 600; }
+.own-look-banner .small-button:hover:not(:disabled) { border-color: var(--e-accent); }
+/* The banner takes its own row above the preview (the preview keeps the rest of the height). */
+.look-preview:has(> .own-look-banner) { grid-template-rows: auto auto minmax(0, 1fr); }

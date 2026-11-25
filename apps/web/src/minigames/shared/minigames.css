@@ -51,6 +51,7 @@
 .step-team-title { margin: 0; font-weight: 800; font-size: 1.1rem; text-align: center; }
 .step-ask { margin: 0; font-family: var(--r-heading-font); font-weight: 800; font-size: 1.25rem; text-align: center; }
 .step-stake, .step-vote-note { margin: 0; text-align: center; color: var(--r-muted); }
+.step-icon-line { font-weight: 700; }
 .step-options { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .step-options.options-1 { grid-template-columns: 1fr; }
 .room .step-option { min-height: 48px; font-size: 1rem; font-weight: 800; }

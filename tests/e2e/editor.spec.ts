@@ -1004,3 +1004,57 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   expect(timer?.x).toBeCloseTo(longest!.x);
   expect(timer?.width).toBeCloseTo(longest!.width);
 });
+
+test('right-clicking a scene or an arrow opens its own menu instead of the browser’s', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Right-click menus are for a mouse.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  const mine = page.getByRole('region', { name: 'Your games' });
+  const name = `Menu test ${Date.now()}`;
+  await mine.getByLabel('Name of your new game').fill(name);
+  await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
+  await mine.getByRole('button', { name: 'Create game' }).click();
+  await mine.getByRole('link', { name: `Edit ${name}` }).click();
+  await expect(page.locator('.scene-card')).toHaveCount(5);
+  await fit(page);
+
+  // One scene: its actions, Delete last; the right-clicked scene is selected; Escape closes and keeps focus on it.
+  const finale = card(page, /Shared finale/);
+  await finale.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Scene actions' });
+  await expect(menu.getByRole('menuitem')).toHaveText([/Open scene/, /Start the game here/, /Duplicate/, /Copy/, /Replace scene type/, /Save as prefab/, /Delete scene/]);
+  await expect(menu.getByRole('menuitem').first()).toBeFocused();
+  await expect(finale).toHaveClass(/selected/);
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(finale).toBeFocused();
+  // Duplicate from the menu adds a scene.
+  await finale.click({ button: 'right' });
+  await menu.getByRole('menuitem', { name: /Duplicate/ }).click();
+  await expect(page.locator('.scene-card')).toHaveCount(6);
+  // Delete asks first.
+  // (The copy sits on top of the original, a little offset.)
+  await card(page, /Shared finale/).last().click({ button: 'right' });
+  await menu.getByRole('menuitem', { name: /Delete scene/ }).click();
+  const ask = page.getByRole('alertdialog', { name: /^Delete “Shared finale/ });
+  await expect(ask).toBeVisible();
+  await ask.getByRole('button', { name: /Keep|Cancel/ }).click();
+  await expect(ask).toHaveCount(0);
+
+  // Several selected: the menu acts on all of them.
+  await page.locator('.scene-card').nth(0).click(); await page.locator('.scene-card').nth(1).click({ modifiers: ['Shift'] });
+  await page.locator('.scene-card').nth(1).click({ button: 'right' });
+  await expect(page.getByRole('menu', { name: 'Actions for 2 scenes' }).getByRole('menuitem', { name: /Duplicate 2 scenes/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // An arrow: add a scene on it, or remove it.
+  const edges = await page.locator('.edge-line').count();
+  const hit = page.locator('.edge-hit').first(); const box = (await hit.boundingBox())!;
+  const point = await hit.evaluate(path => { const geometry = path as SVGPathElement; const at = geometry.getPointAtLength(geometry.getTotalLength() / 2); const matrix = geometry.getScreenCTM()!; return { x: at.x * matrix.a + matrix.e, y: at.y * matrix.d + matrix.f }; });
+  expect(box.width + box.height).toBeGreaterThan(0);
+  await page.mouse.click(point.x, point.y, { button: 'right' });
+  const arrow = page.getByRole('menu', { name: 'Arrow actions' });
+  await expect(arrow.getByRole('menuitem').first()).toHaveText(/Add a scene on this arrow/);
+  await arrow.getByRole('menuitem', { name: /Remove this connection/ }).click();
+  await expect(page.locator('.edge-line')).toHaveCount(edges - 1);
+});

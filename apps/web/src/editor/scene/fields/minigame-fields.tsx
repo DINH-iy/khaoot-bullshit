@@ -131,6 +131,9 @@ export function MinigameFields({ part, definition, node, index, onChange, inDraw
       <label>{t('target')}<input type="number" min={2} max={60} step={0.5} value={seconds(value.targetMs)} onChange={event => setSettings({ ...value, targetMs: ms(event.target.value, 2, 60) }, 'target')} /></label>
       <label>{t('disappears')}<input type="number" min={0} max={60} step={0.5} value={seconds(value.visibleMs)} onChange={event => setSettings({ ...value, visibleMs: ms(event.target.value, 0, 60) }, 'visible')} /></label>
     </div>; })()}
+    {game === 'heads-or-tails' && settings && <Segmented label={t('coinFlip')} value={(settings as MinigameSettings<'heads-or-tails'>).flip ?? 'auto'}
+      choices={[{ value: 'auto', label: t('flipAuto') }, { value: 'host', label: t('flipHost') }]}
+      onChange={flip => setSettings(flip === 'host' ? { flip: 'host' } : {}, 'flip')} />}
     {game === 'lucky-doors' && settings && (() => { const doors = (settings as MinigameSettings<'lucky-doors'>).doorsMilli; return <div className="door-list">
       <Segmented label={t('behindDoor')} value={(settings as MinigameSettings<'lucky-doors'>).order ?? 'random'} choices={[{ value: 'random', label: t('shuffled') }, { value: 'fixed', label: t('asListed') }]}
         onChange={order => setSettings({ ...(settings as MinigameSettings<'lucky-doors'>), ...(order === 'fixed' ? { order: 'fixed' } : { order: undefined }) } as MinigameSettings<'lucky-doors'>, 'order')} />

@@ -21,8 +21,8 @@ export interface StepRenderer {
   label(option: string, view: unknown, settings: MinigameSettings): ReactNode;
   /** A side's board (its cards, its door…), or nothing. `mine`: on the side's own phone. */
   board?(side: StepSideView, settings: MinigameSettings, mine: boolean): ReactNode;
-  /** A line under a step's question (what is at stake). */
-  stake?(step: number, settings: MinigameSettings): string | null;
+  /** What is at stake under a step's question (icons, with words for screen readers), from the side's view when there is one. */
+  stake?(step: number, settings: MinigameSettings, view?: unknown): ReactNode;
 }
 
 export function StepChoices({ renderer, options, view, settings, disabled, onChoose }: {
@@ -73,14 +73,14 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
   return <div className="step-phone">{head}
     <div className="step-question">
       <p className="step-ask">{renderer.question(side.view, side.step, settings)}</p>
-      {renderer.stake?.(side.step, settings) && <p className="step-stake">{renderer.stake(side.step, settings)}</p>}
-      {who === 'captain' ? <p className="wait-note">{c('captain', { name: nameOf(state, steps.decides === 'captain' ? side.captainId : team?.captainId ?? null) })}</p>
+      {renderer.stake && <div className="step-stake">{renderer.stake(side.step, settings, side.view)}</div>}
+      {who === 'captain' ? <p className="wait-note step-icon-line"><span aria-hidden="true">👑</span> {c('captain', { name: nameOf(state, steps.decides === 'captain' ? side.captainId : team?.captainId ?? null) })}</p>
         : <>
-          {who === 'vote' && <p className="step-vote-note">{c('teamVote')}{left !== null && ` · ${c('leftSeconds', { seconds: left })}`}</p>}
+          {who === 'vote' && <p className="step-vote-note step-icon-line"><span aria-hidden="true">🗳️</span> {c('teamVote')}{left !== null && <> · <span aria-hidden="true">⏱</span> {c('leftSeconds', { seconds: left })}</>}</p>}
           {who !== 'voted' && <StepChoices renderer={renderer} options={side.options} view={side.view} settings={settings} disabled={disabled}
             onChoose={option => onMove(side.step, option)} />}
           {who === 'voted' && <div className="step-votes" role="status">
-            <p>{c('voted', { count: counted, total })}{left !== null && ` · ${c('leftSeconds', { seconds: left })}`}</p>
+            <p className="step-icon-line"><span aria-hidden="true">✓</span> {c('voted', { count: counted, total })}{left !== null && <> · <span aria-hidden="true">⏱</span> {c('leftSeconds', { seconds: left })}</>}</p>
             <ul className="step-split">{side.options.map(option => { const count = side.votes.find(vote => vote.option === option)?.count ?? 0;
               return <li key={option}><span>{renderer.label(option, side.view, settings)}</span><span className="step-bar" aria-hidden="true"><span style={{ width: `${counted ? Math.round(count / counted * 100) : 0}%` }} /></span><strong>{count}</strong></li>; })}</ul>
             <button type="button" className="step-decide" disabled={disabled} onClick={() => onMove(side.step, side.options![0]!, true)}>{c('decide')}</button>

@@ -9,7 +9,8 @@ import {
   addConnectedScene, addDrawGames, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
   bendsOf, insertOnEdge, insertPrefab, isBendKey, isGroupKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
-import { ActionMenu } from '../controls/action-menu.js';
+import { ActionMenu, ContextMenu } from '../controls/action-menu.js';
+import { arrowMenuActions, sceneMenuActions } from './scene-menu.js';
 import { InfoTip } from '../controls/info-tip.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SavePrefab } from './save-prefab.js';
@@ -48,6 +49,15 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const [adding, setAdding] = useState<{ from: string | null; option: string | undefined; at: Point; place?: Point; onEdge?: string } | null>(null);
   // Delete or Backspace on selected scenes asks first.
   const [askDelete, setAskDelete] = useState(false);
+  // A scene card's right-click menu: where it opens (client pixels), the scenes it acts on, and the card to focus after Escape.
+  const [sceneMenu, setSceneMenu] = useState<{ at: Point; keys: string[]; card: HTMLElement } | null>(null);
+  const closeSceneMenu = useCallback(() => setSceneMenu(null), []);
+  // An arrow's right-click menu: where it opens and which arrow.
+  const [arrowMenu, setArrowMenu] = useState<{ at: Point; edge: string } | null>(null);
+  const closeArrowMenu = useCallback(() => setArrowMenu(null), []);
+  // Replace or Save as prefab picked in that menu: opened in the scene panel (or the several-selected panel).
+  const [asked, setAsked] = useState<'replace' | 'prefab' | null>(null);
+  const clearAsked = useCallback(() => setAsked(null), []);
   const canvas = useRef<HTMLDivElement>(null);
   const select = (keys: string[]) => { setSelected(keys); setSelectedEdge(null); };
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -82,7 +92,8 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
 
   // ---------- cards: click to select (Shift/Cmd adds; a grouped scene brings its group, Alt takes it alone), drag to move all selected ----------
   const startCardDrag = (event: ReactPointerEvent<HTMLElement>, key: string) => {
-    if (event.button !== 0) return;
+    // Ctrl-click on a Mac is a right-click: it opens the scene's menu instead.
+    if (event.button !== 0 || (event.ctrlKey && MOD === '⌘')) return;
     if ((event.target as HTMLElement).closest('.port, .port-plus')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const additive = event.shiftKey || event.metaKey || event.ctrlKey;
@@ -286,6 +297,10 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     return fromNode && from && to ? pointOnRoute(routeSegments(outputPort(fromNode, from, edge.option), inputPort(to), bendsOf(positions, edge.key), from.y + cardHeight(fromNode)), 0.5) : null;
   })();
   const selectedBends = selectedEdge ? bendsOf(positions, selectedEdge) : [];
+  // The selected arrow's actions (its toolbar and its right-click menu).
+  const addOnSelectedArrow = () => { if (selectedEdge && edgeMid) setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge }); };
+  const straightenArrow = (edge: string) => change(definition, withBends(positions, edge, []));
+  const removeArrow = (edge: string) => { change(disconnect(definition, edge)); setSelectedEdge(null); };
   /**
    * Drags a bend point of an arrow (index), or with `insert` a new one at that place in its list; the scenes stay put.
    * Followed on the window, since a new point's + handle is replaced by the point itself while dragging.
@@ -317,13 +332,30 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const removeBend = (edge: string, index: number) => { if (!readOnly) change(definition, withBends(positions, edge, bendsOf(positions, edge).filter((_, at) => at !== index))); };
   // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
   const contextMenu = (event: React.MouseEvent) => {
-    if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button, input, textarea, select')) return;
+    const target = event.target as Element;
+    // On a scene card: its own menu (text fields in a card keep the browser's).
+    const card = target.closest<HTMLElement>('.scene-card');
+    if (card && !target.closest('input, textarea, select')) { event.preventDefault(); openSceneMenu(event, card); return; }
+    // On an arrow: its own menu (selecting it, as a click does).
+    const edge = target.closest<SVGGElement>('.edge')?.dataset.edge;
+    if (edge) { event.preventDefault(); if (!readOnly) { setAdding(null); setPending(null); setSelectedEdge(edge); setSelected([]); setArrowMenu({ at: { x: event.clientX, y: event.clientY }, edge }); } return; }
+    if (target.closest('.add-menu, button, input, textarea, select')) return;
     event.preventDefault(); if (readOnly || event.ctrlKey) return; setPending(null); setConnecting(null);
     const rect = canvas.current?.getBoundingClientRect();
     // From the keyboard there is no pointer position: use the same spot as the toolbar button.
     const fromKeyboard = event.clientX === 0 && event.clientY === 0;
     const at = fromKeyboard || !rect ? { x: (-view.x + (rect?.width ?? 800) / 3) / view.zoom, y: (-view.y + 120) / view.zoom } : toCanvas(event.clientX, event.clientY);
     select([]); setAdding({ from: null, option: undefined, at, place: { x: at.x - CARD_WIDTH / 2, y: at.y - 24 } });
+  };
+  // Right-clicking a scene in the selection acts on the whole selection; another scene is selected first (with its group, as a click does).
+  const openSceneMenu = (event: React.MouseEvent, card: HTMLElement) => {
+    const key = card.dataset.scene; if (!key || connecting) return;
+    const keys = selected.includes(key) ? selected : event.altKey ? [key] : withWholeGroups(definition, positions, [key]);
+    setPending(null); setAdding(null); select(keys);
+    // From the keyboard (the menu key, Shift + F10) there is no pointer position: open it at the card.
+    const rect = card.getBoundingClientRect();
+    const at = event.clientX === 0 && event.clientY === 0 ? { x: rect.left + 24, y: rect.top + 24 } : { x: event.clientX, y: event.clientY };
+    setSceneMenu({ at, keys, card });
   };
   // The palette lives outside the zoomed surface. Its list can change size when a category opens.
   const menuRef = useRef<HTMLDivElement>(null);
@@ -392,17 +424,19 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       else if (action === 'remove' && selected.length) { event.preventDefault(); setAskDelete(true); }
       if (action === 'selectAll') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
       if (action === 'duplicate' && selected.length) { event.preventDefault(); duplicate(selected); }
-      if (action === 'copy' && selected.length) {
-        const keys = new Set(selected);
-        const from = { ...definition, nodes: definition.nodes.filter(node => keys.has(node.key)), edges: definition.edges.filter(edge => keys.has(edge.from) && keys.has(edge.to)) };
-        if (!writeClip({ keys: [...selected], from, positions: Object.fromEntries(selected.map(key => [key, positions[key]!])), game: d.draft?.gameId ?? null })) { setNotice(t('noCopy')); return; }
-        setNotice(t(selected.length === 1 ? 'copiedOne' : 'copiedMany', { count: selected.length, key: navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl' })); }
+      if (action === 'copy' && selected.length) copyScenes(selected);
       if (action === 'paste') { const clip = readClip(); if (clip) { event.preventDefault(); paste(clip); } }
       if (event.key === 'Escape') { setConnecting(null); setSelectedEdge(null); setPending(null); setAdding(null); setNotice(''); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
   });
 
+  const copyScenes = (copied: string[]) => {
+    const keys = new Set(copied);
+    const from = { ...definition, nodes: definition.nodes.filter(node => keys.has(node.key)), edges: definition.edges.filter(edge => keys.has(edge.from) && keys.has(edge.to)) };
+    if (!writeClip({ keys: [...copied], from, positions: Object.fromEntries(copied.map(key => [key, positions[key]!])), game: d.draft?.gameId ?? null })) { setNotice(t('noCopy')); return; }
+    setNotice(t(copied.length === 1 ? 'copiedOne' : 'copiedMany', { count: copied.length, key: navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl' }));
+  };
   const paste = (clip: Clip) => {
     // In the same game the copies land a little offset; from another game, near the top left of the view.
     const first = clip.positions[clip.keys[0]!] ?? { x: 0, y: 0 };
@@ -497,7 +531,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           return <div key={node.key} className={`scene-card kind-${text.kind}${problems.length ? ' has-problems' : ''}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
             style={{ ...peerOutline(others), left: position.x, top: position.y, width: CARD_WIDTH, height: cardHeight(node) }} tabIndex={0} role="group" aria-roledescription="scene card"
             aria-label={`${text.label}: ${text.banner ? `${text.banner}. ` : ''}${text.title}. ${text.line}.${definition.startNodeKey === node.key ? t('startScene') : ''}${on ? t('selected') : ''}${others.length ? t('workingHere', { names: others.map(peer => peer.name).join(', ') }) : ''}${problems.length ? t('problemsN', { count: problems.length }) : ''}`}
-            onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)} onDoubleClick={() => onOpenScene(node.key)}>
+            data-scene={node.key} onPointerDown={event => startCardDrag(event, node.key)} onKeyDown={event => cardKey(event, node.key)} onDoubleClick={() => onOpenScene(node.key)}>
             <PeerTags peers={others} />
             <p className="card-label">{definition.startNodeKey === node.key && <span className="start-flag">{t('start')}</span>}{text.label}</p>
             <div className={`card-thumb thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`} aria-hidden="true">{text.banner ?? <Icon name={sceneIcon(text.kind, text.input)} size={26} />}</div>
@@ -518,27 +552,47 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       {adding && <div className="add-menu-anchor" ref={menuRef} style={menuSpot(adding.at)}><ScenePalette label={t(adding.onEdge ? 'addOnArrow' : adding.from ? 'addConnected' : 'addScene')} onPick={addFromMenu} onPrefab={adding.onEdge ? undefined : addPrefab} onCancel={() => setAdding(null)} /></div>}
       {/* A selected arrow's actions float at the top of the map (never on the line, which keeps its bend handles free; never in the toolbar, which would jump). */}
       {selectedEdge && !adding && !readOnly && edgeMid && <div className="edge-actions" role="toolbar" aria-label={t('selectedArrow')} onPointerDown={event => event.stopPropagation()}>
-        <button type="button" onClick={() => setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge })}>+ Add a scene here</button>
-        {selectedBends.length > 0 && <button type="button" onClick={() => change(definition, withBends(positions, selectedEdge, []))}>{t('straighten')}</button>}
-        <button type="button" className="danger-outline" aria-label={t('removeConnection')} onClick={() => { change(disconnect(definition, selectedEdge)); setSelectedEdge(null); }}>{t('remove')}</button>
+        <button type="button" onClick={addOnSelectedArrow}>+ {t('addOnArrow')}</button>
+        {selectedBends.length > 0 && <button type="button" onClick={() => straightenArrow(selectedEdge)}>{t('straighten')}</button>}
+        <button type="button" className="danger-outline" aria-label={t('removeConnection')} onClick={() => removeArrow(selectedEdge)}>{t('remove')}</button>
       </div>}
       <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
     </div>
     {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)} onOpen={() => onOpenScene(single.key)}
       onDelete={next => { const kept = ungrouped(positions, [single.key]); delete kept[single.key]; change(next, kept); select([]); }} onClose={() => select([])} onDuplicate={() => duplicate([single.key])}
-      readOnly={readOnly} prefab={{ content: () => prefabFrom(definition, positions, [single.key]), defaultName: cardText(definition, single).banner || cardText(definition, single).title }} />}
+      readOnly={readOnly} prefab={{ content: () => prefabFrom(definition, positions, [single.key]), defaultName: cardText(definition, single).banner || cardText(definition, single).title }} asked={asked} onAsked={clearAsked} />}
+    {arrowMenu && (() => {
+      const actions = arrowMenuActions({ readOnly, bent: bendsOf(positions, arrowMenu.edge).length > 0 },
+        { addHere: addOnSelectedArrow, straighten: () => straightenArrow(arrowMenu.edge), remove: () => removeArrow(arrowMenu.edge) });
+      return actions.length > 0 && <ContextMenu label={t('arrowMenu')} actions={actions} at={arrowMenu.at} onClose={closeArrowMenu} />;
+    })()}
+    {sceneMenu && (() => {
+      const { keys } = sceneMenu; const one = keys.length === 1 ? keys[0]! : null;
+      const actions = sceneMenuActions(
+        { count: keys.length, isStart: definition.startNodeKey === one, readOnly, canPaste: readClip() !== null, oneGroup: isOneGroup(definition, positions, keys), anyGrouped: anyGrouped(definition, positions, keys) },
+        {
+          open: () => { if (one) onOpenScene(one); }, startHere: () => { if (one) change({ ...definition, startNodeKey: one }); },
+          duplicate: () => duplicate(keys), copy: () => copyScenes(keys), paste: () => { const clip = readClip(); if (clip) paste(clip); },
+          replace: () => setAsked('replace'), savePrefab: () => setAsked('prefab'), group: groupSelected, ungroup: ungroupSelected, remove: () => setAskDelete(true),
+        }, zoomShortcuts);
+      return actions.length > 0 && <ContextMenu label={one ? t('sceneMenu') : t('scenesMenu', { count: keys.length })} actions={actions} at={sceneMenu.at} onClose={closeSceneMenu} returnFocus={sceneMenu.card} />;
+    })()}
     {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? t('deleteOne', { title: sceneTitle(selected[0]!) }) : t('deleteMany', { count: selected.length })}
       text={t(selected.length === 1 ? 'deleteTextOne' : 'deleteTextMany')}
       confirm={selected.length === 1 ? t('deleteScene') : t('deleteScenes', { count: selected.length })} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}
-    {selected.length > 1 && <MultiPanel count={selected.length} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)}
+    {selected.length > 1 && <MultiPanel count={selected.length} asked={asked === 'prefab'} onAsked={clearAsked} onDelete={deleteSelected} onClear={() => select([])} onDuplicate={() => duplicate(selected)}
       onGroup={readOnly || isOneGroup(definition, positions, selected) ? undefined : groupSelected} onUngroup={readOnly || !anyGrouped(definition, positions, selected) ? undefined : ungroupSelected}
-      savePrefab={<SavePrefab key={selected.join()} content={() => prefabFrom(definition, positions, selected)} defaultName={`${selected.length} scenes`} />} />}
+      savePrefab={opened => <SavePrefab key={`${selected.join()}-${opened}`} content={() => prefabFrom(definition, positions, selected)} defaultName={`${selected.length} scenes`} startOpen={opened > 0} />} />}
   </div>;
 }
 
-function MultiPanel({ count, onDelete, onClear, onDuplicate, onGroup, onUngroup, savePrefab }: { count: number; onDelete: () => void; onClear: () => void; onDuplicate: () => void; onGroup: (() => void) | undefined; onUngroup: (() => void) | undefined; savePrefab: React.ReactNode }) {
+function MultiPanel({ count, asked, onAsked, onDelete, onClear, onDuplicate, onGroup, onUngroup, savePrefab }: { count: number; asked: boolean; onAsked: () => void; onDelete: () => void; onClear: () => void; onDuplicate: () => void; onGroup: (() => void) | undefined; onUngroup: (() => void) | undefined; savePrefab: (opened: number) => React.ReactNode }) {
   const [confirming, setConfirming] = useState(false);
+  // Save as prefab picked in the right-click menu: the form opens here, already filled in.
+  // Counted, so picking it again opens a fresh form.
+  const [opened, setOpened] = useState(0);
+  useEffect(() => { if (asked) { setOpened(times => times + 1); onAsked(); } }, [asked, onAsked]);
   return <aside className="inspector" aria-labelledby="multi-heading">
     <div className="inspector-head"><h2 id="multi-heading">{t('selectedN', { count })}</h2><button className="small-button" onClick={onClear}>{t('clear')}</button></div>
     <p className="hint">{t('multiHint')}</p>
@@ -547,7 +601,7 @@ function MultiPanel({ count, onDelete, onClear, onDuplicate, onGroup, onUngroup,
       {onUngroup && <button type="button" className="with-icon" onClick={onUngroup} title={`${MOD} + Shift + G`}><Icon name="ungroup" />{t('ungroup')}</button>}
     </div>}
     <button onClick={onDuplicate}>{t('duplicateN', { count })}</button>
-    {savePrefab}
+    {savePrefab(opened)}
     <p className="hint">{t('copyHint')}</p>
     {confirming ? <div className="actions"><button className="danger" onClick={onDelete}>{t('yesDelete', { count })}</button><button onClick={() => setConfirming(false)}>{t('keepThem')}</button></div>
       : <button className="danger-outline" onClick={() => setConfirming(true)}>{t('deleteScenes', { count })}</button>}

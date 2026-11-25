@@ -222,3 +222,35 @@ test("the clock timer's example stays small, and its own colours reach the clock
   await expect(sample.locator('.timer-clock-slice').first()).toHaveCSS('fill', 'rgb(0, 255, 0)');
   await timer.screenshot({ path: 'test-results/timer-colours.png' });
 });
+
+test('scenes with their own look are tagged, explained in the preview, and can follow the game again', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await section.getByLabel('Game text').fill(JSON.stringify({ title: `Own looks ${Date.now()}`, scenes: [
+    { id: 'hello', type: 'cutscene', text: 'Welcome!', look: { theme: { font: 'serif' } } },
+    { id: 'q1', type: 'quiz', question: 'Capital of France?', answers: ['Paris', 'Lyon'], correct: 'Paris', seconds: 60, look: { theme: { font: 'mono' } } },
+  ] }));
+  await section.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  const controls = page.getByRole('complementary', { name: 'Look & feel' });
+  await expect(controls.getByText('2 scenes have their own look.', { exact: false })).toBeVisible();
+  // The preview shows the start scene, which has its own look: it says so, and that scene alone can follow the game.
+  const banner = page.getByRole('note').filter({ hasText: 'This scene has its own look' });
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: 'Use the game’s look' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(controls.getByText('1 scene has its own look.', { exact: false })).toBeVisible();
+  // The list tags the scene that still has its own look.
+  await controls.getByRole('combobox', { name: /Change the look of/ }).or(controls.getByLabel('Change the look of')).first().click();
+  await expect(page.getByRole('option', { name: /Capital of France\? Own look/ })).toBeVisible();
+  await expect(page.getByRole('option', { name: /Own look/ })).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  // All at once, after asking.
+  await controls.getByRole('button', { name: 'Use the game’s look everywhere' }).click();
+  const ask = page.getByRole('alertdialog', { name: 'Use the game’s look in every scene?' });
+  await ask.getByRole('button', { name: 'Use the game’s look' }).click();
+  await expect(controls.getByText(/own look/)).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Every scene now follows the game’s look.' })).toBeVisible();
+});

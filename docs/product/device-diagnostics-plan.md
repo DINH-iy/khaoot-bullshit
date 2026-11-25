@@ -61,7 +61,6 @@ When something fails, a player or the leader sees only "That did not work. Try a
 
 ## Still to do
 
-- Toasts in the room still show raw codes for some refusals (`use-room.ts` shows `error.message` when it has no text for a code). Give them generic texts too.
 - Hosts seeing the logs of their own rooms (open question).
 - Retention period: 7 days unless the owner wants another.
 - A per-game summary over all devices (slowest phone, failure count), once there are enough game-over logs to see what is useful.

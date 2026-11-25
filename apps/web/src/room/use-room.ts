@@ -6,6 +6,7 @@ import { createReactionStore } from '../room-extras/reactions.js';
 import { createPoolAimStore } from '../head-to-head/eight-ball/live-aim.js';
 import { translate } from '../i18n/texts.js';
 import { ROOM_TEXTS } from './room.text.js';
+import { refusalText } from './refusals.js';
 import { isUnavailablePageError } from '../navigation.js';
 import { deviceLog, note, sendGameOver, setLogRoom } from '../diagnostics/recorder.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
@@ -83,7 +84,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
             remember(next); transmit(next, attempt + 1);
           }).catch(() => { if (mounted) { remember(); setMessage(r('notConfirmedCheck')); requestSync(); } });
           return;
-        } setMessage(error instanceof Error ? (error.message === 'TOO_LATE' ? r('tooLate') : error.message) : r('notConfirmed'));
+        } setMessage(refusalText(error, 'notConfirmed'));
         if (error instanceof Error && ['REVISION_CONFLICT', 'INVALID_STATE', 'ALREADY_SUBMITTED', 'ALREADY_JUDGED', 'INELIGIBLE', 'FORBIDDEN', 'INVALID_SUBMISSION', 'COMMAND_KEY_REUSED', 'TOO_LATE', 'ALREADY_DECIDED', 'DECISION_PENDING'].includes(error.message)) { remember(); requestSync(); }
       }).finally(() => { if (mounted) setSaving(false); });
     };
@@ -108,7 +109,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
       } catch (error) {
         if (!mounted) return;
         if (isUnavailablePageError(error)) denyAccess();
-        else setMessage(error instanceof Error ? error.message : r('syncFailed'));
+        else setMessage(refusalText(error, 'syncFailed'));
       }
       finally { syncing = false; if (syncAgain) { syncAgain = false; requestSync(); } }
     };
@@ -157,7 +158,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('room.error', (error: { code: string }) => {
       if (!mounted) return; note({ kind: 'connection', what: 'room error', code: String(error?.code).slice(0, 60) });
       if (isUnavailablePageError(error.code)) denyAccess();
-      else setMessage(error.code);
+      else setMessage(refusalText(new Error(String(error?.code)), 'notConfirmed'));
     });
     socket.on('side.challenge', () => { if (mounted) setChallengeTick(value => value + 1); });
     const interval = setInterval(() => { void heartbeat(); requestSync(); }, 10000);

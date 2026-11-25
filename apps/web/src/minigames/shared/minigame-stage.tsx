@@ -3,7 +3,8 @@ import { FaIcon } from '../../presentation/icons.js';
 import type { Stroke } from '@party/contracts';
 import type { LiveStrokes } from '../../drawing/live-strokes.js';
 import { defaultLook, isStepMinigame, MinigameValueSchema, ROULETTE_BET_FLOOR, rouletteBetLimit, type MinigameSettings, type RoomSnapshot } from '@party/contracts';
-import { useTexts } from '../../i18n/texts.js';
+import { translate, useTexts } from '../../i18n/texts.js';
+import { COIN_TEXTS } from '../heads-or-tails/coin.text.js';
 import { CATALOG_TEXTS } from '../../presentation/catalog.text.js';
 import { minigameResult, tenths } from './result-label.js';
 import { CONTROL_TEXTS } from './controls.text.js';
@@ -49,7 +50,9 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
   const goAt = minigame.goAt ?? (live.go && live.go.stageRunId === stage.id && minigame.startsAt && Date.parse(live.go.goAt) >= Date.parse(minigame.startsAt) ? live.go.goAt : null);
   if (stage.revealed) return null;
   if (stage.status === 'CLOSED' && state.role === 'player') {
-    return <p className="mg-paused" role="status">{t('progress.locked')}</p>;
+    // Heads or Tails can wait for the host to flip: say so, instead of a plain "locked".
+    const waitsForFlip = minigame.game === 'heads-or-tails' && (minigame.settings as MinigameSettings<'heads-or-tails'>).flip === 'host';
+    return <p className="mg-paused" role="status">{waitsForFlip ? translate(COIN_TEXTS, 'waitFlip') : t('progress.locked')}</p>;
   }
   const settings = minigame.settings as MinigameSettings;
   if (minigame.game === 'relay-drawing') return state.view.status === 'PAUSED' ? <p className="mg-paused" role="status">{t('phase.paused')}</p>

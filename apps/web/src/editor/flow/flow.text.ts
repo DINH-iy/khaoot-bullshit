@@ -13,7 +13,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
   straightenAll: 'Straighten all arrows', lineUpIntro: 'Select scenes (Shift-click or Shift-drag) to line them up.', zoom: 'Zoom', zoomIn: 'Zoom in', zoomOut: 'Zoom out', zoom100: 'Zoom to 100%',
   showAll: 'Show the whole game', zoomSelected: 'Zoom to selected', tipsLabel: 'Tips for the map', tips: 'Tips',
   viewingLong: 'Viewing: nothing can be changed. Switch to Editing at the top to make changes.', viewingShort: 'Viewing: nothing can be changed.',
-  tip1: '**Scroll** to zoom; **Shift + scroll** or drag the background to move around.', tip2: '**Right-click** the background to add a scene there.',
+  tip1: '**Scroll** to zoom; **Shift + scroll** or drag the background to move around.', tip2: '**Right-click** the background to add a scene there, or a scene for its actions.',
   tip3: '**Drag from ○** to connect scenes; drop on empty space to add a connected scene.', tip4: '**Click an arrow** to bend it or add a scene on it.', tip5: '**Shift-drag** or **Shift-click** to select several scenes.',
   allShortcuts: 'All shortcuts (?)', gameFlow: 'Game flow', moveArrow: 'Drag to move this arrow to another scene', bendHere: 'Drag to bend the arrow here', moveBend: 'Drag to move this bend point; double-click to remove it',
   startScene: ' Start scene.', selected: ' Selected.', workingHere: ' {names} working here.', problemsN: ' {count} problems.', start: 'Start · ',
@@ -24,6 +24,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
   selectedN: '{count} scenes selected', clear: 'Clear selection', multiHint: 'Drag any of them to move them together, or use the arrow keys. Shift-click a scene to add or remove it.',
   selectTwoGroup: 'Select two or more scenes to group them (Shift-click or Shift-drag).', groupedN: 'Grouped {count} scenes. Click one to select them all; Alt-click takes one scene.', ungroupedNotice: 'Ungrouped. Each scene is selected on its own again.', groupThese: 'Group', ungroup: 'Ungroup', groupName: '{title} · {count} scenes', groupTitle: 'Select this group', tip6: '**Click** a grouped scene to select its group; **Alt-click** takes that scene alone. **Ctrl/⌘ + G** groups the selected scenes.',
   duplicateN: 'Duplicate {count} scenes', copyHint: 'Copy and paste also work: Ctrl/Cmd+C, then Ctrl/Cmd+V, even in another game.', yesDelete: 'Yes, delete {count} scenes', keepThem: 'Keep them',
+  sceneMenu: 'Scene actions', scenesMenu: 'Actions for {count} scenes', menuOpen: 'Open scene', menuView: 'View scene', menuStart: 'Start the game here', menuDuplicate: 'Duplicate', menuCopy: 'Copy', menuPaste: 'Paste', menuReplace: 'Replace scene type…', menuPrefab: 'Save as prefab…', menuDelete: 'Delete scene…', menuDeleteN: 'Delete {count} scenes…', arrowMenu: 'Arrow actions',
 }, {
   nl: {
     bSelf: 'Een scène kan niet naar zichzelf leiden.', bCircle: 'Dan gaat het spel in een kringetje rond.', bSame: 'Een andere optie van deze keuze leidt daar al heen.',
@@ -36,7 +37,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     straightenAll: 'Alle pijlen rechttrekken', lineUpIntro: 'Kies scènes (Shift-klik of Shift-slepen) om ze uit te lijnen.', zoom: 'Zoom', zoomIn: 'Inzoomen', zoomOut: 'Uitzoomen', zoom100: 'Zoom naar 100%',
     showAll: 'Het hele spel tonen', zoomSelected: 'Inzoomen op de keuze', tipsLabel: 'Tips voor de kaart', tips: 'Tips',
     viewingLong: 'Bekijken: er kan niets veranderd worden. Schakel bovenaan over naar Bewerken om iets te veranderen.', viewingShort: 'Bekijken: er kan niets veranderd worden.',
-    tip1: '**Scrollen** om te zoomen; **Shift + scrollen** of de achtergrond slepen om je te verplaatsen.', tip2: '**Rechtsklik** op de achtergrond om daar een scène toe te voegen.',
+    tip1: '**Scrollen** om te zoomen; **Shift + scrollen** of de achtergrond slepen om je te verplaatsen.', tip2: '**Rechtsklik** op de achtergrond om daar een scène toe te voegen, of op een scène voor de acties.',
     tip3: '**Sleep vanaf ○** om scènes te verbinden; laat los op een lege plek om een verbonden scène toe te voegen.', tip4: '**Klik op een pijl** om hem te buigen of er een scène op te zetten.', tip5: '**Shift-slepen** of **Shift-klikken** om meerdere scènes te kiezen.',
     allShortcuts: 'Alle sneltoetsen (?)', gameFlow: 'Spelverloop', moveArrow: 'Sleep om deze pijl naar een andere scène te verplaatsen', bendHere: 'Sleep om de pijl hier te buigen', moveBend: 'Sleep om dit buigpunt te verplaatsen; dubbelklik om het weg te halen',
     startScene: ' Beginscène.', selected: ' Gekozen.', workingHere: ' {names} werkt hier.', problemsN: ' {count} problemen.', start: 'Begin · ',
@@ -47,6 +48,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     selectedN: '{count} scènes gekozen', clear: 'Keuze wissen', multiHint: 'Sleep er een om ze samen te verplaatsen, of gebruik de pijltjestoetsen. Shift-klik op een scène om hem toe te voegen of weg te halen.',
     selectTwoGroup: 'Kies twee of meer scènes om ze te groeperen (Shift-klik of Shift-slepen).', groupedN: '{count} scènes gegroepeerd. Klik er één om ze allemaal te kiezen; Alt-klik kiest één scène.', ungroupedNotice: 'Groep losgemaakt. Elke scène wordt weer los gekozen.', groupThese: 'Groeperen', ungroup: 'Groep losmaken', groupName: '{title} · {count} scènes', groupTitle: 'Deze groep kiezen', tip6: '**Klik** een gegroepeerde scène om de groep te kiezen; **Alt-klik** kiest alleen die scène. **Ctrl/⌘ + G** groepeert de gekozen scènes.',
     duplicateN: '{count} scènes dupliceren', copyHint: 'Kopiëren en plakken werkt ook: Ctrl/Cmd+C, dan Ctrl/Cmd+V, zelfs in een ander spel.', yesDelete: 'Ja, {count} scènes verwijderen', keepThem: 'Laten staan',
+    sceneMenu: 'Scèneacties', scenesMenu: 'Acties voor {count} scènes', menuOpen: 'Scène openen', menuView: 'Scène bekijken', menuStart: 'Het spel hier laten beginnen', menuDuplicate: 'Dupliceren', menuCopy: 'Kopiëren', menuPaste: 'Plakken', menuReplace: 'Scènetype vervangen…', menuPrefab: 'Opslaan als prefab…', menuDelete: 'Scène verwijderen…', menuDeleteN: '{count} scènes verwijderen…', arrowMenu: 'Pijlacties',
   },
   de: {
     bSelf: 'Eine Szene kann nicht zu sich selbst führen.', bCircle: 'Dann würde das Spiel im Kreis gehen.', bSame: 'Eine andere Option dieser Entscheidung führt schon dorthin.',
@@ -59,7 +61,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     straightenAll: 'Alle Pfeile begradigen', lineUpIntro: 'Wähle Szenen (Umschalt-Klick oder Umschalt-Ziehen), um sie auszurichten.', zoom: 'Zoom', zoomIn: 'Hineinzoomen', zoomOut: 'Herauszoomen', zoom100: 'Auf 100 % zoomen',
     showAll: 'Das ganze Spiel zeigen', zoomSelected: 'Auf die Auswahl zoomen', tipsLabel: 'Tipps für die Karte', tips: 'Tipps',
     viewingLong: 'Ansehen: Nichts kann geändert werden. Wechsle oben zu Bearbeiten, um etwas zu ändern.', viewingShort: 'Ansehen: Nichts kann geändert werden.',
-    tip1: '**Scrollen** zum Zoomen; **Umschalt + Scrollen** oder den Hintergrund ziehen, um dich zu bewegen.', tip2: '**Rechtsklick** auf den Hintergrund, um dort eine Szene hinzuzufügen.',
+    tip1: '**Scrollen** zum Zoomen; **Umschalt + Scrollen** oder den Hintergrund ziehen, um dich zu bewegen.', tip2: '**Rechtsklick** auf den Hintergrund, um dort eine Szene hinzuzufügen, oder auf eine Szene für ihre Aktionen.',
     tip3: '**Von ○ ziehen**, um Szenen zu verbinden; auf einer leeren Stelle loslassen fügt eine verbundene Szene hinzu.', tip4: '**Auf einen Pfeil klicken**, um ihn zu biegen oder eine Szene darauf zu setzen.', tip5: '**Umschalt-Ziehen** oder **Umschalt-Klick**, um mehrere Szenen zu wählen.',
     allShortcuts: 'Alle Tastenkürzel (?)', gameFlow: 'Spielablauf', moveArrow: 'Ziehen, um diesen Pfeil zu einer anderen Szene zu verschieben', bendHere: 'Ziehen, um den Pfeil hier zu biegen', moveBend: 'Ziehen, um diesen Knickpunkt zu verschieben; Doppelklick entfernt ihn',
     startScene: ' Startszene.', selected: ' Ausgewählt.', workingHere: ' {names} arbeitet hier.', problemsN: ' {count} Probleme.', start: 'Start · ',
@@ -70,6 +72,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     selectedN: '{count} Szenen ausgewählt', clear: 'Auswahl aufheben', multiHint: 'Ziehe eine davon, um sie zusammen zu verschieben, oder nutze die Pfeiltasten. Umschalt-Klick auf eine Szene fügt sie hinzu oder entfernt sie.',
     selectTwoGroup: 'Wähle zwei oder mehr Szenen, um sie zu gruppieren (Umschalt-Klick oder Umschalt-Ziehen).', groupedN: '{count} Szenen gruppiert. Ein Klick wählt alle; Alt-Klick wählt eine Szene.', ungroupedNotice: 'Gruppe aufgelöst. Jede Szene wird wieder einzeln gewählt.', groupThese: 'Gruppieren', ungroup: 'Gruppe auflösen', groupName: '{title} · {count} Szenen', groupTitle: 'Diese Gruppe wählen', tip6: '**Klicke** eine gruppierte Szene, um ihre Gruppe zu wählen; **Alt-Klick** wählt nur diese Szene. **Strg/⌘ + G** gruppiert die gewählten Szenen.',
     duplicateN: '{count} Szenen duplizieren', copyHint: 'Kopieren und Einfügen geht auch: Strg/Cmd+C, dann Strg/Cmd+V, sogar in einem anderen Spiel.', yesDelete: 'Ja, {count} Szenen löschen', keepThem: 'Behalten',
+    sceneMenu: 'Szenenaktionen', scenesMenu: 'Aktionen für {count} Szenen', menuOpen: 'Szene öffnen', menuView: 'Szene ansehen', menuStart: 'Das Spiel hier beginnen', menuDuplicate: 'Duplizieren', menuCopy: 'Kopieren', menuPaste: 'Einfügen', menuReplace: 'Szenentyp ersetzen…', menuPrefab: 'Als Vorlage speichern…', menuDelete: 'Szene löschen…', menuDeleteN: '{count} Szenen löschen…', arrowMenu: 'Pfeilaktionen',
   },
   ro: {
     bSelf: 'O scenă nu poate duce la ea însăși.', bCircle: 'Atunci jocul s-ar învârti în cerc.', bSame: 'O altă variantă a acestei alegeri duce deja acolo.',
@@ -82,7 +85,7 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     straightenAll: 'Îndreaptă toate săgețile', lineUpIntro: 'Alege scene (Shift-clic sau Shift-tragere) ca să le aliniezi.', zoom: 'Zoom', zoomIn: 'Mărește', zoomOut: 'Micșorează', zoom100: 'Zoom la 100%',
     showAll: 'Arată tot jocul', zoomSelected: 'Mărește pe selecție', tipsLabel: 'Sfaturi pentru hartă', tips: 'Sfaturi',
     viewingLong: 'Vizualizare: nu se poate schimba nimic. Treci sus la Editare ca să faci modificări.', viewingShort: 'Vizualizare: nu se poate schimba nimic.',
-    tip1: '**Derulează** ca să faci zoom; **Shift + derulare** sau trage fundalul ca să te miști.', tip2: '**Clic dreapta** pe fundal ca să adaugi o scenă acolo.',
+    tip1: '**Derulează** ca să faci zoom; **Shift + derulare** sau trage fundalul ca să te miști.', tip2: '**Clic dreapta** pe fundal ca să adaugi o scenă acolo, sau pe o scenă pentru acțiunile ei.',
     tip3: '**Trage de la ○** ca să conectezi scene; lasă pe un loc gol ca să adaugi o scenă conectată.', tip4: '**Clic pe o săgeată** ca s-o îndoi sau să pui o scenă pe ea.', tip5: '**Shift-tragere** sau **Shift-clic** ca să alegi mai multe scene.',
     allShortcuts: 'Toate scurtăturile (?)', gameFlow: 'Fluxul jocului', moveArrow: 'Trage ca să muți această săgeată la altă scenă', bendHere: 'Trage ca să îndoi săgeata aici', moveBend: 'Trage ca să muți acest punct; dublu clic ca să-l elimini',
     startScene: ' Scena de start.', selected: ' Aleasă.', workingHere: ' {names} lucrează aici.', problemsN: ' {count} probleme.', start: 'Start · ',
@@ -93,5 +96,6 @@ export const FLOW_TEXTS = defineTexts('editor-flow', {
     selectedN: '{count} scene alese', clear: 'Golește selecția', multiHint: 'Trage oricare dintre ele ca să le muți împreună sau folosește tastele săgeți. Shift-clic pe o scenă o adaugă sau o scoate.',
     selectTwoGroup: 'Alege două sau mai multe scene ca să le grupezi (Shift-clic sau Shift-tragere).', groupedN: '{count} scene grupate. Un clic le alege pe toate; Alt-clic alege o singură scenă.', ungroupedNotice: 'Grup desfăcut. Fiecare scenă se alege din nou separat.', groupThese: 'Grupează', ungroup: 'Desface grupul', groupName: '{title} · {count} scene', groupTitle: 'Alege acest grup', tip6: '**Clic** pe o scenă grupată alege grupul; **Alt-clic** alege doar acea scenă. **Ctrl/⌘ + G** grupează scenele alese.',
     duplicateN: 'Dublează {count} scene', copyHint: 'Merg și copierea și lipirea: Ctrl/Cmd+C, apoi Ctrl/Cmd+V, chiar și în alt joc.', yesDelete: 'Da, șterge {count} scene', keepThem: 'Păstrează-le',
+    sceneMenu: 'Acțiuni pentru scenă', scenesMenu: 'Acțiuni pentru {count} scene', menuOpen: 'Deschide scena', menuView: 'Vezi scena', menuStart: 'Începe jocul aici', menuDuplicate: 'Dublează', menuCopy: 'Copiază', menuPaste: 'Lipește', menuReplace: 'Înlocuiește tipul de scenă…', menuPrefab: 'Salvează ca prefabricat…', menuDelete: 'Șterge scena…', menuDeleteN: 'Șterge {count} scene…', arrowMenu: 'Acțiuni pentru săgeată',
   },
 });

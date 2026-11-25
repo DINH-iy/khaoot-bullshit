@@ -153,8 +153,10 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       // Drive the bus: `"sips": [1, 2, 3, 4]` for the four rounds.
       const busSips = Array.isArray(raw['sips']) && raw['sips'].length === 4 ? raw['sips'].map(entry => Math.round(Math.min(20, Math.max(0, Number(entry) || 0)))) : null;
       const sips = game === 'bus' && (busSips || raw['rainbow'] === false) ? { settings: { sips: busSips ?? [1, 2, 3, 4], ...(raw['rainbow'] === false ? { rainbow: false } : {}) } } : {};
+      // Heads or Tails: `"flip": "host"` waits for the host to flip the coin once the guesses are in.
+      const coinFlip = game === 'heads-or-tails' && text(raw['flip']) === 'host' ? { settings: { ...(isObject(raw['settings']) ? raw['settings'] : {}), flip: 'host' } } : {};
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...coinFlip, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
     }
     case 'duel': {
       // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.

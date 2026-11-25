@@ -112,3 +112,31 @@ test('every drawing has the full toolbox with an eraser, and the host can give p
     await big.close(); await small.close();
   }
 });
+
+// Bug report (25 November 2026): drawing your look in the lobby ran off the side of a narrow phone.
+test('the look sheet and its drawing tools fit a narrow phone', async ({ browser, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The phone is emulated in its own context below.');
+  const host = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await host.goto(`${baseURL}/?host=1#owner=${token}`);
+  await host.getByRole('radio', { name: /Draw party/ }).check();
+  await host.getByRole('button', { name: 'Open room', exact: true }).click();
+  const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
+  for (const size of [{ width: 320, height: 640 }, { width: 360, height: 800 }]) {
+    const phone = await (await browser.newContext({ viewport: size })).newPage();
+    await phone.goto(`${baseURL}/?code=${code}`);
+    await phone.getByLabel('Your name').fill(`Narrow ${size.width}`); await phone.getByRole('button', { name: 'Join room', exact: true }).click();
+    await phone.getByRole('button', { name: 'Change my look' }).click();
+    await phone.getByRole('dialog', { name: 'Your look' }).getByRole('tab', { name: 'Draw' }).click();
+    // Every tool stays inside the sheet's content, so nothing is cut off or needs sideways scrolling.
+    const outside = await phone.locator('.look-content').evaluate(content => {
+      const box = content.getBoundingClientRect(); const style = getComputedStyle(content);
+      const left = box.left + parseFloat(style.paddingLeft) - 1; const right = box.right - parseFloat(style.paddingRight) + 1;
+      return [...content.querySelectorAll('.drawing-pad, .drawing-pad button, .drawing-surface')].filter(element => {
+        const rect = element.getBoundingClientRect(); return rect.left < left || rect.right > right;
+      }).map(element => element.getAttribute('aria-label') ?? element.className.toString());
+    });
+    expect(outside, `${size.width} px wide`).toEqual([]);
+    expect(await phone.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(size.width);
+    await phone.context().close();
+  }
+});

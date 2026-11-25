@@ -50,6 +50,7 @@ import { SceneComposition } from '../presentation/scene-composition.js';
 import { StageMedia, StageYouTube } from './stage-media.js';
 import { MusicPlayer } from './music-player.js';
 import { translate, useTexts } from '../i18n/texts.js';
+import { COIN_TEXTS } from '../minigames/heads-or-tails/coin.text.js';
 import { useLanguage } from '../i18n/language.js';
 import { localizeStage } from '../presentation/scene-translations.js';
 import { LanguagePicker } from '../i18n/language-picker.js';
@@ -355,7 +356,7 @@ export function RoomScreen() {
     // A scene that explains itself first: the host starts it once everyone has read it.
     : running && stage?.status === 'ACTIVE' && stage.explain ? { label: t('explain.start'), run: () => command('stage.explained', { stageRunId: stage.id }) }
     : running && stage?.status === 'ACTIVE' && !stage.teams?.forming && !showOnly && !(stage.kind === 'duel' && !stage.duel?.duelistIds) ? { label: poolDuel ? poolText('closeVotes') : stage.route?.method === 'draw' ? playText('drawNow') : t('host.close'), run: () => command('stage.close', { stageRunId: stage.id }) }
-    : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
+    : running && stage?.status === 'CLOSED' && !stage.revealed && !showOnly && !stage.revealAfterVote && stage.kind !== 'duel' && (stage.kind !== 'route' || stage.route?.decision) ? { label: stage.kind === 'route' ? t('host.announce') : stage.minigame?.game === 'heads-or-tails' ? translate(COIN_TEXTS, 'flipNow') : t('host.reveal'), run: () => command('stage.reveal', { stageRunId: stage.id }) }
     : !state.tryout && running && stage && (stage.status === 'CLOSED' || (stage.status === 'ACTIVE' && showOnly)) && (stage.kind !== 'route' || stage.route?.decision) && (stage.kind !== 'duel' || stage.duel?.winnerId || (poolDuel && stage.revealed)) ? { label: t('host.next'), run: () => command('stage.advance', { stageRunId: stage.id }) }
     : null;
   // What is happening now, in a word or two, above the round.

@@ -548,6 +548,7 @@
   .crumb { max-width: 100%; }
   /* Menus and popovers open as a sheet at the bottom, so they always fit. */
   .action-menu-list, .peer-me-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; min-width: 0; width: auto; max-height: 70dvh; overflow: auto; z-index: 70; }
+  .editor .action-menu-list.context-menu { left: 12px; right: 12px; top: auto; bottom: 12px; max-height: 70dvh; max-width: none; }
   .editor-header :is(.action-menu, .peer-me) { position: static; }
   .editor .editor-header :is(.action-menu-list, .peer-me-popover) { position: absolute; inset: calc(100% + 4px) 12px auto; min-width: 0; width: auto; max-width: none; }
   .invite-panel, .save-points-panel { position: fixed; grid-area: auto; inset: auto 12px 12px; width: auto; max-height: calc(100% - 24px); }
@@ -595,6 +596,10 @@
 .action-menu-icon { display: inline-grid; place-items: center; width: 20px; flex: none; color: var(--e-accent); }
 .action-menu-list button:disabled .action-menu-icon { color: inherit; }
 .action-menu-keys { margin-left: 18px; padding: 1px 6px; border: 1px solid var(--e-border); border-bottom-width: 2px; border-radius: 6px; font: 600 .72rem/1.5 ui-monospace, Menlo, monospace; color: var(--e-muted); white-space: nowrap; }
+/* A line between groups of items (Delete sits below one). */
+.action-menu-separator { margin: 4px 6px; border: 0; border-top: 1px solid var(--e-border); }
+/* A right-click menu: at the pointer, above the map and its panels. */
+.action-menu-list.context-menu { position: fixed; left: var(--menu-x); top: var(--menu-y); right: auto; bottom: auto; z-index: 70; max-height: calc(100dvh - 16px); overflow: auto; }
 /* R3: a party choice's routes fold in the scene list. */
 .scene-list .route-group-item { margin-top: 4px; }
 .scene-list .route-group { display: flex; align-items: center; gap: 8px; width: 100%; justify-self: stretch; min-height: 34px; padding: 4px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--e-muted); font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; text-align: left; }

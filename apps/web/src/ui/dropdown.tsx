@@ -16,7 +16,8 @@ function swallowStrayClick() {
   setTimeout(() => { document.removeEventListener('click', stop, true); document.removeEventListener('dblclick', stop, true); }, 400);
 }
 
-export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; lang?: string; style?: CSSProperties }
+/** `badge`: a short tag after the label ("Own look"), in the list and on the button. */
+export interface DropdownOption { value: string; label: string; group?: string; disabled?: boolean; lang?: string; style?: CSSProperties; badge?: string }
 
 /**
  * A themed single-select control for the app. It follows the standard "select-only
@@ -122,14 +123,14 @@ export function Dropdown({ id: buttonId, value, options, onChange, placeholder =
   options.forEach((option, index) => { const lastGroup = groups.at(-1); if (lastGroup && lastGroup.name === option.group) lastGroup.items.push(index); else groups.push({ name: option.group, items: [index] }); });
   const optionEl = (index: number) => { const option = options[index]!; return <div key={index} id={`${id}-${index}`} role="option" data-value={option.value} lang={option.lang} aria-selected={index === selected} aria-disabled={option.disabled || undefined}
     className={`ed-dropdown-option${index === active ? ' active' : ''}`} style={option.style}
-    onPointerMove={() => { if (enabled(index) && index !== active) setActive(index); }} onPointerDown={event => event.preventDefault()} onClick={() => { choose(index); swallowStrayClick(); }}>{index === selected && <span className="ed-dropdown-check" aria-hidden="true">✓</span>}{option.label}</div>; };
+    onPointerMove={() => { if (enabled(index) && index !== active) setActive(index); }} onPointerDown={event => event.preventDefault()} onClick={() => { choose(index); swallowStrayClick(); }}>{index === selected && <span className="ed-dropdown-check" aria-hidden="true">✓</span>}{option.label}{option.badge && <span className="ed-dropdown-badge"> {option.badge}</span>}</div>; };
   const root = (button.current?.closest('dialog[open], [role=dialog], .app-menu, .editor, .room') as HTMLElement | null) ?? document.body;
 
   return <>
     <button ref={button} id={triggerId} type="button" role="combobox" value={value} aria-label={label} title={title} disabled={disabled} className={`ed-dropdown${className ? ` ${className}` : ''}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? `${id}-list` : undefined}
       aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined} onKeyDown={onKey}
       onClick={event => { event.preventDefault(); if (open) setOpen(false); else show(); }} onBlur={() => setOpen(false)}>
-      <span lang={options[selected]?.lang} className={selected < 0 ? 'ed-dropdown-placeholder' : undefined} style={selected >= 0 ? options[selected]!.style : undefined}>{selected >= 0 ? options[selected]!.label : placeholder}</span>
+      <span lang={options[selected]?.lang} className={selected < 0 ? 'ed-dropdown-placeholder' : undefined} style={selected >= 0 ? options[selected]!.style : undefined}>{selected >= 0 ? options[selected]!.label : placeholder}{selected >= 0 && options[selected]!.badge && <span className="ed-dropdown-badge"> {options[selected]!.badge}</span>}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
     </button>
     {open && createPortal(<div ref={list} id={`${id}-list`} role="listbox" aria-labelledby={triggerId} className="ed-dropdown-list" style={place} tabIndex={-1} onPointerDown={event => event.preventDefault()}>

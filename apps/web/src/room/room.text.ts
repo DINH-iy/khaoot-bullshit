@@ -18,6 +18,7 @@ export const ROOM_TEXTS = defineTexts('room', {
   invalidReply: 'Invalid server reply', retained: 'Not confirmed — reconnecting. Your action is retained.', changedBefore: 'The room changed just before your action arrived. Check the screen and try again.',
   notConfirmedCheck: 'Not confirmed. Check the screen and try again.', tooLate: 'Time was up before your answer reached the server.', notConfirmed: 'Not confirmed', restored: 'Saved — restored after reconnect.',
   previous: 'Previous action is not confirmed. Review the current stage before retrying or discarding it.', syncFailed: 'Could not synchronize.', checkFailed: 'Connection check failed. Saved data remains on the server.',
+  eChanged: 'The round changed just before that. Check the screen and try again.', eAlready: 'That is already saved.', eJudged: 'That has already been judged.', eNotYou: 'That is not for you to do in this round.', eNotAllowed: 'That answer cannot be used here. Check it and try again.', eDecided: 'That has already been decided.', eDeciding: 'That is being decided right now. Wait a moment.', eGone: 'That is no longer there.', eUnavailable: 'The game is not available right now. Try again in a moment.', eBusy: 'Slow down a little, then try again.', eSignIn: 'This phone is no longer signed in to the room. Join again.', eRoomGone: 'This room is no longer available.', eFailed: 'That did not work. Try again.',
   denied: 'Room access denied. Your access may have expired, been revoked, or your seat was taken over on another phone.', unreachable: 'Cannot reach the server. Retrying with backoff.',
   discarded: 'Pending action discarded locally. Already saved actions remain on the server.',
   // connection states as shown (the code keeps its own values)
@@ -28,7 +29,7 @@ export const ROOM_TEXTS = defineTexts('room', {
   thisRound: 'This round', yourTeam: 'Your team: {team}', yourTeamHidden: 'Your team: ', youCaptain: 'You are the captain', captain: 'captain', blind: 'Blind', aboutRound: 'About this round',
   teamRound: 'Team round · {who}', captainsAnswer: 'the captains answer for their team', everyoneAnswers: 'everyone answers',
   stepsVote: 'Your team votes on every choice; who does not vote in time is not counted.', stepsCaptain: 'The captain makes every choice for the team.', stepsAnyone: 'Anyone in the team taps the choice you agree on.',
-  sips: 'Sips when wrong: {sips} (rounds 1 to 4)', rainbow: 'Rainbow (four different suits): the other teams drink the last round’s sips.', blindRound: 'Blind round: you see your drawing only once it is sent.',
+  sips: 'Sips when wrong: {sips} (rounds 1 to 4)', rainbow: 'Rainbow: with three different suits showing, round 4 lets the team call a rainbow. Right: the other teams drink the last round’s sips. Wrong: the team drinks them.', blindRound: 'Blind round: you see your drawing only once it is sent.',
   scores: 'Scores', close: 'Close', and: '{list} and {last}',
 }, {
   nl: {
@@ -46,6 +47,7 @@ export const ROOM_TEXTS = defineTexts('room', {
     invalidReply: 'Ongeldig antwoord van de server', retained: 'Niet bevestigd — opnieuw verbinden. Je actie wordt bewaard.', changedBefore: 'De kamer veranderde net voordat je actie aankwam. Kijk naar het scherm en probeer het opnieuw.',
     notConfirmedCheck: 'Niet bevestigd. Kijk naar het scherm en probeer het opnieuw.', tooLate: 'De tijd was om voordat je antwoord de server bereikte.', notConfirmed: 'Niet bevestigd', restored: 'Opgeslagen — teruggezet na opnieuw verbinden.',
     previous: 'De vorige actie is niet bevestigd. Bekijk de huidige ronde voordat je opnieuw probeert of weggooit.', syncFailed: 'Bijwerken lukte niet.', checkFailed: 'Verbindingscontrole mislukt. Opgeslagen gegevens blijven op de server.',
+    eChanged: 'De ronde veranderde net daarvoor. Kijk op het scherm en probeer het opnieuw.', eAlready: 'Dat is al opgeslagen.', eJudged: 'Daar is al over beslist.', eNotYou: 'Dat is deze ronde niet aan jou.', eNotAllowed: 'Dat antwoord kan hier niet. Controleer het en probeer het opnieuw.', eDecided: 'Daar is al over beslist.', eDeciding: 'Daar wordt nu over beslist. Wacht even.', eGone: 'Dat is er niet meer.', eUnavailable: 'Het spel is nu niet beschikbaar. Probeer het zo opnieuw.', eBusy: 'Rustig aan, probeer het zo opnieuw.', eSignIn: 'Deze telefoon is niet meer aangemeld in de kamer. Doe opnieuw mee.', eRoomGone: 'Deze kamer is niet meer beschikbaar.', eFailed: 'Dat lukte niet. Probeer het opnieuw.',
     denied: 'Toegang tot de kamer geweigerd. Je toegang is misschien verlopen of ingetrokken, of je plek is overgenomen op een andere telefoon.', unreachable: 'De server is niet bereikbaar. Steeds opnieuw proberen.',
     discarded: 'Openstaande actie hier weggegooid. Al opgeslagen acties blijven op de server.',
     sConnecting: 'Verbinden', sConnected: 'Verbonden', sDisconnected: 'Verbinding verbroken — opnieuw verbinden', sUnavailable: 'Geen verbinding',
@@ -54,7 +56,7 @@ export const ROOM_TEXTS = defineTexts('room', {
     thisRound: 'Deze ronde', yourTeam: 'Je team: {team}', yourTeamHidden: 'Je team: ', youCaptain: 'Jij bent de aanvoerder', captain: 'aanvoerder', blind: 'Blind', aboutRound: 'Over deze ronde',
     teamRound: 'Teamronde · {who}', captainsAnswer: 'de aanvoerders antwoorden voor hun team', everyoneAnswers: 'iedereen antwoordt',
     stepsVote: 'Je team stemt over elke keuze; wie niet op tijd stemt, telt niet mee.', stepsCaptain: 'De aanvoerder maakt elke keuze voor het team.', stepsAnyone: 'Iemand in het team tikt de keuze aan waar jullie het over eens zijn.',
-    sips: 'Slokken bij een fout: {sips} (rondes 1 tot 4)', rainbow: 'Regenboog (vier verschillende kleuren): de andere teams drinken de slokken van de laatste ronde.', blindRound: 'Blinde ronde: je ziet je tekening pas als hij verstuurd is.',
+    sips: 'Slokken bij een fout: {sips} (rondes 1 tot 4)', rainbow: 'Regenboog: liggen er drie verschillende kleuren, dan mag het team in ronde 4 regenboog roepen. Goed: de andere teams drinken de slokken van de laatste ronde. Fout: het team drinkt ze zelf.', blindRound: 'Blinde ronde: je ziet je tekening pas als hij verstuurd is.',
     scores: 'Scores', close: 'Sluiten', and: '{list} en {last}',
   },
   de: {
@@ -72,6 +74,7 @@ export const ROOM_TEXTS = defineTexts('room', {
     invalidReply: 'Ungültige Antwort vom Server', retained: 'Nicht bestätigt — verbinde neu. Deine Aktion bleibt erhalten.', changedBefore: 'Der Raum hat sich kurz vor deiner Aktion geändert. Schau auf den Bildschirm und versuche es erneut.',
     notConfirmedCheck: 'Nicht bestätigt. Schau auf den Bildschirm und versuche es erneut.', tooLate: 'Die Zeit war um, bevor deine Antwort den Server erreichte.', notConfirmed: 'Nicht bestätigt', restored: 'Gespeichert — nach dem Neuverbinden wiederhergestellt.',
     previous: 'Die vorige Aktion ist nicht bestätigt. Prüfe die aktuelle Runde, bevor du sie wiederholst oder verwirfst.', syncFailed: 'Konnte nicht abgleichen.', checkFailed: 'Verbindungsprüfung fehlgeschlagen. Gespeicherte Daten bleiben auf dem Server.',
+    eChanged: 'Die Runde hat sich gerade geändert. Schau auf den Bildschirm und versuche es noch einmal.', eAlready: 'Das ist schon gespeichert.', eJudged: 'Das ist schon bewertet.', eNotYou: 'Das ist in dieser Runde nicht deine Aufgabe.', eNotAllowed: 'Diese Antwort geht hier nicht. Prüfe sie und versuche es noch einmal.', eDecided: 'Das ist schon entschieden.', eDeciding: 'Das wird gerade entschieden. Warte kurz.', eGone: 'Das gibt es nicht mehr.', eUnavailable: 'Das Spiel ist gerade nicht verfügbar. Versuche es gleich noch einmal.', eBusy: 'Etwas langsamer, dann noch einmal.', eSignIn: 'Dieses Handy ist nicht mehr im Raum angemeldet. Tritt erneut bei.', eRoomGone: 'Dieser Raum ist nicht mehr verfügbar.', eFailed: 'Das hat nicht geklappt. Versuche es noch einmal.',
     denied: 'Zugang zum Raum verweigert. Dein Zugang ist vielleicht abgelaufen oder entzogen, oder dein Platz wurde auf einem anderen Handy übernommen.', unreachable: 'Der Server ist nicht erreichbar. Neue Versuche laufen.',
     discarded: 'Offene Aktion hier verworfen. Bereits gespeicherte Aktionen bleiben auf dem Server.',
     sConnecting: 'Verbinde', sConnected: 'Verbunden', sDisconnected: 'Getrennt — verbinde neu', sUnavailable: 'Keine Verbindung',
@@ -80,7 +83,7 @@ export const ROOM_TEXTS = defineTexts('room', {
     thisRound: 'Diese Runde', yourTeam: 'Dein Team: {team}', yourTeamHidden: 'Dein Team: ', youCaptain: 'Du bist der Kapitän', captain: 'Kapitän', blind: 'Blind', aboutRound: 'Über diese Runde',
     teamRound: 'Teamrunde · {who}', captainsAnswer: 'die Kapitäne antworten für ihr Team', everyoneAnswers: 'alle antworten',
     stepsVote: 'Dein Team stimmt über jede Wahl ab; wer nicht rechtzeitig abstimmt, zählt nicht.', stepsCaptain: 'Der Kapitän trifft jede Wahl für das Team.', stepsAnyone: 'Irgendwer im Team tippt die Wahl an, auf die ihr euch einigt.',
-    sips: 'Schlucke bei einem Fehler: {sips} (Runden 1 bis 4)', rainbow: 'Regenbogen (vier verschiedene Farben): die anderen Teams trinken die Schlucke der letzten Runde.', blindRound: 'Blinde Runde: Du siehst deine Zeichnung erst, wenn sie geschickt ist.',
+    sips: 'Schlucke bei einem Fehler: {sips} (Runden 1 bis 4)', rainbow: 'Regenbogen: Liegen drei verschiedene Farben, darf das Team in Runde 4 Regenbogen sagen. Richtig: Die anderen Teams trinken die Schlucke der letzten Runde. Falsch: Das Team trinkt sie selbst.', blindRound: 'Blinde Runde: Du siehst deine Zeichnung erst, wenn sie geschickt ist.',
     scores: 'Punkte', close: 'Schließen', and: '{list} und {last}',
   },
   ro: {
@@ -98,6 +101,7 @@ export const ROOM_TEXTS = defineTexts('room', {
     invalidReply: 'Răspuns invalid de la server', retained: 'Neconfirmat — se reconectează. Acțiunea ta este păstrată.', changedBefore: 'Camera s-a schimbat chiar înainte să ajungă acțiunea ta. Uită-te la ecran și încearcă din nou.',
     notConfirmedCheck: 'Neconfirmat. Uită-te la ecran și încearcă din nou.', tooLate: 'Timpul expirase înainte ca răspunsul tău să ajungă la server.', notConfirmed: 'Neconfirmat', restored: 'Salvat — restaurat după reconectare.',
     previous: 'Acțiunea anterioară nu este confirmată. Verifică etapa curentă înainte să reîncerci sau să renunți la ea.', syncFailed: 'Sincronizarea nu a mers.', checkFailed: 'Verificarea conexiunii a eșuat. Datele salvate rămân pe server.',
+    eChanged: 'Runda s-a schimbat chiar înainte. Verifică ecranul și încearcă din nou.', eAlready: 'Asta e deja salvat.', eJudged: 'Asta a fost deja jurizat.', eNotYou: 'Nu e rândul tău la asta în această rundă.', eNotAllowed: 'Răspunsul acesta nu merge aici. Verifică-l și încearcă din nou.', eDecided: 'Asta s-a decis deja.', eDeciding: 'Se decide chiar acum. Așteaptă puțin.', eGone: 'Asta nu mai există.', eUnavailable: 'Jocul nu e disponibil acum. Încearcă din nou imediat.', eBusy: 'Mai încet puțin, apoi încearcă din nou.', eSignIn: 'Telefonul acesta nu mai e conectat la cameră. Intră din nou.', eRoomGone: 'Camera aceasta nu mai e disponibilă.', eFailed: 'Nu a mers. Încearcă din nou.',
     denied: 'Acces la cameră refuzat. Accesul tău poate să fi expirat sau să fi fost retras, sau locul tău a fost preluat pe alt telefon.', unreachable: 'Serverul nu poate fi accesat. Se reîncearcă.',
     discarded: 'Acțiunea în așteptare a fost abandonată aici. Acțiunile deja salvate rămân pe server.',
     sConnecting: 'Se conectează', sConnected: 'Conectat', sDisconnected: 'Deconectat — se reconectează', sUnavailable: 'Conexiune indisponibilă',
@@ -106,7 +110,7 @@ export const ROOM_TEXTS = defineTexts('room', {
     thisRound: 'Această rundă', yourTeam: 'Echipa ta: {team}', yourTeamHidden: 'Echipa ta: ', youCaptain: 'Tu ești căpitanul', captain: 'căpitan', blind: 'Orb', aboutRound: 'Despre această rundă',
     teamRound: 'Rundă pe echipe · {who}', captainsAnswer: 'căpitanii răspund pentru echipa lor', everyoneAnswers: 'răspunde toată lumea',
     stepsVote: 'Echipa ta votează fiecare alegere; cine nu votează la timp nu se numără.', stepsCaptain: 'Căpitanul face fiecare alegere pentru echipă.', stepsAnyone: 'Oricine din echipă atinge alegerea asupra căreia sunteți de acord.',
-    sips: 'Înghițituri la greșeală: {sips} (rundele 1-4)', rainbow: 'Curcubeu (patru culori diferite): celelalte echipe beau înghițiturile ultimei runde.', blindRound: 'Rundă oarbă: îți vezi desenul abia după ce e trimis.',
+    sips: 'Înghițituri la greșeală: {sips} (rundele 1-4)', rainbow: 'Curcubeu: cu trei simboluri diferite pe masă, în runda 4 echipa poate cere curcubeu. Corect: celelalte echipe beau înghițiturile ultimei runde. Greșit: echipa le bea.', blindRound: 'Rundă oarbă: îți vezi desenul abia după ce e trimis.',
     scores: 'Scoruri', close: 'Închide', and: '{list} și {last}',
   },
 });

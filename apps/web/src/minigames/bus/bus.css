@@ -17,3 +17,14 @@
   .room-player .bus-cards.big { gap: 6px; }
   .room-player .bus-cards.big .bus-card { width: clamp(2rem, 13vw, 2.75rem); height: 3.4rem; }
 }
+/* Calling a rainbow (round 4, three different suits showing): a full-width button under the four suits, in dark rainbow
+   bands so the white text keeps its contrast. */
+.room .step-option.option-rainbow { grid-column: 1 / -1; color: #fff; border-color: transparent; text-shadow: 0 1px 2px rgb(0 0 0 / .45);
+  background: linear-gradient(90deg, #a8261e, #9a4f00, #1f6e38, #1f4b9c, #5f3398); }
+.bus-rainbow-mark { font-size: 1.2em; }
+/* What is at stake and what just happened: icon chips and one or two words, not sentences. */
+.bus-stakes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.bus-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: .95rem; background: var(--r-card); color: var(--r-text); }
+.bus-chip.bad { box-shadow: inset 0 0 0 2px var(--r-bad); }
+.bus-chip.rainbow { box-shadow: inset 0 0 0 2px #8e44ad; }
+.bus-verdict { font-size: 1.25rem; }
