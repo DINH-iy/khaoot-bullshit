@@ -193,7 +193,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         awards: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
       });
     }, { isolationLevel: 'RepeatableRead', maxWait: 2000, timeout: 5000 });
-  } catch (error) { throw error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE'); }
+  } catch (error) { throw error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE', { cause: error }); }
 }
 
 type SongInfo = Map<string, { title: string; credit: string | null }>;

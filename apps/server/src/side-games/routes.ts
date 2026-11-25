@@ -21,6 +21,7 @@ import { drawPack, itemsByKey, saleSet, setsOnSale } from './pack-sets.js';
 import { balanceOf, entryFor, lockWallet, startWallet, walletWhere, type Seat } from './wallet.js';
 import { registerChallenges } from './challenges.js';
 import type { Server } from 'socket.io';
+import { recordProblem } from '../diagnostics/problems.js';
 
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, NOT_FOUND: 404, NOT_ENOUGH_CHIPS: 409, CHIPS_OFF: 409, SIDE_GAMES_OFF: 409, SIDE_GAMES_PAUSED: 409, ALREADY_SUBMITTED: 409, INVALID_STATE: 409 };
 // A stored hand: the cards (the dealer's hidden one included) and, once over, its result.
@@ -41,7 +42,7 @@ export function registerSideGames(app: FastifyInstance, client: PrismaClient, co
   const limiter = new RateLimiter(4096);
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
-    if (code === 'GAME_UNAVAILABLE') app.log.error({ err: error, event: 'side_game_failed' }, 'Side game request failed');
+    if (code === 'GAME_UNAVAILABLE') recordProblem(app, { where: 'side game', error, request: reply.request, actor: 'player' });
     else if (!['SIDE_GAMES_PAUSED', 'NOT_ENOUGH_CHIPS'].includes(code)) app.log.warn({ event: 'side_game_rejected', code }, 'Side game request rejected');
     return reply.code(status[code] ?? (code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
   };

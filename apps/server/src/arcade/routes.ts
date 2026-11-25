@@ -10,6 +10,7 @@ import { CONNECTED_MS, createLobbies, ensureLeader, lockLobby, lookOf, memberCoo
 import { leaderboard, lobbyScores } from './results.js';
 import type { Rounds } from './rounds.js';
 import { graphLibrary } from '../minigames/draw-the-graph/library.js';
+import { recordProblem } from '../diagnostics/problems.js';
 
 const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, FORBIDDEN: 403, ORIGIN_REJECTED: 403, RATE_LIMITED: 429, ROOM_NOT_AVAILABLE: 404, AUTH_UNAVAILABLE: 503,
   LOBBY_PASSWORD_REQUIRED: 403, LOBBY_LOCKED: 409, LOBBY_FULL: 409, ARCADE_FULL: 409, ROUND_ON: 409, NOT_ENOUGH_PLAYERS: 409, INVALID_STATE: 409, REVISION_CONFLICT: 409 };
@@ -23,7 +24,7 @@ export function registerArcade(app: FastifyInstance, client: PrismaClient, confi
   const limiter = new RateLimiter(4096);
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
-    if (code === 'GAME_UNAVAILABLE') app.log.error({ err: error, event: 'arcade_failed' }, 'Arcade request failed');
+    if (code === 'GAME_UNAVAILABLE') recordProblem(app, { where: 'arcade', error, request: reply.request, actor: 'member' });
     else app.log.warn({ event: 'arcade_rejected', code }, 'Arcade request rejected');
     return reply.code(status[code] ?? (code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
   };

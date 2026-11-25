@@ -22,6 +22,7 @@ export * from './players.js';
 export * from './team-colors.js';
 export * from './drawing.js';
 export * from './feedback.js';
+export * from './diagnostics.js';
 export * from './people.js';
 export * from './packs.js';
 export * from './side-games.js';

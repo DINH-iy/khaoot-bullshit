@@ -13,6 +13,8 @@ import { registerGrapherImport } from './authoring/grapher-import.js';
 import { registerLocalHosting } from './hosting/local-owner.js';
 import { createOwnerAccess } from './hosting/owner-access.js';
 import { registerFeedbackRoutes } from './feedback/routes.js';
+import { registerProblemLog, recordProblem } from './diagnostics/problems.js';
+import { registerDeviceLogs } from './diagnostics/device-logs.js';
 import { registerPeopleRoutes } from './people/routes.js';
 import { registerGroupRoutes } from './people/groups.js';
 import { registerMediaLibrary } from './assets/library.js';
@@ -53,6 +55,8 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   registerClientAddress(app, config.TRUST_CLOUDFLARE_LOCAL);
   // The test bench's phones (several players in one browser): rooms/test-seats.ts.
   registerTestSeats(app);
+  // Unexpected server errors are saved for the owner's logs (Admin → Logs) next to what the devices send.
+  registerProblemLog(app, options.database?.client);
   const verifier = options.verifyToken ?? createTokenVerifier(config);
   const metrics = new RequestMetrics();
   const requests = new WeakMap<FastifyRequest, { start: number; span: Span }>();
@@ -95,7 +99,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
   app.setErrorHandler((error, request, reply) => {
     const httpError = error instanceof Error && 'statusCode' in error ? error : undefined;
     const statusCode = typeof httpError?.statusCode === 'number' && httpError.statusCode >= 400 && httpError.statusCode < 500 ? httpError.statusCode : 500;
-    if (statusCode === 500) request.log.error({ err: error, event: 'request_failed' }, 'Unexpected request failure');
+    if (statusCode === 500) recordProblem(app, { where: 'request', error, request });
     else request.log.warn({ event: 'request_rejected', statusCode }, 'Request rejected');
     return problem(request, reply, statusCode, statusCode === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST', statusCode === 500 ? 'An unexpected error occurred.' : 'The request could not be processed.');
   });
@@ -141,6 +145,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerLocalHosting(app, options.database.client, config, owner, live);
     registerGrapherImport(app, owner);
     registerFeedbackRoutes(app, options.database.client, config, owner);
+    registerDeviceLogs(app, options.database.client, config, owner);
     registerPeopleRoutes(app, options.database.client, config, owner, live);
     registerGroupRoutes(app, options.database.client, owner);
     registerPrefabRoutes(app, options.database.client, owner);

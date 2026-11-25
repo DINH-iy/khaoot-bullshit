@@ -280,3 +280,22 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .admin-feedback-attachment :is(img, video) { display: block; max-width: 100%; max-height: min(420px, 60vh); object-fit: contain; border-radius: 10px; }
 
 .admin-item-head > .ed-dropdown, .admin-actions > .ed-dropdown { width: auto; max-width: 100%; }
+/* Device logs: problems in red, finished games in green, server errors in amber. */
+.log-item.log-problem { border-left-color: #d6336c; } .log-item.log-finished { border-left-color: #1f9d55; } .log-item.log-server { border-left-color: #f0a400; }
+.log-item .admin-item-head h2 { overflow-wrap: anywhere; font-size: 1rem; }
+.admin-page button.log-toggle { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; }
+.log-stats { margin: 0; }
+.log-agent { overflow-wrap: anywhere; font-size: .78rem; }
+.log-server { padding: 10px 12px; border-radius: 10px; background: light-dark(#fff6e0, #2f2817); display: grid; gap: 4px; }
+.log-server p { margin: 0; overflow-wrap: anywhere; }
+.log-server pre { margin: 4px 0 0; font-size: .75rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.log-related { display: grid; gap: 8px; } .log-related h3 { margin: 0; font-size: .95rem; }
+.log-timeline-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid light-dark(#e3def2, #3a3550); }
+.log-timeline { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.log-timeline caption { padding: 8px 12px; text-align: left; font-weight: 700; }
+.log-timeline th, .log-timeline td { padding: 5px 10px; border-top: 1px solid light-dark(#eeeaf7, #2c2840); text-align: left; vertical-align: top; }
+.log-timeline th { font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: light-dark(#5f5873, #b3acc8); background: light-dark(#f7f5fc, #25222f); white-space: nowrap; }
+.log-timeline td:first-child, .log-timeline td.num { white-space: nowrap; } .log-timeline .num { text-align: right; }
+.log-timeline td:nth-child(3) { overflow-wrap: anywhere; min-width: 14rem; }
+.log-timeline tr.log-bad td { background: light-dark(#fdecec, #3a1c22); color: light-dark(#9d1717, #ffd0d0); font-weight: 600; }
+.log-timeline-wrap:focus-visible { outline: 3px solid #6d3fd6; outline-offset: 2px; }

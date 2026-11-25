@@ -225,7 +225,7 @@ export function RoomScreen() {
         return roomApi<{ sessionId: string }>('/api/rooms/join', { ...admission, joinId: next });
       });
       history.replaceState(null, '', `/?room=${result.sessionId}`); setReady(true); setSessionId(result.sessionId); setNewKey(null);
-    } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error && cause.message === 'NAME_TAKEN' ? r('nameTaken') : cause instanceof Error && cause.message === 'SEAT_DENIED' ? management('banDenied') : cause instanceof Error ? cause.message : r('joinFailed')); } finally { setBusy(false); }
+    } catch (cause) { setError(cause instanceof Error && cause.message === 'ROOM_NOT_AVAILABLE' ? look.text('join.notFound') : cause instanceof Error && cause.message === 'NAME_TAKEN' ? r('nameTaken') : cause instanceof Error && cause.message === 'SEAT_DENIED' ? management('banDenied') : r('joinFailed')); } finally { setBusy(false); }
   };
   // A test bench phone joins by itself under the name it was opened with (Player 1, Player 2…).
   const autoJoined = useRef(false);

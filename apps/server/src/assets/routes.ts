@@ -13,6 +13,7 @@ import { createRoomGateway, type Principal } from '../rooms/gateway.js';
 import { allowedOrigin, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
 import { cleanUpMedia } from './cleanup.js';
 import { assetPath, cleanPicture, sendStored, defaultMediaDirectory, MAX_PICTURE_BYTES, MAX_UPLOAD_BYTES, removeStored, SESSION_MEDIA_BYTES, storeBytes, storeUpload, UPLOAD_CONTENT_TYPES, UploadTooLarge } from './media.js';
+import { recordProblem } from '../diagnostics/problems.js';
 
 const MAX_ACTIVE_UPLOADS = 4;
 
@@ -23,7 +24,8 @@ export function registerAssetRoutes(app: FastifyInstance, client: PrismaClient, 
   const status: Partial<Record<string, number>> = { UNAUTHORIZED: 401, CREDENTIAL_EXPIRED: 401, FORBIDDEN: 403, INELIGIBLE: 403, ORIGIN_REJECTED: 403, NOT_FOUND: 404, FILE_TOO_LARGE: 413, UNSUPPORTED_MEDIA: 415, RATE_LIMITED: 429, STORAGE_FULL: 507, INVALID_STATE: 409, ALREADY_SUBMITTED: 409 };
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof UploadTooLarge ? 'FILE_TOO_LARGE' : error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
-    app.log.warn({ event: 'asset_request_rejected', code }, 'Asset request rejected');
+    if (code === 'GAME_UNAVAILABLE') recordProblem(app, { where: 'media', error, request: reply.request });
+    else app.log.warn({ event: 'asset_request_rejected', code }, 'Asset request rejected');
     // An upload refused before its bytes were read must not leave them on a reused connection.
     return reply.header('connection', 'close').code(status[code] ?? (code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
   };

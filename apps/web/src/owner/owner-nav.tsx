@@ -8,7 +8,7 @@ import type { HostRole } from './use-host-access.js';
 import { OWNER_TEXTS } from './owner.text.js';
 import './owner-nav.css';
 
-export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people' | 'packs' | 'look';
+export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people' | 'packs' | 'look' | 'logs';
 type Text = Parameters<Translate<keyof typeof OWNER_TEXTS.en>>[0];
 type Link = { key: OwnerSection; label: Text; href: string; icon: IconName };
 // The main places, for everyone allowed (editors: Play and Editor). The editor opens per game, so "Editor" leads
@@ -26,6 +26,7 @@ const OWNER: Link[] = [
   { key: 'people', label: 'people', href: '/?admin=people', icon: 'users' },
   { key: 'packs', label: 'packs', href: '/?admin=packs', icon: 'star' },
   { key: 'look', label: 'joinScreen', href: '/?admin=look', icon: 'circle-info' },
+  { key: 'logs', label: 'deviceLogs', href: '/?admin=logs', icon: 'bolt' },
 ];
 
 /** A small menu that closes on Escape, a click outside or picking an item. */

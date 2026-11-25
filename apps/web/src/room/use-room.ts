@@ -7,6 +7,7 @@ import { createPoolAimStore } from '../head-to-head/eight-ball/live-aim.js';
 import { translate } from '../i18n/texts.js';
 import { ROOM_TEXTS } from './room.text.js';
 import { isUnavailablePageError } from '../navigation.js';
+import { deviceLog, note, sendGameOver, setLogRoom } from '../diagnostics/recorder.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
 import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, SessionChangedSchema, type GameCommand, type PoolAim, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
@@ -37,12 +38,24 @@ export function useRoom(sessionId: string | undefined, display = false) {
     if (!sessionId) return;
     try { const saved = localStorage.getItem(storageKey); if (saved && saved.length < 6000) { const parsed = GameCommandSchema.safeParse(JSON.parse(saved)); if (parsed.success && parsed.data.sessionId === sessionId) { pendingRef.current = parsed.data; setPending(parsed.data); } } } catch { /* Online submission remains available. */ }
     let mounted = true; let syncing = false; let syncAgain = false; let reconciled = false; let connections = 0; let debounce: ReturnType<typeof setTimeout> | undefined;
-    let admissionRetries = 0; let admissionTimer: ReturnType<typeof setTimeout> | undefined;
+    let sawPlaying = false; let admissionRetries = 0; let admissionTimer: ReturnType<typeof setTimeout> | undefined;
     const socket = io({ autoConnect: false, auth: { sessionId, ...(display ? { display: true } : {}), ...(testSeat ? { seat: testSeat } : {}) }, reconnectionAttempts: 20, reconnectionDelay: 500, reconnectionDelayMax: 5000, timeout: 8000 }); socketRef.current = socket;
     const denyAccess = () => { setSnapshot(undefined); setDeniedSession(sessionId); };
+    // Commands go in the device log with their answer and time; syncs only when they fail or are slow,
+    // heartbeats only as round-trip figures (they come every 10 seconds).
+    const logged = (event: string, input: unknown, code: string, ms: number) => {
+      if (event === 'room.heartbeat') { if (code === 'ok') deviceLog.heartbeat.add(ms); else note({ kind: 'command', what: event, code, ms }); return; }
+      if (event === 'room.sync' && code === 'ok' && ms < 1500) return;
+      const type = event === 'room.command' && typeof (input as { type?: unknown } | null)?.type === 'string' ? ` ${(input as { type: string }).type}` : '';
+      if (code === 'ok') deviceLog.requests.add(ms);
+      note({ kind: 'command', what: `${event}${type}`, code, ms });
+    };
     const emit = <T,>(event: string, input: unknown): Promise<T> => new Promise((resolve, reject) => {
-      if (!socket.connected) { reject(new Error(r('notConnected'))); return; }
+      if (!socket.connected) { note({ kind: 'command', what: event, code: 'not connected' }); reject(new Error(r('notConnected'))); return; }
+      const start = performance.now();
       socket.timeout(5000).emit(event, input, (error: Error | null, reply: RoomReply<T>) => {
+        const ms = Math.round(performance.now() - start);
+        logged(event, input, error ? 'timeout' : !reply ? 'invalid reply' : reply.ok ? 'ok' : reply.error.code, ms);
         if (error) reject(new Error(r('notConfirmedReconnect')));
         else if (!reply?.ok) reject(new Error(reply && !reply.ok ? reply.error.code : r('invalidReply'))); else resolve(reply.data);
       });
@@ -87,6 +100,9 @@ export function useRoom(sessionId: string | undefined, display = false) {
       try {
         const state = RoomSnapshotSchema.parse(await emit('room.sync', { sessionId })); if (!mounted) return;
         setSnapshot(previous => { const next = !previous || state.view.revision >= previous.view.revision ? state : previous; latestRef.current = next; return next; });
+        setLogRoom(sessionId, state.role, state.selfPlayerId);
+        // The whole log once the game is over, from a device that saw it played (not one opening an old room).
+        if (state.view.status !== 'FINISHED') sawPlaying = true; else if (sawPlaying) sendGameOver(sessionId);
         setClockOffset(Date.parse(state.view.serverTime) - Date.now());
         if (!reconciled) { reconciled = true; await reconcile(state); }
       } catch (error) {
@@ -106,15 +122,15 @@ export function useRoom(sessionId: string | undefined, display = false) {
         else setMessage(r('checkFailed'));
       }
     };
-    socket.on('connect', () => { if (!mounted) return; admissionRetries = 0; if (admissionTimer) clearTimeout(admissionTimer); connections++; setReconnects(value => value + (connections > 1 ? 1 : 0)); setConnection('Connected'); reconciled = false; void sync(); void heartbeat(); });
+    socket.on('connect', () => { if (!mounted) return; note({ kind: 'connection', what: connections ? 'reconnected' : 'connected' }); if (connections) deviceLog.reconnects++; admissionRetries = 0; if (admissionTimer) clearTimeout(admissionTimer); connections++; setReconnects(value => value + (connections > 1 ? 1 : 0)); setConnection('Connected'); reconciled = false; void sync(); void heartbeat(); });
     socket.on('disconnect', reason => {
-      if (!mounted) return;
+      if (!mounted) return; note({ kind: 'connection', what: 'disconnected', code: reason.slice(0, 60) });
       setConnection('Disconnected — reconnecting'); setSaving(false);
       // A forced disconnect can mean this seat was revoked. Ask the server before deciding where to go.
       if (reason === 'io server disconnect') socket.connect();
     });
     socket.on('connect_error', (error: Error & { data?: { code?: string } }) => {
-      if (!mounted) return; setConnection('Connection unavailable');
+      if (!mounted) return; setConnection('Connection unavailable'); note({ kind: 'connection', what: 'could not connect', code: (error.data?.code ?? error.message).slice(0, 60) });
       if (isUnavailablePageError(error.data?.code)) { denyAccess(); return; }
       setMessage(r('unreachable'));
       // Socket.IO retries transport failures itself, but namespace middleware
@@ -139,7 +155,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('room.pool-aim', (data: unknown) => { if (mounted) poolAims.add(data); });
     socket.on('minigame.progress', (data: { stageRunId?: unknown; counts?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && Array.isArray(data.counts)) setProgress({ stageRunId: data.stageRunId, counts: (data.counts as { playerId: string; count: number }[]).filter(entry => typeof entry?.playerId === 'string' && Number.isInteger(entry.count)).slice(0, 512) }); });
     socket.on('room.error', (error: { code: string }) => {
-      if (!mounted) return;
+      if (!mounted) return; note({ kind: 'connection', what: 'room error', code: String(error?.code).slice(0, 60) });
       if (isUnavailablePageError(error.code)) denyAccess();
       else setMessage(error.code);
     });
@@ -147,7 +163,7 @@ export function useRoom(sessionId: string | undefined, display = false) {
     const interval = setInterval(() => { void heartbeat(); requestSync(); }, 10000);
     const foreground = () => { if (!document.hidden) { if (!socket.connected) socket.connect(); reconciled = false; requestSync(); void heartbeat(); } };
     document.addEventListener('visibilitychange', foreground); window.addEventListener('online', foreground); socket.connect();
-    return () => { mounted = false; clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
+    return () => { mounted = false; setLogRoom(null); clearInterval(interval); if (debounce) clearTimeout(debounce); if (admissionTimer) clearTimeout(admissionTimer); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); socket.removeAllListeners(); socket.disconnect(); socketRef.current = undefined; };
   }, [sessionId, display, remember, storageKey, liveStrokes, reactions, poolAims]);
   return { snapshot, denied: deniedSession !== undefined && deniedSession === sessionId, connection, message, samples, reconnects, pending, saving, clockOffset, confirmMs, go, progress, challengeTick,
     /** A tap race's running count; fire-and-forget, the final result is the saved one. */

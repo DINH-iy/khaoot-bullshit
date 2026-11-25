@@ -972,3 +972,30 @@ model SiteSetting {
 
   @@map("site_settings")
 }
+
+enum LogSource {
+  DEVICE
+  SERVER
+}
+
+// What happened on a device (sent by itself on a problem or at the end of a game) or an unexpected server error.
+// Owner-only, kept 7 days (diagnostics/device-logs.ts). No foreign keys: a log outlives a deleted room or lobby.
+model DeviceLog {
+  id        String    @id @db.Uuid
+  source    LogSource
+  reason    String    @db.VarChar(40)
+  summary   String    @db.VarChar(300)
+  sessionId String?   @db.Uuid
+  lobbyId   String?   @db.Uuid
+  playerId  String?   @db.Uuid
+  role      String    @db.VarChar(12)
+  requestId String?   @db.VarChar(36)
+  /// Device: { device, stats, events }; server: ServerProblemSchema.
+  details   Json      @db.JsonB
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([sessionId, createdAt])
+  @@index([requestId])
+  @@map("device_logs")
+}

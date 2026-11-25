@@ -87,7 +87,7 @@ Songs attached directly to a scene have a player with play and pause, seeking, v
 - `apps/server`: Fastify API, authentication enforcement, logs and instrumentation.
 - `packages/contracts`: public runtime schemas/types; no secrets or privileged engine code.
 
-The room screens (phone, host, shared display) have a first party design: join card, lobby with QR and big room code, colour-coded answers, a host control panel and results bars. The admin dashboard is partly built: feedback and people (see the instructions below).
+The room screens (phone, host, shared display) have a first party design: join card, lobby with QR and big room code, colour-coded answers, a host control panel and results bars. The admin dashboard is partly built: feedback, people and device logs (see the instructions below).
 
 ## Instructions: test version, feedback, people and side games
 
@@ -181,6 +181,21 @@ The lobby is laid out like a party game's phone lobby: a short bar with the lobb
 - Limits: 40 open lobbies, 24 players a lobby, 10 new lobbies a minute per address.
 - Like hosting, the arcade only runs in the test version, never in production (until sign-in exists). Each round is an ordinary room hosted by the arcade, which nobody can join with its room code or take a seat in: only the lobby's members are seated. Code: `apps/server/src/arcade/` and `apps/web/src/arcade/`.
 
+### 6. Device logs: what went wrong, and how a game ran
+
+Phones and screens keep a short log of what happens on them: what was tapped, which requests and room commands went out, what came back and how long it took, connection changes and script errors. Nothing is sent while things work. Players keep seeing the ordinary "That did not work" message; the details go to you.
+
+- **When something goes wrong** (the server fails, a request gets no answer in time or there is no connection, a command is not confirmed, a script error), the device sends its log by itself a few seconds later. It sends at most once a minute.
+- **When a game ends**, every device that played sends its whole log once, with figures: typical and slowest server answer, connection round trip, how often the page was busy, and reconnects.
+- **The server saves its own unexpected errors** too: where it happened, the error and the first lines of its stack, with the request id.
+
+For you: owner menu → **Device logs** (`/?admin=logs`).
+
+- *Problems*, *Finished games* or *Everything*. Search by room code, player, error code or request id.
+- Open a log for its figures, the server errors that belong to it, and the timeline (failures in red). **Copy as text** gives everything to paste into a request to fix it.
+
+A log never holds what was typed, field values, passwords, keys, tokens, cookies, or the part of an address after `?` or `#`. Ids are cut to 8 characters. Logs are kept 7 days (at most 20 000), stored in PostgreSQL (`device_logs`, migration `20261125120000_device_logs`). Limits: 300 events of the last 30 minutes per device, 160 KB per log, 60 logs a minute and 600 an hour per address. Details and what is still open: [device logs](docs/product/device-diagnostics-plan.md). Not yet checked on real phones on a real network, or on Safari/iOS. Code: `apps/web/src/diagnostics/` and `apps/server/src/diagnostics/`.
+
 ## Where to try or play games
 
 | What you want to do | Where to go |
@@ -234,7 +249,7 @@ Local owner hosting is the explicit non-production stand-in for creator sign-in.
 - Optional manual request spans export over OTLP/HTTP when `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is configured. No exporter or external network telemetry is enabled by default. Request spans are currently standalone; database spans and full browser/server trace correlation come later.
 - SIGTERM/SIGINT trigger a bounded shutdown. Fatal exception monitoring logs available diagnostics without swallowing the crash. An external host/process supervisor is required for restarts.
 
-Never commit `.env`, credentials, answers, or recovery codes in logs. Centralized error issue tracking, persistent dashboards, telemetry outage testing, and deployment alerts remain future work.
+Never commit `.env`, credentials, answers, or recovery codes in logs. The owner's device logs (section 6 above) keep unexpected server errors and device problems for 7 days; full error issue tracking, persistent dashboards, telemetry outage testing, and deployment alerts remain future work.
 
 ## Verification and next slice
 

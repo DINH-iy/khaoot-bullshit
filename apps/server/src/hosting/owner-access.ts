@@ -6,6 +6,7 @@ import { GameError } from '../game/errors.js';
 import { allowedOrigin, namedCookie, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { personFromCookie } from '../people/identity.js';
+import { recordProblem } from '../diagnostics/problems.js';
 
 // Local owner access: the person running this server holds a private key in an
 // HttpOnly cookie scoped to /api/host. It is an explicit non-production
@@ -26,7 +27,8 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
     : undefined;
   const fail = (reply: FastifyReply, error: unknown) => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
-    app.log.warn({ event: 'host_request_rejected', code }, 'Host request rejected');
+    if (code === 'GAME_UNAVAILABLE') recordProblem(app, { where: 'host', error, request: reply.request });
+    else app.log.warn({ event: 'host_request_rejected', code }, 'Host request rejected');
     return reply.code(status[code] ?? (code === 'AUDIO_TOOLS_UNAVAILABLE' ? 503 : code === 'GAME_UNAVAILABLE' ? 500 : 400)).send({ ok: false, error: { code } } satisfies RoomReply<never>);
   };
   // Each limit has its own counter: a strict key-guessing limit on signing in

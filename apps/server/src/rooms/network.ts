@@ -31,6 +31,7 @@ import { allowedOrigin, cookieName, newToken, RateLimiter, RoomError, roomAssert
 import { clientAddress } from '../http/client-address.js';
 import { decideDueVotes } from '../minigames/shared/steps/engine.js';
 import { arcadeLink } from '../arcade/link.js';
+import { recordProblem } from '../diagnostics/problems.js';
 
 export function registerRoomNetworking(app: FastifyInstance, client: PrismaClient, config: Config, verifier?: TokenVerifier) {
   const gateway = createRoomGateway(client, config); const limiter = new RateLimiter();
@@ -43,9 +44,11 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const minigames = registerMinigameEvents(io, client, live, app.log);
   const poolAim = registerPoolAim();
   const reactions = registerReactions(io, client); const chat = createRoomChat(client); const breaks = createBreaks(client, service);
-  const failure = (error: unknown): RoomReply<never> => {
+  /** `from`: the HTTP request, or for a socket event its name, the room and who sent it (for the owner's logs). */
+  const failure = (error: unknown, from?: FastifyRequest | { where: string; sessionId: string | null; actor: string }): RoomReply<never> => {
     const code = error instanceof RoomError || error instanceof GameError ? error.code : 'GAME_UNAVAILABLE';
-    app.log.warn({ event: 'room_request_rejected', code }, 'Room request rejected');
+    if (code === 'GAME_UNAVAILABLE') recordProblem(app, from && 'where' in from ? { error, ...from } : { where: 'room', error, ...(from ? { request: from } : {}) });
+    else app.log.warn({ event: 'room_request_rejected', code }, 'Room request rejected');
     return { ok: false, error: { code } };
   };
   const cookie = (request: FastifyRequest) => request.headers.cookie;
@@ -115,7 +118,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const joined = await gateway.join(request.body, signedIn ? { id: signedIn.person.id, name: signedIn.person.name, look: signedIn.person.look } : null, Boolean(seatOf(request.headers[SEAT_HEADER])));
       reply.header('set-cookie', roomCookie(config, joined.sessionId, joined.token, joined.expiresAt));
       return { ok: true, data: { sessionId: joined.sessionId } };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error, reply.request)); }
   });
   app.get('/api/rooms/look/:roomCode', async (request, reply) => {
     try {
@@ -127,14 +130,14 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const look = definition.presentation;
       const joining = await people.joinInfo(room.id, readRoomState(room.state));
       return { ok: true, data: RoomLookSchema.parse({ title: definition.title, presentation: { texts: look?.texts ?? {}, translations: look?.translations, animations: look?.animations ?? {}, themes: look?.theme ? [look.theme] : [] }, ...joining }) };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 404).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 404).send(failure(error, reply.request)); }
   });
   app.get('/api/rooms/seats/:roomCode', async (request, reply) => {
     try {
       requireOrigin(request); roomAssert(limiter.allow(`seats:${request.ip}`, 60), 'RATE_LIMITED');
       const code = RoomCodeSchema.safeParse((request.params as { roomCode?: string }).roomCode); roomAssert(code.success, 'INVALID_COMMAND');
       return { ok: true, data: SeatListSchema.parse(await seats.seats(code.data)) };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/reclaim', async (request, reply) => {
     try {
@@ -143,7 +146,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const result = await seats.request(request.body);
       if (result.status === 'approved') reply.header('set-cookie', roomCookie(config, result.sessionId, result.token, result.expiresAt));
       return { ok: true, data: { status: result.status, sessionId: result.status === 'approved' ? result.sessionId : null } };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error, reply.request)); }
   });
   // People in a room (room-people.ts). A guest makes their own account while joining (when the host allows it):
   // this phone is signed in as the new person and gets the key once, to write down.
@@ -154,7 +157,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       reply.header('set-cookie', personCookie(config, made.device));
       app.log.info({ event: 'person_signed_up' }, 'Guest made an account while joining');
       return { ok: true, data: { name: made.name, key: made.key } };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error, reply.request)); }
   });
   // A phone asks to sign in as one of the people the host added, and repeats the call while it waits for the host.
   app.post('/api/rooms/pick', async (request, reply) => {
@@ -163,28 +166,28 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const result = await people.pick(request.body);
       if (result.status === 'approved') { reply.header('set-cookie', personCookie(config, result.device)); return { ok: true, data: { status: 'approved', name: result.name } }; }
       return { ok: true, data: { status: 'pending', name: null } };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/expected', async (request, reply) => {
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
       roomAssert(ExpectedPeopleSchema.safeParse(request.body).success, 'INVALID_COMMAND');
       await people.setExpected(id, principal, request.body); return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/name-requests', async (request, reply) => {
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
       const body = SeatDecisionSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       await people.decide(id, principal, body.data.requestId, body.data.approve); return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/seat-requests', async (request, reply) => {
     try {
       requireOrigin(request); const id = sessionId(request); const principal = await gateway.authenticate(id, cookie(request));
       const body = SeatDecisionSchema.safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       await seats.decide(id, principal, body.data.requestId, body.data.approve); return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/settings', async (request, reply) => {
     try {
@@ -193,7 +196,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       reactions.settingsChanged(id); await seats.setSettings(id, principal, Object.fromEntries(Object.entries(body.data).filter(([, value]) => value !== undefined)));
       if (body.data.chat === false) chat.clear(id);
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   const chatPrincipal = async (request: FastifyRequest) => {
     roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
@@ -204,7 +207,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   app.get('/api/rooms/:sessionId/chat', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     try { return { ok: true, data: await chat.read(await chatPrincipal(request)) }; }
-    catch (error) { return reply.code(403).send(failure(error)); }
+    catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/chat', async (request, reply) => {
     try {
@@ -213,7 +216,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       roomAssert(input.success, 'INVALID_COMMAND');
       await chat.send(principal, input.data);
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/chat/moderation', async (request, reply) => {
     try {
@@ -227,7 +230,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         roomAssert(await reactions.showText(principal.sessionId, message.from, message.text), 'FORBIDDEN');
       } else await chat.mute(principal, action.playerId, action.muted);
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   // A break: a player votes for (or withdraws from) one, the host calls one. The host ends it by continuing the game.
   app.post('/api/rooms/:sessionId/break', async (request, reply) => {
@@ -236,7 +239,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const body = z.object({ vote: z.boolean().optional() }).strict().safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       if (principal.role === 'host') await breaks.call(id, principal); else await breaks.vote(id, principal, body.data.vote ?? true);
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   // Back to the lobby: a phone or the shared screen of the ended room moves into the next one (restart.ts).
   app.post('/api/rooms/:sessionId/follow', async (request, reply) => {
@@ -247,7 +250,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const moved = await followRoom(client, config, principal);
       reply.header('set-cookie', roomCookie(config, moved.sessionId, moved.token, moved.expiresAt, moved.display));
       return { ok: true, data: { sessionId: moved.sessionId } };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'RATE_LIMITED' ? 429 : 400).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/claim', async (request, reply) => {
     try {
@@ -255,7 +258,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const parsed = ClaimRoomSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND'); const id = sessionId(request);
       const grant = await gateway.claim(id, parsed.data.token);
       reply.header('set-cookie', roomCookie(config, id, parsed.data.token, grant.expiresAt, grant.display)); return { ok: true, data: { sessionId: id } };
-    } catch (error) { return reply.code(401).send(failure(error)); }
+    } catch (error) { return reply.code(401).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms', async (request, reply) => {
     try {
@@ -266,11 +269,11 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       try { identity = await verifier(auth.slice(7)); } catch (error) { throw new RoomError(error instanceof AuthenticationUnavailable ? 'AUTH_UNAVAILABLE' : 'UNAUTHORIZED'); }
       const created = await gateway.create(identity, parsed.data.gameVersionId, parsed.data.sessionId, parsed.data.commandId);
       reply.header('set-cookie', roomCookie(config, created.sessionId, created.token, created.expiresAt)); return { ok: true, data: { sessionId: created.sessionId } };
-    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'AUTH_UNAVAILABLE' ? 503 : 403).send(failure(error)); }
+    } catch (error) { return reply.code(error instanceof RoomError && error.code === 'AUTH_UNAVAILABLE' ? 503 : 403).send(failure(error, reply.request)); }
   });
   app.get('/api/rooms/:sessionId', async (request, reply) => {
     try { requireOrigin(request); return { ok: true, data: await snapshot(await gateway.authenticate(sessionId(request), cookie(request))) }; }
-    catch (error) { return reply.code(401).send(failure(error)); }
+    catch (error) { return reply.code(401).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/display', async (request, reply) => {
     try {
@@ -283,7 +286,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         await tx.roomCredential.create({ data: { sessionId: id, role: 'DISPLAY', source: principal.source, tokenHash: tokenHash(token), expiresAt } });
       });
       return { ok: true, data: { token } };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/birthday-vote', async (request, reply) => {
     try {
@@ -306,7 +309,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         await recordRoomChange(tx, id, 'room.updated');
       });
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
 
   app.post('/api/rooms/:sessionId/host-phone', async (request, reply) => {
@@ -337,7 +340,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         await recordRoomChange(tx, id, 'room.hostPhone');
       });
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
 
   app.post('/api/rooms/:sessionId/close', async (request, reply) => {
@@ -352,7 +355,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       });
       chat.clear(id);
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
 
   app.post('/api/rooms/:sessionId/revoke', async (request, reply) => {
@@ -361,7 +364,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const body = z.object({ playerId: GameIdSchema, ban: z.boolean().optional() }).strict().safeParse(request.body); roomAssert(body.success, 'INVALID_COMMAND');
       await gateway.revoke(id, principal, body.data.playerId, body.data.ban);
       io.in(`player:${id}:${body.data.playerId}`).disconnectSockets(true); return { ok: true, data: {} };
-    } catch (error) { return reply.code(403).send(failure(error)); }
+    } catch (error) { return reply.code(403).send(failure(error, reply.request)); }
   });
   app.post('/api/rooms/:sessionId/logout', async (request, reply) => {
     try {
@@ -369,7 +372,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       await gateway.revoke(id, principal); io.in(`credential:${principal.id}`).disconnectSockets(true);
       reply.header('set-cookie', `${cookieName(id)}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : ''}`);
       return { ok: true, data: {} };
-    } catch (error) { return reply.code(401).send(failure(error)); }
+    } catch (error) { return reply.code(401).send(failure(error, reply.request)); }
   });
 
   io.use((socket, next) => {
@@ -381,7 +384,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       const principal = await gateway.authenticate(parsed.data.sessionId, socket.handshake.headers.cookie, parsed.data.display);
       const peers = [...io.sockets.sockets.values()].filter(peer => (peer.data['principal'] as Principal | undefined)?.id === principal.id).length;
       roomAssert(peers < 3, 'RATE_LIMITED'); socket.data['principal'] = principal;
-    })().then(() => next()).catch(error => { const safe = failure(error); const denied = new Error('Room access denied'); Object.assign(denied, { data: safe.ok ? undefined : safe.error }); next(denied); });
+    })().then(() => next()).catch(error => { const safe = failure(error, { where: 'room.connect', sessionId: null, actor: 'unknown' }); const denied = new Error('Room access denied'); Object.assign(denied, { data: safe.ok ? undefined : safe.error }); next(denied); });
   });
   io.on('connection', socket => {
     const original = socket.data['principal'] as Principal; const id = original.sessionId;
@@ -393,6 +396,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original); poolAim.connect(socket, original);
     const expiry = setTimeout(() => { socket.emit('room.error', { code: 'CREDENTIAL_EXPIRED' }); socket.disconnect(true); }, Math.max(1, original.expiresAt.getTime() - Date.now())); expiry.unref();
     let syncing = false; let commanding = false; let heartbeating = false; let receipting = false;
+    const socketPlace = (where: string) => ({ where, sessionId: id, actor: original.role });
     const current = async () => {
       roomAssert(limiter.allow(`events:${original.id}`, 180), 'RATE_LIMITED');
       return gateway.authenticate(id, socket.handshake.headers.cookie, socket.handshake.auth['display'] === true);
@@ -401,7 +405,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
       if (typeof ack !== 'function') return;
       if (syncing) { ack({ ok: false, error: { code: 'RATE_LIMITED' } }); return; } syncing = true;
       void (async () => { roomAssert(ConnectRoomSchema.safeParse(input).success && (input as { sessionId: string }).sessionId === id, 'FORBIDDEN'); return snapshot(await current()); })()
-        .then(data => ack({ ok: true, data })).catch(error => ack(failure(error))).finally(() => { syncing = false; });
+        .then(data => ack({ ok: true, data })).catch(error => ack(failure(error, socketPlace('room.sync')))).finally(() => { syncing = false; });
     });
     socket.on('room.command', (input: unknown, ack: unknown) => {
       if (typeof ack !== 'function') return;
@@ -415,7 +419,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
           socket.to(`session:${id}`).emit('room.pool-shot', { formatVersion: 1, type: 'session.changed', sessionId: id, revision: receipt.revision });
         }
         return receipt; })()
-        .then(data => ack({ ok: true, data })).catch(error => ack(failure(error))).finally(() => { commanding = false; });
+        .then(data => ack({ ok: true, data })).catch(error => ack(failure(error, socketPlace(`room.command ${typeof (input as { type?: unknown } | null)?.type === 'string' ? String((input as { type: string }).type).slice(0, 40) : '?'}`)))).finally(() => { commanding = false; });
     });
     socket.on('room.receipt', (input: unknown, ack: unknown) => {
       if (typeof ack !== 'function') return;
@@ -430,12 +434,12 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
           const saved = await tx.gameCommand.findFirst({ where: { sessionId: id, actorKey: { in: owner }, commandKey: parsed.data.commandId } });
           return { receipt: saved ? CommandReceiptSchema.parse(saved.result) : null };
         });
-      })().then(data => ack({ ok: true, data })).catch(error => ack(failure(error))).finally(() => { receipting = false; });
+      })().then(data => ack({ ok: true, data })).catch(error => ack(failure(error, socketPlace('room.receipt')))).finally(() => { receipting = false; });
     });
     socket.on('room.heartbeat', (input: unknown, ack: unknown) => {
       if (typeof ack !== 'function' || heartbeating) return; heartbeating = true;
       void (async () => { const parsed = HeartbeatSchema.safeParse(input); roomAssert(parsed.success, 'INVALID_COMMAND'); await current(); return { nonce: parsed.data.nonce, serverTime: new Date().toISOString() }; })()
-        .then(data => ack({ ok: true, data })).catch(error => { ack(failure(error)); if (error instanceof RoomError && ['UNAUTHORIZED', 'CREDENTIAL_EXPIRED'].includes(error.code)) socket.disconnect(true); }).finally(() => { heartbeating = false; });
+        .then(data => ack({ ok: true, data })).catch(error => { ack(failure(error, socketPlace('room.heartbeat'))); if (error instanceof RoomError && ['UNAUTHORIZED', 'CREDENTIAL_EXPIRED'].includes(error.code)) socket.disconnect(true); }).finally(() => { heartbeating = false; });
     });
     io.to(`session:${id}`).emit('presence.changed'); app.log.info({ event: 'room_connected', role: original.role }, 'Room connected');
     socket.on('disconnect', reason => { clearTimeout(expiry); stopMinigames(); io.to(`session:${id}`).emit('presence.changed'); app.log.info({ event: 'room_disconnected', reason }, 'Room disconnected'); });

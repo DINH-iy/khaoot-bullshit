@@ -7,7 +7,12 @@ import { FeedbackButton } from './feedback/feedback-button.js';
 import { applyTheme } from './theme.js';
 import { lazyPage, OnDemand, prefetchLater } from './lazy-page.js';
 import { onNavigate, replaceWithHome } from './navigation.js';
+import { installDeviceLog } from './diagnostics/capture.js';
+import { setLogLobby } from './diagnostics/recorder.js';
 import './style.css';
+
+// What happens on this device, kept in memory and sent only when something goes wrong or a game ends.
+installDeviceLog();
 
 // The editor and the admin menu load only when opened, so phones never download them.
 const EditorShell = lazyPage(() => import('./editor/shell/editor-shell.js').then(module => module.EditorShell));
@@ -35,8 +40,10 @@ function App() {
     || (room !== null && !GameIdSchema.safeParse(room).success)
     || (room === null && bench !== null && !benchId)
     || (arcade !== null && arcade !== '' && !GameIdSchema.safeParse(arcade).success)
-    || (admin !== null && !['', 'feedback', 'people', 'packs', 'look'].includes(admin));
+    || (admin !== null && !['', 'feedback', 'people', 'packs', 'look', 'logs'].includes(admin));
   useEffect(() => { if (invalid) replaceWithHome(); }, [invalid]);
+  // An arcade lobby stays the log's place while its rounds are played; elsewhere there is none.
+  useEffect(() => { if (arcade && GameIdSchema.safeParse(arcade).success) setLogLobby(arcade); else if (room === null) setLogLobby(null); }, [arcade, room]);
   // Another screen (or another room or lobby) starts fresh, as if the page had loaded there; within the admin
   // menu or one editor the screen stays and reads the address itself.
   const screen = editing ? `edit:${editing}` : params.has('admin') ? 'admin' : params.has('host') ? 'host' : params.has('bench') ? `bench:${params.get('bench')}`

@@ -92,7 +92,7 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
         outcome = committed.replayed ? 'REPLAYED' : 'COMMITTED';
         return committed.receipt;
       } catch (error) {
-        const safe = error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE');
+        const safe = error instanceof GameError ? error : new GameError('GAME_UNAVAILABLE', { cause: error });
         outcome = safe.code;
         throw safe;
       } finally {
