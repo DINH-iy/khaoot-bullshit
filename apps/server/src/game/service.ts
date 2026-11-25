@@ -5,6 +5,7 @@ import { applyCommand } from './commands.js';
 import { closeSoonWhenAllIn } from './auto-close.js';
 import type { LiveSignals } from '../minigames/tap-race/live.js';
 import { assertExecutable, contentHash, parseDefinition } from './definition.js';
+import { startingRoomSettings } from './room-settings.js';
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
 import { actorKey, authorize, checkRevision, requireHost, TrustedActorSchema, type TrustedActor } from './model.js';
@@ -48,7 +49,8 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
             requireGame(version.definitionFormat === definition.formatVersion && contentHash(definition) === version.contentHash, 'INVALID_DEFINITION');
             assertExecutable(definition);
             // A new room starts with side games on and chips off unless the game says otherwise; the host can switch both.
-            session = await tx.gameSession.create({ data: { id: command.sessionId, gameVersionId: version.id, hostId: actor.data.creatorId, mode: command.mode, state: { sideGames: definition.sideGames ?? true, chips: definition.chips ?? false, openInvites: definition.openInvites ?? OPEN_INVITES_DEFAULT, quickTimeSeconds: definition.quickTimeSeconds ?? 30, idleCloseMinutes: definition.idleCloseMinutes ?? 0, keepOpen: false, autoRevealSeconds: definition.autoRevealSeconds ?? null, birthdayVote: definition.birthdayVote ?? false } }, include: { gameVersion: true } });
+            // The game's own room settings (scores, reactions, break votes, closing a round) are its starting values.
+            session = await tx.gameSession.create({ data: { id: command.sessionId, gameVersionId: version.id, hostId: actor.data.creatorId, mode: command.mode, state: { sideGames: definition.sideGames ?? true, chips: definition.chips ?? false, openInvites: definition.openInvites ?? OPEN_INVITES_DEFAULT, quickTimeSeconds: definition.quickTimeSeconds ?? 30, idleCloseMinutes: definition.idleCloseMinutes ?? 0, keepOpen: false, autoRevealSeconds: definition.autoRevealSeconds ?? null, birthdayVote: definition.birthdayVote ?? false, ...startingRoomSettings(definition) } }, include: { gameVersion: true } });
           }
           await authorize(tx, session, actor.data);
           if (!PLAYER_COMMANDS.includes(command.type)) requireHost(actor.data);

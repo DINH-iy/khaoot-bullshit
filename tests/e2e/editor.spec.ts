@@ -726,6 +726,27 @@ test('the editor header compacts on resize and the invite panel stays reachable'
   await expect(panel).toHaveCount(0);
 });
 
+test('Game settings set the room\'s starting settings, saving only what differs from the standard', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
+  await openCopy(page, baseURL!, `Room start ${Date.now()}`);
+  const url = `${baseURL}/api/host/games/${new URL(page.url()).searchParams.get('edit')}`;
+  const room = async () => (await (await page.request.get(url, { headers: { 'x-party-request': '1', origin: baseURL! } })).json()).data.definition.room;
+  await page.getByRole('button', { name: /^Game menu/ }).click(); await page.getByRole('menuitem', { name: /^Game settings/ }).click();
+  const section = page.getByRole('region', { name: 'Game settings' }).locator('details').filter({ has: page.getByText('Room settings', { exact: true }) });
+  const summary = section.locator('summary').first();
+  await expect(summary).toContainText('Standard');
+  await summary.click();
+  await section.getByLabel('Players see the scores during the game').uncheck();
+  await section.getByLabel('Seconds to wait after the last answer').fill('8');
+  await expect(summary).toContainText('Own starting values');
+  await expect.poll(room).toEqual({ showScores: false, autoCloseSeconds: 8 });
+  // Back to the standard: nothing is stored.
+  await section.getByLabel('Players see the scores during the game').check();
+  await section.getByLabel('Seconds to wait after the last answer').fill('3');
+  await expect(summary).toContainText('Standard');
+  await expect.poll(room).toBeUndefined();
+});
+
 test('editor menus close outside and Game settings warnings can fold away', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Desktop editor flow.');
   await openCopy(page, baseURL!, `Warnings ${Date.now()}`);
@@ -795,6 +816,8 @@ test('the Scene editor lists scenes in play order, previews them, and edits part
   const compactPill = (await dock.boundingBox())!;
   const sidebar = (await page.locator('.scene-props').boundingBox())!;
   expect(compactPill.x + compactPill.width).toBeLessThan(sidebar.x);
+  // The narrow scene list never scrolls sideways: its header and titles fit or end in ….
+  expect(await page.locator('.scene-list').evaluate(panel => panel.scrollWidth - panel.clientWidth)).toBeLessThanOrEqual(0);
   await page.setViewportSize({ width: 1440, height: 900 });
   const list = page.getByRole('navigation', { name: 'Scenes in play order' });
   await expect(list.locator('.scene-row')).toContainText(['FRIDAY NIGHT.', 'Choose your challenge!', /Music Mayhem/, /Living Sculpture/, /Shared finale/]);

@@ -4,7 +4,7 @@ Feedback from the 14–15 November test evening and the owner's follow-ups throu
 
 ## Left to build
 
-- The People leaderboard still needs individual credit for answers submitted as a team. Tracked in the [product plan](../../APP_PLAN.md#owner-queue-19-november-2026), with the media follow-ups (captions and alt text, more host playback control, playlist shuffle and fades, event sounds).
+- Media follow-ups, tracked in the [product plan](../../APP_PLAN.md#owner-queue-19-november-2026) (captions and alt text, more host playback control, playlist shuffle and fades, event sounds).
 
 ## Still needs testing
 

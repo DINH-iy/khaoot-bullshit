@@ -49,6 +49,7 @@ Top level:
 | `quickTime` | Seconds the host's quick time button adds to a running round. Default: 30. The host can change it in the room. |
 | `chips` | `true` to play the side games with chips (play money): bets, stakes in challenges and a leaderboard. Default: off. The host can still switch both in the room. |
 | `openInvites` | How many challenges a player can have waiting for an answer at once (1 to 10). Default: 3. The host can change it in the room. |
+| `room` | The room's starting settings: `"showScores"` (players see the scores during the game), `"reactions"` and `"reactionLimit"` (1–30 per player every 10 seconds), `"breakVotes"` and `"breakPercent"` (10–100% must agree), `"autoClose"` and `"autoCloseSeconds"` (end a round 1–30 seconds after the last answer). Example: `{ "showScores": false, "autoCloseSeconds": 5 }`. Leave a setting out for the standard (scores shown, reactions on at 10, break votes at 50%, close 3 seconds after the last answer). The host can change them in the room, except `autoClose` and `autoCloseSeconds`: once the game starts, those stay as the game set them. |
 
 Every scene can have:
 
@@ -217,6 +218,7 @@ If the user says "just make it" or has already answered, do not ask; choose sens
 - On a drawing round or minigame, `"countdownSeconds": 5` adds a countdown after any explanation and before play. Use 0–15 seconds. Omit it for the normal start.
 - Use `"idleCloseMinutes": 30` to close an empty room after 30 minutes. Use 0 to keep rooms open by default. The host can keep the current room open in Room settings.
 - The host's quick time button adds 30 seconds to a running round; `"quickTime": 60` makes it a minute (5 to 600 seconds).
+- Room settings the game starts with go in `"room"`, only when the user wants something other than the standard: `"showScores": false` hides the scores until a scoreboard scene and the end (for suspense); `"reactions": false` or `"reactionLimit": 5`; `"breakVotes": false` or `"breakPercent": 70`; `"autoClose": false` keeps a round open until its time runs out or the host closes it, `"autoCloseSeconds": 5` closes it 5 seconds after the last answer. The host can change these in the room, but `autoClose` and `autoCloseSeconds` stay as set once the game starts.
 - Optional look, at top level or on a scene: `"look": { "theme": { "preset": "neon" }, "texts": { "answer.saved": "Locked in!" }, "animations": { "sceneEnter": { "preset": "drop" } } }`. Only add a look if the user asks for a style or colours.
   - Animation moments: `"sceneEnter"`, `"answersEnter"`, `"answerSaved"`, `"timerEnding"`, `"reveal"`, `"scoreboard"`, `"cutscene"`, `"lobbyJoin"`, `"mediaEnter"`, `"teamsEnter"`, `"explanationEnter"`, `"voteEnter"`, `"routeEnter"`, `"duelEnter"`, `"minigameEnter"` and `"finaleEnter"`. Each can select a preset or use a custom animation.
   - Theme presets: `"party"`, `"neon"`, `"pub"`, `"clean"`, `"retro"`, `"terminal"`, `"kids"`, `"elegant"`, `"space"`, `"mars"`, `"saturn"`, `"neptune"`, `"ocean"`, `"christmas"`, `"birthday"`, `"mbou"` (MBO Utrecht's colours). Anything in `"theme"` changes the preset:
@@ -240,6 +242,7 @@ Example:
   "idleCloseMinutes": 30,
   "autoRevealSeconds": 2,
   "phoneEffects": true,
+  "room": { "showScores": false, "autoCloseSeconds": 5 },
   "look": { "theme": { "preset": "neptune", "font": "rounded", "headingFont": "condensed", "sliderStyle": "dial" }, "phoneMenuIcons": { "scores": "star", "games": "wheel", "packs": "sparkles", "blackjack": "cards" }, "animations": { "minigameEnter": { "preset": "fade" } }, "translations": { "nl": { "answer.saved": "Je antwoord is binnen!" } } },
   "scenes": [
     { "id": "welcome", "type": "cutscene", "title": "FRIDAY NIGHT.", "text": "Grab your phone. Closest cuts and best guesses earn points.", "youtube": { "videoId": "M7lc1UVf-VE", "startSeconds": 5, "endSeconds": 15 }, "mediaLayout": { "position": "left", "size": "wide" }, "seconds": 20 },

@@ -173,8 +173,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       <div className="scene-list-head"><h2>{t('scenes')}</h2>
         {routeIds.length > 0 && <button type="button" className="small-button icon-only" aria-label={t(allFolded ? 'unfoldAll' : 'foldAll')} title={t(allFolded ? 'unfoldAll' : 'foldAll')}
           onClick={() => setFolded(allFolded ? new Set() : new Set(routeIds))}><Icon name={allFolded ? 'unfold-all' : 'fold-all'} size={16} /></button>}
-        <button ref={addButton} type="button" className="scene-add-after with-icon small-button" title={t('addAfter')}
-          disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} /><span>{t('addAfter')}</span></button></div>
+        <button ref={addButton} type="button" className="scene-add-after with-icon small-button" title={t('addAfter')} aria-label={t('addAfter')}
+          disabled={readOnly} aria-expanded={adding === 'scene'} onClick={() => setAdding(adding === 'scene' ? null : 'scene')}><Icon name="plus" size={16} /><span>{t('addShort')}</span></button></div>
       <ol className="scene-track">{listed}
         {loose.length > 0 && <li className="scene-unconnected-label"><h3>{t('notConnected')}</h3></li>}
         {loose.map(node => row(node, 0, true))}

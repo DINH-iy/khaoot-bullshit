@@ -286,9 +286,18 @@ export function importDefinition(input: string): Json | null {
     ...(Number.isFinite(Number(raw['quickTime'])) && raw['quickTime'] !== undefined ? { quickTimeSeconds: Math.max(5, Math.min(600, Math.round(Number(raw['quickTime'])))) } : {}),
     // `music`: a background playlist of library songs, as exported games carry it (an AI cannot upload songs).
     ...(GameMusicSchema.safeParse(raw['music']).success ? { music: raw['music'] } : {}),
+    // The game's starting room settings: `"room": { "showScores": false, "autoCloseSeconds": 5 }` (see roomSettings).
+    ...(isObject(raw['room']) && Object.keys(roomSettings(raw['room'])).length ? { room: roomSettings(raw['room']) } : {}),
     // Open challenge invites per player at once (default 3).
     ...(Number.isFinite(Number(raw['openInvites'])) && raw['openInvites'] !== undefined ? { openInvites: Math.max(1, Math.min(MAX_OPEN_INVITES, Math.round(Number(raw['openInvites'])))) } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;
+}
+
+/** A game's starting room settings from an import: switches only as true/false, numbers rounded into range, anything else left out. */
+function roomSettings(raw: Record<string, unknown>) {
+  const flag = (key: string) => typeof raw[key] === 'boolean' ? { [key]: raw[key] } : {};
+  const number = (key: string, min: number, max: number) => raw[key] !== undefined && raw[key] !== null && Number.isFinite(Number(raw[key])) ? { [key]: Math.max(min, Math.min(max, Math.round(Number(raw[key])))) } : {};
+  return { ...flag('showScores'), ...flag('reactions'), ...number('reactionLimit', 1, 30), ...flag('breakVotes'), ...number('breakPercent', 10, 100), ...flag('autoClose'), ...number('autoCloseSeconds', 1, 30) };
 }

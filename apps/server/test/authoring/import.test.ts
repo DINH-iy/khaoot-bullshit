@@ -149,6 +149,14 @@ describe('importing a game from text', () => {
     expect(game(1).quickTimeSeconds).toBe(5);
     expect(game(undefined).quickTimeSeconds).toBeUndefined();
   });
+  it('takes the room\'s starting settings from "room": switches as true/false, numbers into range, nothing else', () => {
+    const game = (room: unknown) => check(JSON.stringify({ title: 'Room', room, scenes: [{ type: 'cutscene', title: 'Hi', text: 'Welcome' }] })).definition;
+    expect(game({ showScores: false, reactions: true, reactionLimit: 99, breakVotes: false, breakPercent: 5, autoClose: true, autoCloseSeconds: 4.6 }).room)
+      .toEqual({ showScores: false, reactions: true, reactionLimit: 30, breakVotes: false, breakPercent: 10, autoClose: true, autoCloseSeconds: 5 });
+    expect(game({ showScores: 'no', chat: true, autoCloseSeconds: 'soon' }).room).toBeUndefined();
+    expect(game(undefined).room).toBeUndefined();
+    expect(check(example).definition.room).toEqual({ showScores: false, autoCloseSeconds: 5 });
+  });
 
   it('fills in names, the start, the order and defaults for a bare minimum game', () => {
     const { issues, definition } = check(JSON.stringify({ title: 'Mini', scenes: [

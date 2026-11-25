@@ -14,6 +14,7 @@ import { actorKey, authorize } from '../game/model.js';
 import { closeExpiredStages } from '../game/timing.js';
 import { parseDefinition } from '../game/definition.js';
 import { createRoomGateway, lockRoom, recordRoomChange, type Principal } from './gateway.js';
+import { lockedRoomSettings } from '../game/room-settings.js';
 import { createSeatReclaim, isHostPhone, pendingRequests, readRoomState } from './reclaim.js';
 import { createRoomPeople } from './room-people.js';
 import { connectionCookies, SEAT_HEADER, seatOf } from './test-seats.js';
@@ -88,7 +89,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     const [view, players, session, arcade] = await Promise.all([
       readSessionView(client, principal.actor, principal.sessionId, undefined, { pictureOnPhone: principal.role === 'player' && !screen }),
       client.sessionPlayer.findMany({ where: { sessionId: principal.sessionId, leftAt: null }, select: { id: true, displayName: true, look: true, personId: true }, orderBy: { joinedAt: 'asc' } }),
-      client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true, state: true } }),
+      client.gameSession.findUniqueOrThrow({ where: { id: principal.sessionId }, select: { roomCode: true, state: true, status: true } }),
       arcadeLink(client, principal.sessionId, selfId),
     ]);
     const connected = connectedPlayers(principal.sessionId); const state = readRoomState(session.state);
@@ -105,7 +106,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
         ? { birthdayVote: { voted: state.birthdayVoters.includes(selfId), ready: state.birthdayReady } } : {}),
       hostPhone, ...(principal.role === 'host' ? { hostPhonePlayerId: state.hostPhonePlayerId, ...(state.tryout ? { tryout: true as const } : {}) } : {}), selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, chat: state.chat, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, chat: state.chat, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(lockedRoomSettings(state, session.status).length ? { locked: lockedRoomSettings(state, session.status) } : {}), ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
         ...(principal.role === 'host' || hostPhone ? { autoRevealSeconds: state.autoRevealSeconds } : {}) },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       seatRequests: principal.role === 'host' ? pendingRequests(state).map(request => ({ requestId: request.id, playerId: request.playerId, requestedAt: request.requestedAt })) : [], ...roomPeople, nextRoom: state.nextRoom, roomClosed: state.roomClosed, arcade });

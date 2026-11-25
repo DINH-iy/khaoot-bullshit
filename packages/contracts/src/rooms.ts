@@ -30,6 +30,21 @@ export const NetworkErrorCodeSchema = z.enum([
 ]);
 export type NetworkErrorCode = z.infer<typeof NetworkErrorCodeSchema>;
 export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: NetworkErrorCode } };
+/**
+ * A game's own starting room settings (editor → Game settings → Room settings, or `"room"` in an imported game).
+ * A room of the game starts with them; the host can still change them in the room, except the round-closing
+ * rule (`autoClose`, `autoCloseSeconds`), which stays as the game set it once the game has started.
+ * Left out: the room's standard (scores shown, reactions on at 10 per 10 s, break votes at 50%, close 3 s after the last answer).
+ */
+export const GameRoomSettingsSchema = z.object({
+  showScores: z.boolean().optional(),
+  reactions: z.boolean().optional(), reactionLimit: z.number().int().min(1).max(30).optional(),
+  breakVotes: z.boolean().optional(), breakPercent: z.number().int().min(10).max(100).optional(),
+  autoClose: z.boolean().optional(), autoCloseSeconds: z.number().int().min(1).max(30).optional(),
+}).strict();
+export type GameRoomSettings = z.infer<typeof GameRoomSettingsSchema>;
+/** Room settings the game fixes once it has started (when the game sets them). */
+export const GAME_LOCKED_SETTINGS = ['autoClose', 'autoCloseSeconds'] as const;
 export const RoomSnapshotSchema = z.object({
   view: SessionViewSchema, roomCode: RoomCodeSchema,
   role: z.enum(['host', 'player', 'display']), selfPlayerId: GameIdSchema.nullable(),
@@ -40,7 +55,9 @@ export const RoomSnapshotSchema = z.object({
   birthdayVote: z.object({ voted: z.boolean(), ready: z.boolean() }).strict().optional(),
   hostPhone: z.boolean().optional(), hostPhonePlayerId: GameIdSchema.nullable().optional(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema, canBan: z.boolean().optional() }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(), idleCloseMinutes: IdleCloseMinutesSchema.optional(), keepOpen: z.boolean().optional() }).strict(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(),
+    // Settings the game fixed now that it has started; the host sees them but cannot change them.
+    locked: z.array(z.enum(GAME_LOCKED_SETTINGS)).optional(), idleCloseMinutes: IdleCloseMinutesSchema.optional(), keepOpen: z.boolean().optional() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
   break: z.object({ active: z.boolean(), startedAt: z.string().datetime().nullable(), votes: z.number().int().min(0), needed: z.number().int().min(1), voted: z.boolean() }).strict(),
   // Host only: new phones waiting to take over a seat. Empty for everyone else.

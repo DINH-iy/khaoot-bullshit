@@ -7,6 +7,7 @@ import { sceneName } from '../scene/inspector.js';
 import { GameMusicFields } from '../scene/fields/music-fields.js';
 import { Section } from '../controls/section.js';
 import { FinaleSettings, WheelSettings } from './show-settings.js';
+import { RoomStartSettings } from './room-start-settings.js';
 import { estimateMinutes, type Definition } from '../model.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SETTINGS_TEXTS } from './settings.text.js';
@@ -30,7 +31,7 @@ function TeamsNote({ definition }: { definition: Definition }) {
  */
 export function GameSettingsPanel({ definition, onChange, onLook, onClose, readOnly = false, problems = [] }: { definition: Definition; onChange: Change; onLook: () => void; onClose: () => void; readOnly?: boolean; problems?: { message: string; path: string }[] }) {
   // Each problem shows in the group where it is fixed (by the setting it is about); anything else under General.
-  const GROUP: Record<string, string> = { finale: 'awards', wheels: 'wheels', quickTimeSeconds: 'host', idleCloseMinutes: 'host', autoRevealSeconds: 'host', birthdayVote: 'host', sideGames: 'side', chips: 'side' };
+  const GROUP: Record<string, string> = { finale: 'awards', wheels: 'wheels', quickTimeSeconds: 'host', idleCloseMinutes: 'host', autoRevealSeconds: 'host', birthdayVote: 'host', room: 'room', sideGames: 'side', chips: 'side' };
   const problemsIn = (group: string) => problems.filter(problem => (GROUP[problem.path.split('.')[0] ?? ''] ?? 'general') === group).map(problem => problem.message);
   const heading = useRef<HTMLHeadingElement>(null); const t = useTexts(SETTINGS_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const phone = useTexts(PHONE_FEEDBACK_TEXTS);
@@ -67,6 +68,7 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
     <Section title={t('music')} memory="Music" summary={(() => { const count = (definition['music'] as { tracks?: unknown[] } | undefined)?.tracks?.length ?? 0; return count ? t(count === 1 ? 'songOne' : 'songMany', { count }) : t('noMusic'); })()}>
       <GameMusicFields definition={definition} onChange={onChange} />
     </Section>
+    <RoomStartSettings definition={definition} onChange={onChange} problems={problemsIn('room')} />
     <Section title={t('hostTools')} memory="Host tools" problems={problemsIn('host')} summary={t('quickTime', { seconds: Number(definition['quickTimeSeconds'] ?? 30) })}>
       <label>{t('quickTimeLabel')}<input type="number" inputMode="numeric" min={5} max={600} step={5} value={Number(definition['quickTimeSeconds'] ?? 30)}
         onChange={event => { const value = Math.round(Number(event.target.value)); if (!(value >= 5 && value <= 600)) return; const next = { ...definition }; if (value === 30) delete next['quickTimeSeconds']; else next['quickTimeSeconds'] = value; onChange(next); }} /></label>

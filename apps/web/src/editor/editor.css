@@ -137,7 +137,8 @@
 /* Scrolling panels are the positioning context of what is placed inside them, so nothing escapes and stretches the page. */
 .scene-list, .scene-props { position: relative; overflow-y: auto; padding: 16px; background: var(--e-panel); }
 .scene-stage { position: relative; }
-.scene-list { border-right: 1px solid var(--e-border); display: grid; gap: 10px; align-content: start; }
+/* One column no wider than the panel: long titles end in … and never scroll sideways. */
+.scene-list { border-right: 1px solid var(--e-border); display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; overflow-x: hidden; }
 .scene-props { border-left: 1px solid var(--e-border); display: grid; gap: 14px; align-content: start; grid-template-columns: minmax(0, 1fr); }
 .scene-props > *, .scene-props fieldset > * { min-width: 0; }
 .scene-props select, .scene-props input:not([type=radio]):not([type=checkbox]), .scene-props textarea { width: 100%; max-width: 100%; background: var(--e-bg); color: inherit; border-color: var(--e-border); }

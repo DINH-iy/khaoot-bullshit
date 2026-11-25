@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { AutoRevealSecondsSchema, IdleCloseMinutesSchema, GameIdSchema, MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT, ReclaimSeatSchema, REACTIONS, MUSIC_VOLUME_DEFAULT } from '@party/contracts';
+import { AutoRevealSecondsSchema, GAME_LOCKED_SETTINGS, IdleCloseMinutesSchema, GameIdSchema, MAX_OPEN_INVITES, OPEN_INVITES_DEFAULT, ReclaimSeatSchema, REACTIONS, MUSIC_VOLUME_DEFAULT } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { authorize, type Transaction, type TrustedActor } from '../game/model.js';
 import { lockRoom, recordRoomChange, type Principal } from './gateway.js';
+import { lockedRoomSettings } from '../game/room-settings.js';
 import { joinToken, roomAssert, tokenHash } from './security.js';
 
 // Seat takeover: a player whose phone died continues on another phone. Only a
@@ -20,6 +21,8 @@ export const RoomStateSchema = z.object({
   birthdayVote: z.boolean().default(false), birthdayVoters: z.array(GameIdSchema).default([]), birthdayReady: z.boolean().default(false),
   bannedPeople: z.array(GameIdSchema).default([]),
   reclaimApproval: z.boolean().default(false),
+  // Settings this room's game fixes once it has started (game/room-settings.ts); set when the room opens.
+  gameLocks: z.array(z.enum(GAME_LOCKED_SETTINGS)).default([]),
   // Host settings (see RoomSettingsSchema). Rooms saved before they existed get these defaults.
   showScores: z.boolean().default(true), reactions: z.boolean().default(true), autoClose: z.boolean().default(true), autoCloseSeconds: z.number().int().min(1).max(30).default(3),
   // Breaks: whether players may vote for one, how many must agree, who has voted, and when the running break began.
@@ -152,6 +155,9 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
         const session = await tx.gameSession.findUniqueOrThrow({ where: { id: sessionId } }); await authorize(tx, session, principal.actor);
         const state = readRoomState(session.state);
         if (principal.role !== 'host') roomAssert(isHostPhone(state, principal.actor), 'FORBIDDEN');
+        // The game's own round-closing rule stays as it is once the game has started.
+        const locked = lockedRoomSettings(state, session.status);
+        roomAssert(!updated.some(key => (locked as string[]).includes(key) && settings[key as keyof typeof settings] !== state[key as keyof RoomState]), 'INVALID_STATE');
         // Turning approval off does not silently grant waiting requests; the host still answers those.
         await save(tx, sessionId, { ...state, ...settings });
         if (settings.keepOpen !== undefined) await tx.gameSession.update({ where: { id: sessionId }, data: { idleCloseAt: null } });

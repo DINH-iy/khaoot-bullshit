@@ -50,22 +50,32 @@ export async function peopleStats(client: PrismaClient, personIds: string[]): Pr
   }
 
   // Answers in revealed rounds of real games: right or wrong for quiz and ordering rounds; minigames played.
-  const answers = games.length ? await client.submission.findMany({ where: { playerId: { in: games.map(seat => seat.id) }, slotKey: 'answer', stage: { revealedAt: { not: null } } },
-    select: { playerId: true, value: true, stage: { select: { nodeKey: true, stageKey: true, session: { select: { gameVersionId: true } } } } } }) : [];
+  // A team's answer (its captain answers for it) counts for every member of that round's lineup;
+  // members have no answer of their own in such a round, so nothing counts twice.
+  const gameSeatIds = games.map(seat => seat.id);
+  const revealedAnswer = { slotKey: 'answer', stage: { revealedAt: { not: null } } } as const;
+  const answerSelect = { value: true, stage: { select: { nodeKey: true, stageKey: true, lineupId: true, session: { select: { gameVersionId: true } } } } } as const;
+  const own = gameSeatIds.length ? await client.submission.findMany({ where: { playerId: { in: gameSeatIds }, ...revealedAnswer }, select: { playerId: true, ...answerSelect } }) : [];
+  const memberships = gameSeatIds.length ? await client.teamMember.findMany({ where: { playerId: { in: gameSeatIds } }, select: { playerId: true, teamId: true, lineupId: true } }) : [];
+  const team = memberships.length ? await client.submission.findMany({ where: { teamId: { in: [...new Set(memberships.map(row => row.teamId))] }, playerId: null, ...revealedAnswer }, select: { teamId: true, ...answerSelect } }) : [];
+  const answers = [...own.map(answer => ({ ...answer, playerIds: [answer.playerId!] })),
+    ...team.map(answer => ({ ...answer, playerIds: memberships.filter(row => row.teamId === answer.teamId && row.lineupId === answer.stage.lineupId).map(row => row.playerId) }))];
   const definitions = new Map<string, GameDefinition | null>();
   const versionIds = [...new Set(answers.map(answer => answer.stage.session.gameVersionId))];
   for (const version of versionIds.length ? await client.gameVersion.findMany({ where: { id: { in: versionIds } }, select: { id: true, definition: true } }) : []) {
     try { definitions.set(version.id, parseDefinition(version.definition)); } catch { definitions.set(version.id, null); }
   }
   for (const answer of answers) {
-    const definition = definitions.get(answer.stage.session.gameVersionId); const person = stats.get(personOf.get(answer.playerId!)!);
+    const definition = definitions.get(answer.stage.session.gameVersionId);
     const located = definition ? locateStage(definition, answer.stage.nodeKey, answer.stage.stageKey) : null;
-    if (!located || !person) continue;
+    const people = answer.playerIds.map(id => stats.get(personOf.get(id) ?? '')).filter(person => person !== undefined);
+    if (!located || !people.length) continue;
     const stage = located.stage;
-    if (stage.kind === 'minigame') { person.minigames += 1; continue; }
+    if (stage.kind === 'minigame') { for (const person of people) person.minigames += 1; continue; }
     if (stage.kind !== 'collect' || (stage.scoring.kind !== 'correct-choice' && stage.scoring.kind !== 'correct-order')) continue;
     const value = SubmissionValueSchema.safeParse(answer.value);
-    if (value.success && earned(stage, value.data)) person.right += 1; else person.wrong += 1;
+    const right = value.success && earned(stage, value.data);
+    for (const person of people) if (right) person.right += 1; else person.wrong += 1;
   }
 
   // Arcade: rounds played and won (own place or the team's).

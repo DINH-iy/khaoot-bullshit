@@ -21,6 +21,8 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
   // A change shows at once and is confirmed by the server; if the server refuses, it goes back.
   const [pending, setPending] = useState<Partial<RoomSnapshot['settings']>>({});
   const shown = { ...state.settings, ...pending };
+  // The game's own round-closing rule, once the game has started: shown, not changeable.
+  const closeLocked = (state.settings.locked ?? []).includes('autoClose');
   const change = (setting: Setting | 'chat' | 'reactionLimit' | 'reactionChoices' | 'autoCloseSeconds' | 'breakPercent' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'keepOpen' | 'autoRevealSeconds', value: boolean | number | number[] | null) => {
     setBusy(true); setPending(previous => ({ ...previous, [setting]: value }));
     void roomApi(`/api/rooms/${sessionId}/settings`, { [setting]: value }).catch(() => onError(h('settingFailed')))
@@ -29,7 +31,7 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
   };
   return <fieldset className="room-settings"><legend>{h('duringGame')}</legend>
     {(Object.keys(LABELS) as Setting[]).map(setting => <SettingToggle key={setting} label={h(LABELS[setting])}
-      checked={shown[setting]} disabled={busy} onChange={value => change(setting, value)} />)}
+      checked={shown[setting]} disabled={busy || (setting === 'autoClose' && closeLocked)} {...(setting === 'autoClose' && closeLocked ? { hint: h('setByGame') } : {})} onChange={value => change(setting, value)} />)}
     {state.role === 'host' && <>
       <SettingToggle label={chat('enable')} checked={shown.chat === true} disabled={busy} onChange={value => change('chat', value)} />
       {state.settings.chat && <ChatModeration state={state} />}
@@ -46,7 +48,7 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
           else if (value !== shown.autoRevealSeconds) change('autoRevealSeconds', value);
         }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>}
     {shown.autoClose && <label className="inline-setting">{h('waitSeconds')}
-      <input type="number" inputMode="numeric" min={1} max={30} value={shown.autoCloseSeconds} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 1 && value <= 30) change('autoCloseSeconds', value); }} /></label>}
+      <input type="number" inputMode="numeric" min={1} max={30} value={shown.autoCloseSeconds} disabled={closeLocked} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 1 && value <= 30) change('autoCloseSeconds', value); }} /></label>}
     <label className="inline-setting">{h('quickTimeSeconds')}
       <input type="number" inputMode="numeric" min={5} max={600} step={5} value={shown.quickTimeSeconds} onChange={event => { const value = Math.round(Number(event.target.value)); if (value >= 5 && value <= 600) change('quickTimeSeconds', value); }} /></label>
     {/* Only for a game with music: it plays on the shared screen (or this screen without one). */}
