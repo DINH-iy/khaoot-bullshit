@@ -1,4 +1,4 @@
-import { PartyExtrasSchema } from './party-extras.js';
+import { PartyExtrasSchema, TeamCelebrationSchema } from './party-extras.js';
 import { TeamColorSchema } from './team-colors.js';
 import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
@@ -148,6 +148,8 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('teams.choose'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11) }).strict(),
   // A team's colour while teams are made: the host picks any colour; a member picks one of the swatches for their own team when the scene lets teams choose.
   z.object({ ...envelope, type: z.literal('teams.color'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11), color: TeamColorSchema }).strict(),
+  // A team's winning celebration while teams are made: a member for their own team, or the host for any.
+  z.object({ ...envelope, type: z.literal('teams.celebration'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11), celebration: TeamCelebrationSchema.nullable() }).strict(),
   // In a team round the host judges each team.
   z.object({ ...hostEnvelope, type: z.literal('stage.judgeTeam'), stageRunId: GameIdSchema, teamId: GameIdSchema, amountMilli: AwardMilliSchema }).strict(),
   // The host picks a route at any time before one is recorded: while voting
@@ -190,7 +192,7 @@ export type GameCommand = z.infer<typeof GameCommandSchema>;
 /** Round commands available to the phone holding delegated host controls. */
 export const HOST_PHONE_COMMANDS = ['session.start', 'session.pause', 'session.resume', 'stage.close', 'stage.advance', 'stage.explained', 'stage.reveal', 'stage.nextResult'] as const;
 /** Commands available to an ordinary player. */
-export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'teams.color', 'teams.vote', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'undercover.act', 'duel.move', 'duel.resign'];
+export const PLAYER_COMMANDS: readonly GameCommand['type'][] = ['submission.submit', 'teams.choose', 'teams.color', 'teams.celebration', 'teams.vote', 'stage.understood', 'player.look', 'minigame.part', 'minigame.move', 'undercover.act', 'duel.move', 'duel.resign'];
 export const CommandReceiptSchema = z.object({
   formatVersion: z.literal(1), commandId: GameIdSchema, sessionId: GameIdSchema,
   revision: RevisionSchema, type: z.enum(GameCommandSchema.options.map(option => option.shape.type.value)),
@@ -240,7 +242,7 @@ export const StageTeamsSchema = z.object({
   // While forming with captains: how they are picked. Elected: each team's votes per teammate, and whom this viewer voted for.
   captainPick: z.enum(CAPTAIN_PICKS).optional(), ownCaptainVote: GameIdSchema.nullable().optional(),
   teams: z.array(z.object({ index: z.number().int().min(0), name: z.string().min(1).max(30), color: TeamColorSchema, teamId: GameIdSchema.nullable(), targetSize: z.number().int().min(1).nullable(),
-    memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable(),
+    memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable(), celebration: TeamCelebrationSchema.nullable().optional(),
     captainVotes: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(1) }).strict()).optional() }).strict()),
   unassignedIds: z.array(GameIdSchema), ownTeamIndex: z.number().int().min(0).nullable(),
 }).strict();
@@ -353,7 +355,7 @@ export const SessionViewSchema = z.object({
   // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
   awards: z.array(FinaleSlideSchema).nullable(),
   // Totals of the game's current teams, following that lineup's carryover rule.
-  teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), color: TeamColorSchema, memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema }).strict()),
+  teamStandings: z.array(z.object({ teamId: GameIdSchema, name: z.string().min(1).max(60), color: TeamColorSchema, memberIds: z.array(GameIdSchema), amountMilli: SignedMilliSchema, celebration: TeamCelebrationSchema.nullable().optional() }).strict()),
 }).strict();
 export type SessionView = z.infer<typeof SessionViewSchema>;
 

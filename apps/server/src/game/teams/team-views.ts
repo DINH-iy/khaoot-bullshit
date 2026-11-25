@@ -1,4 +1,7 @@
-import { defaultTeamColor } from '@party/contracts';
+import { defaultTeamColor, TeamCelebrationSchema } from '@party/contracts';
+
+/** A stored celebration, or null (none, or one that no longer fits). */
+const readCelebration = (value: unknown) => TeamCelebrationSchema.safeParse(value).data ?? null;
 import type { StageRun } from '../../generated/prisma/client.js';
 import type { Transaction } from '../model.js';
 import { captainTally, electionLeader, LineupInfoSchema, readForming, readStagePlay, teamContext, type TeamContext } from './teams.js';
@@ -12,7 +15,7 @@ export async function stageTeams(tx: Transaction, stage: StageRun, viewerPlayerI
     const present = (await tx.sessionPlayer.findMany({ where: { sessionId: stage.sessionId, leftAt: null }, select: { id: true }, orderBy: { joinedAt: 'asc' } })).map(player => player.id);
     // Elected captains: the votes per teammate, and the captain so far (the host's pick, else the one leader).
     const elected = forming.answers === 'captain' && forming.captainPick === 'elected';
-    const teams = forming.teams.map((team, index) => ({ index, name: team.name, color: team.color ?? defaultTeamColor(team.name, index), teamId: null, targetSize: team.targetSize,
+    const teams = forming.teams.map((team, index) => ({ index, name: team.name, color: team.color ?? defaultTeamColor(team.name, index), teamId: null, targetSize: team.targetSize, celebration: team.celebration ?? null,
       memberIds: present.filter(id => forming.assignment[id] === index), captainId: forming.captains[String(index)] ?? (elected ? electionLeader(forming, index, present) : null),
       ...(elected ? { captainVotes: captainTally(forming, index, present) } : {}) }));
     const own = viewerPlayerId ? forming.assignment[viewerPlayerId] : undefined;
@@ -28,9 +31,10 @@ export async function stageTeams(tx: Transaction, stage: StageRun, viewerPlayerI
   const info = LineupInfoSchema.parse(lineup.carryover);
   const rows = await tx.sessionTeam.findMany({ where: { id: { in: [...context.members.keys()] } } });
   const names = new Map(rows.map(team => [team.id, team.name])); const colors = new Map(rows.map(team => [team.id, team.color]));
+  const celebrations = new Map(rows.map(team => [team.id, readCelebration(team.celebration)]));
   const order = info.order ?? [];
   const teams = [...context.members.entries()].sort(([a], [b]) => order.indexOf(names.get(a) ?? '') - order.indexOf(names.get(b) ?? '')).map(([teamId, memberIds], index) => ({
-    index, name: names.get(teamId) ?? 'Team', color: colors.get(teamId) ?? defaultTeamColor(names.get(teamId) ?? '', index), teamId, targetSize: null, memberIds, captainId: context.captainOf.get(teamId) ?? null }));
+    index, name: names.get(teamId) ?? 'Team', color: colors.get(teamId) ?? defaultTeamColor(names.get(teamId) ?? '', index), teamId, targetSize: null, memberIds, captainId: context.captainOf.get(teamId) ?? null, celebration: celebrations.get(teamId) ?? null }));
   const ownTeam = viewerPlayerId ? context.teamOf.get(viewerPlayerId) : undefined;
   return { forming: false, formation: 'random' as const, scope: info.scope, answers: play.answers, points: play.points, teams,
     unassignedIds: [], ownTeamIndex: teams.find(team => team.teamId === ownTeam)?.index ?? null };
@@ -63,7 +67,7 @@ export async function teamStandings(tx: Transaction, sessionId: string, playerTo
   return teams.map(team => {
     const memberIds = current.members.filter(member => member.teamId === team.id).map(member => member.playerId);
     const fromMembers = base.info.data!.carryover === 'members' ? memberIds.reduce((total, id) => total + (playerTotals.get(id) ?? 0n), 0n) : 0n;
-    return { teamId: team.id, name: team.name, color: team.color ?? defaultTeamColor(team.name, 0), memberIds, total: (earned.get(team.id) ?? 0n) + fromMembers };
+    return { teamId: team.id, name: team.name, color: team.color ?? defaultTeamColor(team.name, 0), memberIds, celebration: readCelebration(team.celebration), total: (earned.get(team.id) ?? 0n) + fromMembers };
   }).sort((a, b) => a.total === b.total ? a.name.localeCompare(b.name) : a.total > b.total ? -1 : 1)
     .map(({ total, ...team }) => ({ ...team, amountMilli: total.toString() }));
 }

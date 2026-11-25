@@ -30,6 +30,7 @@ import { GRAPH_TEXTS } from '../minigames/draw-the-graph/graph.text.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
 import { SoundPlayer } from '../room-extras/sound-player.js';
+import { TeamCelebrationShow } from './celebration.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
 import { RoomSettings, SideGamesSwitch } from '../room-extras/room-settings.js';
 import { PointsCelebration } from '../room-extras/celebrate.js';
@@ -596,6 +597,8 @@ export function RoomScreen() {
     {state && role !== 'player' && state.settings.reactions && !scoreBubbles && <ReactionsOverlay state={state} store={room.reactions} />}
     {/* The soundboard plays where the room's sound plays: the shared screen, or the host's screen without one. */}
     {state && (role === 'display' || (role === 'host' && !state.displayConnected)) && <SoundPlayer state={state} event={room.soundEvent} />}
+    {/* A winning team's celebration: with its sound where the room's sound plays, and on that team's phones. */}
+    {state && <TeamCelebrationShow state={state} playsSound={role === 'display' || (role === 'host' && !state.displayConnected)} />}
   </main></StageActionSlot.Provider></RoomSessionContext.Provider></PoolAimContext.Provider></LookContext.Provider>;
 }
 

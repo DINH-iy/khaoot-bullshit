@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import type { TeamCelebration } from '@party/contracts';
 import type { PoolBallBehavior, PoolStart } from '@party/contracts';
 import { UNDERCOVER_ROLES, ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
@@ -469,7 +470,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type.startsWith('teams.')) {
     requireGame(stage.status === 'ACTIVE' && forming, 'INVALID_STATE');
     if (command.type === 'teams.choose' || command.type === 'teams.vote') requireGame(actor.role === 'player', 'FORBIDDEN');
-    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
+    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string; celebration?: TeamCelebration | null }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
     const { forming: _done, ...rest } = stage.presentation as Record<string, unknown>;
     if ('lineupId' in result) {
       // Confirmed: the round starts now, with its timer, for the players in a team (after its explanation, if it has one).

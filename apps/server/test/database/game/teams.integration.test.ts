@@ -186,6 +186,26 @@ describe('team rounds', () => {
     await expect(act(f, 0, 'teams.vote', { stageRunId, playerId: id(1) })).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 
+  it('lets each team pick its winning celebration while teams are made; it stays with the team and shows in the standings', async () => {
+    const pick = { key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players' } }] };
+    const f = await fixture(3, game([pick, quiz('a', teams('everyone', 'team'))]));
+    const stageRunId = (await hostCommand(f, 'session.start')).stageRunId!;
+    for (const [index, team] of [[0, 0], [1, 0], [2, 1]] as const) await act(f, index, 'teams.choose', { stageRunId, teamIndex: team });
+    const cheer = { emoji: '🔥', text: 'Red rules!', sound: 1 };
+    // Only for your own team; the host may set any team's.
+    await expect(act(f, 2, 'teams.celebration', { stageRunId, teamIndex: 0, celebration: cheer })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(act(f, 0, 'teams.celebration', { stageRunId, teamIndex: 0, celebration: { ...cheer, text: 'x'.repeat(30) } })).rejects.toBeTruthy();
+    await act(f, 0, 'teams.celebration', { stageRunId, teamIndex: 0, celebration: cheer });
+    await service.execute(f.host, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'teams.celebration', stageRunId, teamIndex: 1, celebration: { emoji: '🦄', text: '', sound: null } });
+    expect((await view(f, 2)).stage!.teams!.teams.map(team => team.celebration)).toEqual([cheer, { emoji: '🦄', text: '', sound: null }]);
+    await hostCommand(f, 'teams.confirm', { stageRunId });
+    // Saved with the team: the rounds after it and the standings carry it.
+    const round = (await hostCommand(f, 'stage.advance', { stageRunId })).stageRunId!;
+    expect((await hostView(f)).stage!.teams!.teams.find(team => team.name === 'Red')?.celebration).toEqual(cheer);
+    await answer(f, 0, round); await close(f, round);
+    expect((await hostView(f)).teamStandings[0]).toMatchObject({ name: 'Red', celebration: cheer });
+  });
+
   it('gives teams colours: the host picks any colour, a team picks a swatch for itself when allowed; two teams never share one, and the colour stays', async () => {
     const pickScene = (colors?: 'teams') => ({ key: 'pick', stages: [{ key: 'teams', kind: 'teams', prompt: 'Pick your teams', durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players', ...(colors ? { colors } : {}) } }] });
     const f = await fixture(3, game([pickScene('teams'), quiz('a', teams('everyone', 'team'))]));

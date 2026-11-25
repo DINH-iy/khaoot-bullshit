@@ -1,4 +1,4 @@
-import { CAPTAIN_PICKS, DEFAULT_TEAM_NAMES, defaultTeamColor, TEAM_SWATCHES, TeamColorSchema } from '@party/contracts';
+import { CAPTAIN_PICKS, DEFAULT_TEAM_NAMES, defaultTeamColor, TEAM_SWATCHES, TeamCelebrationSchema, TeamColorSchema, type TeamCelebration } from '@party/contracts';
 export { DEFAULT_TEAM_NAMES };
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
@@ -19,7 +19,8 @@ const FormingSchema = z.object({
   scope: z.enum(['game', 'round']), carryover: z.enum(['keep', 'fresh', 'members']), formation: z.enum(['random', 'skill', 'host', 'players']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
   // `color` (absent in proposals made before team colours): the team's colour. `colorsBy`: who may change it.
-  teams: z.array(z.object({ name: z.string().min(1).max(30), targetSize: z.number().int().min(1).nullable(), color: TeamColorSchema.optional() }).strict()).min(1).max(12),
+  // `celebration`: the team's winning celebration, picked by its members while teams are made.
+  teams: z.array(z.object({ name: z.string().min(1).max(30), targetSize: z.number().int().min(1).nullable(), color: TeamColorSchema.optional(), celebration: TeamCelebrationSchema.nullable().optional() }).strict()).min(1).max(12),
   colorsBy: z.enum(['host', 'teams']).optional(),
   // Player ID -> team index, or null for sitting out. Players not listed are unassigned.
   assignment: z.record(GameIdSchema, z.number().int().min(0).max(11).nullable()),
@@ -106,12 +107,15 @@ export async function currentGameLineup(tx: Transaction, sessionId: string) {
   return lineups.find(lineup => LineupInfoSchema.safeParse(lineup.carryover).success && LineupInfoSchema.parse(lineup.carryover).scope === 'game') ?? null;
 }
 
-async function createLineup(tx: Transaction, sessionId: string, info: z.infer<typeof LineupInfoSchema>, teams: { name: string; color?: string; members: string[]; captain: string | null }[]) {
+async function createLineup(tx: Transaction, sessionId: string, info: z.infer<typeof LineupInfoSchema>, teams: { name: string; color?: string; celebration?: TeamCelebration | null | undefined; members: string[]; captain: string | null }[]) {
   const last = await tx.teamLineup.findFirst({ where: { sessionId }, orderBy: { number: 'desc' }, select: { number: true } });
   const lineup = await tx.teamLineup.create({ data: { sessionId, number: (last?.number ?? 0) + 1, carryover: { ...info, order: teams.map(team => team.name) } } });
   for (const team of teams) {
     // A team made again under its name keeps its row; a newly picked colour replaces the old one.
-    const row = await tx.sessionTeam.upsert({ where: { sessionId_name: { sessionId, name: team.name } }, create: { sessionId, name: team.name, ...(team.color ? { color: team.color } : {}) }, update: team.color ? { color: team.color } : {} });
+    // A celebration picked now replaces the team's earlier one; a team that picked none keeps what it had.
+    const celebration = team.celebration ? { celebration: team.celebration } : {};
+    const row = await tx.sessionTeam.upsert({ where: { sessionId_name: { sessionId, name: team.name } }, create: { sessionId, name: team.name, ...(team.color ? { color: team.color } : {}), ...celebration },
+      update: { ...(team.color ? { color: team.color } : {}), ...celebration } });
     await tx.teamMember.createMany({ data: team.members.map(playerId => ({ sessionId, lineupId: lineup.id, teamId: row.id, playerId, isCaptain: playerId === team.captain })) });
   }
   return lineup;
@@ -136,7 +140,7 @@ export async function gameLineupForRound(tx: Transaction, sessionId: string, pre
 }
 
 /** Applies a team-forming command to the proposal; returns the updated proposal, or the confirmed lineup. */
-export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string }, actorPlayerId: string | null, presentIds: string[]) {
+export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string; celebration?: TeamCelebration | null }, actorPlayerId: string | null, presentIds: string[]) {
   const present = new Set(presentIds);
   const size = (index: number) => Object.entries(forming.assignment).filter(([id, team]) => team === index && present.has(id)).length;
   // More or fewer teams than the game proposed: a new team gets the next free colour name; at least one team stays.
@@ -194,6 +198,14 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
       && !teams.some((team, position) => position !== index && team.name.toLowerCase() === named.toLowerCase()) ? named : current;
     return { forming: { ...forming, teams: teams.map((team, position) => position === index ? { ...team, color, name: renamed } : team) } };
   }
+  if (command.type === 'teams.celebration') {
+    // A member picks their own team's celebration; the host may set any team's.
+    const index = command.teamIndex ?? -1;
+    requireGame(index >= 0 && index < forming.teams.length, 'INVALID_COMMAND');
+    if (actorPlayerId) requireGame(forming.assignment[actorPlayerId] === index, 'FORBIDDEN');
+    const celebration = command.celebration === null || command.celebration === undefined ? null : TeamCelebrationSchema.parse(command.celebration);
+    return { forming: { ...forming, teams: forming.teams.map((team, position) => position === index ? { ...team, celebration } : team) } };
+  }
   if (command.type === 'teams.captainPick') {
     // The host switches between assigned and elected captains while teams are made; a captain the host picked stays.
     requireGame(forming.answers === 'captain' && (command.pick === 'assigned' || command.pick === 'elected'), 'INVALID_COMMAND');
@@ -220,7 +232,7 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     const chosen = forming.captains[String(index)];
     const tally = captainTally(forming, index, presentIds); const top = tally.filter(entry => entry.count === tally[0]?.count).map(entry => entry.playerId);
     const pool = top.length ? top : members;
-    return { name: team.name, color: team.color ?? defaultTeamColor(team.name, index), members, captain: chosen && members.includes(chosen) ? chosen : pool.length ? pool[randomInt(pool.length)]! : null };
+    return { name: team.name, color: team.color ?? defaultTeamColor(team.name, index), celebration: team.celebration, members, captain: chosen && members.includes(chosen) ? chosen : pool.length ? pool[randomInt(pool.length)]! : null };
   }).filter(group => group.members.length > 0);
   // Empty teams are dropped; players left unassigned sit this round out.
   requireGame(groups.length > 0, 'INVALID_STATE');

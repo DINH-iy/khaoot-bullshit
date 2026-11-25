@@ -50,6 +50,14 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await expect(forming).toContainText('captain: Ada');
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     expect((await new AxeBuilder({ page: ada }).analyze()).violations).toEqual([]);
+    // Red picks its winning celebration on a phone.
+    await ben.getByRole('button', { name: '🎉 Our celebration' }).click();
+    const sheet = ben.getByRole('dialog', { name: 'Our celebration' });
+    await sheet.getByRole('radio', { name: '🚀' }).click();
+    await sheet.getByLabel('Cheer (up to 24 characters)').fill('GO RED');
+    await sheet.getByRole('radio', { name: 'Air horn' }).click();
+    await sheet.getByRole('button', { name: 'Save' }).click();
+    await expect(host.locator('.team-celebration-summary')).toContainText('🚀 GO RED');
     await host.getByRole('button', { name: 'Start round with these teams' }).click();
 
     // A player's team is a coloured flag in the round bar; the (i) says who is in it.
@@ -70,6 +78,12 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();
     await expect(ben.getByRole('region', { name: 'Round results' })).toContainText('Red · 10');
+    // Red won the round: its celebration shows on the host's screen (no shared screen here) and on Red's phones.
+    await expect(host.locator('.team-celebration')).toContainText('Red wins!');
+    await expect(host.locator('.team-celebration')).toContainText('GO RED');
+    await expect(ben.locator('.team-celebration')).toContainText('Red wins!');
+    await expect(cleo.locator('.team-celebration')).toHaveCount(0);
+    if (process.env['TEAM_SHOTS']) await host.screenshot({ path: `${process.env['TEAM_SHOTS']}/celebration.png` });
     // "both": Red gets 10 and so do Ada and Ben.
     await expectPhoneScores(ben, 'Red · Ada, Ben10');
     await expectPhoneScores(ben, 'Ben (you)10');

@@ -3,7 +3,9 @@ import { defaultLook, TEAM_SWATCHES, type RoomSnapshot } from '@party/contracts'
 import { ColorPicker } from '../ui/color-picker.js';
 import { DRAWING_TEXTS } from '../drawing/drawing.text.js';
 import { Avatar } from '../players/avatar.js';
-import { translate } from '../i18n/texts.js';
+import { translate, useTexts } from '../i18n/texts.js';
+import { CelebrationPicker } from './celebration.js';
+import { CELEBRATION_TEXTS } from './celebration.text.js';
 import { PLAY_TEXTS } from './play.text.js';
 const p = (key: keyof typeof PLAY_TEXTS.en, values?: Record<string, string | number>) => translate(PLAY_TEXTS, key, values);
 import { formatPoints } from './results.js';
@@ -32,7 +34,7 @@ const lookOf = (state: RoomSnapshot, id: string) => state.players.find(player =>
  * big button in the host controls. Players who choose tap their team's big button.
  */
 export function TeamForming({ state, stage, disabled, send }: { state: RoomSnapshot; stage: Stage; disabled: boolean; send: Send }) {
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null); const [celebrating, setCelebrating] = useState(false); const c = useTexts(CELEBRATION_TEXTS);
   const teams = stage.teams; if (!teams?.forming) return null;
   const host = state.role === 'host'; const chooser = state.role === 'player' && teams.formation === 'players' && stage.status === 'ACTIVE';
   const captains = teams.answers === 'captain';
@@ -86,6 +88,9 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
           <button key={swatch} type="button" role="radio" aria-checked={swatch === color} disabled={disabled || taken.has(swatch)} style={{ background: swatch }}
             aria-label={taken.has(swatch) ? p('colourTaken', { colour: swatchName(swatch) }) : swatchName(swatch)} title={swatchName(swatch)}
             onClick={() => { if (swatch !== color) send('teams.color', { stageRunId: stage.id, teamIndex: team.index, color: swatch }); }} />)}</div>}
+        {/* The team's celebration: its emoji and cheer for everyone; a member taps to pick or change it. */}
+        {team.celebration && <p className="team-celebration-summary">{team.celebration.emoji} {team.celebration.text}</p>}
+        {state.role === 'player' && mine && stage.status === 'ACTIVE' && <button type="button" className="ghost team-celebrate" disabled={disabled} onClick={() => setCelebrating(true)}>🎉 {c('ours')}</button>}
         {chooser && <button type="button" className="team-join" disabled={disabled || mine || full} onClick={() => send('teams.choose', { stageRunId: stage.id, teamIndex: team.index })}>
           {p(mine ? 'youAreIn' : full ? 'isFull' : 'join', { team: team.name })}</button>}
         {team.memberIds.length ? <ul className="team-members">{team.memberIds.map(id => chip(id, team))}</ul> : <p className="team-empty">{p(host ? 'nobodyTap' : 'nobody')}</p>}
@@ -105,6 +110,8 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
       <button type="button" className="ghost" disabled={disabled} onClick={() => { send('teams.shuffle', { stageRunId: stage.id, method: 'skill' }); setPicked(null); }}>{p('balanceSkill')}</button>
     </div>}
     {host && teams.teams.every(team => team.memberIds.length === 0) && <p className="wait-note">{p('putOne')}</p>}
+    {celebrating && teams.ownTeamIndex !== null && <CelebrationPicker state={state} stage={stage} teamIndex={teams.ownTeamIndex} disabled={disabled} send={send}
+      current={teams.teams.find(team => team.index === teams.ownTeamIndex)?.celebration} onClose={() => setCelebrating(false)} />}
   </div>;
 }
 

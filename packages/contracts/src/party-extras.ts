@@ -37,3 +37,14 @@ export const SoundRequestSchema = z.object({ sound: z.number().int().min(0).max(
 /** What the room's screens get: the game's own reactions and its soundboard (public: no secrets in them). */
 export const PartyExtrasSchema = z.object({ reactions: z.array(OwnReactionSchema).max(MAX_OWN_REACTIONS), sounds: z.array(SoundSchema).max(MAX_SOUNDS) }).strict();
 export type PartyExtras = z.infer<typeof PartyExtrasSchema>;
+
+/**
+ * A team's winning celebration, picked by its members while teams are made: an emoji that bursts over the
+ * shared screen, a short cheer, and one of the game's soundboard sounds (its number; null: no sound).
+ * It plays when the team wins a round (the most team points at the reveal) and when it wins the game.
+ */
+export const CELEBRATION_EMOJI = ['🎉', '🔥', '🏆', '👑', '🚀', '💥', '🍻', '🦄', '⚡', '🎸', '🐐', '💪'] as const;
+export const TeamCelebrationSchema = z.object({
+  emoji: z.string().trim().min(1).max(16), text: z.string().trim().max(24), sound: z.number().int().min(0).max(MAX_SOUNDS - 1).nullable(),
+}).strict();
+export type TeamCelebration = z.infer<typeof TeamCelebrationSchema>;

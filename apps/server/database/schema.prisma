@@ -284,6 +284,8 @@ model SessionTeam {
   name      String   @db.VarChar(60)
   // The team's colour (#rrggbb), picked while teams were made; null: from its name.
   color     String?  @db.VarChar(7)
+  // The team's winning celebration (TeamCelebrationSchema: emoji, cheer, soundboard sound), picked while teams were made; null: none.
+  celebration Json?  @db.JsonB
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   session     GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)

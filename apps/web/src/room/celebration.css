@@ -1,0 +1,19 @@
+/* A team's celebration: emoji raining down and a card in the team's colour. */
+.team-celebration { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; pointer-events: none; }
+.team-celebration-burst i { position: absolute; top: -10%; left: var(--x); font-size: clamp(2rem, 6vw, 4.5rem); font-style: normal; animation: celebration-fall 3.6s var(--delay) ease-in forwards; }
+.team-celebration-card { display: grid; justify-items: center; gap: 6px; margin: 0; padding: 20px 32px; border-radius: 24px; background: color-mix(in srgb, var(--team, var(--r-accent)) 70%, #000); color: #fff; text-align: center;
+  text-shadow: 0 2px 6px rgb(0 0 0 / .35); box-shadow: 0 16px 48px rgb(0 0 0 / .45); animation: celebration-pop .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+.team-celebration-card strong { font-size: clamp(1.6rem, 5vw, 3.2rem); font-weight: 900; }
+.team-celebration-card span { font-size: clamp(1.1rem, 3vw, 2rem); font-weight: 800; }
+.team-celebration-emoji { font-size: clamp(2.5rem, 8vw, 5rem); }
+@keyframes celebration-fall { from { transform: translateY(0) rotate(0deg); opacity: 1; } to { transform: translateY(120vh) rotate(var(--turn)); opacity: .9; } }
+@keyframes celebration-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .team-celebration-burst { display: none; } .team-celebration-card { animation: none; } }
+.celebration-picker { display: grid; gap: 12px; }
+.celebration-emoji, .celebration-sounds { display: flex; flex-wrap: wrap; gap: 6px; }
+.room .celebration-emoji button { min-width: 48px; min-height: 48px; margin: 0; padding: 0; font-size: 1.5rem; border: 2px solid transparent; background: var(--r-card-strong); box-shadow: none; }
+.room .celebration-sounds button { min-height: 40px; margin: 0; padding: 4px 12px; border: 2px solid transparent; background: var(--r-card-strong); color: var(--r-text); font-weight: 700; box-shadow: none; }
+.room .celebration-emoji button[aria-checked=true], .room .celebration-sounds button[aria-checked=true] { border-color: var(--r-accent); background: color-mix(in srgb, var(--r-accent) 22%, var(--r-card-strong)); }
+.celebration-picker label { display: grid; gap: 4px; font-weight: 700; }
+.room .team-celebrate { margin: 6px 0 0; min-height: 40px; }
+.team-celebration-summary { margin: 4px 0 0; font-weight: 800; }
