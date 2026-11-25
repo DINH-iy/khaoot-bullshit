@@ -4,7 +4,7 @@ Feedback from the 14–15 November test evening and the owner's follow-ups throu
 
 ## Left to build
 
-- Media follow-ups, tracked in the [product plan](../../APP_PLAN.md#owner-queue-19-november-2026) (captions and alt text, more host playback control, playlist shuffle and fades, event sounds).
+- Nothing in the media follow-ups: captions and alt text, host playback control, playlist shuffle and fades, and event sounds were built on 25 November 2026 ([product plan](../../APP_PLAN.md#owner-queue-19-november-2026), row 50). Listen to the event sounds and fades on a real TV.
 
 ## Still needs testing
 

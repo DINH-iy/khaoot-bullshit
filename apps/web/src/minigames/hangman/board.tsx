@@ -1,4 +1,5 @@
-import { HANGMAN_PARTS, hangmanParts, HangmanOwnViewSchema, HangmanViewSchema, type StepSideView } from '@party/contracts';
+import { useState } from 'react';
+import { HANGMAN_PARTS, hangmanParts, hangmanWordMove, HangmanOwnViewSchema, HangmanViewSchema, HangmanWordSchema, readHangmanWordMove, type StepSideView } from '@party/contracts';
 import { translate } from '../../i18n/texts.js';
 import type { StepRenderer } from '../shared/steps/step-game.js';
 import { HANGMAN_TEXTS } from './hangman.text.js';
@@ -38,6 +39,7 @@ function Board({ side, mine }: { side: StepSideView; mine: boolean }) {
         <WordTiles pattern={own.data.pattern} label={h('word', { pattern: own.data.pattern.replace(/_/g, '…').toUpperCase() })} />
         <p className="hangman-count">{solved ? <strong className="hangman-ok">✓ {h('solved')}</strong> : hanged ? <strong className="hangman-out">{h('hanged')}</strong> : h('wrongLeft', { wrong, left: lives - wrong })}</p>
         {missed.length > 0 && <p className="hangman-missed" aria-label={`${h('wrongLetters')}: ${missed.join(', ').toUpperCase()}`}><span aria-hidden="true">{missed.join(' ').toUpperCase()}</span></p>}
+        {own.data.words?.length ? <p className="hangman-missed words" aria-label={`${h('wrongWords')}: ${own.data.words.join(', ').toUpperCase()}`}><span aria-hidden="true">{own.data.words.join(' · ').toUpperCase()}</span></p> : null}
       </div>
     </div>;
   }
@@ -45,8 +47,23 @@ function Board({ side, mine }: { side: StepSideView; mine: boolean }) {
   return <div className="hangman-board">{gallows}<span className="hangman-progress">{solved ? `✓ ${h('solved')}` : hanged ? h('hanged') : h('found', { found, total })}</span></div>;
 }
 
+/** Guessing the whole word: a short button that opens the field (the letters stay the main way to play). */
+function WordGuess({ own, disabled, onChoose }: { own: unknown; disabled: boolean; onChoose: (option: string) => void }) {
+  const [open, setOpen] = useState(false); const [text, setText] = useState('');
+  const tried = HangmanOwnViewSchema.safeParse(own).data?.words ?? [];
+  const word = HangmanWordSchema.safeParse(text); const valid = word.success && !tried.includes(word.data);
+  if (!open) return <button type="button" className="ghost hangman-word-open" disabled={disabled} onClick={() => setOpen(true)}>{h('guessWord')}</button>;
+  return <form className="hangman-word-guess" onSubmit={event => { event.preventDefault(); if (valid) { onChoose(hangmanWordMove(word.data)); setText(''); setOpen(false); } }}>
+    <label>{h('wordField')}<input value={text} maxLength={40} autoComplete="off" autoCapitalize="none" spellCheck={false} autoFocus onChange={event => setText(event.target.value)} /></label>
+    <button type="submit" className="primary" disabled={disabled || !valid}>{h('guess')}</button>
+    <small>{h('wordCost')}</small>
+  </form>;
+}
+
 export const hangman: StepRenderer = {
   question: () => h('ask'),
-  label: option => <span aria-label={h('letter', { letter: option.toUpperCase() })}>{option.toUpperCase()}</span>,
+  label: option => { const word = readHangmanWordMove(option);
+    return word ? <span>{h('wordMove', { word: word.toUpperCase() })}</span> : <span aria-label={h('letter', { letter: option.toUpperCase() })}>{option.toUpperCase()}</span>; },
+  extra: ({ view, disabled, onChoose }) => <WordGuess own={view} disabled={disabled} onChoose={onChoose} />,
   board: (side, _settings, mine) => <Board side={side} mine={mine} />,
 };

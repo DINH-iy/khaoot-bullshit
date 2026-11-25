@@ -1,7 +1,7 @@
 import { AutoRevealSecondsSchema, ColorSchema, GameRoomSettingsSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
+import { CARRYOVERS, MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -45,7 +45,7 @@ export const PlaySchema = z.discriminatedUnion('kind', [
       // Teams for this round only; afterwards the game's own teams apply again.
       z.object({ kind: z.literal('round'), form: FormationSchema }).strict(),
       // Makes new game teams from here on, with a rule for their scores.
-      z.object({ kind: z.literal('reform'), form: FormationSchema, carryover: z.enum(['keep', 'fresh', 'members']) }).strict(),
+      z.object({ kind: z.literal('reform'), form: FormationSchema, carryover: z.enum(CARRYOVERS) }).strict(),
     ]),
     answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
   }).strict(),
@@ -116,7 +116,7 @@ const stageSchema = z.discriminatedUnion('kind', [
   // teams) until the next Pick teams scene. The host sees the proposal, can change it (also add or remove teams) and
   // confirms; then moves on. `carryover`: the team scores when teams are made again. `captains`: each team gets a captain.
   z.object({ ...look, key: GameKeySchema, kind: z.literal('teams'), prompt: z.string().trim().min(1).max(2000), durationMs: z.null(),
-    form: FormationSchema, carryover: z.enum(['keep', 'fresh', 'members']).optional(), captains: z.boolean().optional() }).strict(),
+    form: FormationSchema, carryover: z.enum(CARRYOVERS).optional(), captains: z.boolean().optional() }).strict(),
   // Format 2: the party picks one route. It is the only stage of its node, each
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.

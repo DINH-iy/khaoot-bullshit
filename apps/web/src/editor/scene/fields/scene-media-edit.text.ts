@@ -13,7 +13,7 @@ export const SCENE_MEDIA_EDIT_TEXTS = defineTexts('scene-media-edit', {
   vertical: "Vertical focus",
   badTimes: "Enter a valid start and end time.",
   clipHelp: "Times are in seconds. Leave the end empty to play to the end of the file.",
-    waveform: "Show waveform",
+    waveform: "Show waveform", alt: "Describe the picture (for screen readers)", caption: "Caption (shown under it on every screen)",
 }, {
   nl: {
     crop: "Afbeelding bijsnijden",
@@ -28,7 +28,7 @@ export const SCENE_MEDIA_EDIT_TEXTS = defineTexts('scene-media-edit', {
     vertical: "Verticale focus",
     badTimes: "Voer een geldige begin- en eindtijd in.",
     clipHelp: "Tijden zijn in seconden. Laat het einde leeg om tot het einde af te spelen.",
-    waveform: "Golfvorm tonen",
+    waveform: "Golfvorm tonen", alt: "Beschrijf het plaatje (voor schermlezers)", caption: "Onderschrift (op elk scherm eronder)",
   },
   de: {
     crop: "Bild zuschneiden",
@@ -43,7 +43,7 @@ export const SCENE_MEDIA_EDIT_TEXTS = defineTexts('scene-media-edit', {
     vertical: "Vertikaler Fokus",
     badTimes: "Gib eine gültige Start- und Endzeit ein.",
     clipHelp: "Zeiten in Sekunden. Ohne Endzeit wird bis zum Dateiende abgespielt.",
-    waveform: "Wellenform anzeigen",
+    waveform: "Wellenform anzeigen", alt: "Beschreibe das Bild (für Screenreader)", caption: "Bildunterschrift (auf jedem Bildschirm darunter)",
   },
   ro: {
     crop: "Decupează imaginea",
@@ -58,6 +58,6 @@ export const SCENE_MEDIA_EDIT_TEXTS = defineTexts('scene-media-edit', {
     vertical: "Poziție verticală",
     badTimes: "Introdu timpi valizi de început și sfârșit.",
     clipHelp: "Timpii sunt în secunde. Lasă sfârșitul gol pentru a reda până la finalul fișierului.",
-    waveform: "Arată forma de undă",
+    waveform: "Arată forma de undă", alt: "Descrie imaginea (pentru cititoare de ecran)", caption: "Legendă (afișată dedesubt pe fiecare ecran)",
   },
 });

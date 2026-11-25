@@ -520,6 +520,7 @@
 .room .link-button:hover:not(:disabled) { border-color: var(--r-accent); }
 /* A scene's picture, video or song (stage-media.tsx): under the question, never wider than the card. */
 .stage-media { margin: 0; display: grid; justify-items: center; gap: 10px; }
+.stage-media-caption { margin: 6px 0 0; text-align: center; color: var(--r-muted); font-weight: 700; font-size: .95rem; }
 .stage-media.image img, .stage-media.video video { display: block; max-width: 100%; max-height: min(52vh, 560px); border-radius: var(--r-radius, 16px); object-fit: contain; background: rgb(0 0 0 / .2); }
 .stage-media.image.cropped { margin-inline: auto; width: 100%; max-width: calc(min(42dvh, 480px) * var(--media-crop-ratio)); aspect-ratio: var(--media-crop-ratio); overflow: hidden; border-radius: var(--r-radius, 12px); }
 .stage-media.image.cropped img { width: 100%; height: 100%; min-height: 0; max-height: none; object-fit: cover; object-position: var(--media-crop-position); }
@@ -663,3 +664,19 @@
 .room .team-swatches button { width: 36px; min-height: 36px; padding: 0; border-radius: 50%; border: 2px solid rgb(255 255 255 / .6); }
 .room .team-swatches button[aria-checked=true] { outline: 3px solid var(--r-text); outline-offset: 2px; }
 .room .team-swatches button:disabled { opacity: .25; }
+.media-host-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; }
+.media-host-controls > span { color: var(--r-muted); font-weight: 700; font-size: .9rem; }
+.room .media-host-controls button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; margin: 0; }
+
+/* Teams made again with shared-out or typed scores: what each team starts with. */
+.team-start { margin: 6px 2px 0; font-weight: 700; font-size: .92rem; }
+.team-start-edit { display: grid; gap: 4px; font-size: .85rem; }
+.team-start-edit input { min-height: 40px; max-width: 9rem; font-weight: 700; }
+
+/* The host checks a round's answers: one row per answer, the verdict button on the right. */
+.answer-checks ul { display: grid; gap: 6px; }
+.answer-check { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--r-surface-2, rgb(127 127 127 / .12)); }
+.answer-check-text { display: grid; gap: 1px; min-width: 0; } .answer-check-text span { overflow-wrap: anywhere; }
+.answer-check small { font-weight: 700; } .answer-check.right small { color: var(--r-good, #1f8a4c); } .answer-check.wrong small { color: var(--r-bad, #c2334d); }
+.answer-check button { flex: none; }
+.own-verdict { margin: 6px 0 0; font-weight: 700; }

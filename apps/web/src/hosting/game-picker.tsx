@@ -36,7 +36,7 @@ export function GameCover({ game, size }: { game: Game; size: 'small' | 'large' 
  * the right (stacked on a phone). The list is a group of radio buttons, so it
  * works with the keyboard and screen readers like any choice.
  */
-export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRestore }: { games: Game[]; chosen: string; onChoose: (key: string) => void; busy: boolean; onOpen: () => void; onEdit?: (key: string) => void; onRestore?: (key: string) => void }) {
+export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRestore }: { games: Game[]; chosen: string; onChoose: (key: string) => void; busy: boolean; onOpen: () => void; onEdit?: ((key: string) => void) | undefined; onRestore?: ((key: string) => void) | undefined }) {
   const game = games.find(entry => entry.key === chosen) ?? games[0];
   const [restoring, setRestoring] = useState<string | null>(null); const t = useTexts(HOSTING_TEXTS);
   return <form className="game-picker" onSubmit={event => { event.preventDefault(); onOpen(); }}>

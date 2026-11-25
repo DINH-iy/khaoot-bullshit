@@ -289,6 +289,8 @@ describe('team rounds', () => {
     ['keep', (red: bigint) => red],
     ['fresh', () => 0n],
     ['members', (_red: bigint, members: bigint) => members],
+    // Red's 20 points are shared out (10 each for players 0 and 1): each new team gets one of those shares.
+    ['redistribute', () => 10000n],
   ] as const)('carries team scores over a re-formed lineup with the "%s" rule', async (carryover, expected) => {
     const f = await fixture(4, game([quiz('a'), quiz('b', teams('everyone', 'both', { kind: 'reform', form: { split: { kind: 'count', teams: 2 }, formation: 'host' }, carryover }))],
       { teams: { split: { kind: 'count', teams: 2 }, formation: 'host' }, play: teams('everyone', 'both') }));
@@ -302,12 +304,41 @@ describe('team rounds', () => {
     // New Red: players 0 and 2 (individual 10 + 0 points).
     const second = (await hostCommand(f, 'stage.advance', { stageRunId: first })).stageRunId!;
     for (const [index, team] of [[0, 0], [2, 0], [1, 1], [3, 1]] as const) await hostCommand(f, 'teams.assign', { stageRunId: second, playerId: f.players[index]!.id, teamIndex: team });
+    // Shared-out scores are shown before the host confirms; the other rules count live.
+    const preview = (await hostView(f)).stage!.teams!;
+    expect(preview.carryover).toBe(carryover);
+    expect(preview.teams.map(team => team.startMilli)).toEqual(carryover === 'redistribute' ? ['10000', '10000'] : [undefined, undefined]);
     await hostCommand(f, 'teams.confirm', { stageRunId: second });
     const now = await totals(f);
     expect(now.get('Red')).toBe(expected(20000n, 10000n).toString());
     expect(now.get('Blue')).toBe(expected(0n, 10000n).toString());
     // History is untouched: the earlier lineup still records the original teams.
     expect(await prisma.teamLineup.count({ where: { sessionId: f.sessionId } })).toBe(2);
+  });
+
+  it('lets the host type what each re-formed team starts with, fixed once confirmed, and crowns the winning team at the end', async () => {
+    const f = await fixture(4, game([quiz('a'), quiz('b', teams('everyone', 'team', { kind: 'reform', form: { split: { kind: 'count', teams: 2 }, formation: 'host' }, carryover: 'manual' }))],
+      { teams: { split: { kind: 'count', teams: 2 }, formation: 'host' }, play: teams('everyone', 'team'), finale: { stats: ['teamWinner'] } }));
+    const first = (await hostCommand(f, 'session.start')).stageRunId!;
+    for (const [index, team] of [[0, 0], [1, 0], [2, 1], [3, 1]] as const) await hostCommand(f, 'teams.assign', { stageRunId: first, playerId: f.players[index]!.id, teamIndex: team });
+    // Typed totals only exist for re-formed game teams with the "manual" rule.
+    await expect(hostCommand(f, 'teams.startTotal', { stageRunId: first, teamIndex: 0, amountMilli: '5000' })).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await hostCommand(f, 'teams.confirm', { stageRunId: first });
+    await answer(f, 0, first); await close(f, first);
+    const second = (await hostCommand(f, 'stage.advance', { stageRunId: first })).stageRunId!;
+    for (const [index, team] of [[0, 0], [1, 0], [2, 1], [3, 1]] as const) await hostCommand(f, 'teams.assign', { stageRunId: second, playerId: f.players[index]!.id, teamIndex: team });
+    // Only the host types totals (players cannot send the command at all).
+    await expect(act(f, 0, 'teams.startTotal', { stageRunId: second, teamIndex: 0, amountMilli: '99000' })).rejects.toBeTruthy();
+    await hostCommand(f, 'teams.startTotal', { stageRunId: second, teamIndex: 1, amountMilli: '7500' });
+    expect((await hostView(f)).stage!.teams!.teams.map(team => team.startMilli)).toEqual(['0', '7500']);
+    await hostCommand(f, 'teams.confirm', { stageRunId: second });
+    // Red's earlier 10 points are replaced by its typed start (0); Blue starts with 7.5.
+    expect(await totals(f)).toEqual(new Map([['Blue', '7500'], ['Red', '0']]));
+    await answer(f, 0, second); await close(f, second);
+    expect(await totals(f)).toEqual(new Map([['Red', '10000'], ['Blue', '7500']]));
+    await hostCommand(f, 'stage.advance', { stageRunId: second });
+    const red = (await hostView(f)).teamStandings.find(team => team.name === 'Red')!;
+    expect((await view(f, 2)).awards).toEqual([{ stat: 'teamWinner', playerIds: red.memberIds, value: '10 points', team: { name: 'Red', color: red.color } }]);
   });
 
   it('never lets a team vote for its own entry, and gives the votes to the team that wrote it', async () => {

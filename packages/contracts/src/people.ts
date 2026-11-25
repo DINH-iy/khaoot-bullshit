@@ -18,13 +18,16 @@ export const ClaimPersonSchema = z.object({ token: z.string().min(1).max(64) }).
 export const MeSchema = z.object({ person: z.object({ id: z.uuid(), name: z.string(), look: PlayerLookSchema.nullable(), canEdit: z.boolean() }).strict().nullable() }).strict();
 export type Me = z.infer<typeof MeSchema>;
 
-export const NewPersonSchema = z.object({ name: PersonNameSchema, canEdit: z.boolean().default(false) }).strict();
+// `roleId`: the person's role (what they may do besides playing); `canEdit` (older form) gives the Editor role.
+export const NewPersonSchema = z.object({ name: PersonNameSchema, canEdit: z.boolean().default(false), roleId: z.uuid().nullable().optional() }).strict();
 export const RenamePersonSchema = z.object({ name: PersonNameSchema }).strict();
 export const PersonEditorSchema = z.object({ canEdit: z.boolean() }).strict();
 export const PersonRowSchema = z.object({
   id: z.uuid(), name: z.string(), createdAt: z.string(), devices: z.number().int().min(0), lastSeenAt: z.string().nullable(),
   games: z.number().int().min(0), chips: z.number().int(), wagered: z.number().int().min(0),
   canEdit: z.boolean(),
+  // The person's role (null: a player only) and its name.
+  roleId: z.uuid().nullable().optional(), roleName: z.string().nullable().optional(),
   // False for people made before keys could be looked up again: make a new key to see one.
   hasKey: z.boolean(),
   // Included only when the owner opens the People directory with keys enabled.

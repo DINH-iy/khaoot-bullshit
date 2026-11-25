@@ -65,6 +65,8 @@ export const UndercoverViewSchema = z.object({
   round: z.number().int().min(1), phase: z.enum(UNDERCOVER_PHASES),
   speakerId: Id.nullable(), turnEndsAt: z.string().datetime().nullable(),
   voters: z.array(Id), voteEndsAt: z.string().datetime().nullable(),
+  // A re-vote after a tie: only these players can be voted for (absent: an ordinary vote).
+  runoff: z.array(Id).optional(),
   last: z.object({ round: z.number().int().min(1), tally: z.array(z.object({ playerId: Id, count: z.number().int().min(1) }).strict()), outId: Id.nullable() }).strict().nullable(),
   guesserId: Id.nullable(), guessEndsAt: z.string().datetime().nullable(),
   winner: z.enum(['civilians', 'impostors', 'white']).nullable(),

@@ -52,7 +52,7 @@ export function registerGrapherImport(app: FastifyInstance, owner: OwnerAccess) 
   const limiter = new RateLimiter(1024);
   app.post('/api/host/graph-import', { bodyLimit: 4096 }, async (request, reply) => {
     try {
-      await owner.requireEditor(request, 'edit');
+      await owner.requirePermission(request, 'games.make', 'edit');
       roomAssert(limiter.allow(request.ip, 12), 'RATE_LIMITED');
     } catch (error) { return owner.fail(reply, error); }
     const body = GrapherImportRequestSchema.safeParse(request.body);

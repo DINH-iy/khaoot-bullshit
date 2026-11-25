@@ -5,8 +5,11 @@ import { locateRunStage } from '../graph.js';
 import type { Transaction } from '../model.js';
 import { minigameOutcome } from '../../minigames/shared/outcome.js';
 import { readMinigameRun } from '../../minigames/shared/rules.js';
+import { countsAsCorrect, latestVerdicts, scoredCorrect } from '../scoring/verdicts.js';
+import { playerTotals } from '../teams/carryover.js';
+import { teamStandings } from '../teams/team-views.js';
 
-export interface FinaleSlide { stat: AwardRule; title?: string; playerIds: string[]; value: string }
+export interface FinaleSlide { stat: AwardRule; title?: string; playerIds: string[]; value: string; team?: { name: string; color: string } }
 /** The statistics shown unless the author chooses: everything that has something to show. */
 export const DEFAULT_FINALE: readonly FinaleStat[] = FINALE_STATS;
 const points = (milli: bigint) => { const whole = milli / 1000n; const rest = milli % 1000n; return rest === 0n ? `${whole}` : `${whole}.${String(rest).padStart(3, '0').replace(/0+$/, '')}`; };
@@ -32,6 +35,8 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
   const submissions = await tx.submission.findMany({ where: { sessionId, slotKey: 'answer' }, select: { id: true, stageRunId: true, playerId: true, teamId: true, value: true, receivedAt: true } });
   const scores = await tx.scoreEntry.findMany({ where: { sessionId, recipientPlayerId: { not: null } }, select: { recipientPlayerId: true, amountMilli: true, reason: true, stageRunId: true } });
   const stageOf = new Map(runs.map(run => [run.id, { run, stage: locateRunStage(definition, run)?.stage }]));
+  // The host's verdicts overrule the round's own scoring for right and wrong answers.
+  const verdicts = await latestVerdicts(tx, sessionId, submissions.map(submission => submission.id));
   const author = new Map(submissions.map(submission => [submission.id, submission.playerId]));
 
   const totals = new Map<string, bigint>(); const lucky = new Map<string, bigint>();
@@ -47,8 +52,7 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
     if (!submission.playerId || info.stage.kind !== 'collect') continue;
     const rule = info.stage.scoring;
     if (rule.kind !== 'none') {
-      const right = (rule.kind === 'correct-choice' && value.data.kind === 'choice' && value.data.choiceKey === rule.correctChoiceKey)
-        || (rule.kind === 'correct-order' && value.data.kind === 'order' && value.data.keys.every((key, index) => key === rule.correctOrder[index]));
+      const right = countsAsCorrect(verdicts.get(submission.id), scoredCorrect(info.stage, submission.value));
       bump(right ? correct : wrong, submission.playerId);
       // Speed only counts on questions with a right answer: writing and drawing take as long as they take.
       times.set(submission.playerId, [...(times.get(submission.playerId) ?? []), submission.receivedAt.getTime() - info.run.openedAt.getTime()]);
@@ -68,7 +72,7 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
     winner: bigTop(totals), mostCorrect: count(correct, ['correct answer', 'correct answers']), mostWrong: count(wrong, ['wrong answer', 'wrong answers']),
     fastest: (() => { const best = top(average, true); return best ? { playerIds: best.playerIds, value: seconds(best.value) } : null; })(),
     slowest: (() => { const best = average.size >= 2 ? top(average) : null; return best ? { playerIds: best.playerIds, value: seconds(best.value) } : null; })(),
-    mostVotes: count(votes, ['vote', 'votes']), minigameChamp: count(firsts, ['minigame won', 'minigames won']), luckiest: bigTop(lucky), mostReactions: null,
+    mostVotes: count(votes, ['vote', 'votes']), minigameChamp: count(firsts, ['minigame won', 'minigames won']), luckiest: bigTop(lucky), mostReactions: null, teamWinner: null,
   };
   // Most points in one scene: what each player earned in that scene's rounds.
   const sceneTotals = new Map<string, Map<string, bigint>>();
@@ -86,8 +90,15 @@ export async function finaleSlides(tx: Transaction, sessionId: string, definitio
     const low = scored.reduce((result, entry) => entry.total < result ? entry.total : result, scored[0]!.total);
     return { playerIds: scored.filter(entry => entry.total === low).map(entry => entry.id), value: `${points(low)} points` };
   })();
+  // The winning team: the game's teams at the end, by their team total (a tie shares nothing: no slide).
+  const teamWinner = await (async () => {
+    if (!wanted.some(award => award.rule === 'teamWinner')) return null;
+    const [first, second] = await teamStandings(tx, sessionId, await playerTotals(tx, sessionId));
+    if (!first || (second && second.amountMilli === first.amountMilli)) return null;
+    return { playerIds: first.memberIds, value: `${points(BigInt(first.amountMilli))} points`, team: { name: first.name, color: first.color } };
+  })();
   return wanted.flatMap(award => {
-    const slide = award.rule === 'scene' ? bigTop(sceneTotals.get(award.nodeKey ?? '') ?? new Map()) : award.rule === 'fewest' ? fewest : slides[award.rule];
+    const slide = award.rule === 'scene' ? bigTop(sceneTotals.get(award.nodeKey ?? '') ?? new Map()) : award.rule === 'fewest' ? fewest : award.rule === 'teamWinner' ? teamWinner : slides[award.rule];
     const title = award.title ? { title: award.title } : {};
     return slide ? [{ stat: award.rule, ...title, ...slide }] : award.rule === 'mostReactions' ? [{ stat: award.rule, ...title, playerIds: [], value: '' }] : [];
   });

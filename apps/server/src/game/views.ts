@@ -18,6 +18,7 @@ import { locateRunStage } from './graph.js';
 import { routeView } from './routes/route-views.js';
 import { GameError, requireGame } from './errors.js';
 import type { Clock } from './timing.js';
+import { checkable, hostAnswers, publicVerdicts } from './scoring/verdicts.js';
 import { answerKeyFor, stageTeams, teamContext, teamStandings } from './teams/team-views.js';
 import { actorKey, authorize, EligibilitySchema, TrustedActorSchema, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
 
@@ -189,7 +190,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           ...('resultCards' in entry.stage && entry.stage.resultCards !== undefined && current.revealedAt ? { resultCards: { mode: entry.stage.resultCards, revealedAt: current.revealedAt.toISOString(), index: (current.presentation as { resultCardIndex?: number }).resultCardIndex ?? 0 } } : {}), minigame, duel: entry.stage.kind === 'duel' ? await duelView(tx, current, entry.stage, viewer) : null, revealAfterVote: entry.stage.kind !== 'route' && isVoteSource(definition, current.nodeKey, current.stageKey),
           ...(graph && current.revealedAt && sharedScreen && revealEasing !== 'instant' ? { graphPlayback: readGraphPlayback(current.presentation, current.revealedAt) } : {}),
           revealed, reveal: revealed ? { answer: voteAnswer ?? minigameAnswer ?? answer, awards: awards.map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
-            teamAwards: teamAwards.map(row => ({ teamId: row.recipientTeamId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })) } : null } : null,
+            teamAwards: teamAwards.map(row => ({ teamId: row.recipientTeamId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
+            ...(checkable(entry.stage) ? { verdicts: await publicVerdicts(tx, session.id, current.id), ...(actor.data.role === 'host' && !actor.data.actingPlayerId ? { answers: await hostAnswers(tx, session.id, current.id, entry.stage) } : {}) } : {}) } : null } : null,
         serverTime: clock().toISOString(),
         ownSubmission: own && ownValue ? { id: own.id, value: ownValue } : null,
         standings: totals.filter(row => row.recipientPlayerId !== null).map(row => ({ playerId: row.recipientPlayerId!, amountMilli: (row._sum.amountMilli ?? 0n).toString() })),
@@ -218,11 +220,12 @@ async function songInfo(tx: { gameMedia: { findMany: (args: { where: { id: { in:
  * The room's music: the game's playlist and what the scene on screen does with it (contracts/media.ts).
  * Null when nothing would ever play: no playlist and no song of the scene's own.
  */
-export function musicView(definition: { music?: { tracks: { id: string }[] } | undefined }, stage: { music?: SceneMusic | undefined; media?: SceneMedia | undefined; youtube?: YouTubeClip | undefined } | null, songs: SongInfo): PublicMusic | null {
+export function musicView(definition: { music?: { tracks: { id: string }[]; shuffle?: boolean | undefined; fade?: boolean | undefined } | undefined }, stage: { music?: SceneMusic | undefined; media?: SceneMedia | undefined; youtube?: YouTubeClip | undefined } | null, songs: SongInfo): PublicMusic | null {
   const song = (id: string) => { const info = songs.get(id); return info ? { id, url: sceneMediaUrl(id), title: info.title, credit: info.credit } : null; };
   const playlist = (definition.music?.tracks ?? []).map(track => song(track.id)).filter(entry => entry !== null);
   const music = stage?.music ?? { mode: 'keep' as const };
   const own = music.mode === 'play' ? song(music.track.id) : null;
   if (!playlist.length && !own) return null;
-  return { playlist, scene: { mode: music.mode === 'play' && !own ? 'keep' : music.mode, track: own }, duck: Boolean(stage?.youtube) || stage?.media?.kind === 'video' || stage?.media?.kind === 'audio' };
+  return { playlist, scene: { mode: music.mode === 'play' && !own ? 'keep' : music.mode, track: own }, duck: Boolean(stage?.youtube) || stage?.media?.kind === 'video' || stage?.media?.kind === 'audio',
+    ...(definition.music?.shuffle ? { shuffle: true } : {}), ...(definition.music?.fade ? { fade: true } : {}) };
 }

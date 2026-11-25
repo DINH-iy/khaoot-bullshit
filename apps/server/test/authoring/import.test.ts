@@ -106,6 +106,18 @@ describe('importing a game from text', () => {
     const elected = check(JSON.stringify({ title: 'Vote night', scenes: [{ id: 'teams', type: 'pick-teams', captains: 'elected' }, { id: 'q', type: 'quiz', question: 'Q?', answers: ['A', 'B'], correct: 'A', inTeams: true, captain: true }] }));
     expect(elected.issues).toEqual([]);
     expect((elected.definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]).toMatchObject({ captains: true, form: { captainPick: 'elected' } });
+    // Teams made again: how their scores carry over (an unknown rule falls back to the standard: from zero).
+    const again = (scores: string) => (check(JSON.stringify({ title: 'Again', scenes: [{ id: 't1', type: 'pick-teams' }, { id: 't2', type: 'pick-teams', scores }] })).definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[1]!.stages[0]!;
+    expect(again('redistribute')).toMatchObject({ carryover: 'redistribute' });
+    expect(again('manual')).toMatchObject({ carryover: 'manual' });
+    expect(again('sideways')).not.toHaveProperty('carryover');
+  });
+
+  it('keeps a picture\'s alt text and a caption on scene media', () => {
+    const media = { id: '00000000-0000-4000-8000-0000000000aa', kind: 'image', alt: 'A red bicycle against a canal', caption: 'Amsterdam, 1972' };
+    const { issues, definition } = check(JSON.stringify({ title: 'Pictures', scenes: [{ id: 'q', type: 'quiz', question: 'Which city?', answers: ['Amsterdam', 'Rome'], correct: 'Amsterdam', media }] }));
+    expect(issues).toEqual([]);
+    expect((definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]!['media']).toEqual(media);
   });
 
   it('imports the game\'s own reactions and soundboard, leaving out what does not fit', () => {

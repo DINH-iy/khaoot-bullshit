@@ -91,7 +91,8 @@ export function FinaleShow({ state }: { state: RoomSnapshot }) {
     <h2 id="finale-heading">{t('stat.title')}</h2>
     <div className="finale-slide" key={at} aria-live="polite">
       <p className="finale-stat">{name(slide)}</p>
-      <div className="finale-people">{players.length ? players.map(player => <span key={player.id}><Avatar look={player.look} size={84} /><strong>{player.displayName}</strong></span>) : <strong>—</strong>}</div>
+      {slide.team && <p className="finale-team" style={{ '--team': slide.team.color } as React.CSSProperties}><span className="finale-team-dot" aria-hidden="true" />{slide.team.name}</p>}
+      <div className="finale-people">{players.length ? players.map(player => <span key={player.id}><Avatar look={player.look} size={slide.team && players.length > 4 ? 56 : 84} /><strong>{player.displayName}</strong></span>) : <strong>—</strong>}</div>
       <p className="finale-value">{slide.value}</p>
     </div>
     {slides.length > 1 && <div className="finale-nav">

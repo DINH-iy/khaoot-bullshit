@@ -53,3 +53,18 @@ export function playSound(sound: Sound): boolean {
   SYNTH[sound.name](audio, audio.currentTime + 0.02);
   return true;
 }
+
+/** The shared screen's short cues: the last seconds of a round, its end, the reveal (a right answer) and the winner. */
+export type EventCue = 'tick' | 'end' | 'reveal' | 'correct' | 'winner';
+const CUES: Record<EventCue, (audio: AudioContext, start: number) => void> = {
+  tick: (audio, start) => tone(audio, start, { at: 0, frequency: 1046.5, length: 0.08, type: 'square', volume: 0.08 }),
+  end: (audio, start) => { tone(audio, start, { at: 0, frequency: 196, length: 1.4, type: 'sine', volume: 0.3 }); tone(audio, start, { at: 0, frequency: 392, length: 1, type: 'sine', volume: 0.1 }); },
+  reveal: (audio, start) => [0, 0.09, 0.18].forEach((at, index) => tone(audio, start, { at, frequency: [523.25, 659.25, 783.99][index]!, length: 0.3, type: 'triangle', volume: 0.16 })),
+  correct: (audio, start) => [0, 0.1, 0.2, 0.3].forEach((at, index) => tone(audio, start, { at, frequency: [659.25, 783.99, 987.77, 1318.51][index]!, length: 0.4, type: 'triangle', volume: 0.16 })),
+  winner: (audio, start) => SYNTH.fanfare(audio, start),
+};
+export function playCue(cue: EventCue) {
+  unlockSound();
+  const audio = activeSoundContext(); if (!audio) return;
+  CUES[cue](audio, audio.currentTime + 0.02);
+}

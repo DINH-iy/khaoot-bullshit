@@ -14,6 +14,8 @@ describe('the music a room plays', () => {
   });
   it('is the playlist, with titles and credits, in the lobby and in scenes that keep it', () => {
     expect(musicView(playlist, null, library)).toEqual({ playlist: [song(a), song(b)], scene: { mode: 'keep', track: null }, duck: false });
+    // The author's shuffle and fade choices travel with the playlist to the screen that plays it.
+    expect(musicView({ music: { ...playlist.music!, shuffle: true, fade: true } }, null, library)).toMatchObject({ shuffle: true, fade: true });
     expect(musicView(playlist, {}, library)?.scene).toEqual({ mode: 'keep', track: null });
   });
   it('follows the scene: its own song (even without a playlist), quieter, or silence', () => {

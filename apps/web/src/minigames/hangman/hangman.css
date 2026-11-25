@@ -21,3 +21,12 @@
 .mg-hangman .step-sides .hangman-board { justify-content: center; }
 .hangman-reveal { display: grid; justify-items: center; gap: 6px; margin: 0 0 12px; }
 .hangman-reveal p { margin: 0; color: var(--r-muted); font-weight: 700; }
+
+/* Guessing the whole word: a quiet button under the letters, opening a field with its Guess button. */
+.hangman-word-open { justify-self: center; min-height: 40px; }
+.hangman-word-guess { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: end; }
+.hangman-word-guess label { display: grid; gap: 4px; font-weight: 700; font-size: .9rem; }
+.hangman-word-guess input { min-height: 44px; text-transform: uppercase; font-weight: 800; letter-spacing: .08em; }
+.hangman-word-guess button { min-height: 44px; }
+.hangman-word-guess small { grid-column: 1 / -1; color: var(--r-muted); }
+.hangman-missed.words { letter-spacing: .04em; }

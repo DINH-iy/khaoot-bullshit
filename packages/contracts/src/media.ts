@@ -19,8 +19,10 @@ export const MediaTrimSchema = z.object({
   startSeconds: z.number().min(0).max(86_400),
   endSeconds: z.number().positive().max(86_400).optional(),
 }).strict().refine(trim => trim.endSeconds === undefined || trim.endSeconds > trim.startSeconds);
+// `alt`: what a picture shows, for screen readers (else "Picture for <scene>"). `caption`: a line shown under the media on every screen.
 export const SceneMediaSchema = z.object({
   id: z.uuid(), kind: SceneMediaKindSchema, crop: MediaCropSchema.optional(), trim: MediaTrimSchema.optional(), waveform: z.boolean().optional(),
+  alt: z.string().trim().min(1).max(200).optional(), caption: z.string().trim().min(1).max(200).optional(),
 }).strict();
 export type SceneMedia = z.infer<typeof SceneMediaSchema>;
 
@@ -106,7 +108,8 @@ export const TrimAudioSchema = z.object({
  * song makes the music quieter while that scene is on. The host can switch music off and set its volume in the room.
  */
 const AudioRefSchema = z.object({ id: z.uuid(), kind: z.literal('audio') }).strict();
-export const GameMusicSchema = z.object({ tracks: z.array(AudioRefSchema).min(1).max(30) }).strict();
+// `shuffle`: songs in a random order (new for each room); `fade`: songs fade in and out, and quieter or louder glides.
+export const GameMusicSchema = z.object({ tracks: z.array(AudioRefSchema).min(1).max(30), shuffle: z.boolean().optional(), fade: z.boolean().optional() }).strict();
 export type GameMusic = z.infer<typeof GameMusicSchema>;
 export const SCENE_MUSIC_MODES = ['keep', 'play', 'quiet', 'stop'] as const;
 export const SceneMusicSchema = z.discriminatedUnion('mode', [
@@ -124,6 +127,7 @@ export const PublicMusicSchema = z.object({
   scene: z.object({ mode: z.enum(SCENE_MUSIC_MODES), track: PublicAudioSchema.nullable() }).strict(),
   // The scene has its own video or song: the music plays quieter under it.
   duck: z.boolean(),
+  shuffle: z.boolean().optional(), fade: z.boolean().optional(),
 }).strict();
 export type PublicMusic = z.infer<typeof PublicMusicSchema>;
 export const MUSIC_VOLUME_DEFAULT = 60;
@@ -143,3 +147,8 @@ export const DEFAULT_SONGS: readonly DefaultSong[] = [
   // Public domain (CC0) by Gichco (“obscure music” on OpenGameArt); credit is optional, given anyway.
   { id: '5e0c7c6a-0d3b-4a51-9f61-6b1d0c1a0004', title: 'Loop 3', credit: 'Loop 3 by Gichco (opengameart.org), public domain (CC0)', url: 'https://opengameart.org/sites/default/files/loops_1.zip', sha256: '35031eaa66f48f5e63568a8d48e658697e197462d48d0945d80035c10f1cd88b', byteSize: 3656088, zipEntry: 'loop3.mp3', use: 'playlist' },
 ];
+
+/** The host plays, pauses or restarts the scene's video or song (or YouTube clip) on the shared screen. Relayed, never stored. */
+export const MEDIA_CONTROLS = ['play', 'pause', 'restart'] as const;
+export const MediaControlSchema = z.object({ stageRunId: z.uuid(), action: z.enum(MEDIA_CONTROLS) }).strict();
+export type MediaControl = z.infer<typeof MediaControlSchema>;

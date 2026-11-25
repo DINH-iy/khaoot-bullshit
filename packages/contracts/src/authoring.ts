@@ -19,6 +19,8 @@ export const GameSummarySchema = z.object({
   issueCount: z.number().int().min(0), published: Published,
   // Who made the game: an editor's name (`you`: the one looking), or null when the owner made it. `shared`: shared with the one looking.
   author: z.object({ name: z.string(), you: z.boolean() }).strict().nullable().optional(), shared: z.boolean().optional(),
+  // What the one looking may do with this game (contracts/roles.ts game permissions): everything as its maker or the owner.
+  can: z.array(z.string()).optional(),
 }).strict();
 export type GameSummary = z.infer<typeof GameSummarySchema>;
 /**
@@ -27,11 +29,12 @@ export type GameSummary = z.infer<typeof GameSummarySchema>;
  * (for games from before authors were kept, which all count as the owner's).
  */
 export const GameSharingSchema = z.object({
-  authorPersonId: GameIdSchema.nullable(), sharedWith: z.array(GameIdSchema),
-  editors: z.array(z.object({ personId: GameIdSchema, name: z.string() }).strict()), canChangeAuthor: z.boolean(),
+  // `shares`: who the game is shared with and in which role; `editors`: the people it can be shared with (those with a role).
+  authorPersonId: GameIdSchema.nullable(), shares: z.array(z.object({ personId: GameIdSchema, roleId: GameIdSchema }).strict()),
+  editors: z.array(z.object({ personId: GameIdSchema, name: z.string() }).strict()), roles: z.array(z.object({ id: GameIdSchema, name: z.string() }).strict()), canChangeAuthor: z.boolean(),
 }).strict();
 export type GameSharing = z.infer<typeof GameSharingSchema>;
-export const UpdateGameSharingSchema = z.object({ sharedWith: z.array(GameIdSchema).max(100), authorPersonId: GameIdSchema.nullable().optional() }).strict();
+export const UpdateGameSharingSchema = z.object({ shares: z.array(z.object({ personId: GameIdSchema, roleId: GameIdSchema }).strict()).max(100), authorPersonId: GameIdSchema.nullable().optional() }).strict();
 export const DraftSchema = GameSummarySchema.extend({ definition: z.unknown(), issues: z.array(DefinitionIssueSchema),
   // Set when this is the owner's own version of a built-in game: which one (its key and original title).
   builtIn: z.object({ key: z.string(), title: z.string() }).strict().nullable().optional() }).strict();

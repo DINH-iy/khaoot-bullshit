@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { recordAction } from '../admin/actions.js';
 import { FEEDBACK_BASE64_MAX, FEEDBACK_IMAGE_MAX, FEEDBACK_VIDEO_MAX, FeedbackAttachmentTypeSchema, FeedbackListSchema, FeedbackMarkDoneSchema, FeedbackUpdateSchema, GameIdSchema, NewFeedbackSchema, type FeedbackItem } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -103,9 +104,11 @@ export function registerFeedbackRoutes(app: FastifyInstance, client: PrismaClien
   });
   app.post('/api/host/feedback/:id/delete', async (request, reply) => {
     try {
-      owner.requireOwner(request);
-      const removed = await client.feedbackItem.deleteMany({ where: { id: idParam(request) } });
+      owner.requireOwner(request); const id = idParam(request);
+      const title = (await client.feedbackItem.findUnique({ where: { id }, select: { title: true } }))?.title ?? 'Feedback';
+      const removed = await client.feedbackItem.deleteMany({ where: { id } });
       roomAssert(removed.count === 1, 'NOT_FOUND');
+      await recordAction(client, { personId: null }, 'feedback.deleted', title);
       return { ok: true, data: {} };
     } catch (error) { return owner.fail(reply, error); }
   });

@@ -41,7 +41,7 @@ export const TEXT_DEFAULTS = {
   'duel.vs': '{a} vs {b}', 'duel.bet': 'Who wins? Bet on one', 'duel.youBet': 'You bet on {name}', 'duel.youDuel': 'You are in the duel against {name}!', 'duel.picking': 'The host picks two players…', 'duel.won': '{name} wins the duel!', 'duel.betRight': 'You bet right: +{points}', 'duel.betWrong': 'No luck with your bet this time.',
   'break.title': 'Smoke break!', 'break.icon': '🚬', 'break.text': 'The game is paused. Back in a moment.', 'break.vote': 'Break', 'break.voted': 'You voted for a break', 'break.host': 'Continue the game',
   'wheel.spin': 'Spin the wheel', 'wheel.again': 'Spin again', 'wheel.current': 'Now: {result}',
-  'stat.title': 'The awards', 'stat.winner': 'Winner', 'stat.mostCorrect': 'Most correct answers', 'stat.mostWrong': 'Most wrong answers', 'stat.fastest': 'Fastest fingers', 'stat.slowest': 'Took their time',
+  'stat.title': 'The awards', 'stat.winner': 'Winner', 'stat.teamWinner': 'Winning team', 'stat.mostCorrect': 'Most correct answers', 'stat.mostWrong': 'Most wrong answers', 'stat.fastest': 'Fastest fingers', 'stat.slowest': 'Took their time',
   'stat.mostVotes': 'Crowd favourite', 'stat.minigameChamp': 'Minigame champion', 'stat.luckiest': 'Luckiest', 'stat.mostReactions': 'Most reactions', 'stat.scene': 'Best in one scene', 'stat.fewest': 'Wooden spoon',
   'scores.open': 'Show the scoreboard', 'scores.close': 'Close', 'react.open': 'Send a reaction', 'react.title': 'React on the big screen',
   'minigame.getReady': 'Get ready…', 'minigame.wait': 'Wait for it…', 'minigame.go': 'GO!', 'minigame.tooSoon': 'Too soon!', 'minigame.tap': 'TAP!',

@@ -49,6 +49,7 @@ Authoritative definitions: [schema.prisma](../../apps/server/database/schema.pri
 | Runtime | RouteDecision / route_decisions | One resolution per choice stage; selected edge/destination, reason, vote snapshot and command reference |
 | Reliability | GameCommand / game_commands | Unique session+actor+command key, request hash, committed result |
 | Runtime history | StageJudgment / stage_judgments | One immutable judgment per stage+player, including zero awards; same-session stage/player/command references |
+| Runtime history | AnswerVerdict / answer_verdicts | The host overruling a quiz or ordering round on one answer (correct, not correct, or back to the round: null). Append-only (update/delete rejected), one row per answer and session revision; the latest counts. Its point changes are ADJUSTMENT score entries keyed `verdict:<submissionId>:…` |
 | Reliability | ScoreEntry / score_entries | Recipient player or team, exact signed amount, source command/stage/lineup, award key, correction/transfer references |
 | Reliability | AuditEvent / audit_events | Session revision+event index, command reference, event kind, private structured details |
 | Reliability | OutboxEvent / outbox_events | Ordered session events, intended audience/key, payload, attempts, next availability and publish timestamp |

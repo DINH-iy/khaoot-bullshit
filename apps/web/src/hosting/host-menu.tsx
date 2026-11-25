@@ -93,9 +93,11 @@ export function HostMenu() {
     <p><a href="/">{t('joinAsPlayer')}</a></p>
   </main> : <Loader full label={t('loadingGames')} />;
   const owner = menu.role === 'owner';
-  return <><OwnerNav current={hash === '#my-games' || !owner ? 'editor' : 'host'} role={menu.role}
-    mainAction={<button type="button" disabled={busy}
-      onClick={() => open(roomApi('/api/host/minigame-tryout', tryoutRequest), 'bench')}>{t('minigameTryout')}</button>} /><main className="host-page">
+  // What a role allows (the server checks it again): hosting real rooms, and the minigame tryout.
+  const may = (permission: string) => owner || Boolean(menu.permissions?.includes(permission)); const host = may('rooms.host');
+  return <><OwnerNav current={hash === '#my-games' || !host ? 'editor' : 'host'} role={menu.role} permissions={menu.permissions}
+    mainAction={may('rooms.rehearse') ? <button type="button" disabled={busy}
+      onClick={() => open(roomApi('/api/host/minigame-tryout', tryoutRequest), 'bench')}>{t('minigameTryout')}</button> : undefined} /><main className="host-page">
     {owner
       ? <header className="host-hero"><p className="eyebrow">{t('eyebrowHost')}</p><h1>{t('heroHost')}</h1>
         <p>{t('heroHostText')}</p></header>
@@ -113,14 +115,14 @@ export function HostMenu() {
             : <span className="open-room-actions"><button className="primary" disabled={busy} aria-label={t('returnLabel', { code: room.roomCode })} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>{t('returnToRoom')}</button>
               <button type="button" className="danger icon-only" disabled={busy} aria-label={t('closeLabel', { code: room.roomCode })} title={t('closeTitle')} onClick={() => setClosing(room.sessionId)}><Icon name="trash" size={20} /></button></span>}</li>)}</ul>
       </section>}
-      {owner && <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">{t('chooseGame')}</h2>
+      {host && <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">{t('chooseGame')}</h2>
         <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))}
-          onEdit={key => { setBusy(true); void roomApi<{ gameId: string }>(`/api/host/builtins/${key}/edit`, {}).then(result => location.assign(`/?edit=${result.gameId}`)).catch(cause => { setError(explain(cause)); setBusy(false); }); }}
-          onRestore={key => { void roomApi(`/api/host/builtins/${key}/restore`, {}).then(reload).catch(cause => setError(explain(cause))); }} />
-        <p className="hint">{rich(t('builtInHint'), { edit: <strong>{t('editThisGame')}</strong> })}</p>
+          onEdit={!owner ? undefined : key => { setBusy(true); void roomApi<{ gameId: string }>(`/api/host/builtins/${key}/edit`, {}).then(result => location.assign(`/?edit=${result.gameId}`)).catch(cause => { setError(explain(cause)); setBusy(false); }); }}
+          onRestore={!owner ? undefined : key => { void roomApi(`/api/host/builtins/${key}/restore`, {}).then(reload).catch(cause => setError(explain(cause))); }} />
+        {owner && <p className="hint">{rich(t('builtInHint'), { edit: <strong>{t('editThisGame')}</strong> })}</p>}
       </section>}
-      <MyGames menu={menu} reload={reload} openRoom={owner ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
-      <ImportGame />
+      <MyGames menu={menu} reload={reload} openRoom={host ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
+      {(owner || menu.permissions?.includes('games.make')) && <ImportGame />}
     <p className="host-links"><a href="/">{t('joinAsPlayer')}</a>{owner && <><a href="/?admin">{t('adminFeedback')}</a><a href="/?admin=people">{t('adminPeople')}</a></>}</p>
   </main></>;
 }

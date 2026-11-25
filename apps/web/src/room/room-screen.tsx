@@ -12,6 +12,7 @@ import { StageTimer, useRemaining } from './stage-timer.js';
 import { ConnectionMenu, FloatingScores, HostDialog, Popover, RoundBar } from './room-chrome.js';
 import { FaIcon } from '../presentation/icons.js';
 import { AnswerInput, draftValue, emptyDraft } from './answer-input.js';
+import { AnswerChecks } from './answer-checks.js';
 import { JudgePanel, leaderLine, Scoreboard, StageResults } from './results.js';
 import { VoteBallot } from './vote.js';
 import { SeatApprovalSetting, SeatReclaim, SeatRequests } from './seat-reclaim.js';
@@ -30,6 +31,7 @@ import { GRAPH_TEXTS } from '../minigames/draw-the-graph/graph.text.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
 import { SoundPlayer } from '../room-extras/sound-player.js';
+import { EventSounds } from '../room-extras/event-sounds.js';
 import { TeamCelebrationShow } from './celebration.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
 import { RoomSettings, SideGamesSwitch } from '../room-extras/room-settings.js';
@@ -49,7 +51,7 @@ import { LookContext, themeClass, useThemeStyle, useBuiltLook, useLook, useMomen
 import { useSiteThemeState } from '../presentation/site-look.js';
 import { LeaveRoom } from '../room-extras/leave-room.js';
 import { SceneComposition } from '../presentation/scene-composition.js';
-import { StageMedia, StageYouTube } from './stage-media.js';
+import { MediaHostControls, StageMedia, StageYouTube } from './stage-media.js';
 import { MusicPlayer } from './music-player.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { COIN_TEXTS } from '../minigames/heads-or-tails/coin.text.js';
@@ -449,8 +451,13 @@ export function RoomScreen() {
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}${stage.minigame?.graph ? ' round-graph' : stage.minigame?.dots ? ' round-dots' : ''}`} aria-labelledby="stage-heading">
           <SceneComposition layout={stage.mediaLayout} media={showingScene && (stage.youtube || stage.media) ? <div ref={mediaRef}>
-            {stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} />
-              : stage.media ? <StageMedia key={stage.id} media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'} /> : null
+            {stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'}
+                control={room.mediaControl?.stageRunId === stage.id ? room.mediaControl : null} />
+              : stage.media ? <StageMedia key={stage.id} media={stage.media} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'}
+                control={room.mediaControl?.stageRunId === stage.id ? room.mediaControl : null} /> : null}
+            {/* The host runs the shared screen's video, song or clip from here. */}
+            {role === 'host' && state.displayConnected && (stage.youtube || (stage.media && stage.media.kind !== 'image')) && state.view.status === 'RUNNING'
+              && <MediaHostControls onControl={action => room.sendMediaControl(stage.id, action)} />
             }
           </div> : null}>
             {stage.info && <p className="stage-banner">{stage.info.title}</p>}
@@ -489,6 +496,8 @@ export function RoomScreen() {
           {stage.kind !== 'route' && stage.revealed && (!poolDuel || ((role !== 'player' || !state.screenConnected) && stage.duel?.pick !== 'teams' && stage.reveal?.awards.length)) && <div ref={resultsRef}><StageResults state={state} stage={stage} offset={room.clockOffset} onNext={() => command('stage.nextResult', { stageRunId: stage.id })}
             onGraphPlayback={action => command('stage.graphPlayback', { stageRunId: stage.id, action })} disabled={disabled} /></div>}
           {/* A writing, upload or drawing round with host points: the host gives them under the shown answers. */}
+          {/* A revealed quiz or ordering round: the host can overrule it on one answer. */}
+          {host && stage.revealed && <AnswerChecks state={state} stage={stage} disabled={disabled} send={command} />}
           {host && stage.kind === 'collect' && stage.challenge && stage.revealed && running && <JudgePanel state={state} stage={stage} disabled={disabled} send={command} />}
           {stage.status === 'CLOSED' && !stage.revealed && stage.revealAfterVote && <p>{r('shownWithoutNames')}</p>}
           {stage.kind === 'minigame' ? (role === 'player' && answerBlock && stage.status === 'ACTIVE' ? <p className="wait-note">{answerBlock}</p> : null)
@@ -597,6 +606,7 @@ export function RoomScreen() {
     {state && role !== 'player' && state.settings.reactions && !scoreBubbles && <ReactionsOverlay state={state} store={room.reactions} />}
     {/* The soundboard plays where the room's sound plays: the shared screen, or the host's screen without one. */}
     {state && (role === 'display' || (role === 'host' && !state.displayConnected)) && <SoundPlayer state={state} event={room.soundEvent} />}
+    {state && (role === 'display' || (role === 'host' && !state.displayConnected)) && <EventSounds state={state} offset={room.clockOffset} />}
     {/* A winning team's celebration: with its sound where the room's sound plays, and on that team's phones. */}
     {state && <TeamCelebrationShow state={state} playsSound={role === 'display' || (role === 'host' && !state.displayConnected)} />}
   </main></StageActionSlot.Provider></RoomSessionContext.Provider></PoolAimContext.Provider></LookContext.Provider>;

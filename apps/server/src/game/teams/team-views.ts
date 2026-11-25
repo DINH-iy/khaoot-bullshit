@@ -1,9 +1,10 @@
-import { defaultTeamColor, TeamCelebrationSchema } from '@party/contracts';
+import { defaultTeamColor, TeamCelebrationSchema, type SessionView } from '@party/contracts';
 
 /** A stored celebration, or null (none, or one that no longer fits). */
 const readCelebration = (value: unknown) => TeamCelebrationSchema.safeParse(value).data ?? null;
 import type { StageRun } from '../../generated/prisma/client.js';
 import type { Transaction } from '../model.js';
+import { lineupStart, proposedStarts } from './carryover.js';
 import { captainTally, electionLeader, LineupInfoSchema, readForming, readStagePlay, teamContext, type TeamContext } from './teams.js';
 
 const revealedOnly = { OR: [{ stageRunId: null }, { stage: { revealedAt: { not: null } } }] };
@@ -15,12 +16,13 @@ export async function stageTeams(tx: Transaction, stage: StageRun, viewerPlayerI
     const present = (await tx.sessionPlayer.findMany({ where: { sessionId: stage.sessionId, leftAt: null }, select: { id: true }, orderBy: { joinedAt: 'asc' } })).map(player => player.id);
     // Elected captains: the votes per teammate, and the captain so far (the host's pick, else the one leader).
     const elected = forming.answers === 'captain' && forming.captainPick === 'elected';
+    const starts = await proposedStarts(tx, stage.sessionId, forming, present);
     const teams = forming.teams.map((team, index) => ({ index, name: team.name, color: team.color ?? defaultTeamColor(team.name, index), teamId: null, targetSize: team.targetSize, celebration: team.celebration ?? null,
       memberIds: present.filter(id => forming.assignment[id] === index), captainId: forming.captains[String(index)] ?? (elected ? electionLeader(forming, index, present) : null),
-      ...(elected ? { captainVotes: captainTally(forming, index, present) } : {}) }));
+      ...(elected ? { captainVotes: captainTally(forming, index, present) } : {}), ...(starts ? { startMilli: starts[index]!.toString() } : {}) }));
     const own = viewerPlayerId ? forming.assignment[viewerPlayerId] : undefined;
     const ownVote = viewerPlayerId ? forming.captainVotes?.[viewerPlayerId] : undefined;
-    return { forming: true, formation: forming.formation, colorsBy: forming.colorsBy ?? 'host', scope: forming.scope, answers: forming.answers, points: forming.points, teams,
+    return { forming: true, formation: forming.formation, colorsBy: forming.colorsBy ?? 'host', scope: forming.scope, ...(forming.scope === 'game' ? { carryover: forming.carryover } : {}), answers: forming.answers, points: forming.points, teams,
       ...(forming.answers === 'captain' ? { captainPick: elected ? 'elected' as const : 'assigned' as const } : {}),
       ...(elected && viewerPlayerId ? { ownCaptainVote: ownVote && own !== undefined && own !== null && forming.assignment[ownVote] === own ? ownVote : null } : {}),
       unassignedIds: present.filter(id => forming.assignment[id] === undefined || forming.assignment[id] === null), ownTeamIndex: own ?? null };
@@ -40,6 +42,15 @@ export async function stageTeams(tx: Transaction, stage: StageRun, viewerPlayerI
     unassignedIds: [], ownTeamIndex: teams.find(team => team.teamId === ownTeam)?.index ?? null };
 }
 
+/**
+ * A view without scores, for phones and the shared screen while scores are secret: no standings, and no
+ * start totals of teams being made (they would give the team scores away).
+ */
+export function secretScores(view: SessionView): SessionView {
+  const stage = view.stage?.teams ? { ...view.stage, teams: { ...view.stage.teams, teams: view.stage.teams.teams.map(({ startMilli: _start, ...team }) => team) } } : view.stage;
+  return { ...view, standings: [], teamStandings: [], stage };
+}
+
 /** The key under which the viewer's answer is stored: their own, or their team's when a captain answers. */
 export function answerKeyFor(context: TeamContext | null, playerId: string, own: string): string {
   if (!context || context.answers === 'everyone') return own;
@@ -49,7 +60,8 @@ export function answerKeyFor(context: TeamContext | null, playerId: string, own:
 /**
  * Totals for the game's current teams. Lineups chain back while their rule is
  * "keep"; the first lineup with another rule sets the start: "fresh" counts team
- * points from there, "members" also adds the current members' individual scores.
+ * points from there, "members" also adds the current members' individual scores,
+ * "redistribute" and "manual" add the start fixed on that lineup when it was confirmed.
  */
 export async function teamStandings(tx: Transaction, sessionId: string, playerTotals: Map<string, bigint>) {
   const lineups = (await tx.teamLineup.findMany({ where: { sessionId }, orderBy: { number: 'asc' }, include: { members: true } }))
@@ -63,11 +75,11 @@ export async function teamStandings(tx: Transaction, sessionId: string, playerTo
     tx.sessionTeam.findMany({ where: { id: { in: teamIds } } }),
     tx.scoreEntry.groupBy({ by: ['recipientTeamId'], where: { sessionId, recipientTeamId: { in: teamIds }, createdAt: { gte: base.createdAt }, ...revealedOnly }, _sum: { amountMilli: true }, orderBy: { recipientTeamId: 'asc' } }),
   ]);
-  const earned = new Map(sums.map(row => [row.recipientTeamId!, row._sum.amountMilli ?? 0n]));
+  const earned = new Map(sums.map(row => [row.recipientTeamId!, row._sum.amountMilli ?? 0n])); const start = lineupStart(base);
   return teams.map(team => {
     const memberIds = current.members.filter(member => member.teamId === team.id).map(member => member.playerId);
     const fromMembers = base.info.data!.carryover === 'members' ? memberIds.reduce((total, id) => total + (playerTotals.get(id) ?? 0n), 0n) : 0n;
-    return { teamId: team.id, name: team.name, color: team.color ?? defaultTeamColor(team.name, 0), memberIds, celebration: readCelebration(team.celebration), total: (earned.get(team.id) ?? 0n) + fromMembers };
+    return { teamId: team.id, name: team.name, color: team.color ?? defaultTeamColor(team.name, 0), memberIds, celebration: readCelebration(team.celebration), total: (earned.get(team.id) ?? 0n) + fromMembers + (start.get(team.name) ?? 0n) };
   }).sort((a, b) => a.total === b.total ? a.name.localeCompare(b.name) : a.total > b.total ? -1 : 1)
     .map(({ total, ...team }) => ({ ...team, amountMilli: total.toString() }));
 }

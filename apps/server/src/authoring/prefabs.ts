@@ -33,7 +33,7 @@ export function registerPrefabRoutes(app: FastifyInstance, client: PrismaClient,
   // Saving is idempotent per prefabId: a retried click returns the same prefab.
   app.post('/api/host/prefabs', { bodyLimit: MAX_PREFAB_BYTES + 4 * 1024 }, async (request, reply) => {
     try {
-      await owner.requireEditor(request);
+      await owner.requirePermission(request, 'games.make');
       const parsed = SavePrefabSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const { prefabId, name, content } = parsed.data;
       roomAssert(Buffer.byteLength(JSON.stringify(content), 'utf8') <= MAX_PREFAB_BYTES, 'INVALID_COMMAND');
@@ -54,7 +54,7 @@ export function registerPrefabRoutes(app: FastifyInstance, client: PrismaClient,
   });
   app.post('/api/host/prefabs/:prefabId/delete', async (request, reply) => {
     try {
-      await owner.requireEditor(request);
+      await owner.requirePermission(request, 'games.make');
       const creator = await ownerCreator(client);
       const removed = await client.scenePrefab.deleteMany({ where: { id: idParam(request), creatorId: creator.id } });
       if (removed.count !== 1) throw new RoomError('NOT_FOUND');

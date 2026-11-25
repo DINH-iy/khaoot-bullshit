@@ -7,6 +7,8 @@ import { FaIcon } from '../presentation/icons.js';
 const QUIET = 0.3;
 const UNDER_MEDIA = 0.15;
 const CAPTION_MS = 8000;
+/** How long a song takes to fade in or out when the game fades its music. */
+const FADE_MS = 2000;
 
 export function MusicPlayer({ music, volume }: { music: PublicMusic; volume: number }) {
   const t = useTexts(EXTRAS_TEXTS);
@@ -20,8 +22,11 @@ export function MusicPlayer({ music, volume }: { music: PublicMusic; volume: num
   const resume = useRef<{ key: string; time: number } | null>(null);
   const { mode, track } = music.scene;
   const { playlist } = music;
+  // Shuffle: a random order, drawn once for this screen (each song still plays before any repeats).
+  const [order] = useState(() => { const list = playlist.map((_, at) => at); for (let at = list.length - 1; at > 0; at--) { const other = Math.floor(Math.random() * (at + 1)); [list[at], list[other]] = [list[other]!, list[at]!]; } return list; });
+  const position = index % Math.max(1, playlist.length);
   const own = mode === 'play' && track ? track : null;
-  const target = mode === 'stop' ? null : own ?? playlist[index % playlist.length] ?? null;
+  const target = mode === 'stop' ? null : own ?? playlist[music.shuffle && order.length === playlist.length ? order[position]! : position] ?? null;
   const url = target?.url;
   const key = target ? (own ? `scene:${target.id}` : `playlist:${index}:${target.id}`) : null;
   const loop = Boolean(own) || playlist.length === 1;
@@ -73,10 +78,25 @@ export function MusicPlayer({ music, volume }: { music: PublicMusic; volume: num
     };
   }, [key, url, own?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { if (audio.current) audio.current.volume = level; }, [level]);
+  // Fades: a new song comes in from silence, the end of a song goes out, and quieter or louder glides.
+  const fader = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const fadeTo = (target: number, ms: number) => {
+    const element = audio.current; if (!element) return;
+    clearInterval(fader.current);
+    const from = element.volume; const steps = Math.max(1, Math.round(ms / 50)); let step = 0;
+    fader.current = setInterval(() => { step++; element.volume = Math.max(0, Math.min(1, from + (target - from) * step / steps)); if (step >= steps) clearInterval(fader.current); }, 50);
+  };
+  useEffect(() => () => clearInterval(fader.current), []);
+  useEffect(() => { if (!audio.current) return; if (music.fade) fadeTo(level, 700); else audio.current.volume = level; }, [level]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (music.fade && key && audio.current) { audio.current.volume = 0; fadeTo(level, FADE_MS); } }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fadingOut = useRef<string | null>(null);
+  const nearEnd = () => {
+    const element = audio.current; if (!music.fade || !element || loop || !key || fadingOut.current === key) return;
+    if (Number.isFinite(element.duration) && element.duration - element.currentTime < FADE_MS / 1000) { fadingOut.current = key; fadeTo(0, Math.max(200, (element.duration - element.currentTime) * 1000)); }
+  };
 
   return <>
-    <audio ref={audio} loop={loop} preload="auto" aria-hidden="true"
+    <audio ref={audio} loop={loop} preload="auto" aria-hidden="true" onTimeUpdate={nearEnd}
       onEnded={() => { if (key && !loop) setIndex(value => value + 1); }}
       onError={() => {
         // Try each playlist entry at most once until a song actually plays.

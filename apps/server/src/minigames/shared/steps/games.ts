@@ -18,6 +18,8 @@ export interface StepGame<State> {
   /** The choices for the next step, or null once the side is done. */
   options(state: State, settings: MinigameSettings, run: MinigameRun): readonly string[] | null;
   apply(state: State, option: string, settings: MinigameSettings, run: MinigameRun): State;
+  /** A move the game also accepts besides its listed options (Galgje: a whole word), while it has options at all. */
+  accepts?(state: State, option: string, settings: MinigameSettings, run: MinigameRun): boolean;
   /** The side's result once done (ranked as the catalog says, see MINIGAMES[game].better). */
   result(state: State, settings: MinigameSettings, run: MinigameRun, now: Date): number | null;
   /** What screens may see of the side while the game runs: never the secrets. `extra`: added to its result by other sides (see `extras`). */

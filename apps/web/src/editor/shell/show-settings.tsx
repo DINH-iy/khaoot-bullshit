@@ -87,7 +87,7 @@ export function SpinFields({ definition, node, index, onChange }: { definition: 
 }
 
 // How each award is decided (as the server works it out), for the add-an-award popup.
-const AWARD_RULES = { winner: 'rWinner', mostCorrect: 'rMostCorrect', mostWrong: 'rMostWrong', fastest: 'rFastest', slowest: 'rSlowest', mostVotes: 'rMostVotes',
+const AWARD_RULES = { winner: 'rWinner', teamWinner: 'rTeamWinner', mostCorrect: 'rMostCorrect', mostWrong: 'rMostWrong', fastest: 'rFastest', slowest: 'rSlowest', mostVotes: 'rMostVotes',
   minigameChamp: 'rMinigameChamp', luckiest: 'rLuckiest', mostReactions: 'rMostReactions', scene: 'rScene', fewest: 'rFewest' } as const satisfies Record<AwardRule, keyof typeof SETTINGS_TEXTS.en>;
 interface Award { rule: AwardRule; title?: string; nodeKey?: string }
 /**

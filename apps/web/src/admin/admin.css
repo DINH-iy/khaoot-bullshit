@@ -299,3 +299,53 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .log-timeline td:nth-child(3) { overflow-wrap: anywhere; min-width: 14rem; }
 .log-timeline tr.log-bad td { background: light-dark(#fdecec, #3a1c22); color: light-dark(#9d1717, #ffd0d0); font-weight: 600; }
 .log-timeline-wrap:focus-visible { outline: 3px solid #6d3fd6; outline-offset: 2px; }
+/* Live rooms, Storage and Action log. */
+.admin-item .admin-meta, p.admin-meta[role=status] { margin: 4px 0 8px; color: light-dark(#5d5873, #b8b2cf); opacity: 1; }
+.storage-disk { margin-bottom: 16px; }
+.storage-disk p { margin: 0 0 6px; }
+.storage-bar { height: 12px; border-radius: 999px; background: light-dark(#e7e3f3, #2e2a44); overflow: hidden; }
+.storage-bar span { display: block; height: 100%; background: #6d3fd6; }
+.storage-bar.full span { background: #c62828; }
+.storage-list { display: grid; gap: 8px; margin: 0 0 16px; }
+.storage-list div { display: grid; grid-template-columns: minmax(10rem, 14rem) 1fr; gap: 12px; padding: 10px 12px; border-radius: 10px; background: light-dark(#fff, #1f1b30); border: 1px solid light-dark(#e3def2, #3a3553); }
+.storage-list dt { font-weight: 700; } .storage-list dd { margin: 0; }
+.action-log { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.action-log li { display: grid; grid-template-columns: 11rem 9rem 14rem 1fr; gap: 12px; padding: 8px 12px; border-radius: 8px; background: light-dark(#fff, #1f1b30); border: 1px solid light-dark(#e3def2, #3a3553); }
+.action-log time { color: light-dark(#5d5873, #b8b2cf); font-variant-numeric: tabular-nums; }
+.action-who { font-weight: 700; } .action-subject { overflow-wrap: anywhere; }
+@media (max-width: 760px) { .action-log li, .storage-list div { grid-template-columns: 1fr; gap: 2px; } }
+.admin-page .actions button { display: inline-flex; align-items: center; gap: 8px; }
+.admin-page .actions button .fa-icon, .admin-page .actions button svg { width: 1em; height: 1em; flex: none; }
+.storage-list dt, .storage-list dd { font-size: .95rem; }
+/* Health: the verdict and one card per part. */
+.health-summary { margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; border-width: 2px; border-style: solid; }
+.health-summary .admin-meta { display: inline; margin: 0 0 0 8px; }
+.level-ok { border-color: light-dark(#2e7d32, #66bb6a); } .level-check { border-color: light-dark(#b26a00, #ffb74d); } .level-problem { border-color: light-dark(#c62828, #ef5350); }
+.health-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; margin-bottom: 16px; }
+.health-part { padding: 12px 14px; border-radius: 12px; border-width: 2px; border-style: solid; background: light-dark(#fff, #1f1b30); }
+.health-part h2 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 8px; font-size: 1.05rem; }
+.health-level { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.health-part.level-ok .health-level { color: light-dark(#2e7d32, #81c784); } .health-part.level-check .health-level { color: light-dark(#8a5200, #ffcc80); } .health-part.level-problem .health-level { color: light-dark(#b71c1c, #ef9a9a); }
+.health-part dl { display: grid; gap: 4px; margin: 0; }
+.health-part dl div { display: flex; justify-content: space-between; gap: 12px; }
+.health-part dt, .health-part dd { font-size: .92rem; } .health-part dt { color: light-dark(#5d5873, #b8b2cf); } .health-part dd { margin: 0; font-weight: 700; text-align: right; }
+/* Admin → Roles: one card per role, its permissions as rows with the switch on the left. */
+.role-add { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin: 0 0 24px; }
+.role-add label { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; flex: 0 1 22rem; }
+.role-add input { min-height: 44px; }
+.role-add button { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; }
+.role-add button svg, .role-card .actions svg { width: 1em; height: 1em; flex: none; }
+.role-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; }
+.role-card { padding: 16px 18px; border-radius: 16px; border: 1px solid light-dark(#e3def2, #3a3550); background: light-dark(#fff, #1e1c28); display: grid; gap: 12px; }
+.role-head { display: grid; gap: 4px; }
+.role-name input { width: 100%; min-height: 40px; font-size: 1.1rem; font-weight: 700; }
+.role-group { margin: 0; padding: 0; border: 0; display: grid; gap: 2px; }
+.role-group legend { padding: 0 0 6px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: light-dark(#5f5873, #b9b2cc); }
+.role-permission { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.role-permission:hover { background: light-dark(#f7f5fc, #25222f); }
+.role-permission input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: #6d3fd6; }
+.role-permission span { display: grid; gap: 1px; } .role-permission strong { font-size: .95rem; }
+.role-permission small { font-size: .82rem; color: light-dark(#5f5873, #b9b2cc); }
+.role-card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.role-card .actions button { display: inline-flex; gap: 6px; align-items: center; }
+.role-select { min-width: 9rem; }

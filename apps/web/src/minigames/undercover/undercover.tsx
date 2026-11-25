@@ -42,7 +42,8 @@ export function UndercoverTable({ state, stage, offset, disabled, onAct }: { sta
 
   return <div className={`uc-table phase-${view.phase}`}>
     {me && data?.own !== undefined && <OwnWord word={data.own.word} />}
-    {view.last && <p className="uc-last" role="status">{view.last.outId ? u('out', { name: nameOf(state, view.last.outId), role: role(outOf(view.last.outId)?.role ?? 'civilian') }) : u('tie')}</p>}
+    {view.runoff && view.phase === 'vote' ? <p className="uc-last" role="status">{u('runoff', { names: view.runoff.map(id => nameOf(state, id)).join(' · ') })}</p>
+      : view.last && <p className="uc-last" role="status">{view.last.outId ? u('out', { name: nameOf(state, view.last.outId), role: role(outOf(view.last.outId)?.role ?? 'civilian') }) : u('tie')}</p>}
     {imOut && view.phase !== 'done' && <p className="wait-note">{u('youAreOut')}</p>}
     <div className="uc-head"><strong>{u('round', { round: view.round })}</strong>{timer}</div>
 
@@ -53,7 +54,7 @@ export function UndercoverTable({ state, stage, offset, disabled, onAct }: { sta
     </>}
 
     {view.phase === 'vote' && <>
-      <p className="uc-ask"><strong>{u('voteTitle')}</strong> · {u('voted', { count: view.voters.length, total: active.length })}</p>
+      <p className="uc-ask"><strong>{u(view.runoff ? 'runoffTitle' : 'voteTitle')}</strong> · {u('voted', { count: view.voters.length, total: active.length })}</p>
       {me && !imOut && data?.own?.vote && <p className="uc-note">{u('youVoted', { name: nameOf(state, data.own.vote) })}</p>}
       {next(u('countVotes'))}
     </>}
@@ -65,13 +66,13 @@ export function UndercoverTable({ state, stage, offset, disabled, onAct }: { sta
 
     {/* The table: everyone in speaking order. In a vote, players still in tap someone else; out players show their role. */}
     <ol className="uc-players" aria-label={u('inGame')}>{view.order.map(id => {
-      const gone = outOf(id); const canVote = view.phase === 'vote' && live && me !== null && !imOut && !gone && id !== me;
+      const gone = outOf(id); const canVote = view.phase === 'vote' && live && me !== null && !imOut && !gone && id !== me && (!view.runoff || view.runoff.includes(id));
       const picked = data?.own?.vote === id; const voted = view.voters.includes(id);
       const content = <><Avatar look={lookOf(state, id)} size={36} /><span className="uc-name">{nameOf(state, id)}{id === me ? ' ✦' : ''}</span>
         {view.speakerId === id && <span className="uc-badge speaking" aria-hidden="true">🗣</span>}
         {view.phase === 'vote' && voted && <span className="uc-badge" title={u('voted', { count: 1, total: 1 })} aria-hidden="true">✓</span>}
         {gone && <span className="uc-role">{role(gone.role)}</span>}</>;
-      return <li key={id} className={`${gone ? 'gone' : ''}${view.speakerId === id ? ' speaking' : ''}`}>
+      return <li key={id} className={`${gone ? 'gone' : ''}${view.speakerId === id ? ' speaking' : ''}${view.phase === 'vote' && view.runoff?.includes(id) ? ' runoff' : ''}`}>
         {canVote ? <button type="button" className="uc-player" aria-pressed={picked} disabled={disabled} onClick={() => act('vote', view.round, { playerId: id })}>{content}</button>
           : <span className="uc-player">{content}</span>}</li>;
     })}</ol>

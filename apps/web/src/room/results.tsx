@@ -7,6 +7,7 @@ import type { GraphPlaybackAction, RoomSnapshot } from '@party/contracts';
 import { MediaView } from './media-upload.js';
 import { BallotContent, SavedVoteBadge, savedVote } from './vote.js';
 import { TeamStandings, teamName } from './teams.js';
+import { OwnVerdict } from './answer-checks.js';
 import { GraphReplayControls } from '../minigames/draw-the-graph/replay-controls.js';
 import { MinigamePhoneResult } from '../minigames/shared/phone-result.js';
 import { MinigameResults } from '../minigames/shared/shared-result.js';
@@ -112,6 +113,7 @@ export function StageResults({ state, stage, offset = 0, onNext, onGraphPlayback
     {/* On a phone your own result comes first, big: that is what you look for. */}
     {state.role === 'player' && stage.input?.kind !== 'media' && <OwnRoundPoints points={own ? formatPoints(own.amountMilli) : undefined}
       message={own ? t('results.earned', { points: formatPoints(own.amountMilli) }) : t('results.nothing')} />}
+    <OwnVerdict state={state} stage={stage} />
     {answer?.kind === 'choice' && <>
       {answer.correctChoiceKey && <CorrectRoundAnswer>{t('results.correct', { answer: label(answer.correctChoiceKey) })}</CorrectRoundAnswer>}
       <ul className="plain-list answer-bars">{answer.counts.map(row => { const total = answer.counts.reduce((sum, entry) => sum + entry.count, 0);

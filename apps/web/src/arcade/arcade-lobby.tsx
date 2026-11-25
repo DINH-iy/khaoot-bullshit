@@ -262,8 +262,9 @@ function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
         {tile}<span className="arcade-change">Change</span></button>}
     {/* The game's own settings (round time, targets, a duel's rules) in one row under the game; the others can look but not change. */}
     {hasArcadeSettings(game) && <button type="button" className="arcade-settings-row" aria-haspopup="dialog" data-changed={Boolean(arcadeSettingsSummary(game, chosen)) || undefined}
-      aria-label={`${gameName(game)} settings${arcadeSettingsSummary(game, chosen) ? `: ${arcadeSettingsSummary(game, chosen)}` : ''}`} onClick={() => setSetting(true)}>
-      <FaIcon name="gear" /><span>Game settings</span><small>{arcadeSettingsSummary(game, chosen) || 'Standard'}</small><FaIcon name="chevron-down" turn={-90} /></button>}
+      onClick={() => setSetting(true)}>
+      {/* The spoken name starts with what is visible ("Game settings Standard"), then says which game. */}
+      <FaIcon name="gear" /><span>Game settings</span><small>{arcadeSettingsSummary(game, chosen) || 'Standard'}</small><span className="visually-hidden">, {gameName(game)}</span><FaIcon name="chevron-down" turn={-90} /></button>}
     {setting && <BottomSheet title={`${gameName(game)} settings`} onClose={() => setSetting(false)}>
       {watching && <p className="arcade-meta"><FaIcon name="star" /> {chooser} sets these</p>}
       <ArcadeGameSettingsFields game={game} chosen={chosen} disabled={watching}

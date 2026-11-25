@@ -38,7 +38,9 @@ test('editors see only their own games and games shared with them; the owner see
     await page.getByRole('button', { name: /^Game menu/ }).click();
     await page.getByRole('menuitem', { name: 'Invite people' }).click();
     const sharing = page.locator('.game-sharing');
-    await sharing.getByLabel(editorName).check();
+    // Shared as Viewer: they may look and rehearse, not change, publish or remove it.
+    await sharing.getByLabel(`Role of ${editorName} for this game`).click();
+    await page.getByRole('option', { name: 'Viewer' }).click();
     await expect(sharing.getByRole('status')).toHaveText('Saved.');
     expect((await new AxeBuilder({ page }).include('.invite-panel').analyze()).violations).toEqual([]);
     if (process.env['TEAM_SHOTS']) await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/sharing.png` });
@@ -46,5 +48,8 @@ test('editors see only their own games and games shared with them; the owner see
     await expect(theirs.locator('.my-game').filter({ hasText: ownerGame })).toContainText('by the owner · shared with you');
     await expect(theirs.locator('.my-game').filter({ hasText: ownerGame }).getByRole('button', { name: /^Remove/ })).toHaveCount(0);
     if (process.env['TEAM_SHOTS']) await editor.screenshot({ path: `${process.env['TEAM_SHOTS']}/editor-games.png` });
+    await theirs.getByRole('link', { name: `Edit ${ownerGame}` }).click();
+    await expect(editor.getByText('View only', { exact: true })).toBeVisible();
+    expect((await editor.request.post(`${baseURL}/api/host/games/${new URL(editor.url()).searchParams.get('edit')}/archive`, { headers, data: {} })).status()).toBe(403);
   } finally { await editorContext.close(); }
 });

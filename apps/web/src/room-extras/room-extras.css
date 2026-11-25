@@ -234,3 +234,6 @@
 .room .tray-tabs button { flex: 1 1 0; min-height: 38px; margin: 0; border: 0; border-radius: 999px; background: transparent; color: var(--r-text); font-weight: 800; box-shadow: none; }
 .room .tray-tabs button[aria-pressed=true] { background: var(--r-accent); color: var(--r-accent-ink); }
 .sound-board { margin-top: 0; }
+/* The winning team on its award slide: its name with its colour, above its members. */
+.finale-team { margin: 0; display: inline-flex; align-items: center; justify-self: center; gap: 10px; font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 900; }
+.finale-team-dot { width: .8em; height: .8em; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 3px rgb(255 255 255 / .6); flex: none; }

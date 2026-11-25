@@ -1,4 +1,4 @@
-import { BUILTIN_SOUNDS, MAX_OWN_REACTIONS, MAX_SOUNDS, HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
+import { CARRYOVERS, BUILTIN_SOUNDS, MAX_OWN_REACTIONS, MAX_SOUNDS, HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
 import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
@@ -127,7 +127,9 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
           ...(raw['captains'] === 'elected' ? { captainPick: 'elected' } : {}),
           // `names`: the teams' own names, one per team (the standard colour names fill any missing ones).
           ...(Array.isArray(raw['names']) && raw['names'].length ? { names: Array.from({ length: count }, (_, index) => text((raw['names'] as unknown[])[index]).slice(0, 30) || DEFAULT_TEAM_NAMES[index]!) } : {}) },
-        ...(raw['captains'] === true || raw['captains'] === 'elected' ? { captains: true } : {}) };
+        ...(raw['captains'] === true || raw['captains'] === 'elected' ? { captains: true } : {}),
+        // `scores`: the team scores when teams are made again (a later Pick teams scene). Standard: "fresh".
+        ...((CARRYOVERS as readonly string[]).includes(text(raw['scores'])) && text(raw['scores']) !== 'fresh' ? { carryover: text(raw['scores']) } : {}) };
     }
     case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
     case 'minigame': {
@@ -318,5 +320,5 @@ export function importDefinition(input: string): Json | null {
 function roomSettings(raw: Record<string, unknown>) {
   const flag = (key: string) => typeof raw[key] === 'boolean' ? { [key]: raw[key] } : {};
   const number = (key: string, min: number, max: number) => raw[key] !== undefined && raw[key] !== null && Number.isFinite(Number(raw[key])) ? { [key]: Math.max(min, Math.min(max, Math.round(Number(raw[key])))) } : {};
-  return { ...flag('showScores'), ...flag('reactions'), ...number('reactionLimit', 1, 30), ...flag('soundboard'), ...flag('breakVotes'), ...number('breakPercent', 10, 100), ...flag('autoClose'), ...number('autoCloseSeconds', 1, 30) };
+  return { ...flag('showScores'), ...flag('reactions'), ...number('reactionLimit', 1, 30), ...flag('soundboard'), ...flag('eventSounds'), ...flag('breakVotes'), ...number('breakPercent', 10, 100), ...flag('autoClose'), ...number('autoCloseSeconds', 1, 30) };
 }

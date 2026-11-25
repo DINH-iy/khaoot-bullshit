@@ -23,6 +23,8 @@ export interface StepRenderer {
   board?(side: StepSideView, settings: MinigameSettings, mine: boolean): ReactNode;
   /** What is at stake under a step's question (icons, with words for screen readers), from the side's view when there is one. */
   stake?(step: number, settings: MinigameSettings, view?: unknown): ReactNode;
+  /** A move besides the option buttons (Galgje: guessing the whole word), under them. */
+  extra?(props: { view: unknown; settings: MinigameSettings; disabled: boolean; onChoose: (option: string) => void }): ReactNode;
 }
 
 export function StepChoices({ renderer, options, view, settings, disabled, onChoose }: {
@@ -79,9 +81,10 @@ export function StepPhone({ state, stage, offset, canPlay, disabled, onMove }: {
           {who === 'vote' && <p className="step-vote-note step-icon-line"><span aria-hidden="true">🗳️</span> {c('teamVote')}{left !== null && <> · <span aria-hidden="true">⏱</span> {c('leftSeconds', { seconds: left })}</>}</p>}
           {who !== 'voted' && <StepChoices renderer={renderer} options={side.options} view={side.view} settings={settings} disabled={disabled}
             onChoose={option => onMove(side.step, option)} />}
+          {who !== 'voted' && renderer.extra?.({ view: side.own ?? side.view, settings, disabled, onChoose: option => onMove(side.step, option) })}
           {who === 'voted' && <div className="step-votes" role="status">
             <p className="step-icon-line"><span aria-hidden="true">✓</span> {c('voted', { count: counted, total })}{left !== null && <> · <span aria-hidden="true">⏱</span> {c('leftSeconds', { seconds: left })}</>}</p>
-            <ul className="step-split">{side.options.map(option => { const count = side.votes.find(vote => vote.option === option)?.count ?? 0;
+            <ul className="step-split">{[...side.options, ...side.votes.map(vote => vote.option).filter(option => !side.options!.includes(option))].map(option => { const count = side.votes.find(vote => vote.option === option)?.count ?? 0;
               return <li key={option}><span>{renderer.label(option, side.view, settings)}</span><span className="step-bar" aria-hidden="true"><span style={{ width: `${counted ? Math.round(count / counted * 100) : 0}%` }} /></span><strong>{count}</strong></li>; })}</ul>
             <button type="button" className="step-decide" disabled={disabled} onClick={() => onMove(side.step, side.options![0]!, true)}>{c('decide')}</button>
           </div>}

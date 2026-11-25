@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { CROP_RATIOS, youtubeWatchUrl, type PublicSceneMedia, type YouTubeClip } from '@party/contracts';
+import { CROP_RATIOS, youtubeWatchUrl, type MediaControl, type PublicSceneMedia, type YouTubeClip } from '@party/contracts';
+import { MEDIA_CONTROL_TEXTS } from './media-control.text.js';
 import { useTexts } from '../i18n/texts.js';
 import { YOUTUBE_TEXTS } from '../presentation/youtube.text.js';
 import { EXTRAS_TEXTS } from './extras.text.js';
@@ -8,6 +9,8 @@ import { AudioWaveform } from './audio-waveform.js';
 import { formatRemaining } from './stage-timer.js';
 
 type Role = 'host' | 'player' | 'display';
+/** The host's latest play, pause or restart for this screen's media (from the room connection). */
+export type MediaCommand = (MediaControl & { id: number }) | null;
 const YOUTUBE_ORIGIN = 'https://www.youtube-nocookie.com';
 const canPlayHere = (role: Role, displayConnected: boolean) => role === 'display' || (role === 'host' && !displayConnected);
 
@@ -18,8 +21,8 @@ function MediaNote({ role, song = false }: { role: Role; song?: boolean }) {
     : role === 'player' ? 'watchScreen' : 'videoScreen')}</p>;
 }
 
-export function StageYouTube({ clip, role, displayConnected, label, paused = false, preview = false }: {
-  clip: YouTubeClip; role: Role; displayConnected: boolean; label: string; paused?: boolean; preview?: boolean;
+export function StageYouTube({ clip, role, displayConnected, label, paused = false, preview = false, control = null }: {
+  clip: YouTubeClip; role: Role; displayConnected: boolean; label: string; paused?: boolean; preview?: boolean; control?: MediaCommand;
 }) {
   const t = useTexts(YOUTUBE_TEXTS);
   const x = useTexts(EXTRAS_TEXTS);
@@ -28,13 +31,13 @@ export function StageYouTube({ clip, role, displayConnected, label, paused = fal
   return <figure className="stage-media youtube">
     {preview && !opened
       ? <button type="button" className="primary" onClick={() => setOpened(true)}><FaIcon name="play" /> {x('playVideo')}</button>
-      : <YouTubeFrame clip={clip} title={`${t('title')} · ${label}`} paused={paused} autoPlay={preview || !paused} preview={preview} />}
+      : <YouTubeFrame clip={clip} title={`${t('title')} · ${label}`} paused={paused} autoPlay={preview || !paused} preview={preview} control={control} />}
     <a className="hint" href={youtubeWatchUrl(clip.videoId, clip.startSeconds)} target="_blank" rel="noreferrer">{t('open')}</a>
   </figure>;
 }
 
-function YouTubeFrame({ clip, title, paused, autoPlay, preview }: {
-  clip: YouTubeClip; title: string; paused: boolean; autoPlay: boolean; preview: boolean;
+function YouTubeFrame({ clip, title, paused, autoPlay, preview, control }: {
+  clip: YouTubeClip; title: string; paused: boolean; autoPlay: boolean; preview: boolean; control: MediaCommand;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   // Loading is tied to the clip. A change to room pause must never reload or rewind the iframe.
@@ -70,6 +73,15 @@ function YouTubeFrame({ clip, title, paused, autoPlay, preview }: {
     }
     return () => window.removeEventListener('message', message);
   }, [paused, preview, startPlaying]);
+  // The host's play, pause or restart (never while the room is paused).
+  const handled = useRef(0);
+  useEffect(() => {
+    if (!control || control.id <= handled.current || preview) return;
+    handled.current = control.id;
+    if (control.action === 'pause' || paused) { command('pauseVideo'); return; }
+    if (control.action === 'restart') post({ event: 'command', func: 'seekTo', args: [clip.startSeconds ?? 0, true] });
+    command('playVideo');
+  }, [control?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const params = new URLSearchParams({ autoplay: startPlaying ? '1' : '0', playsinline: '1' });
   if (clip.startSeconds) params.set('start', String(clip.startSeconds));
   if (clip.endSeconds !== undefined) params.set('end', String(clip.endSeconds));
@@ -82,20 +94,22 @@ function YouTubeFrame({ clip, title, paused, autoPlay, preview }: {
 }
 
 /** Only the shared display (or the host alone) plays sound. The room pause also pauses that screen's media. */
-export function StageMedia({ media, role, displayConnected, label, paused = false, preview = false }: {
-  media: PublicSceneMedia; role: Role; displayConnected: boolean; label: string; paused?: boolean; preview?: boolean;
+export function StageMedia({ media, role, displayConnected, label, paused = false, preview = false, control = null }: {
+  media: PublicSceneMedia; role: Role; displayConnected: boolean; label: string; paused?: boolean; preview?: boolean; control?: MediaCommand;
 }) {
   const t = useTexts(EXTRAS_TEXTS);
   if (media.kind === 'image') {
     const crop = media.crop;
     const style = crop ? { '--media-crop-ratio': CROP_RATIOS[crop.ratio], '--media-crop-position': `${crop.x}% ${crop.y}%` } as CSSProperties : undefined;
-    return <figure className={`stage-media image${crop ? ' cropped' : ''}`} style={style}><img src={media.url} alt={t('picture', { label })} /></figure>;
+    return <><figure className={`stage-media image${crop ? ' cropped' : ''}`} style={style}><img src={media.url} alt={media.alt ?? t('picture', { label })} /></figure>
+      {media.caption && <p className="stage-media-caption">{media.caption}</p>}</>;
   }
-  if (!canPlayHere(role, displayConnected)) return <MediaNote role={role} song={media.kind === 'audio'} />;
-  return <Player key={media.id} media={media} label={label} paused={paused} preview={preview} />;
+  // The caption shows on every screen, also on phones where the video or song plays on the shared screen.
+  if (!canPlayHere(role, displayConnected)) return <>{<MediaNote role={role} song={media.kind === 'audio'} />}{media.caption && <p className="stage-media-caption">{media.caption}</p>}</>;
+  return <><Player key={media.id} media={media} label={label} paused={paused} preview={preview} control={control} />{media.caption && <p className="stage-media-caption">{media.caption}</p>}</>;
 }
 
-function Player({ media, label, paused, preview }: { media: PublicSceneMedia; label: string; paused: boolean; preview: boolean }) {
+function Player({ media, label, paused, preview, control }: { media: PublicSceneMedia; label: string; paused: boolean; preview: boolean; control: MediaCommand }) {
   const t = useTexts(EXTRAS_TEXTS);
   const element = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const started = useRef(false);
@@ -117,6 +131,16 @@ function Player({ media, label, paused, preview }: { media: PublicSceneMedia; la
   }, [paused, preview]);
   const start = media.trim?.startSeconds ?? 0;
   const end = media.trim?.endSeconds;
+  // The host's play, pause or restart (never while the room is paused).
+  const handled = useRef(0);
+  useEffect(() => {
+    const player = element.current;
+    if (!control || control.id <= handled.current || !player || preview) return;
+    handled.current = control.id;
+    if (control.action === 'pause' || paused) { player.pause(); return; }
+    if (control.action === 'restart') player.currentTime = start;
+    started.current = true; play();
+  }, [control?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const readAudio = () => {
     const player = element.current;
     if (!player) return;
@@ -170,4 +194,15 @@ function Player({ media, label, paused, preview }: { media: PublicSceneMedia; la
       </div>}
     {media.kind === 'video' && blocked && !paused && <button type="button" className="primary stage-media-play" onClick={play}><FaIcon name="play" /> {t('playVideo')}</button>}
   </figure>;
+}
+
+/** The host's buttons for the video, song or clip playing on the shared screen. */
+export function MediaHostControls({ onControl }: { onControl: (action: MediaControl['action']) => void }) {
+  const c = useTexts(MEDIA_CONTROL_TEXTS);
+  return <div className="media-host-controls" role="group" aria-label={c('controls')}>
+    <span>{c('controls')}</span>
+    <button type="button" aria-label={`${c('play')} · ${c('controls')}`} onClick={() => onControl('play')}><FaIcon name="play" /> {c('play')}</button>
+    <button type="button" aria-label={`${c('pause')} · ${c('controls')}`} onClick={() => onControl('pause')}><FaIcon name="pause" /> {c('pause')}</button>
+    <button type="button" aria-label={`${c('restart')} · ${c('controls')}`} onClick={() => onControl('restart')}><FaIcon name="arrow-rotate-left" /> {c('restart')}</button>
+  </div>;
 }

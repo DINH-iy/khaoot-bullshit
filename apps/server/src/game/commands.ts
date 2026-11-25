@@ -23,6 +23,7 @@ import { GameError, requireGame } from './errors.js';
 import { actorKey, EligibilitySchema, requireHost, VotePresentationSchema, type Transaction, type TrustedActor } from './model.js';
 import { acceptsUntil, closesAt, graceFor, MAX_REMAINING_MS, remainingMs, timerColumns } from './timing.js';
 import { explainsFirst, readExplain, withReady, withoutExplain } from './explain.js';
+import { answerVerdict } from './scoring/verdicts.js';
 import { formingCommand, gameLineupForRound, readForming, route, startForming, teamContext, type Award, type TeamContext } from './teams/teams.js';
 
 export interface Effect {
@@ -31,6 +32,8 @@ export interface Effect {
   awards?: Award[];
   judgments?: { playerId: string; amountMilli: bigint; stageRunId: string }[];
   decision?: RouteDecisionEffect | null;
+  // The host's verdict on one answer, saved with this command.
+  verdict?: { submissionId: string; correct: boolean | null };
 }
 
 // `number` counts runs in this session (1, 2, 3…); on a branching game it is not a position in the definition.
@@ -334,6 +337,12 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
     }
     return empty;
   }
+  if (command.type === 'score.verdict') {
+    // Like corrections: during and after the game, on any revealed quiz or ordering round.
+    requireGame(session.status !== 'LOBBY', 'INVALID_STATE');
+    const result = await answerVerdict(tx, session.id, definition, { commandId: command.commandId, submissionId: command.submissionId, correct: command.correct });
+    return { ...empty, awards: result.awards, verdict: result.verdict };
+  }
   if (command.type === 'score.adjust') {
     // Corrections work during and after the game, and for players who have left.
     requireGame(session.status !== 'LOBBY', 'INVALID_STATE');
@@ -470,7 +479,7 @@ export async function applyCommand(tx: Transaction, session: GameSession, defini
   if (command.type.startsWith('teams.')) {
     requireGame(stage.status === 'ACTIVE' && forming, 'INVALID_STATE');
     if (command.type === 'teams.choose' || command.type === 'teams.vote') requireGame(actor.role === 'player', 'FORBIDDEN');
-    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string; celebration?: TeamCelebration | null }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
+    const result = await formingCommand(tx, session.id, forming, command as { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string; celebration?: TeamCelebration | null; amountMilli?: string }, actor.role === 'player' ? actor.playerId : null, await present(tx, session.id));
     const { forming: _done, ...rest } = stage.presentation as Record<string, unknown>;
     if ('lineupId' in result) {
       // Confirmed: the round starts now, with its timer, for the players in a team (after its explanation, if it has one).

@@ -10,7 +10,7 @@ import { refusalText } from './refusals.js';
 import { isUnavailablePageError } from '../navigation.js';
 import { deviceLog, note, sendGameOver, setLogRoom } from '../diagnostics/recorder.js';
 const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | number>) => translate(ROOM_TEXTS, key, values);
-import { CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, SessionChangedSchema, type GameCommand, type PoolAim, type RoomReply, type RoomSnapshot } from '@party/contracts';
+import { MediaControlSchema, CommandReceiptSchema, GameCommandSchema, HeartbeatReplySchema, RoomSnapshotSchema, SessionChangedSchema, type GameCommand, type PoolAim, type RoomReply, type RoomSnapshot } from '@party/contracts';
 
 export function useRoom(sessionId: string | undefined, display = false) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot>(); const [connection, setConnection] = useState('Connecting');
@@ -22,6 +22,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
   const [challengeTick, setChallengeTick] = useState(0);
   const [go, setGo] = useState<{ stageRunId: string; goAt: string; receivedAt: number } | null>(null); const [progress, setProgress] = useState<{ stageRunId: string; counts: { playerId: string; count: number }[] } | null>(null);
   // The soundboard: the latest sound to play (screens), and until when this phone waits before its next one (server time).
+  // The host's latest play, pause or restart for the shared screen's media.
+  const [mediaControl, setMediaControl] = useState<{ id: number; stageRunId: string; action: 'play' | 'pause' | 'restart' } | null>(null);
   const [soundEvent, setSoundEvent] = useState<{ id: number; playerId: string; sound: number } | null>(null); const [soundUntil, setSoundUntil] = useState(0);
   const [liveStrokes] = useState(createLiveStrokes); const [reactions] = useState(createReactionStore); const [poolAims] = useState(createPoolAimStore);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
@@ -155,6 +157,11 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('minigame.go', (data: { stageRunId?: unknown; goAt?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && typeof data.goAt === 'string') { setGo({ stageRunId: data.stageRunId, goAt: data.goAt, receivedAt: performance.now() }); requestSync(); } });
     socket.on('drawing.live', (data: unknown) => { if (mounted) liveStrokes.apply(data); });
     socket.on('room.reaction', (data: unknown) => { if (mounted) reactions.add(data); });
+    socket.on('room.mediaControl', (data: unknown) => {
+      const parsed = MediaControlSchema.safeParse(data && typeof data === 'object' ? { stageRunId: (data as { stageRunId?: unknown }).stageRunId, action: (data as { action?: unknown }).action } : null);
+      const id = (data as { id?: unknown } | null)?.id;
+      if (mounted && parsed.success && typeof id === 'number') setMediaControl({ ...parsed.data, id });
+    });
     socket.on('room.sound', (data: { id?: unknown; playerId?: unknown; sound?: unknown }) => {
       if (mounted && typeof data?.id === 'number' && typeof data.playerId === 'string' && typeof data.sound === 'number') setSoundEvent({ id: data.id, playerId: data.playerId, sound: data.sound });
     });
@@ -177,7 +184,9 @@ export function useRoom(sessionId: string | undefined, display = false) {
     /** A tap race's running count; fire-and-forget, the final result is the saved one. */
     // Not volatile: a report waits for a busy connection instead of being dropped, so the server sees every tap it can.
     sendTaps(stageRunId: string, count: number) { socketRef.current?.emit('minigame.taps', { stageRunId, count }); },
-    liveStrokes, reactions, poolAims, soundEvent, soundUntil,
+    liveStrokes, reactions, poolAims, soundEvent, soundUntil, mediaControl,
+    /** The host plays, pauses or restarts the scene's media on the shared screen. */
+    sendMediaControl(stageRunId: string, action: 'play' | 'pause' | 'restart') { socketRef.current?.emit('room.mediaControl', { stageRunId, action }); },
     /** A sound of the game's soundboard on the shared screen; the server says when this phone may play the next. */
     sendSound(sound: number) { socketRef.current?.emit('room.sound', { sound }); },
     /** The 8-ball shooter's aim while lining up; dropped when the connection is busy, the next one replaces it. */

@@ -1140,3 +1140,9 @@
 .party-add input { flex: 1 1 10rem; min-width: 0; }
 /* The invite panel: who may edit this game. */
 .game-sharing ul { display: grid; gap: 4px; }
+
+/* The soundboard list in Reactions & sounds looks like the playlist. */
+.sound-list { margin: 0; padding: 0 0 0 1.4em; display: grid; gap: 6px; }
+.sound-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name up remove" "player player player"; gap: 4px 6px; align-items: center; }
+.sound-list .music-name { grid-area: name; } .sound-list audio { grid-area: player; width: 100%; height: 36px; }
+.sound-list li { grid-template-columns: minmax(0, 1fr) auto auto; }

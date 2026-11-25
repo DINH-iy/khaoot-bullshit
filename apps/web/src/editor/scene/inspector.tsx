@@ -255,7 +255,7 @@ function TeamNameFields({ form, onChange }: { form: Form; onChange: (form: Form)
 }
 
 // What happens to the team scores when teams are made again.
-const carryover = () => [{ value: 'fresh', label: t('cFresh') }, { value: 'keep', label: t('cKeep') }, { value: 'members', label: t('cMembers') }];
+const carryover = () => [{ value: 'fresh', label: t('cFresh') }, { value: 'keep', label: t('cKeep') }, { value: 'members', label: t('cMembers') }, { value: 'redistribute', label: t('cRedistribute') }, { value: 'manual', label: t('cManual') }];
 /** Solo or teams for one part; empty means it follows the game's setting. */
 function PlayFields({ definition, node, index, onChange }: { definition: Definition; node: Node; index: number; onChange: Change }) {
   const stage = node.stages[index]!; const play = stage['play'] as { kind: string; lineup?: { kind: string; form?: Form; carryover?: string }; answers?: string; points?: string } | undefined;

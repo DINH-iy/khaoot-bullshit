@@ -40,7 +40,7 @@ function App() {
     || (room !== null && !GameIdSchema.safeParse(room).success)
     || (room === null && bench !== null && !benchId)
     || (arcade !== null && arcade !== '' && !GameIdSchema.safeParse(arcade).success)
-    || (admin !== null && !['', 'feedback', 'people', 'packs', 'look', 'logs'].includes(admin));
+    || (admin !== null && !['', 'feedback', 'people', 'packs', 'look', 'logs', 'rooms', 'storage', 'actions', 'health', 'roles'].includes(admin));
   useEffect(() => { if (invalid) replaceWithHome(); }, [invalid]);
   // An arcade lobby stays the log's place while its rounds are played; elsewhere there is none.
   useEffect(() => { if (arcade && GameIdSchema.safeParse(arcade).success) setLogLobby(arcade); else if (room === null) setLogLobby(null); }, [arcade, room]);

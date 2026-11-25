@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import type { SessionView } from '@party/contracts';
 import { randomAssignment, route, type TeamContext } from '../../src/game/teams/teams.js';
+import { secretScores } from '../../src/game/teams/team-views.js';
 
 const ids = (count: number) => Array.from({ length: count }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`);
 const sizesOf = (assignment: Record<string, number | null>, teams: number) => Array.from({ length: teams }, (_, index) => Object.values(assignment).filter(team => team === index).length);
@@ -42,5 +44,16 @@ describe('where team points go', () => {
     expect(route(base, { playerId: c }, context('both')).map(award => [award.teamId, award.playerId])).toEqual([['blue', undefined], [undefined, c]]);
     expect(route(base, { playerId: a }, null)).toEqual([{ ...base, playerId: a }]);
     expect(route({ ...base, amountMilli: 0n }, { teamId: 'red' }, context('both'))).toEqual([]);
+  });
+});
+
+describe('secret scores', () => {
+  it('leaves out the standings and the start totals of teams being made', () => {
+    const team = { index: 0, name: 'Red', color: '#e8505b', teamId: null, targetSize: null, memberIds: [], captainId: null, startMilli: '12000' };
+    const view = { standings: [{ playerId: ids(1)[0]!, amountMilli: '5000' }], teamStandings: [{ name: 'Red' }], stage: { kind: 'teams', teams: { forming: true, teams: [team] } } } as unknown as SessionView;
+    const hidden = secretScores(view);
+    expect(hidden.standings).toEqual([]); expect(hidden.teamStandings).toEqual([]);
+    expect(hidden.stage!.teams!.teams[0]).not.toHaveProperty('startMilli');
+    expect(JSON.stringify(hidden)).not.toContain('12000');
   });
 });

@@ -1,3 +1,4 @@
+import { EDITOR_ROLE_ID } from '@party/contracts';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MAX_SAVE_POINTS } from '@party/contracts';
@@ -41,7 +42,7 @@ describe('save points', () => {
     const editor = await person(true);
     // Only a game shared with an editor (or made by them) shows its save points to them.
     expect((await call('GET', `/api/host/games/${gameId}/save-points`, undefined, editor.cookie)).statusCode).toBe(404);
-    expect((await call('POST', `/api/host/games/${gameId}/sharing`, { sharedWith: [editor.id] })).statusCode).toBe(200);
+    expect((await call('POST', `/api/host/games/${gameId}/sharing`, { shares: [{ personId: editor.id, roleId: EDITOR_ROLE_ID }] })).statusCode).toBe(200);
     const listed = (await call('GET', `/api/host/games/${gameId}/save-points`, undefined, editor.cookie)).json().data;
     expect(listed).toMatchObject({ limit: MAX_SAVE_POINTS, savePoints: [{ id: savePointId }] });
     expect((await call('GET', `/api/host/games/${gameId}/save-points/${savePointId}`, undefined, editor.cookie)).json().data.definition).toEqual(definition);

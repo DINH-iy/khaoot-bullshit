@@ -1,4 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { EDITOR_ROLE_ID, PersonRoleSchema } from '@party/contracts';
+import { recordAction } from '../admin/actions.js';
 import { ClaimPersonSchema, GameIdSchema, LeaderboardQuerySchema, LeaderboardSchema, MeSchema, NewPersonSchema, PeoplePageSchema, PeopleQuerySchema, PeopleSummarySchema, PersonEditorSchema, PersonKeyViewSchema, PersonRowSchema, PersonStandingSchema, PlayerLookSchema, RenamePersonSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -90,12 +92,18 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
       return { ok: true, data: PersonStandingSchema.parse(found) };
     } catch (error) { return owner.fail(reply, error); }
   });
+  /** A person's name for the action log. */
+  const nameOf = async (id: string) => (await client.person.findUnique({ where: { id }, select: { name: true } }))?.name ?? 'Unknown person';
   app.post('/api/host/people', async (request, reply) => {
     try {
       const { roomSecret } = owner.requireOwner(request);
       const parsed = NewPersonSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
-      const { person, key } = await createPerson(client, roomSecret, parsed.data.name, parsed.data.canEdit);
+      // A role given here, or (the older way) "can edit games" as the Editor role.
+      const roleId = parsed.data.roleId !== undefined ? parsed.data.roleId : parsed.data.canEdit ? EDITOR_ROLE_ID : null;
+      if (roleId) roomAssert(await client.accessRole.findUnique({ where: { id: roleId }, select: { id: true } }), 'INVALID_COMMAND');
+      const { person, key } = await createPerson(client, roomSecret, parsed.data.name, roleId);
       app.log.info({ event: 'person_added', canEdit: person.canEdit }, 'Person added');
+      await recordAction(client, { personId: null }, 'person.added', person.name, { roleId: person.roleId });
       return { ok: true, data: PersonKeyViewSchema.parse({ id: person.id, name: person.name, key }) };
     } catch (error) { return owner.fail(reply, error); }
   });
@@ -106,6 +114,7 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
       const changed = await client.person.updateMany({ where: { id: idParam(request), removedAt: null }, data: { name: parsed.data.name, nameKey: nameKey(parsed.data.name) } })
         .catch(error => { throw taken(error) ? new RoomError('NAME_TAKEN') : error; });
       roomAssert(changed.count === 1, 'NOT_FOUND');
+      await recordAction(client, { personId: null }, 'person.renamed', parsed.data.name);
       return { ok: true, data: {} };
     } catch (error) { return owner.fail(reply, error); }
   });
@@ -114,10 +123,28 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
     try {
       owner.requireOwner(request); const id = idParam(request);
       const parsed = PersonEditorSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
-      const changed = await client.person.updateMany({ where: { id, removedAt: null }, data: { canEdit: parsed.data.canEdit } });
-      roomAssert(changed.count === 1, 'NOT_FOUND');
+      // The older switch: on gives the Editor role (keeping a role the person already has), off takes the role away.
+      const current = await client.person.findFirst({ where: { id, removedAt: null }, select: { roleId: true } }); roomAssert(current, 'NOT_FOUND');
+      const roleId = parsed.data.canEdit ? current.roleId ?? EDITOR_ROLE_ID : null;
+      await client.person.update({ where: { id }, data: { roleId, canEdit: roleId !== null } });
       if (!parsed.data.canEdit) live?.dropPerson(id);
       app.log.info({ event: 'person_editor_changed', canEdit: parsed.data.canEdit }, 'Editor rights changed');
+      await recordAction(client, { personId: null }, parsed.data.canEdit ? 'person.editor_on' : 'person.editor_off', await nameOf(id));
+      return { ok: true, data: {} };
+    } catch (error) { return owner.fail(reply, error); }
+  });
+  // A person's role: what they may do besides playing (see Admin → Roles); none makes them a player only.
+  // Takes effect at once: every request reads the role again, and an editor they have open closes.
+  app.post('/api/host/people/:id/role', async (request, reply) => {
+    try {
+      owner.requireOwner(request); const id = idParam(request);
+      const parsed = PersonRoleSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+      const role = parsed.data.roleId ? await client.accessRole.findUnique({ where: { id: parsed.data.roleId }, select: { name: true } }) : null;
+      roomAssert(!parsed.data.roleId || role, 'INVALID_COMMAND');
+      const changed = await client.person.updateMany({ where: { id, removedAt: null }, data: { roleId: parsed.data.roleId, canEdit: parsed.data.roleId !== null } });
+      roomAssert(changed.count === 1, 'NOT_FOUND');
+      live?.dropPerson(id);
+      await recordAction(client, { personId: null }, 'person.role', `${await nameOf(id)}: ${role?.name ?? 'player only'}`);
       return { ok: true, data: {} };
     } catch (error) { return owner.fail(reply, error); }
   });
@@ -139,6 +166,7 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
       await activePerson(id);
       const { key, data } = keyFields(roomSecret);
       const person = await client.person.update({ where: { id }, data });
+      await recordAction(client, { personId: null }, 'person.new_key', person.name);
       return { ok: true, data: PersonKeyViewSchema.parse({ id: person.id, name: person.name, key }) };
     } catch (error) { return owner.fail(reply, error); }
   });
@@ -148,19 +176,21 @@ export function registerPeopleRoutes(app: FastifyInstance, client: PrismaClient,
       await activePerson(id);
       await client.personDevice.updateMany({ where: { personId: id, revokedAt: null }, data: { revokedAt: new Date() } });
       live?.dropPerson(id);
+      await recordAction(client, { personId: null }, 'person.signed_out', await nameOf(id));
       return { ok: true, data: {} };
     } catch (error) { return owner.fail(reply, error); }
   });
   // Removing keeps history (seats, chips) but signs every phone out, frees the name and drops the key and editor rights.
   app.post('/api/host/people/:id/remove', async (request, reply) => {
     try {
-      owner.requireOwner(request); const id = idParam(request);
+      owner.requireOwner(request); const id = idParam(request); const name = await nameOf(id);
       await client.$transaction(async tx => {
         const person = await tx.person.findUnique({ where: { id } }); roomAssert(person && !person.removedAt, 'NOT_FOUND');
         await tx.personDevice.updateMany({ where: { personId: id, revokedAt: null }, data: { revokedAt: new Date() } });
-        await tx.person.update({ where: { id }, data: { removedAt: new Date(), nameKey: `removed:${id.replaceAll('-', '')}`, linkHash: tokenHash(newToken()), keySealed: null, canEdit: false } });
+        await tx.person.update({ where: { id }, data: { removedAt: new Date(), nameKey: `removed:${id.replaceAll('-', '')}`, linkHash: tokenHash(newToken()), keySealed: null, canEdit: false, roleId: null } });
       });
       live?.dropPerson(id);
+      await recordAction(client, { personId: null }, 'person.removed', name);
       return { ok: true, data: {} };
     } catch (error) { return owner.fail(reply, error); }
   });

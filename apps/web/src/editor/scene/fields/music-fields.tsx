@@ -30,7 +30,10 @@ function useSongNames(ids: string[]) {
 export function GameMusicFields({ definition, onChange }: { definition: Definition; onChange: (next: Definition, group?: string) => void }) {
   const tracks = ((definition['music'] as { tracks?: Track[] } | undefined)?.tracks ?? []);
   const [adding, setAdding] = useState(false); const name = useSongNames(tracks.map(track => track.id));
-  const set = (next: Track[]) => { const copy = { ...definition }; if (next.length) copy['music'] = { tracks: next }; else delete copy['music']; onChange(copy, 'music'); };
+  const music = definition['music'] as { tracks?: Track[]; shuffle?: boolean; fade?: boolean } | undefined;
+  const options = { ...(music?.shuffle ? { shuffle: true } : {}), ...(music?.fade ? { fade: true } : {}) };
+  const set = (next: Track[], extra: { shuffle?: boolean; fade?: boolean } = options) => { const copy = { ...definition }; if (next.length) copy['music'] = { tracks: next, ...extra }; else delete copy['music']; onChange(copy, 'music'); };
+  const option = (key: 'shuffle' | 'fade', on: boolean) => { const next: { shuffle?: boolean; fade?: boolean } = { ...options }; if (on) next[key] = true; else delete next[key]; set(tracks, next); };
   const [note, setNote] = useState('');
   // The standard songs (DEFAULT_SONGS) that this server's library has: put on the server by `npm run music:defaults`.
   const addStandard = () => { setNote(''); void roomApi('/api/host/media').then(data => {
@@ -51,6 +54,9 @@ export function GameMusicFields({ definition, onChange }: { definition: Definiti
     <div className="actions">
       <button type="button" className="small-button with-icon" disabled={tracks.length >= 30} onClick={() => setAdding(true)}><Icon name="plus" size={16} />{t('addSong')}</button>
       <button type="button" className="small-button" disabled={tracks.length >= 30} onClick={addStandard}>{t('useStandard')}</button></div>
+    {tracks.length > 1 && <div className="check-row">
+      <label className="choice"><input type="checkbox" checked={Boolean(music?.shuffle)} onChange={event => option('shuffle', event.target.checked)} />{t('shuffle')}</label>
+      <label className="choice"><input type="checkbox" checked={Boolean(music?.fade)} onChange={event => option('fade', event.target.checked)} />{t('fadeSongs')}</label></div>}
     {note && <p className="hint" role="status">{note}</p>}
     {adding && <MediaLibraryDialog current={undefined} only="audio" title={t('addSong')} onPick={(item: LibraryItem) => { set([...tracks, { id: item.id, kind: 'audio' }]); setAdding(false); }} onClose={() => setAdding(false)} />}
   </div>;

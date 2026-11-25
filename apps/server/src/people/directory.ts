@@ -25,7 +25,7 @@ export async function matchingIds(db: PrismaClient | Transaction, search: string
   return (await db.$queryRaw<{ id: string }[]>`SELECT id::text AS id FROM people WHERE ${nameMatches(search)} ORDER BY name, id ${limit}`).map(row => row.id);
 }
 const rowSelect = {
-  id: true, name: true, createdAt: true, canEdit: true, keySealed: true,
+  id: true, name: true, createdAt: true, canEdit: true, keySealed: true, roleId: true, role: { select: { name: true } },
   devices: { where: { revokedAt: null }, select: { lastSeenAt: true } },
   _count: { select: { players: true } },
 } as const;
@@ -39,7 +39,7 @@ async function toRows(client: PrismaClient, people: RowSource[], keys: string | 
     id: person.id, name: person.name, createdAt: person.createdAt.toISOString(), devices: person.devices.length,
     lastSeenAt: person.devices.reduce<Date | null>((latest, device) => !latest || device.lastSeenAt > latest ? device.lastSeenAt : latest, null)?.toISOString() ?? null,
     games: person._count.players, chips: total(person.id, ['START', 'REFILL', 'BET', 'PAYOUT']), wagered: -total(person.id, ['BET']),
-    canEdit: person.canEdit, hasKey: person.keySealed !== null,
+    canEdit: person.canEdit, roleId: person.roleId, roleName: person.role?.name ?? null, hasKey: person.keySealed !== null,
     ...(keys ? { key: openPersonKey(keys, person.keySealed) } : {}),
   }));
 }
@@ -65,7 +65,7 @@ export async function peopleSummary(client: PrismaClient, now = new Date()) {
   const signedIn = { some: { revokedAt: null } };
   const [people, editors, seenThisWeek, neverSignedIn, phones] = await Promise.all([
     client.person.count({ where: active() }),
-    client.person.count({ where: { ...active(), canEdit: true } }),
+    client.person.count({ where: { ...active(), roleId: { not: null } } }),
     client.person.count({ where: { ...active(), devices: { some: { revokedAt: null, lastSeenAt: { gt: new Date(now.getTime() - WEEK_MS) } } } } }),
     client.person.count({ where: { ...active(), NOT: { devices: signedIn } } }),
     client.personDevice.count({ where: { revokedAt: null, person: active() } }),

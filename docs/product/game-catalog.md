@@ -79,8 +79,8 @@ Legend: **Built** · **Parts ready** (can be made in the editor now, maybe as a 
 | Shake it | Shake the phone fastest | New mechanic: motion sensors (needs permission on iPhone) |
 | Balance | Keep a ball in the middle by tilting the phone | New mechanic: motion sensors |
 | Rhythm | Tap on the beat of a song | New mechanic: audio and timing (research first) |
-| Galgje (Hangman) | Guess a hidden word letter by letter before the drawing is finished | Requested by the owner; kit "Guess the word" |
-| Undercover / Mr. White | Everyone gets a secret word, the undercover players a similar one and Mr. White none; give clues, vote someone out; Mr. White may guess the word | Requested by the owner; kit "Secret words" |
+| Galgje (Hangman) | Guess a hidden word letter by letter before the drawing is finished | Built 25 November 2026 (minigame `hangman`) |
+| Undercover / Mr. White | Everyone gets a secret word, the undercover players a similar one and Mr. White none; give clues, vote someone out; Mr. White may guess the word | Built 25 November 2026 (minigame `undercover`) |
 
 ## 6. Team and show formats
 

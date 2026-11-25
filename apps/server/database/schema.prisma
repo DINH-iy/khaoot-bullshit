@@ -90,18 +90,18 @@ model Creator {
 }
 
 model Game {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  creatorId  String    @db.Uuid
-  title      String    @db.VarChar(160)
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creatorId      String    @db.Uuid
+  title          String    @db.VarChar(160)
   // The owner's own version of a built-in game (its key in game/templates.ts): edited and published like any
   // game, and used instead of the built-in once published. Restoring the original archives it and clears this.
-  builtInKey String?   @db.VarChar(64)
+  builtInKey     String?   @db.VarChar(64)
   // The editor (a person with editor rights) who made the game; null when the owner made it, which includes
   // every game made before games had an author. Editors see their own games and the games shared with them.
-  authorPersonId String? @db.Uuid
-  archivedAt DateTime? @db.Timestamptz(3)
-  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+  authorPersonId String?   @db.Uuid
+  archivedAt     DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
 
   creator    Creator         @relation(fields: [creatorId], references: [id], onDelete: Restrict)
   author     Person?         @relation("AuthoredGames", fields: [authorPersonId], references: [id], onDelete: Restrict)
@@ -116,18 +116,39 @@ model Game {
   @@map("games")
 }
 
-/// A game shared with an editor by its author or the owner: they see and edit it like their own.
+/// A game shared with a person by its maker or the owner; the role says what they may do with it (its game permissions).
 model GameShare {
   gameId    String   @db.Uuid
   personId  String   @db.Uuid
+  // Always set by the server (new shares start as the built-in Editor unless another role is chosen).
+  roleId    String   @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+  game   Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  person Person     @relation(fields: [personId], references: [id], onDelete: Restrict)
+  role   AccessRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@id([gameId, personId])
   @@index([personId])
+  @@index([roleId])
   @@map("game_shares")
+}
+
+/// A role the owner made (or one of the two built-in ones): a name and its permissions (contracts/roles.ts).
+/// People and shared games point at a role; a role in use cannot be removed.
+model AccessRole {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(40)
+  nameKey     String   @unique @db.VarChar(40)
+  permissions String[] @default([])
+  builtIn     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  people Person[]
+  shares GameShare[]
+
+  @@map("access_roles")
 }
 
 model GameDraft {
@@ -196,15 +217,15 @@ model GameSession {
   endedAt        DateTime?     @db.Timestamptz(3)
   idleCloseAt    DateTime?     @db.Timestamptz(3)
 
-  gameVersion GameVersion     @relation(fields: [gameVersionId], references: [id], onDelete: Restrict)
-  host        Creator         @relation(fields: [hostId], references: [id], onDelete: Restrict)
-  players     SessionPlayer[]
-  teams       SessionTeam[]
-  lineups     TeamLineup[]
-  stages      StageRun[]
-  commands    GameCommand[]
-  auditEvents AuditEvent[]
-  outbox      OutboxEvent[]
+  gameVersion     GameVersion      @relation(fields: [gameVersionId], references: [id], onDelete: Restrict)
+  host            Creator          @relation(fields: [hostId], references: [id], onDelete: Restrict)
+  players         SessionPlayer[]
+  teams           SessionTeam[]
+  lineups         TeamLineup[]
+  stages          StageRun[]
+  commands        GameCommand[]
+  auditEvents     AuditEvent[]
+  outbox          OutboxEvent[]
   roomCredentials RoomCredential[]
   arcadeRound     ArcadeRound?
 
@@ -226,19 +247,19 @@ model SessionPlayer {
   // The player's own look: built-in character parts, validated by PlayerLookSchema. Null means the default made from the ID.
   look        Json?     @db.JsonB
 
-  session     GameSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  credentials PlayerCredential[]
-  memberships TeamMember[]
-  submissions Submission[]
-  scores      ScoreEntry[]
-  judgments   StageJudgment[]
-  assets      Asset[]
-  person      Person?            @relation(fields: [personId], references: [id], onDelete: Restrict)
-  chips       ChipEntry[]
-  sideRounds  SideRound[]
-  items       CollectedItem[]
-  challengesMade     SideChallenge[] @relation("ChallengeChallenger")
-  challengesReceived SideChallenge[] @relation("ChallengeOpponent")
+  session            GameSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  credentials        PlayerCredential[]
+  memberships        TeamMember[]
+  submissions        Submission[]
+  scores             ScoreEntry[]
+  judgments          StageJudgment[]
+  assets             Asset[]
+  person             Person?            @relation(fields: [personId], references: [id], onDelete: Restrict)
+  chips              ChipEntry[]
+  sideRounds         SideRound[]
+  items              CollectedItem[]
+  challengesMade     SideChallenge[]    @relation("ChallengeChallenger")
+  challengesReceived SideChallenge[]    @relation("ChallengeOpponent")
   arcadeSeat         ArcadeSeat?
 
   @@unique([sessionId, id])
@@ -248,14 +269,14 @@ model SessionPlayer {
 }
 
 model RoomCredential {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId String @db.Uuid
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String           @db.Uuid
   role      RoomRole
   source    CredentialSource @default(OIDC)
-  tokenHash String @unique @db.Char(64)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  expiresAt DateTime @db.Timestamptz(3)
-  revokedAt DateTime? @db.Timestamptz(3)
+  tokenHash String           @unique @db.Char(64)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime         @db.Timestamptz(3)
+  revokedAt DateTime?        @db.Timestamptz(3)
 
   session GameSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
 
@@ -279,14 +300,14 @@ model PlayerCredential {
 }
 
 model SessionTeam {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId String   @db.Uuid
-  name      String   @db.VarChar(60)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String   @db.Uuid
+  name        String   @db.VarChar(60)
   // The team's colour (#rrggbb), picked while teams were made; null: from its name.
-  color     String?  @db.VarChar(7)
+  color       String?  @db.VarChar(7)
   // The team's winning celebration (TeamCelebrationSchema: emoji, cheer, soundboard sound), picked while teams were made; null: none.
-  celebration Json?  @db.JsonB
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  celebration Json?    @db.JsonB
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
   session     GameSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   memberships TeamMember[]
@@ -374,10 +395,11 @@ model Submission {
   value      Json     @db.JsonB
   receivedAt DateTime @default(now()) @db.Timestamptz(3)
 
-  stage  StageRun       @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
-  player SessionPlayer? @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
-  team   SessionTeam?   @relation(fields: [sessionId, teamId], references: [sessionId, id], onDelete: Restrict)
-  asset  Asset?
+  stage    StageRun        @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
+  player   SessionPlayer?  @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
+  team     SessionTeam?    @relation(fields: [sessionId, teamId], references: [sessionId, id], onDelete: Restrict)
+  asset    Asset?
+  verdicts AnswerVerdict[]
 
   @@unique([stageRunId, actorKey, slotKey])
   @@index([sessionId, stageRunId])
@@ -388,20 +410,20 @@ model Submission {
 // directory; this row is the authority on who uploaded it, for which stage,
 // what it was verified to be, and which saved answer uses it.
 model Asset {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId    String    @db.Uuid
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId    String       @db.Uuid
   // Null for a player's picture, which belongs to no round.
-  stageRunId   String?   @db.Uuid
-  playerId     String    @db.Uuid
+  stageRunId   String?      @db.Uuid
+  playerId     String       @db.Uuid
   kind         AssetKind
   purpose      AssetPurpose @default(ANSWER)
-  contentType  String    @db.VarChar(64)
+  contentType  String       @db.VarChar(64)
   byteSize     Int
-  sha256       String    @db.Char(64)
-  submissionId String?   @unique @db.Uuid
-  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  sha256       String       @db.Char(64)
+  submissionId String?      @unique @db.Uuid
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
   // Set when the file was deleted by the clean-up; the row stays for history and audit.
-  removedAt    DateTime? @db.Timestamptz(3)
+  removedAt    DateTime?    @db.Timestamptz(3)
 
   stage      StageRun?     @relation(fields: [sessionId, stageRunId], references: [sessionId, id], onDelete: Restrict)
   player     SessionPlayer @relation(fields: [sessionId, playerId], references: [sessionId, id], onDelete: Restrict)
@@ -447,6 +469,7 @@ model GameCommand {
   decisions RouteDecision[]
   audit     AuditEvent[]
   judgments StageJudgment[]
+  verdicts  AnswerVerdict[]
 
   @@unique([sessionId, id])
   @@unique([sessionId, actorKey, commandKey])
@@ -455,6 +478,28 @@ model GameCommand {
 
 // A zero-point decision is still a durable judgment. Corrections are a later
 // append-only operation, not an update of this historical decision.
+/// The host overruling the round on one answer: counted as correct (true), as not correct (false), or back to
+/// the round's own scoring (null). Append-only: the latest row per answer is the one that counts. The points
+/// that change go into score_entries as ADJUSTMENT entries keyed `verdict:<submissionId>:…`.
+model AnswerVerdict {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId    String   @db.Uuid
+  submissionId String   @db.Uuid
+  commandId    String   @db.Uuid
+  correct      Boolean?
+  /// The session revision the verdict was made at: orders verdicts on one answer.
+  revision     Int
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  submission Submission  @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  command    GameCommand @relation(fields: [sessionId, commandId], references: [sessionId, id], onDelete: Restrict)
+
+  @@unique([submissionId, revision])
+  @@index([sessionId, submissionId])
+  @@index([sessionId, commandId])
+  @@map("answer_verdicts")
+}
+
 model StageJudgment {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sessionId   String   @db.Uuid
@@ -601,19 +646,22 @@ model Person {
   // The current key, encrypted with a key derived from ROOM_TOKEN_SECRET, so the
   // owner can look it up again. Null for people made before keys could be looked up.
   keySealed String?   @db.VarChar(200)
-  // May edit games (never host rooms or use the admin menu).
+  // Has a role (kept in step with roleId, for older readers); what the person may do comes from the role.
   canEdit   Boolean   @default(false)
+  // The person's role: what they may do in the app (contracts/roles.ts); null: a player only.
+  roleId    String?   @db.Uuid
   look      Json?     @db.JsonB
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   removedAt DateTime? @db.Timestamptz(3)
 
-  devices PersonDevice[]
-  authoredGames Game[] @relation("AuthoredGames")
-  gameShares GameShare[]
-  players SessionPlayer[]
-  chips   ChipEntry[]
-  rounds  SideRound[]
-  items   CollectedItem[]
+  role          AccessRole?         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  devices       PersonDevice[]
+  authoredGames Game[]              @relation("AuthoredGames")
+  gameShares    GameShare[]
+  players       SessionPlayer[]
+  chips         ChipEntry[]
+  rounds        SideRound[]
+  items         CollectedItem[]
   arcadeMembers ArcadeMember[]
   arcadeResults ArcadeResult[]
   groups        PersonGroupMember[]
@@ -1022,4 +1070,19 @@ model DeviceLog {
   @@index([sessionId, createdAt])
   @@index([requestId])
   @@map("device_logs")
+}
+
+/// Admin → Action log: what the owner and editors changed (people, games, rooms, clean-ups), newest first.
+/// Only ever added to; `actorPersonId` null is the owner. Names are copied, so the log reads the same after a rename.
+model AdminAction {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  actorPersonId String?  @db.Uuid
+  actorName     String   @db.VarChar(60)
+  action        String   @db.VarChar(40)
+  subject       String   @db.VarChar(200)
+  details       Json?    @db.JsonB
+
+  @@index([createdAt])
+  @@map("admin_actions")
 }

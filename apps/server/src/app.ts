@@ -16,8 +16,10 @@ import { registerFeedbackRoutes } from './feedback/routes.js';
 import { registerProblemLog, recordProblem } from './diagnostics/problems.js';
 import { registerDeviceLogs } from './diagnostics/device-logs.js';
 import { registerPeopleRoutes } from './people/routes.js';
+import { registerRoleRoutes } from './people/roles.js';
 import { registerGroupRoutes } from './people/groups.js';
 import { registerMediaLibrary } from './assets/library.js';
+import { registerAdminRoutes } from './admin/routes.js';
 import { registerSideGames } from './side-games/routes.js';
 import { registerPackAdminRoutes } from './side-games/pack-admin-routes.js';
 import { registerSiteLook } from './site/look.js';
@@ -147,6 +149,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerFeedbackRoutes(app, options.database.client, config, owner);
     registerDeviceLogs(app, options.database.client, config, owner);
     registerPeopleRoutes(app, options.database.client, config, owner, live);
+    registerRoleRoutes(app, options.database.client, owner, live);
     registerGroupRoutes(app, options.database.client, owner);
     registerPrefabRoutes(app, options.database.client, owner);
     registerSavePointRoutes(app, options.database.client, owner);
@@ -154,6 +157,7 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerPackAdminRoutes(app, options.database.client, config, owner);
     registerSiteLook(app, options.database.client, owner);
     registerMediaLibrary(app, options.database.client, config, owner);
+    registerAdminRoutes(app, options.database.client, config, owner, { metrics, database: options.database, connections: () => rooms?.io.engine.clientsCount ?? 0 });
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway, rooms.io);
     if (rooms) { const lobbies = createLobbies(options.database.client); registerArcade(app, options.database.client, config, rooms.gateway, createRounds(options.database.client, config, rooms.service, lobbies), lobbies); }
   }

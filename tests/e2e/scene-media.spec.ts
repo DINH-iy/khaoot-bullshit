@@ -191,6 +191,10 @@ test('an author puts a picture in a quiz question, and the room shows it with th
   await crop.getByRole('button', { name: 'Use this', exact: true }).click();
   await expect(canvas.locator('.stage-media.cropped')).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  // Words with the picture: what it shows (for screen readers) and a caption under it on every screen.
+  await page.getByLabel('Describe the picture (for screen readers)').fill('The Eiffel tower at night');
+  await page.getByLabel('Caption (shown under it on every screen)').fill('Paris, 1889');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   await field.getByRole('button', { name: 'Media settings' }).click();
   await crop.getByRole('button', { name: 'Back to library' }).click();
   await expect(library.getByText('In this scene', { exact: true })).toBeVisible();
@@ -222,6 +226,8 @@ test('an author puts a picture in a quiz question, and the room shows it with th
       const picture = screen.locator('.media-above.media-wide .stage-media.image.cropped img');
       await expect(picture).toBeVisible();
       expect(await picture.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1);
+      await expect(picture).toHaveAttribute('alt', 'The Eiffel tower at night');
+      await expect(screen.locator('.stage-media-caption')).toHaveText('Paris, 1889');
     }
   } finally { await phoneContext.close(); }
 });

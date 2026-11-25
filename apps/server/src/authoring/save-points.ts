@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { visibleTo, type EditorAccess } from './drafts.js';
+import { gamePermissions, visibleTo, type EditorAccess } from './drafts.js';
 import { CreateSavePointSchema, GameIdSchema, MAX_SAVE_POINTS, SavePointListSchema, SavePointSchema, SavePointSummarySchema } from '@party/contracts';
 import { Prisma, type PrismaClient } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
@@ -20,9 +20,11 @@ export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClie
   const param = (request: FastifyRequest, name: 'gameId' | 'savePointId') => { const id = GameIdSchema.safeParse((request.params as Record<string, string | undefined>)[name]); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   /** The game, when it is one of the owner's games that is still in the list. */
   // Only a game this person may see (their own, shared with them, or any for the owner).
-  const game = async (request: FastifyRequest, access: EditorAccess) => {
+  // `need`: reading save points needs to see the game; making, removing or going back to one needs `game.savePoints`.
+  const game = async (request: FastifyRequest, access: EditorAccess, need: 'view' | 'edit' = 'view') => {
     const gameId = param(request, 'gameId'); const creator = await ownerCreator(client);
-    const found = await client.game.findFirst({ where: { id: gameId, creatorId: creator.id, archivedAt: null, draft: { isNot: null }, ...visibleTo(access) }, select: { id: true } });
+    const found = await client.game.findFirst({ where: { id: gameId, creatorId: creator.id, archivedAt: null, draft: { isNot: null }, ...visibleTo(access) }, select: { id: true, authorPersonId: true } });
+    if (found) roomAssert((await gamePermissions(client, found, access)).has(need === 'edit' ? 'game.savePoints' : 'game.view'), 'FORBIDDEN');
     roomAssert(found, 'NOT_FOUND'); return gameId;
   };
 
@@ -45,7 +47,7 @@ export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClie
     try {
       const access = await owner.requireEditor(request);
       const parsed = CreateSavePointSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
-      const { savePointId, name, expectedRevision, automatic = false } = parsed.data; const gameId = await game(request, access);
+      const { savePointId, name, expectedRevision, automatic = false } = parsed.data; const gameId = await game(request, access, 'edit');
       const savedBy = access.personId ? (await client.person.findUnique({ where: { id: access.personId }, select: { name: true } }))?.name.slice(0, 80) ?? null : null;
       const row = await client.$transaction(async tx => {
         // One at a time per game, so the limit holds when two people save at once.
@@ -86,7 +88,7 @@ export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClie
   });
   app.post('/api/host/games/:gameId/save-points/:savePointId/delete', async (request, reply) => {
     try {
-      const access = await owner.requireEditor(request); const gameId = await game(request, access);
+      const access = await owner.requireEditor(request); const gameId = await game(request, access, 'edit');
       const removed = await client.gameSavePoint.deleteMany({ where: { id: param(request, 'savePointId'), gameId } });
       if (removed.count !== 1) throw new RoomError('NOT_FOUND');
       return { ok: true, data: {} };

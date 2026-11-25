@@ -11,8 +11,8 @@ import { ROOM_MANAGEMENT_TEXTS } from '../room/room-management.text.js';
 import { HOST_TEXTS } from '../room/host.text.js';
 import './room-extras.css';
 
-type Setting = 'showScores' | 'reactions' | 'soundboard' | 'autoClose' | 'breakVotes' | 'confirmLooks';
-const LABELS = { showScores: 'sShowScores', reactions: 'sReactions', soundboard: 'sSoundboard', autoClose: 'sAutoClose', breakVotes: 'sBreakVotes', confirmLooks: 'sConfirmLooks' } as const satisfies Record<Setting, keyof typeof HOST_TEXTS.en>;
+type Setting = 'showScores' | 'reactions' | 'soundboard' | 'eventSounds' | 'autoClose' | 'breakVotes' | 'confirmLooks';
+const LABELS = { showScores: 'sShowScores', reactions: 'sReactions', soundboard: 'sSoundboard', eventSounds: 'sEventSounds', autoClose: 'sAutoClose', breakVotes: 'sBreakVotes', confirmLooks: 'sConfirmLooks' } as const satisfies Record<Setting, keyof typeof HOST_TEXTS.en>;
 
 /** Host: how the room behaves. Changes apply straight away for everyone. */
 export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {

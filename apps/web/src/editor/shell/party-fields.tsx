@@ -42,7 +42,7 @@ export function PartyFields({ definition, onChange }: { definition: Definition; 
 
     <p className="field-title">{t('sounds')}</p>
     <p className="hint">{t('soundsHint')}</p>
-    <ol className="music-list">{sounds.map((sound, index) => <li key={`${index}-${nameOf(sound)}`}>
+    <ol className="sound-list">{sounds.map((sound, index) => <li key={`${index}-${nameOf(sound)}`}>
       <span className="music-name">{nameOf(sound)}</span>
       {sound.kind === 'media' ? <audio src={sceneMediaUrl(sound.id)} controls preload="none" aria-label={t('listen', { name: nameOf(sound) })} />
         : <button type="button" className="icon-only" aria-label={t('listen', { name: nameOf(sound) })} onClick={() => playSound(sound)}><Icon name="play" size={14} /></button>}

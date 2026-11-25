@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RoleSelect, useRoles } from './roles-panel.js';
 import { Loader } from '../ui/loader.js';
 import qrcode from 'qrcode-generator';
 import { PeopleSummarySchema, PersonKeyViewSchema, PersonRowSchema, PersonStandingSchema, type PeopleSummary as Summary, type PersonKeyView, type PersonRow, type PersonStanding } from '@party/contracts';
@@ -54,7 +55,7 @@ function KeyCard({ view, onDone }: { view: PersonKeyView; onDone: () => void }) 
 export function PeoplePanel() {
   const paging = usePeoplePage({ withKeys: true }); const { data, search, setSearch, query } = paging;
   const [summary, setSummary] = useState<Summary>(); const [error, setError] = useState(''); const [name, setName] = useState('');
-  const [canEdit, setCanEdit] = useState(false);
+  const [roleId, setRoleId] = useState<string | null>(null); const { roles } = useRoles();
   const [shown, setShown] = useState<PersonKeyView>(); const [busy, setBusy] = useState(false);
   // One person's own page (?admin=people&person=…): the browser's back button returns to the list.
   // The list, the leaderboard (?admin=people&tab=leaderboard) or the groups (&tab=groups), each in the browser's history too.
@@ -74,7 +75,7 @@ export function PeoplePanel() {
   useEffect(() => { if (paging.failed) setError(explain(undefined)); }, [paging.failed]);
   const run = async (work: () => Promise<unknown>) => { setBusy(true); setError(''); try { await work(); paging.reload(); setChanges(count => count + 1); } catch (cause) { setError(explain(cause)); } finally { setBusy(false); } };
   const show = (data: unknown) => setShown(PersonKeyViewSchema.parse(data));
-  const add = (event: React.FormEvent) => { event.preventDefault(); void run(async () => { show(await roomApi('/api/host/people', { name, canEdit })); setName(''); setCanEdit(false); }); };
+  const add = (event: React.FormEvent) => { event.preventDefault(); void run(async () => { show(await roomApi('/api/host/people', { name, roleId })); setName(''); setRoleId(null); }); };
   const actions: PersonActions = {
     rename: person => { const next = prompt(`New name for ${person.name}`, person.name)?.trim(); if (next && next !== person.name) void run(() => roomApi(`/api/host/people/${person.id}`, { name: next }, 'PUT')); },
     viewKey: person => {
@@ -82,9 +83,12 @@ export function PeoplePanel() {
       else void run(async () => show(await roomApi(`/api/host/people/${person.id}/key`)));
     },
     newKey: person => { if (confirm(`Make a new key for ${person.name}? The old key and link stop working; phones already signed in stay signed in.`)) void run(async () => show(await roomApi(`/api/host/people/${person.id}/key`, {}))); },
-    setEditor: (person, next) => {
-      if (next ? confirm(`Let ${person.name} edit games? They can make, change, publish, rehearse and remove games. They cannot host rooms or open this admin menu.`) : true)
-        void run(() => roomApi(`/api/host/people/${person.id}/editor`, { canEdit: next }));
+    roles,
+    setRole: (person, next) => {
+      const role = roles?.find(entry => entry.id === next);
+      if (next === (person.roleId ?? null)) return;
+      if (confirm(role ? `Give ${person.name} the role ${role.name}? They may do what that role allows (see Admin → Roles).` : `Make ${person.name} a player only? They can no longer work on games.`))
+        void run(() => roomApi(`/api/host/people/${person.id}/role`, { roleId: next }));
     },
     signOut: person => { if (confirm(`Sign out all of ${person.name}’s phones? They join as guests until they sign in with their key again.`)) void run(() => roomApi(`/api/host/people/${person.id}/sign-out`, {})); },
     remove: person => { if (confirm(`Remove ${person.name}? Their phones are signed out, their key stops working and the name is free again. Past games and chips stay in the history.`)) void run(async () => { await roomApi(`/api/host/people/${person.id}/remove`, {}); openPerson(null); }); },
@@ -105,14 +109,14 @@ export function PeoplePanel() {
   if (place.tab === 'leaderboard') return <>{tabs}<Leaderboard onOpen={openPerson} /></>;
   const people = data?.people;
   return <>{tabs}
-    <p className="admin-intro">Make an account for each regular player. Each gets a personal key: typed once on a phone (or opened as a link), that phone then always joins as them, with their look and their chips across games. Editors can also make and change games, but never host or see this menu. Players without an account still join as guests. Click a name for everything about that person.</p>
+    <p className="admin-intro">Make an account for each regular player. Each gets a personal key: typed once on a phone (or opened as a link), that phone then always joins as them, with their look and their chips across games. A role (Admin → Roles) lets someone make or change games, or more; only you see this menu. Players without an account still join as guests. Click a name for everything about that person.</p>
     {error && <p role="alert" className="error">{error}</p>}
     {summary && summary.people > 0 && <PeopleSummary summary={summary} />}
     {keyCard}
     <form className="person-add" onSubmit={add} aria-labelledby="person-add-heading">
       <h2 id="person-add-heading">Add a person</h2>
       <label className="person-add-name">Name<input value={name} maxLength={40} required onChange={event => setName(event.target.value)} /></label>
-      <label className="person-check"><input type="checkbox" checked={canEdit} onChange={event => setCanEdit(event.target.checked)} />Can edit games</label>
+      <label className="person-check">Role <RoleSelect value={roleId} roles={roles} label="Role of the new person" onChange={setRoleId} /></label>
       <button type="submit" className="primary" disabled={busy || !name.trim()}>Add person</button>
     </form>
     {!data && !error && <p role="status">Loading people…</p>}
@@ -122,11 +126,11 @@ export function PeoplePanel() {
       <span role="status">{query && data ? `${data.total.toLocaleString()} found` : ''}</span></div>}
     {query && data && !data.total && <p className="admin-empty">Nobody is called “{query}”.</p>}
     {people && people.length > 0 && <div className="people-table-wrap"><table className="people-table">
-      <thead><tr><th scope="col">Name</th><th scope="col">Editor</th><th scope="col" className="num">Phones</th><th scope="col">Last seen</th><th scope="col">Personal key</th></tr></thead>
+      <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col" className="num">Phones</th><th scope="col">Last seen</th><th scope="col">Personal key</th></tr></thead>
       <tbody>{people.map(person => <tr key={person.id}>
         <th scope="row"><a className="person-name" href={`?admin=people&person=${person.id}`} onClick={event => { event.preventDefault(); openPerson(person.id); }}>
           <span className={`person-initials${person.canEdit ? ' is-editor' : ''}`} aria-hidden="true">{initials(person.name)}</span><span className="person-name-text">{person.name}</span></a></th>
-        <td className="wide-only"><label className="person-switch"><input type="checkbox" role="switch" checked={person.canEdit} disabled={busy} onChange={event => actions.setEditor(person, event.target.checked)} /><span className="visually-hidden">{person.name} can edit games</span><span aria-hidden="true">{person.canEdit ? 'Yes' : 'No'}</span></label></td>
+        <td className="wide-only"><RoleSelect value={person.roleId ?? null} roles={roles} label={`Role of ${person.name}`} disabled={busy} onChange={next => actions.setRole(person, next)} /></td>
         <td className="num wide-only">{person.devices}</td>
         <td className="person-seen"><LastSeen at={person.lastSeenAt} /></td>
         <td className="person-key-cell">{person.key

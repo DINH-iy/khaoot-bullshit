@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { recordAction } from '../admin/actions.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -115,7 +116,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
     const upload = async (request: FastifyRequest, reply: FastifyReply, font: boolean) => {
       let counted = false;
       try {
-        const editor = await owner.requireEditor(request, 'edit');
+        const editor = await owner.requirePermission(request, 'media.manage', 'edit');
         roomAssert(limiter.allow(`library:${editor.personId ?? 'owner'}`, 30), 'RATE_LIMITED');
         const declared = Number(request.headers['content-length']);
         const rules = font ? FONT_UPLOAD : RULES;
@@ -139,7 +140,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
   app.post('/api/host/fonts/google', async (request, reply) => {
     let counted = false;
     try {
-      const editor = await owner.requireEditor(request, 'edit');
+      const editor = await owner.requirePermission(request, 'media.manage', 'edit');
       const input = GoogleFontImportSchema.safeParse(request.body);
       roomAssert(input.success, 'INVALID_COMMAND');
       const family = googleFontFamily(input.data.url);
@@ -155,7 +156,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
 
   app.post('/api/host/media/youtube', async (request, reply) => {
     try {
-      const editor = await owner.requireEditor(request, 'edit');
+      const editor = await owner.requirePermission(request, 'media.manage', 'edit');
       const input = ImportYouTubeAudioSchema.safeParse(request.body);
       roomAssert(input.success, 'INVALID_COMMAND');
       const url = youtubeVideoUrl(input.data.url);
@@ -168,7 +169,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
 
   app.post('/api/host/media/:id/trim', async (request, reply) => {
     try {
-      const editor = await owner.requireEditor(request, 'edit');
+      const editor = await owner.requirePermission(request, 'media.manage', 'edit');
       const id = idParam(request);
       const input = TrimAudioSchema.safeParse(request.body);
       roomAssert(input.success, 'INVALID_COMMAND');
@@ -185,7 +186,7 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
   // A new name, or the credit shown when it plays (composer and licence; empty removes it).
   app.put('/api/host/media/:id', async (request, reply) => {
     try {
-      await owner.requireEditor(request, 'edit'); const id = idParam(request);
+      await owner.requirePermission(request, 'media.manage', 'edit'); const id = idParam(request);
       const parsed = UpdateLibraryItemSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const changed = await client.gameMedia.updateMany({ where: { id, removedAt: null, kind: { not: 'FONT' } }, data: {
         ...(parsed.data.name !== undefined ? { name: cleanName(parsed.data.name) } : {}), ...(parsed.data.credit !== undefined ? { credit: parsed.data.credit || null } : {}) } });
@@ -214,8 +215,10 @@ export function registerMediaLibrary(app: FastifyInstance, client: PrismaClient,
   for (const [path, font] of [['/api/host/media/:id/remove', false], ['/api/host/fonts/:id/remove', true]] as const) {
     app.post(path, async (request, reply) => {
       try {
-        await owner.requireEditor(request, 'edit');
-        await removeItem(idParam(request), font);
+        const access = await owner.requirePermission(request, 'media.manage', 'edit'); const id = idParam(request);
+        const name = (await client.gameMedia.findUnique({ where: { id }, select: { name: true } }))?.name ?? id;
+        await removeItem(id, font);
+        await recordAction(client, access, font ? 'font.removed' : 'media.removed', name);
         return { ok: true, data: {} };
       } catch (error) { return owner.fail(reply, error); }
     });

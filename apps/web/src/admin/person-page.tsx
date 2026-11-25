@@ -1,10 +1,12 @@
 import { accuracy, HEAD_TO_HEAD_GAMES, isHeadToHeadKey, winRate, type PersonRow, type PersonStanding, type RankingKey } from '@party/contracts';
+import type { Role } from '@party/contracts';
+import { RoleSelect } from './roles-panel.js';
 import { fullMoment, seenThisWeek, shortMoment } from './people-time.js';
 
 /** What the owner can do with a person; the People panel runs them (with their confirmations). */
 export interface PersonActions {
   rename: (person: PersonRow) => void; viewKey: (person: PersonRow) => void; newKey: (person: PersonRow) => void;
-  setEditor: (person: PersonRow, next: boolean) => void; signOut: (person: PersonRow) => void; remove: (person: PersonRow) => void;
+  setRole: (person: PersonRow, roleId: string | null) => void; roles: Role[] | undefined; signOut: (person: PersonRow) => void; remove: (person: PersonRow) => void;
 }
 
 export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join('');
@@ -51,7 +53,7 @@ export function PersonPage({ person, busy, actions, standing, onOpen }: { person
     <header className="person-page-head">
       <span className={`person-initials large${person.canEdit ? ' is-editor' : ''}`} aria-hidden="true">{initials(person.name)}</span>
       <div><h2 id="person-page-name">{person.name}</h2>
-        <p>{person.canEdit ? 'Player and editor' : 'Player'} · added <span title={fullMoment(person.createdAt)}>{shortMoment(person.createdAt)}</span></p></div>
+        <p>{person.roleName ? `Player · ${person.roleName}` : 'Player'} · added <span title={fullMoment(person.createdAt)}>{shortMoment(person.createdAt)}</span></p></div>
     </header>
 
     <section className="person-card" aria-labelledby="person-stats"><h3 id="person-stats">Stats</h3>
@@ -62,8 +64,8 @@ export function PersonPage({ person, busy, actions, standing, onOpen }: { person
       <p className="person-hint">Counted over finished games with a personal key; practice rooms do not count.</p></section>
 
     <section className="person-card" aria-labelledby="person-access"><h3 id="person-access">What {person.name} may do</h3>
-      <label className="person-switch"><input type="checkbox" role="switch" checked={person.canEdit} disabled={busy} onChange={event => actions.setEditor(person, event.target.checked)} />Can edit games</label>
-      <p className="person-hint">Editors make, change, publish and rehearse games. They never host rooms or see the admin menu.</p></section>
+      <label className="person-role">Role <RoleSelect value={person.roleId ?? null} roles={actions.roles} label={`Role of ${person.name}`} disabled={busy} onChange={roleId => actions.setRole(person, roleId)} /></label>
+      <p className="person-hint">What each role may do is set under Admin → Roles. Without a role, {person.name} is a player only. Nobody but you sees the admin menu.</p></section>
 
     <section className="person-card" aria-labelledby="person-key"><h3 id="person-key">Personal key</h3>
       {person.key && <p className="person-key"><code>{person.key}</code></p>}

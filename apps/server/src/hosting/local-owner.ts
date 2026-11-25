@@ -1,4 +1,5 @@
 import { gameFacts } from './game-facts.js';
+import { recordAction } from '../admin/actions.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Draft } from '@party/contracts';
 import { ClaimRoomSchema, GameIdSchema, HostAccessSchema, HostGameSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
@@ -25,7 +26,7 @@ import { ownerCreator as sharedOwnerCreator } from './owner-creator.js';
 const HOST_ACCESS_MS = 8 * 60 * 60 * 1000;
 
 export function registerLocalHosting(app: FastifyInstance, client: PrismaClient, config: Config, owner: OwnerAccess, live?: EditorLive) {
-  const { fail, guard, isOwner, localToken, requireOwner, requireEditor } = owner;
+  const { fail, guard, isOwner, localToken, requireOwner, requireEditor, requirePermission } = owner;
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'));
   const authoring = createAuthoring(client);
   const secure = config.PUBLIC_ORIGIN.startsWith('https:') ? '; Secure' : '';
@@ -88,7 +89,8 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     try {
       const access = await requireEditor(request); const { role } = access;
       const creator = await ownerCreator(); const custom = await authoring.builtInVersions(creator.id);
-      const rooms = role !== 'owner' ? [] : await client.gameSession.findMany({
+      // Open rooms: the owner's, also for anyone whose role may host rooms.
+      const rooms = role !== 'owner' && !access.permissions.has('rooms.host') ? [] : await client.gameSession.findMany({
         where: { hostId: creator.id, status: { not: 'FINISHED' }, roomCode: { not: null }, createdAt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
         select: { id: true, roomCode: true, status: true, gameVersion: { select: { game: { select: { title: true } } } }, _count: { select: { players: { where: { leftAt: null } } } } },
         orderBy: { createdAt: 'desc' }, take: 10,
@@ -101,14 +103,14 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
             custom: own ? { gameId: own.gameId, inUse: own.versionId !== null, unpublished: own.unpublished } : null };
         }),
         myGames: await authoring.list(creator.id, { personId: access.personId }),
-        role,
+        role, permissions: [...access.permissions],
         rooms: rooms.map(room => ({ sessionId: room.id, roomCode: room.roomCode, title: room.gameVersion.game.title, status: room.status, playerCount: room._count.players })),
       }) };
     } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/rooms', async (request, reply) => {
     try {
-      const settings = requireOwner(request);
+      const settings = await requirePermission(request, 'rooms.host');
       const parsed = HostRoomSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const { sessionId, commandId, gameKey, gameId } = parsed.data;
       const creator = await ownerCreator();
@@ -125,7 +127,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   });
   app.post('/api/host/minigame-tryout', async (request, reply) => {
     try {
-      const settings = await requireEditor(request);
+      const settings = await requirePermission(request, 'rooms.rehearse');
       const parsed = RestartRoomSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const { sessionId, commandId } = parsed.data;
       const creator = await ownerCreator();
@@ -138,7 +140,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   // The owner can always get back into their own room, e.g. after host access expired.
   app.post('/api/host/rooms/:sessionId/enter', async (request, reply) => {
     try {
-      requireOwner(request);
+      await requirePermission(request, 'rooms.host');
       const id = GameIdSchema.safeParse((request.params as { sessionId?: string }).sessionId); roomAssert(id.success, 'INVALID_COMMAND');
       const creator = await ownerCreator(); const token = newToken(); const expiresAt = new Date(Date.now() + HOST_ACCESS_MS);
       await client.$transaction(async tx => {
@@ -156,12 +158,12 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   // Closing a room that already ended is fine, so a repeated click does no harm.
   app.post('/api/host/rooms/:sessionId/close', async (request, reply) => {
     try {
-      requireOwner(request);
+      const access = await requirePermission(request, 'rooms.host');
       const id = GameIdSchema.safeParse((request.params as { sessionId?: string }).sessionId); roomAssert(id.success, 'INVALID_COMMAND');
       const creator = await ownerCreator();
       const session = await client.gameSession.findUnique({ where: { id: id.data }, select: { hostId: true, roomCode: true } });
       roomAssert(session && session.hostId === creator.id && session.roomCode, 'ROOM_NOT_AVAILABLE');
-      await client.$transaction(tx => closeRoom(tx, id.data));
+      if (await client.$transaction(tx => closeRoom(tx, id.data))) await recordAction(client, access, 'room.closed', `Room ${session.roomCode}`);
       return { ok: true, data: { sessionId: id.data } };
     } catch (error) { return fail(reply, error); }
   });
@@ -202,7 +204,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     try { const access = await requireEditor(request); return { ok: true, data: await authoring.list((await ownerCreator()).id, access) }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games', async (request, reply) => {
-    try { const access = await requireEditor(request); return { ok: true, data: await authoring.create((await ownerCreator()).id, request.body, access) }; } catch (error) { return fail(reply, error); }
+    try { const access = await requirePermission(request, 'games.make'); return { ok: true, data: await authoring.create((await ownerCreator()).id, request.body, access) }; } catch (error) { return fail(reply, error); }
   });
   app.get('/api/host/games/:gameId', async (request, reply) => {
     try { const access = await requireEditor(request, 'edit'); return { ok: true, data: await authoring.get((await ownerCreator()).id, gameParam(request), access) }; } catch (error) { return fail(reply, error); }
@@ -221,10 +223,11 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   });
   // Pasted games can be as large as a draft, so this route alone accepts up to the draft limit.
   app.post('/api/host/games/import', { bodyLimit: MAX_DRAFT_BYTES + 16 * 1024 }, async (request, reply) => {
-    try { const access = await requireEditor(request); return { ok: true, data: await authoring.importGame((await ownerCreator()).id, request.body, access) }; } catch (error) { return fail(reply, error); }
+    try { const access = await requirePermission(request, 'games.make'); return { ok: true, data: await authoring.importGame((await ownerCreator()).id, request.body, access) }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/archive', async (request, reply) => {
-    try { const access = await requireEditor(request); await authoring.archive((await ownerCreator()).id, gameParam(request), access); return { ok: true, data: {} }; } catch (error) { return fail(reply, error); }
+    try { const access = await requireEditor(request); const gameId = gameParam(request); const { title } = await authoring.get((await ownerCreator()).id, gameId, access);
+      await authoring.archive((await ownerCreator()).id, gameId, access); await recordAction(client, access, 'game.removed', title); return { ok: true, data: {} }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/rehearse', async (request, reply) => {
     try {
@@ -240,14 +243,20 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/publish', async (request, reply) => {
-    try { const access = await requireEditor(request); const draft = await authoring.publish((await ownerCreator()).id, gameParam(request), request.body, access); live?.saved(forEveryone(draft)); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
+    try { const access = await requireEditor(request); const draft = await authoring.publish((await ownerCreator()).id, gameParam(request), request.body, access); live?.saved(forEveryone(draft));
+      await recordAction(client, access, 'game.published', `${draft.title} (version ${draft.published?.number ?? 1})`); return { ok: true, data: draft }; } catch (error) { return fail(reply, error); }
   });
   // Sharing a game with editors (its author or the owner), and the owner saying who made it.
   app.get('/api/host/games/:gameId/sharing', async (request, reply) => {
     try { const access = await requireEditor(request); return { ok: true, data: await authoring.sharing((await ownerCreator()).id, gameParam(request), access) }; } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games/:gameId/sharing', async (request, reply) => {
-    try { const access = await requireEditor(request); return { ok: true, data: await authoring.share((await ownerCreator()).id, gameParam(request), request.body, access) }; } catch (error) { return fail(reply, error); }
+    try { const access = await requireEditor(request); const gameId = gameParam(request); const sharing = await authoring.share((await ownerCreator()).id, gameId, request.body, access);
+      const { title } = await authoring.get((await ownerCreator()).id, gameId);
+      const people = new Map((await client.person.findMany({ where: { id: { in: sharing.shares.map(share => share.personId) } }, select: { id: true, name: true } })).map(person => [person.id, person.name]));
+      const roles = new Map(sharing.roles.map(role => [role.id, role.name]));
+      const names = sharing.shares.map(share => `${people.get(share.personId) ?? '?'} (${roles.get(share.roleId) ?? '?'})`);
+      await recordAction(client, access, 'game.shared', `${title}: ${names.length ? names.join(', ') : 'nobody'}`); return { ok: true, data: sharing }; } catch (error) { return fail(reply, error); }
   });
 }
 /** A saved draft as every editor in it receives it live: without who made it as seen by the one who saved. */

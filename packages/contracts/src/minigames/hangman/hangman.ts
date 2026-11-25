@@ -44,8 +44,22 @@ export const HANGMAN_WORDS: Record<HangmanWordLanguage, readonly string[]> = {
 export const HangmanViewSchema = z.object({ mask: z.string().max(30), found: z.number().int().min(0), wrong: z.number().int().min(0), lives: z.number().int().min(1),
   solved: z.boolean(), hanged: z.boolean() }).strict();
 export type HangmanView = z.infer<typeof HangmanViewSchema>;
-// What only the side's own phones see: the word with its found letters ("ga_g_e"), and every letter it guessed, in order.
-export const HangmanOwnViewSchema = z.object({ pattern: z.string().max(30), guessed: z.array(z.string().length(1)) }).strict();
+// What only the side's own phones see: the word with its found letters ("ga_g_e"), every letter it guessed, in order,
+// and the wrong whole words it tried (absent in older views).
+export const HangmanOwnViewSchema = z.object({ pattern: z.string().max(30), guessed: z.array(z.string().length(1)), words: z.array(z.string().max(30)).optional() }).strict();
+
+/**
+ * Guessing the whole word: a move like any other, written "w__" + the word (spaces as "_"), so it also works in a
+ * team vote. The right word solves it; a wrong one costs a life, like a wrong letter.
+ */
+const WORD_MOVE = 'w__';
+export const hangmanWordMove = (word: string) => `${WORD_MOVE}${normalizeHangmanWord(word).replace(/ /g, '_')}`;
+/** The guessed word of a whole-word move (normalized), or null when the move is not one. */
+export function readHangmanWordMove(move: string): string | null {
+  if (!move.startsWith(WORD_MOVE)) return null;
+  const parsed = HangmanWordSchema.safeParse(move.slice(WORD_MOVE.length).replace(/_/g, ' '));
+  return parsed.success ? parsed.data : null;
+}
 export type HangmanOwnView = z.infer<typeof HangmanOwnViewSchema>;
 
 /** The word with only the guessed letters showing ("_" for the others). */
@@ -53,15 +67,16 @@ export const hangmanPattern = (word: string, guessed: readonly string[]) => [...
 /** Gallows parts showing after `wrong` mistakes with `lives` lives: all of them once hanged. */
 export const hangmanParts = (wrong: number, lives: number) => Math.min(HANGMAN_PARTS, Math.round(wrong * HANGMAN_PARTS / lives));
 
-/** Where a side stands: its wrong guesses, letter places found, and whether it found the word or is hanged. */
-export function hangmanProgress(word: string, guessed: readonly string[], lives: number) {
+/** Where a side stands: its wrong guesses (letters and whole words), letter places found, and whether it found the word or is hanged. */
+export function hangmanProgress(word: string, guessed: readonly string[], lives: number, words: readonly string[] = []) {
   const inWord = new Set([...word].filter(char => /[a-z]/.test(char)));
-  const wrong = guessed.filter(letter => !inWord.has(letter)).length;
-  const solved = [...inWord].every(letter => guessed.includes(letter));
-  return { wrong, solved, hanged: !solved && wrong >= lives, found: [...word].filter(char => /[a-z]/.test(char) && guessed.includes(char)).length };
+  const named = words.includes(word);
+  const wrong = guessed.filter(letter => !inWord.has(letter)).length + words.filter(entry => entry !== word).length;
+  const solved = named || [...inWord].every(letter => guessed.includes(letter));
+  return { wrong, solved, hanged: !solved && wrong >= lives, found: [...word].filter(char => /[a-z]/.test(char) && (named || guessed.includes(char))).length };
 }
 /** The view everyone sees of a side (no letters). */
-export const hangmanView = (word: string, guessed: readonly string[], lives: number): HangmanView => {
-  const { wrong, solved, hanged, found } = hangmanProgress(word, guessed, lives);
+export const hangmanView = (word: string, guessed: readonly string[], lives: number, words: readonly string[] = []): HangmanView => {
+  const { wrong, solved, hanged, found } = hangmanProgress(word, guessed, lives, words);
   return { mask: word.replace(/[a-z]/g, '_'), found, wrong, lives, solved, hanged };
 };

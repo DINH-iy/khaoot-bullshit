@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { RoomReply } from '@party/contracts';
+import { APP_PERMISSIONS, PERMISSIONS, type AppPermission, type RoomReply } from '@party/contracts';
+
+const ALL_PERMISSIONS = new Set<string>(PERMISSIONS);
 import type { Config } from '../config.js';
 import { GameError } from '../game/errors.js';
 import { allowedOrigin, namedCookie, RateLimiter, RoomError, roomAssert } from '../rooms/security.js';
@@ -71,16 +73,21 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
     roomAssert(hasOwnerCookie(settings, request), 'UNAUTHORIZED');
     return settings;
   };
+  // The owner may do everything; a person with a role may do what the role allows (contracts/roles.ts), read
+  // from the database on every request, so a changed role takes effect at once. No role: a player only.
   const editorIdentity = async (settings: ReturnType<typeof guard>, request: FastifyRequest) => {
-    if (hasOwnerCookie(settings, request)) return { role: 'owner' as const, personId: null };
+    if (hasOwnerCookie(settings, request)) return { role: 'owner' as const, personId: null, permissions: ALL_PERMISSIONS as ReadonlySet<string> };
     const found = await personFromCookie(client, request.headers.cookie);
-    return found?.person.canEdit ? { role: 'editor' as const, personId: found.person.id } : null;
+    if (!found?.person.roleId) return null;
+    const role = await client.accessRole.findUnique({ where: { id: found.person.roleId }, select: { permissions: true } });
+    return role ? { role: 'editor' as const, personId: found.person.id, permissions: new Set(role.permissions) as ReadonlySet<string> } : null;
   };
   const navigationAccess = async (request: FastifyRequest) => {
     checkRequest(request, 'access');
     if (!settings) return { role: null, localSignIn: false };
-    const role = (await editorIdentity(settings, request))?.role ?? null;
-    return { role, localSignIn: role !== 'owner' && request.headers['sec-fetch-site'] === 'same-origin' && Boolean(localToken(settings, request)) };
+    const identity = await editorIdentity(settings, request); const role = identity?.role ?? null;
+    return { role, localSignIn: role !== 'owner' && request.headers['sec-fetch-site'] === 'same-origin' && Boolean(localToken(settings, request)),
+      ...(identity ? { permissions: [...identity.permissions].filter(permission => (APP_PERMISSIONS as readonly string[]).includes(permission)) } : {}) };
   };
   /**
    * Working on games: the owner, or a person the owner gave editor rights to.
@@ -94,6 +101,12 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
     roomAssert(identity, 'UNAUTHORIZED');
     return { ...settings, ...identity };
   };
-  return { fail, guard, isOwner, localToken, requireOwner, requireEditor, navigationAccess };
+  /** The owner, or a person whose role has this app permission (games.make, media.manage, rooms.rehearse, rooms.host…). */
+  const requirePermission = async (request: FastifyRequest, permission: AppPermission, bucket: 'menu' | 'edit' = 'menu') => {
+    const access = await requireEditor(request, bucket);
+    roomAssert(access.permissions.has(permission), 'FORBIDDEN');
+    return access;
+  };
+  return { fail, guard, isOwner, localToken, requireOwner, requireEditor, requirePermission, navigationAccess };
 }
 export type OwnerAccess = ReturnType<typeof createOwnerAccess>;

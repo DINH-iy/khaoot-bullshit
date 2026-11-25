@@ -26,6 +26,8 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
   const [title, setTitle] = useState(''); const [startFrom, setStartFrom] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS); const s = useTexts(SHARE_TEXTS);
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
+  // What each person may do follows their role (and the game's role for them); the server checks it again.
+  const make = menu.role === 'owner' || Boolean(menu.permissions?.includes('games.make'));
   const run = (work: Promise<unknown>) => { setBusy(true); setError(''); void work.then(reload).catch(cause => { setError(explain(cause)); reload(); }).finally(() => setBusy(false)); };
   const showProblems = (gameId: string) => { void roomApi(`/api/host/games/${gameId}`).then(data => setProblems(current => ({ ...current, [gameId]: DraftSchema.parse(data).issues }))).catch(cause => setError(explain(cause))); };
   // Visible labels stay short; the accessible names say which game (and start with the visible label).
@@ -41,19 +43,19 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
         {game.issueCount > 0 && (problems[game.gameId]
           ? <button type="button" aria-expanded="true" onClick={() => setProblems(({ [game.gameId]: _hidden, ...rest }) => rest)} aria-label={t('hideProblemsLabel', { title: game.title })}>{t('hideProblems')}</button>
           : <button type="button" aria-expanded="false" onClick={() => showProblems(game.gameId)} aria-label={t('showProblemsLabel', { title: game.title })}>{t('showProblems')}</button>)}
-        {game.issueCount === 0 && !game.published?.matchesDraft && <button type="button" disabled={busy} onClick={() => run(roomApi(`/api/host/games/${game.gameId}/publish`, { expectedRevision: game.revision }))} aria-label={t('publishLabel', { title: game.title })}>{t('publish')}</button>}
-        <button type="button" disabled={busy} onClick={() => run(roomApi('/api/host/games', { gameId: newId(), title: t('copyTitle', { title: game.title }).slice(0, 160), startFrom: null, copyOf: game.gameId }))}
-          aria-label={t('copyLabel', { title: game.title })}>{t('copy')}</button>
+        {game.issueCount === 0 && !game.published?.matchesDraft && (game.can ?? []).includes('game.publish') && <button type="button" disabled={busy} onClick={() => run(roomApi(`/api/host/games/${game.gameId}/publish`, { expectedRevision: game.revision }))} aria-label={t('publishLabel', { title: game.title })}>{t('publish')}</button>}
+        {make && (game.can ?? []).includes('game.copy') && <button type="button" disabled={busy} onClick={() => run(roomApi('/api/host/games', { gameId: newId(), title: t('copyTitle', { title: game.title }).slice(0, 160), startFrom: null, copyOf: game.gameId }))}
+          aria-label={t('copyLabel', { title: game.title })}>{t('copy')}</button>}
         {game.published && openRoom && <button type="button" disabled={busy} onClick={() => openRoom(game.gameId)} aria-label={t('openRoomLabel', { title: game.title })}>{t('openRoom')}</button>}
-        {/* Only its maker or the owner removes a game; someone it was shared with cannot. */}
-        {game.shared ? null : removing === game.gameId
+        {/* Its maker or the owner removes a game; someone it was shared with only when their role for it may. */}
+        {!(game.can ?? []).includes('game.remove') ? null : removing === game.gameId
           ? <span className="my-game-confirm"><button type="button" className="danger" disabled={busy} onClick={() => { setRemoving(null); run(roomApi(`/api/host/games/${game.gameId}/archive`, {})); }} aria-label={t('yesRemoveLabel', { title: game.title })}>{t('yesRemove')}</button><button type="button" onClick={() => setRemoving(null)}>{t('keepIt')}</button></span>
           : <button type="button" className="quiet-danger" onClick={() => setRemoving(game.gameId)} aria-label={t('removeLabel', { title: game.title })}>{t('remove')}</button>}
       </div>
       {removing === game.gameId && <p className="my-game-note">{t('removeNote')}</p>}
       {problems[game.gameId] && <ul className="my-game-problems" aria-label={t('problemsIn', { title: game.title })}>{problems[game.gameId]!.map((issue, index) => <li key={index}>{issue.nodeKey ? (issue.stageIndex !== null ? t('scenePartProblem', { scene: issue.nodeKey, part: issue.stageIndex + 1 }) : t('sceneProblem', { scene: issue.nodeKey })) : ''}{issue.message}</li>)}</ul>}
     </li>)}</ul>}
-    <form className="new-game" aria-labelledby="new-game-heading" onSubmit={event => { event.preventDefault(); const own = startFrom.startsWith('own:') ? startFrom.slice(4) : null;
+    {make && <form className="new-game" aria-labelledby="new-game-heading" onSubmit={event => { event.preventDefault(); const own = startFrom.startsWith('own:') ? startFrom.slice(4) : null;
       run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: own || !startFrom ? null : startFrom, copyOf: own }).then(() => setTitle(''))); }}>
       <h3 id="new-game-heading">{t('newGame')}</h3>
       <label>{t('newGameName')}<input value={title} maxLength={160} onChange={event => setTitle(event.target.value)} required placeholder={t('newGamePlaceholder')} /></label>
@@ -61,6 +63,6 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
         options={[{ value: '', label: t('blankGame') }, ...menu.games.map(game => ({ value: game.key, label: t('copyOf', { title: game.title }), group: t('builtInGames') })),
           ...menu.myGames.map(game => ({ value: `own:${game.gameId}`, label: t('copyOf', { title: game.title }), group: t('yourGames') }))]} /></label>
       <button className="primary" disabled={busy || !title.trim()}>{t('createGame')}</button>
-    </form>
+    </form>}
   </section>;
 }

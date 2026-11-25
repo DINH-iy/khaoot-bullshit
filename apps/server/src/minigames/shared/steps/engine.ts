@@ -99,7 +99,7 @@ export async function stepMove(play: Play, playerId: string, step: number, optio
   const options = gameOf(play.rules).options(record.state, play.rules.settings, run!);
   requireGame(options, 'ALREADY_SUBMITTED');
   requireGame(step === record.step, step < record.step ? 'ALREADY_SUBMITTED' : 'INVALID_SUBMISSION');
-  requireGame(options!.includes(option), 'INVALID_SUBMISSION');
+  requireGame(options!.includes(option) || Boolean(gameOf(play.rules).accepts?.(record.state, option, play.rules.settings, run!)), 'INVALID_SUBMISSION');
   if (side.teamId && play.rules.decide === 'captain') requireGame(record.captainId === playerId, 'INELIGIBLE');
   if (side.teamId && play.rules.decide === 'anyone' && play.context!.answers === 'captain') requireGame(play.context!.captainOf.get(side.teamId) === playerId, 'INELIGIBLE');
   if (!voting(play.rules, side)) return applyOption(play, run!, side, record, option);

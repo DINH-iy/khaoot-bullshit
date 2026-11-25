@@ -71,6 +71,7 @@ export function createGameService(client: PrismaClient, observe?: (event: Comman
           const revision = session.revision + 1;
           const result = CommandReceiptSchema.parse({ formatVersion: 1, commandId: command.commandId, sessionId: session.id, revision, type: command.type, stageRunId: effect.stageRunId, submissionId: effect.submissionId });
           const saved = await tx.gameCommand.create({ data: { sessionId: session.id, commandKey: command.commandId, actorKey: key, type, requestHash, result } });
+          if (effect.verdict) await tx.answerVerdict.create({ data: { ...effect.verdict, sessionId: session.id, commandId: saved.id, revision } });
           if (effect.judgments?.length) await tx.stageJudgment.createMany({ data: effect.judgments.map(judgment => ({ ...judgment, sessionId: session.id, commandId: saved.id })) });
           // The route outcome references this command; the database allows exactly one per route run.
           if (effect.decision) await tx.routeDecision.create({ data: { ...effect.decision, voteSnapshot: effect.decision.voteSnapshot, sessionId: session.id, commandId: saved.id } });

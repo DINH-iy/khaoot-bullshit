@@ -26,7 +26,7 @@ export function registerStyleRoutes(app: FastifyInstance, client: PrismaClient, 
   // Saving is idempotent per styleId: it creates the style, or replaces its name and look.
   app.post('/api/host/styles', { bodyLimit: MAX_THEME_BYTES + 1024 }, async (request, reply) => {
     try {
-      await owner.requireEditor(request, 'edit');
+      await owner.requirePermission(request, 'games.make', 'edit');
       const parsed = SaveStyleSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
       const { styleId, name, theme } = parsed.data;
       roomAssert(Buffer.byteLength(JSON.stringify(theme), 'utf8') <= MAX_THEME_BYTES, 'INVALID_COMMAND');
@@ -50,7 +50,7 @@ export function registerStyleRoutes(app: FastifyInstance, client: PrismaClient, 
 
   app.post('/api/host/styles/:styleId/delete', async (request, reply) => {
     try {
-      await owner.requireEditor(request, 'edit');
+      await owner.requirePermission(request, 'games.make', 'edit');
       const creator = await ownerCreator(client);
       const removed = await client.themeStyle.deleteMany({ where: { id: idParam(request), creatorId: creator.id } });
       if (removed.count !== 1) throw new RoomError('NOT_FOUND');

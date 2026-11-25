@@ -26,9 +26,13 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
   const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
   // View mode: look through the game without changing it by accident. Every edit passes `change` (and undo/redo),
   // so this one switch is what makes viewing safe; the screens also lock their controls. Remembered in this browser.
-  const [readOnly, setReadOnlyState] = useState(() => { try { return localStorage.getItem(MODE_KEY) === 'view'; } catch { return false; } });
+  const [chosenReadOnly, setReadOnlyState] = useState(() => { try { return localStorage.getItem(MODE_KEY) === 'view'; } catch { return false; } });
+  // What one may do with this game (the server says, and checks again on every request): without "change", viewing only.
+  const can = (permission: string) => !draft?.can || draft.can.includes(permission);
+  const mayEdit = can('game.edit');
+  const readOnly = chosenReadOnly || !mayEdit;
   const viewing = useRef(readOnly); viewing.current = readOnly;
-  const setReadOnly = (next: boolean) => { setReadOnlyState(next); try { localStorage.setItem(MODE_KEY, next ? 'view' : 'edit'); } catch { /* storage blocked: this visit only */ } };
+  const setReadOnly = (next: boolean) => { if (!mayEdit) return; setReadOnlyState(next); try { localStorage.setItem(MODE_KEY, next ? 'view' : 'edit'); } catch { /* storage blocked: this visit only */ } };
   const [history, setHistory] = useState<EditHistory>({ undo: [], redo: [] });
   const [loadedHistory, setLoadedHistory] = useState<string>();
   const revision = useRef(0); const dirty = useRef(false); const saving = useRef(false); const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -185,7 +189,7 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.', `${bench ? 'bench' : 'rehearse'}-${gameId}`,
       bench ? sessionId => `/?bench=${sessionId}` : undefined);
 
-  return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, saveNow: flush, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly,
+  return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, saveNow: flush, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly, can, mayEdit,
     undo: () => restore('undo'), redo: () => restore('redo'), restore,
     // Your steps in words, for the history list: done (oldest first) and undone (the next redo last).
     steps: { undo: history.undo.map(step => ({ label: step.label, at: step.at })), redo: history.redo.map(step => ({ label: step.label, at: step.at })) }, canUndo: !readOnly && history.undo.length > 0, canRedo: !readOnly && history.redo.length > 0 };

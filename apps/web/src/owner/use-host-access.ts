@@ -5,7 +5,8 @@ import { roomApi } from '../room/api.js';
 
 export type HostRole = NonNullable<HostAccess['role']>;
 type Access = HostRole | 'denied' | 'error';
-type Check = { identity: object | null | undefined; role: Access; localSignIn: boolean };
+// `permissions`: the app permissions of the one signed in (contracts/roles.ts); all of them for the owner.
+type Check = { identity: object | null | undefined; role: Access; localSignIn: boolean; permissions: readonly string[] };
 
 /** Checks the browser's current server permissions without loading the game list. */
 export function useHostAccess({ enabled = true, identity, refreshOnFocus = false }: {
@@ -15,15 +16,17 @@ export function useHostAccess({ enabled = true, identity, refreshOnFocus = false
   useEffect(() => {
     if (!enabled) { setCheck(undefined); return; }
     let latest = 0;
+    // Checking again when the window gets focus keeps showing the last answer meanwhile: clearing it
+    // hid links such as "Back to host menu", so the page jumped under the first click after the focus came back.
+    setCheck(undefined);
     const load = () => {
       const request = ++latest;
-      setCheck(undefined);
       void roomApi('/api/host/access').then(data => {
         if (request !== latest) return;
         const access = HostAccessSchema.parse(data);
-        setCheck({ identity, role: access.role ?? 'denied', localSignIn: access.localSignIn });
+        setCheck({ identity, role: access.role ?? 'denied', localSignIn: access.localSignIn, permissions: access.permissions ?? [] });
       }).catch(cause => {
-        if (request === latest) setCheck({ identity, role: isUnavailablePageError(cause) ? 'denied' : 'error', localSignIn: false });
+        if (request === latest) setCheck({ identity, role: isUnavailablePageError(cause) ? 'denied' : 'error', localSignIn: false, permissions: [] });
       });
     };
     load();
@@ -36,3 +39,6 @@ export function useHostAccess({ enabled = true, identity, refreshOnFocus = false
 export function hostMenuHref(role: Access | null | undefined) {
   return role === 'owner' ? '/?host=1' : role === 'editor' ? '/?host=1#my-games' : undefined;
 }
+
+/** Whether the one signed in may do this in the app: always for the owner, else when their role allows it. */
+export const mayDo = (check: { role: Access; permissions: readonly string[] } | undefined, permission: string) => check?.role === 'owner' || Boolean(check?.permissions.includes(permission));

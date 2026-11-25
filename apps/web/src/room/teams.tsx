@@ -64,7 +64,8 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
     <div className="team-forming-head">
       <h3>{p(teams.scope === 'game' ? 'forGame' : 'forRound')}</h3>
       <p>{host ? (picked ? p(captains && pickedTeam ? 'tapTeamOrCaptain' : 'tapTeamFor', { name: nameOf(state, picked) }) : p('tapPlayer')) : state.arcade && teams.formation === 'random' ? p('leaderShuffle') : p(how[teams.formation])}
-        {' '}{p(captains ? 'captainsAnswer' : 'everyoneAnswers')} {p(pointsText[teams.points])}{host && elected ? ` ${p('electHint')}` : ''}</p>
+        {' '}{p(captains ? 'captainsAnswer' : 'everyoneAnswers')} {p(pointsText[teams.points])}{host && elected ? ` ${p('electHint')}` : ''}
+        {teams.carryover === 'redistribute' ? ` ${p('carryShare')}` : teams.carryover === 'manual' ? ` ${p(host ? 'carryManualHost' : 'carryManual')}` : ''}</p>
       {/* The host chooses how captains are picked: assigned (the host, else at random) or elected by each team. */}
       {host && captains && <div className="team-captain-pick"><span id={`captain-pick-${stage.id}`}>{p('captainsBy')}</span>
         <div className="team-segments" role="group" aria-labelledby={`captain-pick-${stage.id}`}>{(['assigned', 'elected'] as const).map(pick =>
@@ -82,6 +83,10 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
             suggestions={TEAM_SWATCHES.filter(swatch => !taken.has(swatch))} onChange={hex => { const next = solid(hex); if (!taken.has(next) && next !== color) send('teams.color', { stageRunId: stage.id, teamIndex: team.index, color: next }); }} />}
           <strong>{team.name}</strong><span className="team-count">{team.targetSize !== null ? p('ofTarget', { count: team.memberIds.length, target: team.targetSize }) : ` · ${team.memberIds.length}`}</span>
           {host && teams.teams.length > 1 && <button type="button" className="team-remove danger" disabled={disabled} aria-label={p('removeTeam', { team: team.name })} onClick={() => send('teams.remove', { stageRunId: stage.id, teamIndex: team.index })}>×</button>}</div>
+        {/* What the team starts with when old scores are shared out or the host types them (hidden while scores are secret). */}
+        {team.startMilli !== undefined && (host && teams.carryover === 'manual'
+          ? <StartTotal key={team.startMilli} team={team.name} milli={team.startMilli} disabled={disabled} onSave={amountMilli => send('teams.startTotal', { stageRunId: stage.id, teamIndex: team.index, amountMilli })} />
+          : <p className="team-start">{p('startsWith', { points: formatPoints(team.startMilli) })}</p>)}
         {captains && team.captainId && <p className="visually-hidden">{p('captainOf', { name: nameOf(state, team.captainId) })}</p>}
         {/* A team picks its own colour from the swatches, when the scene lets teams choose. */}
         {state.role === 'player' && mine && teams.colorsBy === 'teams' && <div className="team-swatches" role="radiogroup" aria-label={p('ourColour')}>{TEAM_SWATCHES.map(swatch =>
@@ -118,6 +123,19 @@ export function TeamForming({ state, stage, disabled, send }: { state: RoomSnaps
 /** During a team round: who is in which team. */
 /** “Ben and Cleo”: the names, joined for a sentence. */
 export const nameList = (state: RoomSnapshot, ids: string[]) => list(state, ids);
+
+/** The host types what a team starts with (whole or decimal points); saved when the field is left or on Enter. */
+function StartTotal({ team, milli, disabled, onSave }: { team: string; milli: string; disabled: boolean; onSave: (amountMilli: string) => void }) {
+  const [text, setText] = useState(formatPoints(milli).replace('−', '-'));
+  const save = () => {
+    const value = Number(text.replace(',', '.'));
+    if (!text.trim() || !Number.isFinite(value) || Math.abs(value) >= 1e9) { setText(formatPoints(milli).replace('−', '-')); return; }
+    const next = String(Math.round(value * 1000)); if (next !== milli) onSave(next === '-0' ? '0' : next);
+  };
+  return <label className="team-start team-start-edit">{p('startsLabel', { team })}
+    <input type="number" inputMode="decimal" step="any" value={text} disabled={disabled} onChange={event => setText(event.target.value)}
+      onBlur={save} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>;
+}
 
 export function TeamSummary({ state, stage }: { state: RoomSnapshot; stage: Stage }) {
   const teams = stage.teams; if (!teams || teams.forming) return null;

@@ -1,3 +1,4 @@
+import { countsAsCorrect } from '../game/scoring/verdicts.js';
 import { SubmissionValueSchema, type PersonStats } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { parseDefinition, type GameDefinition } from '../game/definition.js';
@@ -54,7 +55,8 @@ export async function peopleStats(client: PrismaClient, personIds: string[]): Pr
   // members have no answer of their own in such a round, so nothing counts twice.
   const gameSeatIds = games.map(seat => seat.id);
   const revealedAnswer = { slotKey: 'answer', stage: { revealedAt: { not: null } } } as const;
-  const answerSelect = { value: true, stage: { select: { nodeKey: true, stageKey: true, lineupId: true, session: { select: { gameVersionId: true } } } } } as const;
+  // The host's latest verdict on an answer overrules the round's own scoring.
+  const answerSelect = { value: true, verdicts: { select: { correct: true }, orderBy: { revision: 'desc' }, take: 1 }, stage: { select: { nodeKey: true, stageKey: true, lineupId: true, session: { select: { gameVersionId: true } } } } } as const;
   const own = gameSeatIds.length ? await client.submission.findMany({ where: { playerId: { in: gameSeatIds }, ...revealedAnswer }, select: { playerId: true, ...answerSelect } }) : [];
   const memberships = gameSeatIds.length ? await client.teamMember.findMany({ where: { playerId: { in: gameSeatIds } }, select: { playerId: true, teamId: true, lineupId: true } }) : [];
   const team = memberships.length ? await client.submission.findMany({ where: { teamId: { in: [...new Set(memberships.map(row => row.teamId))] }, playerId: null, ...revealedAnswer }, select: { teamId: true, ...answerSelect } }) : [];
@@ -74,7 +76,7 @@ export async function peopleStats(client: PrismaClient, personIds: string[]): Pr
     if (stage.kind === 'minigame') { for (const person of people) person.minigames += 1; continue; }
     if (stage.kind !== 'collect' || (stage.scoring.kind !== 'correct-choice' && stage.scoring.kind !== 'correct-order')) continue;
     const value = SubmissionValueSchema.safeParse(answer.value);
-    const right = value.success && earned(stage, value.data);
+    const right = countsAsCorrect(answer.verdicts[0]?.correct, Boolean(value.success && earned(stage, value.data)));
     for (const person of people) if (right) person.right += 1; else person.wrong += 1;
   }
 

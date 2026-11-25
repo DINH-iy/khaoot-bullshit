@@ -14,6 +14,8 @@ export const UndercoverTableSchema = z.object({
   round: z.number().int().min(1), phase: z.enum(['clues', 'vote', 'guess', 'done']),
   turn: z.number().int().min(0), turnEndsAt: z.string().datetime().nullable(),
   votes: z.record(Id, Id), voteEndsAt: z.string().datetime().nullable(),
+  // A re-vote after a tie: only these players can be voted for (absent: an ordinary vote).
+  runoff: z.array(Id).min(2).optional(),
   last: z.object({ round: z.number().int().min(1), tally: z.array(z.object({ playerId: Id, count: z.number().int().min(1) }).strict()), outId: Id.nullable() }).strict().nullable(),
   guesserId: Id.nullable(), guessEndsAt: z.string().datetime().nullable(), guess: z.string().max(60).optional(),
   winner: z.enum(['civilians', 'impostors', 'white']).nullable(), tooFew: z.boolean(),
@@ -67,7 +69,7 @@ function settle(table: UndercoverTable): UndercoverTable {
   return winner ? { ...table, phase: 'done', winner, turnEndsAt: null, voteEndsAt: null, guessEndsAt: null } : table;
 }
 /** The next round: clues again, in the same order, from the first player still in. */
-function nextRound(table: UndercoverTable, settings: UndercoverSettings, now: Date): UndercoverTable {
+function nextRound({ runoff: _runoff, ...table }: UndercoverTable, settings: UndercoverSettings, now: Date): UndercoverTable {
   return { ...table, round: table.round + 1, phase: 'clues', turn: 0, turnEndsAt: at(now, settings.turnSeconds), votes: {}, voteEndsAt: null, guesserId: null, guessEndsAt: null };
 }
 function afterClue(table: UndercoverTable, settings: UndercoverSettings, now: Date): UndercoverTable {
@@ -75,14 +77,20 @@ function afterClue(table: UndercoverTable, settings: UndercoverSettings, now: Da
   if (turn < activeIds(table).length) return { ...table, turn, turnEndsAt: at(now, settings.turnSeconds) };
   return { ...table, turn, turnEndsAt: null, phase: 'vote', votes: {}, voteEndsAt: at(now, settings.voteSeconds) };
 }
-/** Counts the votes: the one player with the most votes is out (a tie: nobody), and their role shows. */
+/**
+ * Counts the votes: the one player with the most votes is out, and their role shows. A tie goes to one re-vote
+ * between the tied players (everyone still in votes again, for one of them); a tie in the re-vote sends nobody out.
+ */
 function tally(table: UndercoverTable, settings: UndercoverSettings, now: Date): UndercoverTable {
   const active = new Set(activeIds(table));
   const counts = new Map<string, number>();
   for (const [voter, target] of Object.entries(table.votes)) if (active.has(voter) && active.has(target)) counts.set(target, (counts.get(target) ?? 0) + 1);
   const ranked = [...counts].sort((a, b) => b[1] - a[1] || table.order.indexOf(a[0]) - table.order.indexOf(b[0]));
   const top = ranked[0]; const outId = top && (ranked[1]?.[1] ?? 0) < top[1] ? top[0] : null;
-  const counted = { ...table, last: { round: table.round, tally: ranked.map(([playerId, count]) => ({ playerId, count })), outId }, voteEndsAt: null };
+  const { runoff, ...rest } = table;
+  const counted = { ...rest, last: { round: table.round, tally: ranked.map(([playerId, count]) => ({ playerId, count })), outId }, voteEndsAt: null };
+  const tied = top ? ranked.filter(([, count]) => count === top[1]).map(([playerId]) => playerId) : [];
+  if (!outId && !runoff && tied.length >= 2) return { ...counted, votes: {}, runoff: tied, voteEndsAt: at(now, settings.voteSeconds) };
   if (!outId) return nextRound(counted, settings, now);
   const out = { ...counted, out: [...counted.out, { playerId: outId, round: table.round }] };
   // A voted-out Mr. White first gets to guess the word.
@@ -120,7 +128,7 @@ export function undercoverMove(table: UndercoverTable, settings: UndercoverSetti
   if (move.action === 'vote') {
     const active = activeIds(table);
     requireGame(table.phase === 'vote' && active.includes(actor!), 'INELIGIBLE');
-    requireGame(move.playerId && move.playerId !== actor && active.includes(move.playerId), 'INVALID_SUBMISSION');
+    requireGame(move.playerId && move.playerId !== actor && active.includes(move.playerId) && (!table.runoff || table.runoff.includes(move.playerId)), 'INVALID_SUBMISSION');
     const voted = { ...table, votes: { ...table.votes, [actor!]: move.playerId! } };
     // Everyone still in has voted: count at once.
     return active.every(id => voted.votes[id]) ? tally(voted, settings, now) : voted;
@@ -142,7 +150,7 @@ export function undercoverWinners(table: UndercoverTable): Set<string> {
 export function undercoverView(table: UndercoverTable): UndercoverView {
   return { order: table.order, out: table.out.map(entry => ({ ...entry, role: table.roles[entry.playerId]! })), round: table.round, phase: table.phase,
     speakerId: speaker(table), turnEndsAt: table.turnEndsAt, voters: table.phase === 'vote' ? Object.keys(table.votes).filter(id => activeIds(table).includes(id)) : [],
-    voteEndsAt: table.voteEndsAt, last: table.last, guesserId: table.guesserId, guessEndsAt: table.guessEndsAt, winner: table.winner, tooFew: table.tooFew };
+    voteEndsAt: table.voteEndsAt, ...(table.runoff ? { runoff: table.runoff } : {}), last: table.last, guesserId: table.guesserId, guessEndsAt: table.guessEndsAt, winner: table.winner, tooFew: table.tooFew };
 }
 /** What one player's phone gets: their own word (none for Mr. White) and their vote this round. */
 export function undercoverOwn(table: UndercoverTable, playerId: string): UndercoverOwn | null {

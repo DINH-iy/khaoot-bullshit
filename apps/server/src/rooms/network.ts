@@ -1,4 +1,6 @@
+import { secretScores } from '../game/teams/team-views.js';
 import { Server } from 'socket.io';
+import { registerMediaControl } from './media-control.js';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { RoomWordsSchema, ChatModerationSchema, ChatSendSchema, HOST_PHONE_COMMANDS, ClaimRoomSchema, CommandReceiptSchema, ConnectRoomSchema, RoomCodeSchema, RoomLookSchema, RoomSettingsSchema, SeatDecisionSchema, SeatListSchema, ExpectedPeopleSchema, GameIdSchema, HeartbeatSchema, RoomSnapshotSchema, SessionChangedSchema, type RoomReply, PlayerLookSchema, defaultLook } from '@party/contracts';
@@ -44,6 +46,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
   const service = createGameService(client, event => app.log.info({ event: 'game_command', ...event }, 'Game command completed'), undefined, live.signals);
   const minigames = registerMinigameEvents(io, client, live, app.log);
   const poolAim = registerPoolAim();
+  const mediaControl = registerMediaControl(io);
   const reactions = registerReactions(io, client); const chat = createRoomChat(client); const breaks = createBreaks(client, service);
   /** `from`: the HTTP request, or for a socket event its name, the room and who sent it (for the owner's logs). */
   const failure = (error: unknown, from?: FastifyRequest | { where: string; sessionId: string | null; actor: string }): RoomReply<never> => {
@@ -99,14 +102,14 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     // "Most reactions" comes from the room's own count; without one, the slide is left out.
     const reacted = view.awards?.some(slide => slide.stat === 'mostReactions') ? reactions.most(principal.sessionId) : null;
     const awards = view.awards?.flatMap(slide => slide.stat !== 'mostReactions' ? [slide] : reacted ? [{ ...slide, playerIds: reacted.playerIds, value: `${reacted.count} ${reacted.count === 1 ? 'reaction' : 'reactions'}` }] : []) ?? null;
-    const shown = { ...(scoresOpen ? view : { ...view, standings: [], teamStandings: [] }), awards };
+    const shown = { ...(scoresOpen ? view : secretScores(view)), awards };
     // The host also sees the people added to the room and the phones asking to sign in as one of them.
     const roomPeople = principal.role === 'host' ? await people.hostView(principal.sessionId, state) : { expected: [], nameRequests: [] };
     return RoomSnapshotSchema.parse({ view: shown, roomCode: session.roomCode, role: principal.role, displayConnected: displayConnected(principal.sessionId), screenConnected: screen, ...(selfId && state.hostPhonePlayerId !== selfId && state.birthdayVote && ['RUNNING', 'PAUSED'].includes(view.status)
         ? { birthdayVote: { voted: state.birthdayVoters.includes(selfId), ready: state.birthdayReady } } : {}),
       hostPhone, ...(principal.role === 'host' ? { hostPhonePlayerId: state.hostPhonePlayerId, ...(state.tryout ? { tryout: true as const } : {}) } : {}), selfPlayerId: principal.actor.role === 'player' ? principal.actor.playerId : null,
       // A stored look that no longer fits the parts list falls back to the default.
-      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, soundboard: state.soundboard, chat: state.chat, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(lockedRoomSettings(state, session.status).length ? { locked: lockedRoomSettings(state, session.status) } : {}), ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
+      players: players.map(player => { const look = PlayerLookSchema.safeParse(player.look); return { id: player.id, displayName: player.displayName, look: look.success ? look.data : defaultLook(player.id), connected: connected.has(player.id), ...(principal.role === 'host' && player.personId ? { canBan: true } : {}) }; }), settings: { reclaimApproval: state.reclaimApproval, showScores: state.showScores, reactions: state.reactions, soundboard: state.soundboard, eventSounds: state.eventSounds, chat: state.chat, autoClose: state.autoClose, autoCloseSeconds: state.autoCloseSeconds, breakVotes: state.breakVotes, breakPercent: state.breakPercent, reactionLimit: state.reactionLimit, reactionChoices: state.reactionChoices, sideGames: state.sideGames, chips: state.chips, openInvites: state.openInvites, confirmLooks: state.confirmLooks, quickTimeSeconds: state.quickTimeSeconds, music: state.music, musicVolume: state.musicVolume, signup: state.signup, testBench: state.testBench, ...(lockedRoomSettings(state, session.status).length ? { locked: lockedRoomSettings(state, session.status) } : {}), ...(principal.role === 'host' ? { idleCloseMinutes: state.idleCloseMinutes, keepOpen: state.keepOpen } : {}),
         ...(principal.role === 'host' || hostPhone ? { autoRevealSeconds: state.autoRevealSeconds } : {}) },
       break: { active: Boolean(state.breakStartedAt) && view.status === 'PAUSED', startedAt: state.breakStartedAt, votes: state.breakVoters.length, needed: breakVotesNeeded(state.breakPercent, players.length), voted: Boolean(selfId && state.breakVoters.includes(selfId)) },
       ...(principal.role === 'host' ? { ownWords: state.ownWords } : {}),
@@ -404,7 +407,7 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     if (original.role !== 'display') void client.gameSession.updateMany({
       where: { id, idleCloseAt: { not: null } }, data: { idleCloseAt: null },
     }).catch(() => app.log.warn({ event: 'idle_room_reset_failed' }, 'Could not reset empty room timer'));
-    const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original); poolAim.connect(socket, original);
+    const stopMinigames = minigames.connect(socket, original); reactions.connect(socket, original); poolAim.connect(socket, original); mediaControl.connect(socket, original);
     const expiry = setTimeout(() => { socket.emit('room.error', { code: 'CREDENTIAL_EXPIRED' }); socket.disconnect(true); }, Math.max(1, original.expiresAt.getTime() - Date.now())); expiry.unref();
     let syncing = false; let commanding = false; let heartbeating = false; let receipting = false;
     const socketPlace = (where: string) => ({ where, sessionId: id, actor: original.role });

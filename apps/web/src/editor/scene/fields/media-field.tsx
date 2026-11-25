@@ -105,6 +105,11 @@ export function MediaField({ stage, open, onOpen, onClose, onChange }: { stage: 
         const { waveform: _waveform, ...source } = media;
         onChange({ ...stage, media: event.target.checked ? source : { ...source, waveform: false } });
       }} />{sceneMediaText('waveform')}</label>}
+      {/* Words with the media: what a picture shows (screen readers), and a caption every screen shows under it. */}
+      {media && <>
+        {media.kind === 'image' && <label>{sceneMediaText('alt')}<input value={media.alt ?? ''} maxLength={200} onChange={event => { const { alt: _alt, ...rest } = media; const alt = event.target.value; onChange({ ...stage, media: alt.trim() ? { ...rest, alt } : rest }); }} /></label>}
+        <label>{sceneMediaText('caption')}<input value={media.caption ?? ''} maxLength={200} onChange={event => { const { caption: _caption, ...rest } = media; const caption = event.target.value; onChange({ ...stage, media: caption.trim() ? { ...rest, caption } : rest }); }} /></label>
+      </>}
       {(clip || (media && media.kind !== 'image')) && <p className="hint">{layoutText('roomPause')}</p>}
     </div>
     {sourceKey && pendingRemoval === sourceKey && <ConfirmDialog title={t('removeSceneAsk')} text={t(media ? 'staysInLibrary' : 'removeSceneClip')}

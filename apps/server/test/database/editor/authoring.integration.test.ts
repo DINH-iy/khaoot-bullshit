@@ -1,3 +1,4 @@
+import { EDITOR_ROLE_ID } from '@party/contracts';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../../src/app.js';
@@ -22,9 +23,10 @@ const creator = () => prisma.creator.create({ data: { issuer: 'https://identity.
 describe('authoring drafts and publishing', () => {
   it('shows editors only the games they made or that are shared with them; the owner sees all, with who made each; existing games stay the owner\'s', async () => {
     const author = await creator();
-    const editor = async (name: string) => { const full = `${name} ${randomUUID().slice(0, 8)}`; return prisma.person.create({ data: { name: full, nameKey: full.toLowerCase(), linkHash: randomUUID().replace(/-/g, '').padEnd(64, '0'), canEdit: true } }); };
+    const editor = async (name: string) => { const full = `${name} ${randomUUID().slice(0, 8)}`; return prisma.person.create({ data: { name: full, nameKey: full.toLowerCase(), linkHash: randomUUID().replace(/-/g, '').padEnd(64, '0'), canEdit: true, roleId: EDITOR_ROLE_ID } }); };
     const ann = await editor('Ann'); const bo = await editor('Bo');
     const as = (person: { id: string } | null) => ({ personId: person?.id ?? null });
+    const editing = (person: { id: string }) => ({ shares: [{ personId: person.id, roleId: EDITOR_ROLE_ID }] });
     // A game from before authors were kept: made by the owner, nothing about it changes.
     const old = await authoring.create(author.id, { gameId: randomUUID(), title: 'Old favourite', startFrom: null });
     const anns = await authoring.create(author.id, { gameId: randomUUID(), title: 'Ann quiz', startFrom: null }, as(ann));
@@ -38,14 +40,14 @@ describe('authoring drafts and publishing', () => {
     await expect(authoring.create(author.id, { gameId: randomUUID(), title: 'Copy', startFrom: null, copyOf: anns.gameId }, as(bo))).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(authoring.archive(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'NOT_FOUND' });
     // Ann shares it with Bo: Bo sees and edits it, but cannot remove or re-share it, nor say who made it.
-    await expect(authoring.share(author.id, anns.gameId, { sharedWith: [bo.id], authorPersonId: bo.id }, as(ann))).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(await authoring.share(author.id, anns.gameId, { sharedWith: [bo.id] }, as(ann))).toMatchObject({ authorPersonId: ann.id, sharedWith: [bo.id], canChangeAuthor: false });
+    await expect(authoring.share(author.id, anns.gameId, { ...editing(bo), authorPersonId: bo.id }, as(ann))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await authoring.share(author.id, anns.gameId, editing(bo), as(ann))).toMatchObject({ authorPersonId: ann.id, shares: [{ personId: bo.id, roleId: EDITOR_ROLE_ID }], canChangeAuthor: false });
     expect((await authoring.list(author.id, as(bo))).map(game => [game.title, game.author?.name, game.shared])).toEqual([['Ann quiz', ann.name, true]]);
     expect((await authoring.save(author.id, anns.gameId, { expectedRevision: 0, definition: anns.definition }, as(bo))).revision).toBe(1);
     await expect(authoring.archive(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(authoring.sharing(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     // The owner gives the old game to Bo (who made it before authors were kept): Bo sees it, Ann does not.
-    await authoring.share(author.id, old.gameId, { sharedWith: [], authorPersonId: bo.id }, OWNER_ACCESS);
+    await authoring.share(author.id, old.gameId, { shares: [], authorPersonId: bo.id }, OWNER_ACCESS);
     expect((await authoring.list(author.id, as(bo))).map(game => game.title).sort()).toEqual(['Ann quiz', 'Old favourite']);
     expect((await authoring.list(author.id, as(ann))).map(game => game.title)).toEqual(['Ann quiz']);
     // Nothing was lost: every game still has its draft.

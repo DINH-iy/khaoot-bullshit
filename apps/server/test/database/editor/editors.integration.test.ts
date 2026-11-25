@@ -1,3 +1,4 @@
+import { EDITOR_ROLE_ID } from '@party/contracts';
 import { randomUUID } from 'node:crypto';
 import { io as connect, type Socket } from 'socket.io-client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -41,8 +42,8 @@ describe('people with editor rights', () => {
     const menu = await call('GET', '/api/host', undefined, editor.cookie);
     expect(menu.statusCode).toBe(200); expect(menu.json().data).toMatchObject({ role: 'editor', rooms: [] });
     expect((await call('GET', '/api/host', undefined, owner)).json().data.role).toBe('owner');
-    expect((await call('GET', '/api/host/access', undefined, editor.cookie)).json()).toEqual({ ok: true, data: { role: 'editor', localSignIn: false } });
-    expect((await call('GET', '/api/host/access', undefined, owner)).json()).toEqual({ ok: true, data: { role: 'owner', localSignIn: false } });
+    expect((await call('GET', '/api/host/access', undefined, editor.cookie)).json()).toEqual({ ok: true, data: { role: 'editor', localSignIn: false, permissions: ['games.make', 'media.manage', 'rooms.rehearse'] } });
+    expect((await call('GET', '/api/host/access', undefined, owner)).json()).toMatchObject({ ok: true, data: { role: 'owner', localSignIn: false } });
     const game = await newGame(editor.cookie);
     expect((await call('GET', `/api/host/games/${game.gameId}`, undefined, editor.cookie)).statusCode).toBe(200);
     const saved = await call('PUT', `/api/host/games/${game.gameId}/draft`, { expectedRevision: game.revision, definition: { ...(game.definition as object), title: 'Renamed by the editor' } }, editor.cookie);
@@ -56,13 +57,14 @@ describe('people with editor rights', () => {
     expect((await call('POST', `/api/host/games/${game.gameId}/archive`, {}, editor.cookie)).statusCode).toBe(200);
   });
 
+  // Hosting real rooms needs a role with rooms.host (refused as FORBIDDEN); the admin menu stays the owner's (UNAUTHORIZED).
   it('never host real rooms or use the admin menu', async () => {
     const editor = await makePerson(true); const game = await newGame(owner);
     const room = { sessionId: randomUUID(), commandId: randomUUID() };
-    expect((await call('POST', '/api/host/rooms', { gameKey: 'timed-quiz', ...room }, editor.cookie)).statusCode).toBe(401);
-    expect((await call('POST', '/api/host/rooms', { gameId: game.gameId, ...room }, editor.cookie)).statusCode).toBe(401);
+    expect((await call('POST', '/api/host/rooms', { gameKey: 'timed-quiz', ...room }, editor.cookie)).statusCode).toBe(403);
+    expect((await call('POST', '/api/host/rooms', { gameId: game.gameId, ...room }, editor.cookie)).statusCode).toBe(403);
     const opened = await call('POST', '/api/host/rooms', { gameKey: 'timed-quiz', ...room }, owner); expect(opened.statusCode).toBe(200);
-    expect((await call('POST', `/api/host/rooms/${room.sessionId}/enter`, {}, editor.cookie)).statusCode).toBe(401);
+    expect((await call('POST', `/api/host/rooms/${room.sessionId}/enter`, {}, editor.cookie)).statusCode).toBe(403);
     for (const [method, path] of [['GET', '/api/host/people'], ['POST', '/api/host/people'], ['GET', `/api/host/people/${editor.id}/key`], ['POST', `/api/host/people/${editor.id}/editor`], ['GET', '/api/host/feedback']] as const)
       expect((await call(method, path, method === 'POST' ? { name: 'x', canEdit: true } : undefined, editor.cookie)).statusCode).toBe(401);
     // Its open rooms stay the owner's business.
@@ -94,7 +96,7 @@ describe('people with editor rights', () => {
   it('are disconnected from live editing when the rights are taken away', async () => {
     const editor = await makePerson(true); const game = await newGame(owner);
     // An editor works on the owner's game once it is shared with them.
-    expect((await call('POST', `/api/host/games/${game.gameId}/sharing`, { sharedWith: [editor.id] }, owner)).statusCode).toBe(200);
+    expect((await call('POST', `/api/host/games/${game.gameId}/sharing`, { shares: [{ personId: editor.id, roleId: EDITOR_ROLE_ID }] }, owner)).statusCode).toBe(200);
     const ticket = (await call('POST', `/api/host/games/${game.gameId}/live`, {}, editor.cookie)).json().data.ticket as string;
     const socket = connect(`${url}${EDITOR_NAMESPACE}`, { auth: { ticket, name: 'Ed' }, transports: ['websocket'], reconnection: false, extraHeaders: { origin: config.PUBLIC_ORIGIN } }); sockets.push(socket);
     await new Promise<void>((resolve, reject) => { socket.once('connect', () => resolve()); socket.once('connect_error', reject); });

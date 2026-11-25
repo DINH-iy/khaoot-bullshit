@@ -14,9 +14,10 @@ export const nameTaken = (error: unknown) => error instanceof Prisma.PrismaClien
 export const keyFields = (roomSecret: string) => { const key = newPersonKey(); return { key, data: { linkHash: tokenHash(key), keySealed: sealPersonKey(roomSecret, key) } }; };
 
 /** A new person with a fresh personal key; NAME_TAKEN when the name is in use. */
-export async function createPerson(db: PrismaClient | Transaction, roomSecret: string, name: string, canEdit = false) {
+// `roleId`: the person's role (see roles.ts), or null for a player only; `canEdit` follows it (kept for older readers).
+export async function createPerson(db: PrismaClient | Transaction, roomSecret: string, name: string, roleId: string | null = null) {
   const { key, data } = keyFields(roomSecret);
-  const person = await db.person.create({ data: { name: name.trim(), nameKey: nameKey(name), canEdit, ...data } })
+  const person = await db.person.create({ data: { name: name.trim(), nameKey: nameKey(name), roleId, canEdit: roleId !== null, ...data } })
     .catch((error: unknown) => { throw nameTaken(error) ? new RoomError('NAME_TAKEN') : error; });
   return { person, key };
 }

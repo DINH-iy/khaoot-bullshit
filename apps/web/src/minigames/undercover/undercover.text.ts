@@ -3,7 +3,7 @@ import { defineTexts } from '../../i18n/texts.js';
 export const UNDERCOVER_TEXTS = defineTexts('undercover', {
   yourWord: 'Your secret word', showWord: 'Show my word', hideWord: 'Hide', mrWhite: 'You are Mr. White', mrWhiteHint: 'You have no word. Listen, blend in, and guess the word if you are voted out.',
   round: 'Round {round}', cluesTitle: 'Clues, out loud', yourTurn: 'Your turn: say one clue about your word.', clued: 'I gave my clue', speaking: '{name} gives a clue…',
-  nextPlayer: 'Next player', voteTitle: 'Vote someone out', voteHint: 'Who has another word?', voted: '{count} of {total} voted', countVotes: 'Count the votes',
+  nextPlayer: 'Next player', voteTitle: 'Vote someone out', runoffTitle: 'Re-vote', runoff: 'A tie between {names}. Vote again, only for one of them.', voteHint: 'Who has another word?', voted: '{count} of {total} voted', countVotes: 'Count the votes',
   youVoted: 'You voted for {name}. Tap someone else to change.', guessTitle: 'Mr. White guesses the word', guessLabel: 'The civilians’ word', send: 'Guess', guessing: '{name} is Mr. White and guesses the word…',
   moveOn: 'Move on', out: '{name} is out: {role}', tie: 'A tie: nobody is out this round.', youAreOut: 'You are out. Keep watching (and keep quiet).',
   civilian: 'Civilian', undercover: 'Undercover', white: 'Mr. White', winCivilians: 'The civilians win!', winImpostors: 'The impostors win!', winWhite: 'Mr. White guessed the word and wins!',
@@ -13,7 +13,7 @@ export const UNDERCOVER_TEXTS = defineTexts('undercover', {
   nl: {
     yourWord: 'Je geheime woord', showWord: 'Toon mijn woord', hideWord: 'Verberg', mrWhite: 'Jij bent Mr. White', mrWhiteHint: 'Je hebt geen woord. Luister, val niet op, en raad het woord als je eruit gestemd wordt.',
     round: 'Ronde {round}', cluesTitle: 'Hints, hardop', yourTurn: 'Jouw beurt: zeg één hint over je woord.', clued: 'Ik heb mijn hint gegeven', speaking: '{name} geeft een hint…',
-    nextPlayer: 'Volgende speler', voteTitle: 'Stem iemand eruit', voteHint: 'Wie heeft een ander woord?', voted: '{count} van {total} gestemd', countVotes: 'Stemmen tellen',
+    nextPlayer: 'Volgende speler', voteTitle: 'Stem iemand eruit', runoffTitle: 'Nieuwe stemming', runoff: 'Gelijkspel tussen {names}. Stem opnieuw, alleen op een van hen.', voteHint: 'Wie heeft een ander woord?', voted: '{count} van {total} gestemd', countVotes: 'Stemmen tellen',
     youVoted: 'Je stemde op {name}. Tik op iemand anders om te wisselen.', guessTitle: 'Mr. White raadt het woord', guessLabel: 'Het woord van de burgers', send: 'Raden', guessing: '{name} is Mr. White en raadt het woord…',
     moveOn: 'Verder', out: '{name} ligt eruit: {role}', tie: 'Gelijkspel: deze ronde ligt niemand eruit.', youAreOut: 'Je ligt eruit. Kijk mee (en zeg niets).',
     civilian: 'Burger', undercover: 'Undercover', white: 'Mr. White', winCivilians: 'De burgers winnen!', winImpostors: 'De infiltranten winnen!', winWhite: 'Mr. White raadde het woord en wint!',
@@ -23,7 +23,7 @@ export const UNDERCOVER_TEXTS = defineTexts('undercover', {
   de: {
     yourWord: 'Dein geheimes Wort', showWord: 'Mein Wort zeigen', hideWord: 'Verbergen', mrWhite: 'Du bist Mr. White', mrWhiteHint: 'Du hast kein Wort. Hör zu, fall nicht auf und rate das Wort, wenn du rausgewählt wirst.',
     round: 'Runde {round}', cluesTitle: 'Hinweise, laut', yourTurn: 'Du bist dran: sag einen Hinweis zu deinem Wort.', clued: 'Ich habe meinen Hinweis gegeben', speaking: '{name} gibt einen Hinweis…',
-    nextPlayer: 'Nächster Spieler', voteTitle: 'Wähle jemanden raus', voteHint: 'Wer hat ein anderes Wort?', voted: '{count} von {total} abgestimmt', countVotes: 'Stimmen zählen',
+    nextPlayer: 'Nächster Spieler', voteTitle: 'Wähle jemanden raus', runoffTitle: 'Stichwahl', runoff: 'Gleichstand zwischen {names}. Stimmt noch einmal ab, nur für einen von ihnen.', voteHint: 'Wer hat ein anderes Wort?', voted: '{count} von {total} abgestimmt', countVotes: 'Stimmen zählen',
     youVoted: 'Du hast für {name} gestimmt. Tippe auf jemand anderen, um zu wechseln.', guessTitle: 'Mr. White rät das Wort', guessLabel: 'Das Wort der Bürger', send: 'Raten', guessing: '{name} ist Mr. White und rät das Wort…',
     moveOn: 'Weiter', out: '{name} ist raus: {role}', tie: 'Gleichstand: diese Runde ist niemand raus.', youAreOut: 'Du bist raus. Schau weiter zu (und sag nichts).',
     civilian: 'Bürger', undercover: 'Undercover', white: 'Mr. White', winCivilians: 'Die Bürger gewinnen!', winImpostors: 'Die Eindringlinge gewinnen!', winWhite: 'Mr. White hat das Wort erraten und gewinnt!',
@@ -33,7 +33,7 @@ export const UNDERCOVER_TEXTS = defineTexts('undercover', {
   ro: {
     yourWord: 'Cuvântul tău secret', showWord: 'Arată-mi cuvântul', hideWord: 'Ascunde', mrWhite: 'Tu ești Mr. White', mrWhiteHint: 'Nu ai cuvânt. Ascultă, nu ieși în evidență și ghicește cuvântul dacă ești eliminat.',
     round: 'Runda {round}', cluesTitle: 'Indicii, cu voce tare', yourTurn: 'E rândul tău: spune un indiciu despre cuvântul tău.', clued: 'Mi-am spus indiciul', speaking: '{name} dă un indiciu…',
-    nextPlayer: 'Următorul jucător', voteTitle: 'Votează pe cineva afară', voteHint: 'Cine are alt cuvânt?', voted: '{count} din {total} au votat', countVotes: 'Numără voturile',
+    nextPlayer: 'Următorul jucător', voteTitle: 'Votează pe cineva afară', runoffTitle: 'Vot din nou', runoff: 'Egalitate între {names}. Votați din nou, doar pentru unul dintre ei.', voteHint: 'Cine are alt cuvânt?', voted: '{count} din {total} au votat', countVotes: 'Numără voturile',
     youVoted: 'Ai votat cu {name}. Atinge pe altcineva ca să schimbi.', guessTitle: 'Mr. White ghicește cuvântul', guessLabel: 'Cuvântul civililor', send: 'Ghicește', guessing: '{name} e Mr. White și ghicește cuvântul…',
     moveOn: 'Mai departe', out: '{name} e eliminat: {role}', tie: 'Egalitate: nimeni nu e eliminat runda asta.', youAreOut: 'Ești eliminat. Privește în continuare (și taci).',
     civilian: 'Civil', undercover: 'Undercover', white: 'Mr. White', winCivilians: 'Câștigă civilii!', winImpostors: 'Câștigă impostorii!', winWhite: 'Mr. White a ghicit cuvântul și câștigă!',

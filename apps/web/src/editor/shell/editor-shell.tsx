@@ -7,7 +7,7 @@ import { LookView } from '../look/look-view.js';
 import { estimateMinutes, isRoute } from '../model.js';
 import { useDraft, type SaveState } from './use-draft.js';
 import { AppMenu } from '../../owner/owner-nav.js';
-import { hostMenuHref, useHostAccess, type HostRole } from '../../owner/use-host-access.js';
+import { hostMenuHref, mayDo, useHostAccess, type HostRole } from '../../owner/use-host-access.js';
 import { GameSettingsPanel } from './game-settings.js';
 import { InvitePanel } from './invite-panel.js';
 import { FieldLimit } from '../controls/field-limit.js';
@@ -46,16 +46,19 @@ export function EditorShell({ gameId }: { gameId: string }) {
 }
 
 function EditorPage({ gameId }: { gameId: string }) {
-  const access = useHostAccess()?.role;
+  const check = useHostAccess(); const access = check?.role;
   const role = access === 'owner' || access === 'editor' ? access : null;
+  // What one may do in the app (the game's own permissions come with the draft).
+  const allowed = { host: mayDo(check, 'rooms.host'), make: mayDo(check, 'games.make'), media: mayDo(check, 'media.manage'), permissions: check?.permissions ?? [] };
   const { person } = useMe();
   const historyIdentity = role === 'owner' ? 'owner' : role === 'editor' ? person?.id : undefined;
   // No separate bar above the editor: its own "p." logo opens the other places (AppMenu), so it keeps one header.
-  return <div className="editor-page"><EditorBody key={gameId} gameId={gameId} role={role} historyIdentity={historyIdentity} /><FieldLimit /></div>;
+  return <div className="editor-page"><EditorBody key={gameId} gameId={gameId} role={role} allowed={allowed} historyIdentity={historyIdentity} /><FieldLimit /></div>;
 }
 
 /** Both editors over one draft: the Flow editor (the map) and the Scene editor (slide by slide). */
-function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: HostRole | null; historyIdentity: string | undefined }) {
+type Allowed = { host: boolean; make: boolean; media: boolean; permissions: readonly string[] };
+function EditorBody({ gameId, role, allowed, historyIdentity }: { gameId: string; role: HostRole | null; allowed: Allowed; historyIdentity: string | undefined }) {
   const d = useDraft(gameId, historyIdentity); const t = useTexts(SHELL_TEXTS);
   const mediaText = useTexts(MEDIA_TEXTS); const savePointText = useTexts(SAVE_POINT_TEXTS);
   const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
@@ -124,7 +127,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
     {/* The header holds the game title, save status, and actions. */}
     <header className={`editor-header${compactHeader ? ' compact-header' : ''}`}>
       <h1 className="visually-hidden">{t(VIEW_NAMES[view])}: {definition.title}</h1>
-      <div className="editor-title"><AppMenu role={role} />
+      <div className="editor-title"><AppMenu role={role} permissions={allowed.permissions} />
         <div><label className="visually-hidden" htmlFor="game-title">{t('gameName')}</label>
           <input id="game-title" className="title-input" readOnly={d.readOnly} value={definition.title} maxLength={160} onChange={event => d.change({ ...definition, title: event.target.value }, undefined, 'title')} />
           <p className="crumb" title={overview}>{gamesHref ? <a href={gamesHref}>{gamesLabel}</a> : gamesLabel}{draft.builtIn && <> / <span className="crumb-builtin" title={t('yourVersionTitle', { title: draft.builtIn.title })}>{t('yourVersionOf', { title: draft.builtIn.title })}</span></>} / {t('draft')}{draft.published ? ` · v${draft.published.number}${draft.published.matchesDraft ? '' : t('changes')}` : ''} · <span role="status" className={`save-state save-${d.save}`}>{t(SAVE_TEXT[d.save])}</span>{compactHeader && d.readOnly && <> · {t('viewing')}</>}<span className="game-overview"> · {overview}</span></p></div></div>
@@ -134,36 +137,37 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
           <button type="button" className="icon-only" aria-label={t('undo')} title={`${t('undo')} (${editingLabel('undo', zoomShortcuts.edits.undo)})`} disabled={!d.canUndo} onClick={d.undo}><Icon name="undo" size={18} /></button>
           <button type="button" className="icon-only" aria-label={t('redo')} title={`${t('redo')} (${editingLabel('redo', zoomShortcuts.edits.redo)})`} disabled={!d.canRedo} onClick={d.redo}><Icon name="redo" size={18} /></button></div>
         {/* View mode: look through the game without changing anything by accident. One button switches. */}
-        <button type="button" className={`mode-toggle${d.readOnly ? ' viewing' : ''}`} aria-label={modeLabel}
+{d.mayEdit ?         <button type="button" className={`mode-toggle${d.readOnly ? ' viewing' : ''}`} aria-label={modeLabel}
           title={t(d.readOnly ? 'viewingTitle' : 'editingTitle')} onClick={toggleMode}>
-          <Icon name={d.readOnly ? 'eye' : 'edit'} size={18} /><span>{t(d.readOnly ? 'viewing' : 'editing')}</span></button>
+          <Icon name={d.readOnly ? 'eye' : 'edit'} size={18} /><span>{t(d.readOnly ? 'viewing' : 'editing')}</span></button> : <span className="mode-toggle viewing view-only"><Icon name="eye" size={18} /><span>{t('viewOnly')}</span></span>}
         </>}
         {/* Trying out, publishing and playing: one menu. Each item says why when it cannot be used yet. */}
         {/* A game with problems cannot be rehearsed or published: the menu says so, and the problems are in the box at the bottom left. */}
         <ActionMenu label={t('playPublish')} text={t('playPublishText')} {...(d.issues.length || compactHeader ? { icon: compactHeader ? 'play' : 'warning' } : {})}
           intro={d.issues.length ? <span className="menu-warning" title={t('problemsTip')}><Icon name="warning" size={16} />{t('toFixFirst', { problems: problemCount })}</span> : t('rehearseIntro')} actions={[
-          { label: t('rehearse'), disabled: d.busy || d.save !== 'saved', onSelect: () => setRehearsing(true) },
+          // Rehearsing, the test bench, publishing and playing: each only when one's role allows it (the server checks again).
+          ...(d.can('game.rehearse') ? [{ label: t('rehearse'), disabled: d.busy || d.save !== 'saved', onSelect: () => setRehearsing(true) },
           // The test bench: the draft from the start, with the host screen and virtual phones side by side in one tab.
-          { label: fromStart ? t('benchFix', { fix: fix(fromStart) }) : t('bench'), disabled: d.busy || d.save !== 'saved' || fromStart > 0, onSelect: () => d.rehearse(null, false, true) },
-          { label: draft.published?.matchesDraft ? t('publishNothing') : d.issues.length ? t('publishFix', { problems: problemCount }) : d.save !== 'saved' ? t('publishSaving') : t('publish'),
-            disabled: d.busy || !ready || Boolean(draft.published?.matchesDraft), onSelect: d.publish },
+          { label: fromStart ? t('benchFix', { fix: fix(fromStart) }) : t('bench'), disabled: d.busy || d.save !== 'saved' || fromStart > 0, onSelect: () => d.rehearse(null, false, true) }] : []),
+          ...(d.can('game.publish') ? [{ label: draft.published?.matchesDraft ? t('publishNothing') : d.issues.length ? t('publishFix', { problems: problemCount }) : d.save !== 'saved' ? t('publishSaving') : t('publish'),
+            disabled: d.busy || !ready || Boolean(draft.published?.matchesDraft), onSelect: d.publish }] : []),
           // Opening a real room is hosting: the owner's alone. Editors rehearse instead.
-          ...(role === 'owner' ? [{ label: draft.published ? t('playPublished') : t('playFirst'), disabled: d.busy || !draft.published, onSelect: d.play }] : []),
+          ...(allowed.host ? [{ label: draft.published ? t('playPublished') : t('playFirst'), disabled: d.busy || !draft.published, onSelect: d.play }] : []),
         ]} />
         <ActionMenu label={t('gameMenu')} actions={[{ label: t('gameSettings'), icon: 'gear', onSelect: () => openPanel('settings'), problems: gameProblems },
           ...(role ? [{ label: mediaText('library'), icon: 'upload', onSelect: () => setLibraryOpen(true) }] : []),
           ...(compactHeader ? [
             { label: t('undo'), icon: 'undo', disabled: !d.canUndo, onSelect: d.undo },
             { label: t('redo'), icon: 'redo', disabled: !d.canRedo, onSelect: d.redo },
-            { label: modeLabel, icon: d.readOnly ? 'eye' : 'edit', onSelect: toggleMode },
+            ...(d.mayEdit ? [{ label: modeLabel, icon: d.readOnly ? 'eye' as const : 'edit' as const, onSelect: toggleMode }] : []),
           ] : []),
-          { label: savePointText('menu'), icon: 'save', shortcut: `${modLabel} + S`, onSelect: () => openPanel('savePoints') },
+          ...(d.can('game.savePoints') ? [{ label: savePointText('menu'), icon: 'save' as const, shortcut: `${modLabel} + S`, onSelect: () => openPanel('savePoints') }] : []),
           // A copy of the whole game (saved first), opened in the editor; the original stays as it is.
-          { label: t('copyGame'), icon: 'copy', onSelect: () => {
+          ...(d.can('game.copy') && allowed.make ? [{ label: t('copyGame'), icon: 'copy' as const, onSelect: () => {
             const copy = newId(); d.setNotice(t('copying'));
             void d.saveNow().then(() => roomApi('/api/host/games', { gameId: copy, title: t('copyTitle', { title: d.definition?.title ?? '' }).slice(0, 160), startFrom: null, copyOf: gameId }))
               .then(() => { location.href = `/?edit=${copy}`; }).catch(() => d.setNotice(t('copyFailed')));
-          } },
+          } }] : []),
           { label: t('invitePeople'), icon: 'invite', onSelect: () => openPanel('invite') }, { label: t('exportText'), icon: 'export', onSelect: () => openPanel('export') }, { label: t('help'), icon: 'help', shortcut: editingLabel('help', zoomShortcuts.edits.help), onSelect: () => setHelping(true) },
           { label: t(theme === 'dark' ? 'lightMode' : 'darkMode'), icon: theme === 'dark' ? 'sun' : 'moon', onSelect: () => { const next = theme === 'dark' ? 'light' : 'dark'; chooseTheme(next); setTheme(next); } }]} />
         {/* Who is here, you last: at the far right, as in most editors. */}
@@ -176,7 +180,7 @@ function EditorBody({ gameId, role, historyIdentity }: { gameId: string; role: H
         blocked: selected.length !== 1 || fromScene > 0, run: () => d.rehearse(selected[0]!) },
     ]} />}
     {helping && <HelpPanel zoomShortcuts={zoomShortcuts} onZoomShortcuts={changeZoomShortcuts} onClose={() => setHelping(false)} />}
-    {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly} onClose={() => setLibraryOpen(false)} />}
+    {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly || !allowed.media} onClose={() => setLibraryOpen(false)} />}
     {savePoints && <SavePointsPanel gameId={gameId} d={d} onClose={() => setSavePoints(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}

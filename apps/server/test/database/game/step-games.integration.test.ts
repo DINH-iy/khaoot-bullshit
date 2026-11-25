@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
-import { busGuessRight, type BusGuess, type PlayingCard } from '@party/contracts';
+import { hangmanWordMove, busGuessRight, type BusGuess, type PlayingCard } from '@party/contracts';
 import { parseDefinition } from '../../../src/game/definition.js';
 import { createGameService } from '../../../src/game/service.js';
 import { readSessionView } from '../../../src/game/views.js';
@@ -72,6 +72,23 @@ describe('step games: one engine for games played move by move', () => {
     const reveal = (await viewOf(f, 1)).stage!.reveal!.answer as { word?: string; entries: { playerId: string | null; value: number | null; place: number | null }[] };
     expect(reveal.word).toBe('fiets');
     expect(reveal.entries.map(entry => [entry.playerId, entry.value, entry.place])).toEqual([[f.players[2]!.id, 0, 1], [f.players[0]!.id, 1, 2], [f.players[1]!.id, null, null]]);
+  });
+
+  it('Galgje: a whole word can be guessed at any time; a wrong word costs a life, the right one solves it', async () => {
+    const w = world(); const f = await fixture(2, game({ game: 'hangman', settings: { lives: 3, words: ['Fiets'] }, placementMilli: ['10000', '6000'] }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!; w.advance(3500);
+    const stepOf = async (index: number) => (await viewOf(f, index)).stage!.minigame!.steps!.sides.find(side => side.playerId === f.players[index]!.id)!;
+    await move(w, f, 0, stageRunId, 0, 'e');
+    await move(w, f, 0, stageRunId, 1, hangmanWordMove('fiest'));
+    expect(await stepOf(0)).toMatchObject({ own: { pattern: '__e__', words: ['fiest'] }, view: { wrong: 1, solved: false } });
+    // The same wrong word twice is refused; a word that is no word is refused.
+    await expect(move(w, f, 0, stageRunId, 2, hangmanWordMove('fiest'))).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await expect(move(w, f, 0, stageRunId, 2, 'w__x')).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await move(w, f, 0, stageRunId, 2, hangmanWordMove('FIETS'));
+    expect(await stepOf(0)).toMatchObject({ options: null, result: 1, own: { pattern: 'fiets', words: ['fiest'] }, view: { solved: true, found: 5 } });
+    // Three wrong words hang a side like three wrong letters.
+    for (const [step, word] of ['boot', 'auto', 'trein'].entries()) await move(w, f, 1, stageRunId, step, hangmanWordMove(word));
+    expect(await stepOf(1)).toMatchObject({ options: null, view: { hanged: true, wrong: 3 } });
   });
 
   it('Drive the bus: a team guesses its four cards (anyone taps), sees each card only once guessed, and the fewest sips win', async () => {

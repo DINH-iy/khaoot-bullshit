@@ -56,6 +56,21 @@ async function hostCommand(socket: Socket, sessionId: string, type: string, extr
 }
 
 describe('verified HTTP admission and actual Socket.IO networking', () => {
+  it('passes the host\'s play, pause and restart for the scene\'s media to the shared screen only', async () => {
+    const f = await room(); const grant = await api(`/api/rooms/${f.sessionId}/display`, {}, f.cookie); const token = grant.json().data.token as string;
+    const displayCookie = extractCookie(await api(`/api/rooms/${f.sessionId}/claim`, { token }));
+    const display = await socketFor(f.sessionId, displayCookie, { display: true }); const host = await socketFor(f.sessionId, f.cookie);
+    const phone = await socketFor(f.sessionId, (await player(f)).cookie);
+    const stageRunId = randomUUID();
+    const heard = new Promise<{ action: string; stageRunId: string; id: number }>((resolve, reject) => { const timeout = setTimeout(() => reject(new Error('Missing media control')), 3000); display.once('room.mediaControl', data => { clearTimeout(timeout); resolve(data); }); });
+    host.emit('room.mediaControl', { stageRunId, action: 'restart' });
+    expect(await heard).toMatchObject({ stageRunId, action: 'restart' });
+    // A player cannot run the shared screen's media, and phones never receive the controls.
+    const quiet = new Promise<boolean>(resolve => { const got = () => resolve(false); display.once('room.mediaControl', got); phone.once('room.mediaControl', got); setTimeout(() => { display.off('room.mediaControl', got); resolve(true); }, 400); });
+    phone.emit('room.mediaControl', { stageRunId, action: 'pause' });
+    expect(await quiet).toBe(true);
+  });
+
   it('plays soundboard sounds on the screens only, one at a time and with a wait per player; keeps the host\'s own words from the phones', async () => {
     const f = await room(); const alex = await player(f, 'Alex'); const sam = await player(f, 'Sam');
     const host = await socketFor(f.sessionId, f.cookie); const one = await socketFor(f.sessionId, alex.cookie); const two = await socketFor(f.sessionId, sam.cookie);

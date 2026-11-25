@@ -1,4 +1,4 @@
-import { CAPTAIN_PICKS, DEFAULT_TEAM_NAMES, defaultTeamColor, TEAM_SWATCHES, TeamCelebrationSchema, TeamColorSchema, type TeamCelebration } from '@party/contracts';
+import { CAPTAIN_PICKS, CARRYOVERS, DEFAULT_TEAM_NAMES, defaultTeamColor, TEAM_SWATCHES, TeamCelebrationSchema, TeamColorSchema, type TeamCelebration } from '@party/contracts';
 export { DEFAULT_TEAM_NAMES };
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
@@ -13,10 +13,12 @@ import type { Transaction } from '../model.js';
 // for "Red". Game teams persist across rounds; round teams apply to one round.
 // Every new lineup starts as a proposal the host can change and must confirm.
 export type TeamPlay = Extract<Play, { kind: 'teams' }>;
-export type Carryover = 'keep' | 'fresh' | 'members';
+export type { Carryover } from '@party/contracts';
+import type { Carryover } from '@party/contracts';
+import { proposedStarts } from './carryover.js';
 
 const FormingSchema = z.object({
-  scope: z.enum(['game', 'round']), carryover: z.enum(['keep', 'fresh', 'members']), formation: z.enum(['random', 'skill', 'host', 'players']),
+  scope: z.enum(['game', 'round']), carryover: z.enum(CARRYOVERS), formation: z.enum(['random', 'skill', 'host', 'players']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
   // `color` (absent in proposals made before team colours): the team's colour. `colorsBy`: who may change it.
   // `celebration`: the team's winning celebration, picked by its members while teams are made.
@@ -27,10 +29,14 @@ const FormingSchema = z.object({
   captains: z.record(z.string().regex(/^\d{1,2}$/), GameIdSchema),
   // Elected captains: voter -> the teammate they vote for. A vote counts only while both are in the same team.
   captainPick: z.enum(CAPTAIN_PICKS).optional(), captainVotes: z.record(GameIdSchema, GameIdSchema).optional(),
+  // "Host sets": the totals the host typed per team index, in thousandths of a point (a team without one starts at 0).
+  startTotals: z.record(z.string().regex(/^\d{1,2}$/), z.string().regex(/^-?(0|[1-9][0-9]{0,11})$/)).optional(),
 }).strict();
 export type Forming = z.infer<typeof FormingSchema>;
 // `order` keeps the teams in the order the game defines them (Red before Blue).
-export const LineupInfoSchema = z.object({ formatVersion: z.literal(1), scope: z.enum(['game', 'round']), carryover: z.enum(['keep', 'fresh', 'members']), order: z.array(z.string().min(1).max(60)).max(12).optional() }).strict();
+// `start`: with "share out" or "host sets", what each team (by name) started with, in thousandths of a point.
+export const LineupInfoSchema = z.object({ formatVersion: z.literal(1), scope: z.enum(['game', 'round']), carryover: z.enum(CARRYOVERS), order: z.array(z.string().min(1).max(60)).max(12).optional(),
+  start: z.record(z.string().min(1).max(60), z.string().regex(/^-?(0|[1-9][0-9]*)$/)).optional() }).strict();
 const StagePlaySchema = z.object({ answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']) }).strict();
 
 export const readForming = (presentation: unknown): Forming | null => {
@@ -140,7 +146,7 @@ export async function gameLineupForRound(tx: Transaction, sessionId: string, pre
 }
 
 /** Applies a team-forming command to the proposal; returns the updated proposal, or the confirmed lineup. */
-export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string; celebration?: TeamCelebration | null }, actorPlayerId: string | null, presentIds: string[]) {
+export async function formingCommand(tx: Transaction, sessionId: string, forming: Forming, command: { type: string; playerId?: string; teamIndex?: number | null; method?: 'skill'; color?: string; pick?: string; celebration?: TeamCelebration | null; amountMilli?: string }, actorPlayerId: string | null, presentIds: string[]) {
   const present = new Set(presentIds);
   const size = (index: number) => Object.entries(forming.assignment).filter(([id, team]) => team === index && present.has(id)).length;
   // More or fewer teams than the game proposed: a new team gets the next free colour name; at least one team stays.
@@ -157,7 +163,8 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     const shift = (team: number | null) => team === null || team < index ? team : team === index ? null : team - 1;
     const assignment = Object.fromEntries(Object.entries(forming.assignment).map(([id, team]) => [id, shift(team)]));
     const captains = Object.fromEntries(Object.entries(forming.captains).flatMap(([team, id]) => { const next = shift(Number(team)); return next === null ? [] : [[String(next), id]]; }));
-    return { forming: { ...forming, teams: forming.teams.filter((_, position) => position !== index), assignment, captains } };
+    const startTotals = forming.startTotals && Object.fromEntries(Object.entries(forming.startTotals).flatMap(([team, amount]) => { const next = shift(Number(team)); return next === null ? [] : [[String(next), amount]]; }));
+    return { forming: { ...forming, teams: forming.teams.filter((_, position) => position !== index), assignment, captains, ...(startTotals ? { startTotals } : {}) } };
   }
   if (command.type === 'teams.shuffle') {
     const skilled = command.method === 'skill';
@@ -206,6 +213,12 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     const celebration = command.celebration === null || command.celebration === undefined ? null : TeamCelebrationSchema.parse(command.celebration);
     return { forming: { ...forming, teams: forming.teams.map((team, position) => position === index ? { ...team, celebration } : team) } };
   }
+  if (command.type === 'teams.startTotal') {
+    // "Host sets": the host types what a team starts with (only for the game's teams, with that rule).
+    const index = command.teamIndex ?? -1;
+    requireGame(forming.scope === 'game' && forming.carryover === 'manual' && index >= 0 && index < forming.teams.length && command.amountMilli !== undefined, 'INVALID_COMMAND');
+    return { forming: { ...forming, startTotals: { ...forming.startTotals, [String(index)]: command.amountMilli } } };
+  }
   if (command.type === 'teams.captainPick') {
     // The host switches between assigned and elected captains while teams are made; a captain the host picked stays.
     requireGame(forming.answers === 'captain' && (command.pick === 'assigned' || command.pick === 'elected'), 'INVALID_COMMAND');
@@ -236,7 +249,10 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
   }).filter(group => group.members.length > 0);
   // Empty teams are dropped; players left unassigned sit this round out.
   requireGame(groups.length > 0, 'INVALID_STATE');
-  const lineup = await createLineup(tx, sessionId, { formatVersion: 1, scope: forming.scope, carryover: forming.carryover }, groups);
+  // "Share out" and "host sets" fix each team's start now, from the proposal the host confirms.
+  const starts = await proposedStarts(tx, sessionId, forming, presentIds);
+  const start = starts ? { start: Object.fromEntries(forming.teams.flatMap((team, index) => groups.some(group => group.name === team.name) ? [[team.name, starts[index]!.toString()]] : [])) } : {};
+  const lineup = await createLineup(tx, sessionId, { formatVersion: 1, scope: forming.scope, carryover: forming.carryover, ...start }, groups);
   return { lineupId: lineup.id, playerIds: groups.flatMap(group => group.members) };
 }
 

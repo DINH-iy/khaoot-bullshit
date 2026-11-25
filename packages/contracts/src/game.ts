@@ -128,6 +128,8 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('stage.graphPlayback'), stageRunId: GameIdSchema, action: GraphPlaybackActionSchema }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('stage.nextResult'), stageRunId: GameIdSchema }).strict(),
   // A correction is a new ledger entry; earlier awards and judgments are never edited.
+  // The host overrules a quiz or ordering round on one answer (after the reveal): correct, not correct, or null: back to the round's own scoring.
+  z.object({ ...hostEnvelope, type: z.literal('score.verdict'), submissionId: GameIdSchema, correct: z.boolean().nullable() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('score.adjust'), playerId: GameIdSchema, amountMilli: AdjustmentMilliSchema, reason: z.string().trim().min(1).max(120) }).strict(),
   // Team forming before a team round starts. The host can always change the
   // proposal; players may pick a team only when the round lets them choose.
@@ -135,6 +137,7 @@ export const GameCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...hostEnvelope, type: z.literal('teams.assign'), stageRunId: GameIdSchema, playerId: GameIdSchema, teamIndex: z.number().int().min(0).max(11).nullable() }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.captain'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
   // Captains assigned (the host picks; otherwise one at random) or elected (each player votes for a teammate). The host can switch while teams are made.
+  z.object({ ...hostEnvelope, type: z.literal('teams.startTotal'), stageRunId: GameIdSchema, teamIndex: z.number().int().min(0).max(11), amountMilli: z.string().regex(/^-?(0|[1-9][0-9]{0,11})$/) }).strict(),
   z.object({ ...hostEnvelope, type: z.literal('teams.captainPick'), stageRunId: GameIdSchema, pick: z.enum(CAPTAIN_PICKS) }).strict(),
   // An elected captain: a player's vote for a teammate (changeable until the teams are confirmed).
   z.object({ ...envelope, type: z.literal('teams.vote'), stageRunId: GameIdSchema, playerId: GameIdSchema }).strict(),
@@ -221,6 +224,12 @@ export const StageRevealSchema = z.object({
   ]).nullable(),
   awards: z.array(z.object({ playerId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
   teamAwards: z.array(z.object({ teamId: GameIdSchema, amountMilli: SignedMilliSchema }).strict()),
+  // Answers the host overruled (quiz and ordering rounds): whose, and whether it now counts as correct.
+  verdicts: z.array(z.object({ playerId: GameIdSchema.nullable(), teamId: GameIdSchema.nullable(), correct: z.boolean() }).strict()).optional(),
+  // The host only: every answer of a quiz or ordering round, to overrule one. `correct`: what the round itself
+  // decided; `verdict`: the host's (null: none). `choiceKey` / `keys`: what was answered.
+  answers: z.array(z.object({ submissionId: GameIdSchema, playerId: GameIdSchema.nullable(), teamId: GameIdSchema.nullable(),
+    choiceKey: GameKeySchema.optional(), keys: z.array(GameKeySchema).optional(), correct: z.boolean(), verdict: z.boolean().nullable() }).strict()).optional(),
 }).strict();
 // One entry players can vote for. Authors stay hidden until the vote is revealed;
 // `own` only tells a player which entry is theirs.
@@ -234,6 +243,13 @@ export const BallotEntrySchema = z.object({
 }).strict();
 // The teams of a team round. While `forming`, teams are a proposal (no team IDs
 // yet) that the host confirms; afterwards they are the round's fixed lineup.
+/**
+ * The team scores when the game's teams are made again: keep them with the team names, start fresh, start
+ * from the members' own scores, share the old totals out (each old team's total divided over its members,
+ * whose shares then add up in their new team), or start from totals the host types in.
+ */
+export const CARRYOVERS = ['keep', 'fresh', 'members', 'redistribute', 'manual'] as const;
+export type Carryover = typeof CARRYOVERS[number];
 export const StageTeamsSchema = z.object({
   forming: z.boolean(), formation: z.enum(['random', 'skill', 'host', 'players']), scope: z.enum(['game', 'round']),
   answers: z.enum(['everyone', 'captain']), points: z.enum(['team', 'members', 'both']),
@@ -243,7 +259,11 @@ export const StageTeamsSchema = z.object({
   captainPick: z.enum(CAPTAIN_PICKS).optional(), ownCaptainVote: GameIdSchema.nullable().optional(),
   teams: z.array(z.object({ index: z.number().int().min(0), name: z.string().min(1).max(30), color: TeamColorSchema, teamId: GameIdSchema.nullable(), targetSize: z.number().int().min(1).nullable(),
     memberIds: z.array(GameIdSchema), captainId: GameIdSchema.nullable(), celebration: TeamCelebrationSchema.nullable().optional(),
-    captainVotes: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(1) }).strict()).optional() }).strict()),
+    captainVotes: z.array(z.object({ playerId: GameIdSchema, count: z.number().int().min(1) }).strict()).optional(),
+    // While forming with shared-out or typed totals: the points the team starts with (hidden while scores are secret).
+    startMilli: SignedMilliSchema.optional() }).strict()),
+  // While forming: how the team scores carry over (absent in older views and for one-round teams).
+  carryover: z.enum(CARRYOVERS).optional(),
   unassignedIds: z.array(GameIdSchema), ownTeamIndex: z.number().int().min(0).nullable(),
 }).strict();
 // A route choice as a screen sees it. Never contains where routes lead, later
@@ -320,13 +340,15 @@ export const PublicStageSchema = z.object({
   revealed: z.boolean(), reveal: StageRevealSchema.nullable(),
 }).strict();
 /** Statistics for the end-of-game show; the author picks which ones appear and in which order. */
-export const FINALE_STATS = ['winner', 'mostCorrect', 'mostWrong', 'fastest', 'slowest', 'mostVotes', 'minigameChamp', 'luckiest', 'mostReactions'] as const;
+export const FINALE_STATS = ['winner', 'teamWinner', 'mostCorrect', 'mostWrong', 'fastest', 'slowest', 'mostVotes', 'minigameChamp', 'luckiest', 'mostReactions'] as const;
 export type FinaleStat = typeof FINALE_STATS[number];
 // Every rule an award can follow: the statistics above, the most points in one chosen scene, and the fewest points.
 export const AWARD_RULES = [...FINALE_STATS, 'scene', 'fewest'] as const;
 export type AwardRule = typeof AWARD_RULES[number];
 // One award as the screens show it: its rule, the author's own title when given, the winners and their score.
-export const FinaleSlideSchema = z.object({ stat: z.enum(AWARD_RULES), title: z.string().max(60).optional(), playerIds: z.array(GameIdSchema), value: z.string().max(60) }).strict();
+// `team`: the winning team (Team winner), shown above its members.
+export const FinaleSlideSchema = z.object({ stat: z.enum(AWARD_RULES), title: z.string().max(60).optional(), playerIds: z.array(GameIdSchema), value: z.string().max(60),
+  team: z.object({ name: z.string().min(1).max(60), color: TeamColorSchema }).strict().optional() }).strict();
 // The wheel of fortune as screens see it: a spin on the current scene (with every entry, to draw the wheel),
 // and the last result, which stays in a corner until the next spin or until a scene clears it.
 export const WheelViewSchema = z.object({

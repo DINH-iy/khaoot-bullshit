@@ -1,6 +1,8 @@
 # Scenes from building blocks
 
-Written 13 November 2026 from the owner's request list: games on the phones while waiting (slot machine, blackjack, pack opening, with a gambling leaderboard), 1 v 1 challenges such as chess with a replay at the end, and the minigames Galgje (Hangman) and Undercover / Mr. White. None of these are built. This note describes how to build them so that each new game makes the next one cheaper. It does not change what is built.
+Written 13 November 2026 from the owner's request list: games on the phones while waiting (slot machine, blackjack, pack opening, with a gambling leaderboard), 1 v 1 challenges such as chess with a replay at the end, and the minigames Galgje (Hangman) and Undercover / Mr. White. This note describes how to build them so that each new game makes the next one cheaper. It does not change what is built.
+
+**Status (25 November 2026):** side games and 1 v 1 challenges are built (see below and the README). Galgje and Undercover / Mr. White are built as two minigames of their own (Galgje on the step-game engine; Undercover with its own table), not yet as the *Guess the word* and *Secret words* kits with all their knobs; a word list of the author, the host or a built-in list per language is the shared block they use.
 
 ## The idea
 
