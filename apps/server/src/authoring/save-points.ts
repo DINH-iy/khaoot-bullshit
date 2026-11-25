@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { visibleTo, type EditorAccess } from './drafts.js';
 import { CreateSavePointSchema, GameIdSchema, MAX_SAVE_POINTS, SavePointListSchema, SavePointSchema, SavePointSummarySchema } from '@party/contracts';
 import { Prisma, type PrismaClient } from '../generated/prisma/client.js';
 import type { OwnerAccess } from '../hosting/owner-access.js';
@@ -18,22 +19,23 @@ const sceneCountOf = (definition: unknown) => { const nodes = (definition as { n
 export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClient, owner: OwnerAccess) {
   const param = (request: FastifyRequest, name: 'gameId' | 'savePointId') => { const id = GameIdSchema.safeParse((request.params as Record<string, string | undefined>)[name]); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   /** The game, when it is one of the owner's games that is still in the list. */
-  const game = async (request: FastifyRequest) => {
+  // Only a game this person may see (their own, shared with them, or any for the owner).
+  const game = async (request: FastifyRequest, access: EditorAccess) => {
     const gameId = param(request, 'gameId'); const creator = await ownerCreator(client);
-    const found = await client.game.findFirst({ where: { id: gameId, creatorId: creator.id, archivedAt: null, draft: { isNot: null } }, select: { id: true } });
+    const found = await client.game.findFirst({ where: { id: gameId, creatorId: creator.id, archivedAt: null, draft: { isNot: null }, ...visibleTo(access) }, select: { id: true } });
     roomAssert(found, 'NOT_FOUND'); return gameId;
   };
 
   app.get('/api/host/games/:gameId/save-points', async (request, reply) => {
     try {
-      await owner.requireEditor(request, 'edit'); const gameId = await game(request);
+      const access = await owner.requireEditor(request, 'edit'); const gameId = await game(request, access);
       const rows = await client.gameSavePoint.findMany({ where: { gameId }, orderBy: { createdAt: 'desc' }, take: MAX_SAVE_POINTS, select: fields });
       return { ok: true, data: SavePointListSchema.parse({ savePoints: rows.map(summary), limit: MAX_SAVE_POINTS }) };
     } catch (error) { return owner.fail(reply, error); }
   });
   app.get('/api/host/games/:gameId/save-points/:savePointId', async (request, reply) => {
     try {
-      await owner.requireEditor(request, 'edit'); const gameId = await game(request);
+      const access = await owner.requireEditor(request, 'edit'); const gameId = await game(request, access);
       const row = await client.gameSavePoint.findFirst({ where: { id: param(request, 'savePointId'), gameId } }); roomAssert(row, 'NOT_FOUND');
       return { ok: true, data: SavePointSchema.parse({ ...summary(row), definition: row.definition }) };
     } catch (error) { return owner.fail(reply, error); }
@@ -43,7 +45,7 @@ export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClie
     try {
       const access = await owner.requireEditor(request);
       const parsed = CreateSavePointSchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
-      const { savePointId, name, expectedRevision, automatic = false } = parsed.data; const gameId = await game(request);
+      const { savePointId, name, expectedRevision, automatic = false } = parsed.data; const gameId = await game(request, access);
       const savedBy = access.personId ? (await client.person.findUnique({ where: { id: access.personId }, select: { name: true } }))?.name.slice(0, 80) ?? null : null;
       const row = await client.$transaction(async tx => {
         // One at a time per game, so the limit holds when two people save at once.
@@ -84,7 +86,7 @@ export function registerSavePointRoutes(app: FastifyInstance, client: PrismaClie
   });
   app.post('/api/host/games/:gameId/save-points/:savePointId/delete', async (request, reply) => {
     try {
-      await owner.requireEditor(request); const gameId = await game(request);
+      const access = await owner.requireEditor(request); const gameId = await game(request, access);
       const removed = await client.gameSavePoint.deleteMany({ where: { id: param(request, 'savePointId'), gameId } });
       if (removed.count !== 1) throw new RoomError('NOT_FOUND');
       return { ok: true, data: {} };

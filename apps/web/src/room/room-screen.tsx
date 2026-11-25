@@ -29,6 +29,7 @@ import { isDefaultGraphQuestion } from '../minigames/draw-the-graph/graph-questi
 import { GRAPH_TEXTS } from '../minigames/draw-the-graph/graph.text.js';
 import { DrawingAnswer } from '../drawing/drawing-answer.js';
 import { PhoneDock } from '../room-extras/phone-dock.js';
+import { SoundPlayer } from '../room-extras/sound-player.js';
 import { ReactionsOverlay } from '../room-extras/reactions.js';
 import { RoomSettings, SideGamesSwitch } from '../room-extras/room-settings.js';
 import { PointsCelebration } from '../room-extras/celebrate.js';
@@ -587,12 +588,14 @@ export function RoomScreen() {
     {/* The music plays where sound plays: the shared screen, or the host's screen without one. */}
     {state?.view.music && state.settings.music && (role === 'display' || (role === 'host' && !state.displayConnected)) && <MusicPlayer music={state.view.music} volume={state.settings.musicVolume / 100} />}
     {state && <BreakOverlay state={state} host={host} disabled={disabled} onContinue={() => command('session.resume')} />}
-    {state && role === 'player' && <PhoneDock key={`${state.view.sessionId}:${state.selfPlayerId}`} state={state} challengeTick={room.challengeTick} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction}
+    {state && role === 'player' && <PhoneDock key={`${state.view.sessionId}:${state.selfPlayerId}`} state={state} challengeTick={room.challengeTick} canSeeScores={canSeeScores} onChangeLook={() => setEditingLook(true)} onReact={room.sendReaction} onSound={room.sendSound} soundUntil={room.soundUntil} offset={room.clockOffset}
       onBreak={vote => { void roomApi(`/api/rooms/${sessionId}/break`, { vote }).catch(() => setError(r('voteFailed'))); }}
       scores={<Scoreboard state={state} disabled={disabled} send={command} />} />}
     {state && role === 'player' && <PointsCelebration customizable={state.view.phoneEffects === true} roundId={stage?.revealed ? stage.id : null} points={ownPoints ? Number(ownPoints) / 1000 : null} label={ownPoints ? formatPoints(ownPoints) : ''} />}
     {state && role === 'display' && canSeeScores && !scoreMoment && state.view.status !== 'LOBBY' && stage?.revealed && <FloatingScores leader={leaderLine(state)}><Scoreboard state={state} disabled={disabled} send={command} compact /></FloatingScores>}
     {state && role !== 'player' && state.settings.reactions && !scoreBubbles && <ReactionsOverlay state={state} store={room.reactions} />}
+    {/* The soundboard plays where the room's sound plays: the shared screen, or the host's screen without one. */}
+    {state && (role === 'display' || (role === 'host' && !state.displayConnected)) && <SoundPlayer state={state} event={room.soundEvent} />}
   </main></StageActionSlot.Provider></RoomSessionContext.Provider></PoolAimContext.Provider></LookContext.Provider>;
 }
 

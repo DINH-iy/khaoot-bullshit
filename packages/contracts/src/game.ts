@@ -1,3 +1,4 @@
+import { PartyExtrasSchema } from './party-extras.js';
 import { TeamColorSchema } from './team-colors.js';
 import { PhoneMenuIconsSchema } from './phone-menu.js';
 import { z } from 'zod';
@@ -346,6 +347,8 @@ export const SessionViewSchema = z.object({
   wheel: WheelViewSchema,
   // The room's music (absent in older views; null: the game has none).
   music: PublicMusicSchema.nullable().optional(),
+  // The game's own reactions and soundboard sounds (see party-extras.ts).
+  party: PartyExtrasSchema.optional(),
   phoneEffects: z.boolean().optional(),
   // Once the game is finished: the slides of the end-of-game show (empty when the author switched it off).
   awards: z.array(FinaleSlideSchema).nullable(),

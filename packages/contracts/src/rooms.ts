@@ -1,3 +1,4 @@
+import { MAX_OWN_REACTIONS } from './party-extras.js';
 import { HangmanWordSchema } from './minigames/hangman/hangman.js';
 import { UndercoverPairSchema } from './minigames/undercover/undercover.js';
 import { z } from 'zod';
@@ -41,6 +42,8 @@ export type RoomReply<T> = { ok: true; data: T } | { ok: false; error: { code: N
 export const GameRoomSettingsSchema = z.object({
   showScores: z.boolean().optional(),
   reactions: z.boolean().optional(), reactionLimit: z.number().int().min(1).max(30).optional(),
+  // `soundboard`: players may play the game's sounds on the shared screen (one at a time, a wait per player).
+  soundboard: z.boolean().optional(),
   breakVotes: z.boolean().optional(), breakPercent: z.number().int().min(10).max(100).optional(),
   autoClose: z.boolean().optional(), autoCloseSeconds: z.number().int().min(1).max(30).optional(),
 }).strict();
@@ -57,7 +60,7 @@ export const RoomSnapshotSchema = z.object({
   birthdayVote: z.object({ voted: z.boolean(), ready: z.boolean() }).strict().optional(),
   hostPhone: z.boolean().optional(), hostPhonePlayerId: GameIdSchema.nullable().optional(),
   players: z.array(z.object({ id: GameIdSchema, displayName: z.string().min(1).max(40), connected: z.boolean(), look: PlayerLookSchema, canBan: z.boolean().optional() }).strict()),
-  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(),
+  settings: z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), soundboard: z.boolean().optional(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int(), breakVotes: z.boolean(), breakPercent: z.number().int(), reactionLimit: z.number().int(), reactionChoices: z.array(z.number().int()), sideGames: z.boolean(), chips: z.boolean(), openInvites: z.number().int(), confirmLooks: z.boolean(), quickTimeSeconds: z.number().int(), music: z.boolean(), musicVolume: z.number().int(), signup: z.boolean(), testBench: z.boolean(), autoRevealSeconds: AutoRevealSecondsSchema.nullable().optional(),
     // Settings the game fixed now that it has started; the host sees them but cannot change them.
     locked: z.array(z.enum(GAME_LOCKED_SETTINGS)).optional(), idleCloseMinutes: IdleCloseMinutesSchema.optional(), keepOpen: z.boolean().optional() }).strict(),
   // A break: the game is paused for everyone until the host continues. `votes`/`needed`: the players' vote for one.
@@ -89,7 +92,7 @@ export const OPEN_INVITES_DEFAULT = 3; export const MAX_OPEN_INVITES = 10;
 // `showScores`: players and the shared screen see the scoreboard during the game (else only at scoreboard scenes and the end).
 // `reactions`: players may send emoji and stickers to the shared screen. `autoClose`: a round closes 3 seconds after everyone answered.
 // `reactionLimit`: reactions each player may send per 10 seconds. `reactionChoices`: which of REACTIONS are allowed (positions in the list).
-export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int().min(1).max(30),
+export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showScores: z.boolean(), reactions: z.boolean(), soundboard: z.boolean(), chat: z.boolean().optional(), autoClose: z.boolean(), autoCloseSeconds: z.number().int().min(1).max(30),
   // `breakVotes`: players may vote for a break; it starts when `breakPercent` of the players agree. The host can always call one.
   breakVotes: z.boolean(), breakPercent: z.number().int().min(10).max(100),
   // `sideGames`: games on the phones while waiting (challenges between players). `chips`: the games played with chips
@@ -111,7 +114,8 @@ export const RoomSettingsSchema = z.object({ reclaimApproval: z.boolean(), showS
   keepOpen: z.boolean(),
   reactionLimit: z.number().int().min(1).max(30), reactionChoices: z.array(z.number().int().min(0).max(REACTIONS.length - 1)).min(1).max(REACTIONS.length).refine(list => new Set(list).size === list.length, 'Each reaction once') }).partial().strict()
   .refine(settings => Object.keys(settings).length > 0, 'Change at least one setting');
-export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length - 1) }).strict();
+/** A reaction: one of REACTIONS by its position, or after them one of the game's own (REACTIONS.length + its position). */
+export const ReactionSchema = z.object({ reaction: z.number().int().min(0).max(REACTIONS.length + MAX_OWN_REACTIONS - 1) }).strict();
 /**
  * The host's own words for this room: Galgje words and Undercover word pairs. The next Galgje or Undercover
  * round that starts uses them instead of its scene's words (empty: the scene's). Only the host ever sees them.

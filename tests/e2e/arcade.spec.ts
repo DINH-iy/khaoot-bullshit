@@ -294,3 +294,49 @@ test("the leader sets a game's own settings; the others see them read-only", asy
   await page.getByRole('button', { name: /^Play Stop the clock/ }).click();
   await expect(page.getByRole('heading', { name: 'Stop the clock', level: 2 })).toBeVisible();
 });
+
+test('Galgje and Undercover play in an arcade lobby of three phones, run by the leader without a host', async ({ browser, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'Three phones are emulated in separate contexts below.');
+  test.setTimeout(150_000);
+  const phone = async () => (await browser.newContext({ baseURL, viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })).newPage();
+  const [ann, bo, cy] = [await phone(), await phone(), await phone()] as [Page, Page, Page];
+  try {
+    await ann.goto('/?arcade'); await ann.getByLabel('Your name').fill('Ann');
+    await ann.getByRole('button', { name: 'Open a lobby' }).click();
+    const link = await inviteLink(ann);
+    for (const [page, name] of [[bo, 'Bo'], [cy, 'Cy']] as const) { await page.goto(link); await page.getByLabel('Your name').fill(name); await page.getByRole('button', { name: 'Join the lobby' }).click(); }
+    await expect(ann.getByRole('button', { name: 'Players 3' })).toBeVisible({ timeout: 10_000 });
+
+    // Galgje: everyone guesses on their own phone; the leader ends the round and shows the word.
+    await pickGame(ann, 'Hangman');
+    await ann.getByRole('button', { name: 'Play Hangman' }).click();
+    for (const page of [ann, bo, cy]) await page.getByRole('button', { name: 'Got it!' }).click({ timeout: 15_000 });
+    await ann.getByRole('button', { name: /^Start \(3 of 3 ready\)$/ }).click();
+    for (const page of [ann, bo, cy]) await page.getByRole('button', { name: 'Letter E', exact: true }).click({ timeout: 15_000 });
+    await expect(bo.getByRole('img', { name: /^Gallows: [01] of 7 wrong$/ }).first()).toBeVisible();
+    await ann.getByRole('button', { name: 'Leader tools' }).click();
+    await ann.getByRole('button', { name: 'End now and count the results' }).click();
+    await ann.getByRole('button', { name: 'Show the results' }).click();
+    await expect(cy.getByText('The word was').first()).toBeVisible();
+    await ann.getByRole('button', { name: 'Back to the lobby' }).click();
+
+    // Undercover: each phone its own word; clues in turn; everyone votes; with three players one vote decides.
+    await expect(ann.getByRole('button', { name: /Change$/ })).toBeVisible({ timeout: 15_000 });
+    await pickGame(ann, 'Undercover');
+    await ann.getByRole('button', { name: 'Play Undercover' }).click();
+    for (const page of [ann, bo, cy]) await page.getByRole('button', { name: 'Got it!' }).click({ timeout: 15_000 });
+    await ann.getByRole('button', { name: /^Start \(3 of 3 ready\)$/ }).click();
+    for (const page of [ann, bo, cy]) { await page.getByRole('button', { name: 'Show my word' }).click({ timeout: 15_000 }); await expect(page.locator('.uc-word-text strong')).toHaveText(/\S/); }
+    for (let tries = 0; tries < 40 && !await ann.getByText(/Vote someone out/).count(); tries++) {
+      for (const page of [ann, bo, cy]) { const button = page.getByRole('button', { name: 'I gave my clue' }); if (await button.count()) { await button.click(); await expect(button).toHaveCount(0); break; } }
+      await ann.waitForTimeout(250);
+    }
+    await ann.getByRole('button', { name: /^Bo/ }).click();
+    await bo.getByRole('button', { name: /^Ann/ }).click();
+    await cy.getByRole('button', { name: /^Bo/ }).click();
+    await expect(cy.getByText(/The (civilians|impostors) win!/)).toBeVisible();
+    // The round closes by itself once decided; the leader shows the results with both words.
+    await ann.getByRole('button', { name: 'Show the results' }).click({ timeout: 15_000 });
+    await expect(bo.getByText(/The words: /)).toBeVisible();
+  } finally { await Promise.all([ann, bo, cy].map(page => page.context().close())); }
+});

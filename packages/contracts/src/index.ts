@@ -35,6 +35,7 @@ export * from './minigames/eight-ball/pool.js';
 export { shootPool } from './minigames/eight-ball/physics.js';
 export * from './arcade.js';
 export * from './media.js';
+export * from './party-extras.js';
 export * from './points-at-stake.js';
 
 export const ProblemSchema = z.object({

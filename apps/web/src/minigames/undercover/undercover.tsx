@@ -21,8 +21,12 @@ export function UndercoverTable({ state, stage, offset, disabled, onAct }: { sta
   const u = useTexts(UNDERCOVER_TEXTS); const data = stage.minigame?.undercover;
   const view = data?.view;
   const ends = view ? view.phase === 'clues' ? view.turnEndsAt : view.phase === 'vote' ? view.voteEndsAt : view.phase === 'guess' ? view.guessEndsAt : null : null;
-  const now = useServerNow(offset, ends !== null && ends !== undefined);
+  const starts = stage.minigame?.startsAt ? Date.parse(stage.minigame.startsAt) : null;
+  const now = useServerNow(offset, (ends !== null && ends !== undefined) || (starts !== null && starts > Date.now() + offset - 1000));
   if (!view) return null;
+  // The countdown everyone starts together after (as in every minigame); the word can already be looked at.
+  if (starts !== null && now < starts) return <div className="uc-table">{state.role === 'player' && data?.own !== undefined && <OwnWord word={data.own.word} />}
+    <p className="mg-big" role="timer" aria-label={u('round', { round: 1 })}>{Math.ceil((starts - now) / 1000)}</p></div>;
   if (view.tooFew) return <p className="wait-note uc-few" role="status">{u('tooFew')}</p>;
   const me = state.role === 'player' ? state.selfPlayerId : null; const host = state.role === 'host';
   const outOf = (id: string) => view.out.find(entry => entry.playerId === id);

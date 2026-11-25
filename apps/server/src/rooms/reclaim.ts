@@ -24,7 +24,7 @@ export const RoomStateSchema = z.object({
   // Settings this room's game fixes once it has started (game/room-settings.ts); set when the room opens.
   gameLocks: z.array(z.enum(GAME_LOCKED_SETTINGS)).default([]),
   // Host settings (see RoomSettingsSchema). Rooms saved before they existed get these defaults.
-  showScores: z.boolean().default(true), reactions: z.boolean().default(true), autoClose: z.boolean().default(true), autoCloseSeconds: z.number().int().min(1).max(30).default(3),
+  showScores: z.boolean().default(true), reactions: z.boolean().default(true), soundboard: z.boolean().default(true), autoClose: z.boolean().default(true), autoCloseSeconds: z.number().int().min(1).max(30).default(3),
   // Breaks: whether players may vote for one, how many must agree, who has voted, and when the running break began.
   breakVotes: z.boolean().default(true), breakPercent: z.number().int().min(10).max(100).default(50), breakVoters: z.array(GameIdSchema).max(200).default([]), breakStartedAt: z.string().datetime().nullable().default(null),
   chat: z.boolean().default(false),
@@ -158,7 +158,7 @@ export function createSeatReclaim(client: PrismaClient, config: Config, connecte
         await recordRoomChange(tx, sessionId, 'room.settings');
       });
     },
-    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'chat' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'signup' | 'testBench' | 'keepOpen' | 'autoRevealSeconds'>>) {
+    async setSettings(sessionId: string, principal: Principal, settings: Partial<Pick<RoomState, 'reclaimApproval' | 'showScores' | 'reactions' | 'soundboard' | 'chat' | 'autoClose' | 'autoCloseSeconds' | 'breakVotes' | 'breakPercent' | 'reactionLimit' | 'reactionChoices' | 'sideGames' | 'chips' | 'openInvites' | 'confirmLooks' | 'quickTimeSeconds' | 'music' | 'musicVolume' | 'signup' | 'testBench' | 'keepOpen' | 'autoRevealSeconds'>>) {
       const updated = Object.keys(settings);
       const onlyReveal = updated.length === 1 && updated[0] === 'autoRevealSeconds';
       roomAssert(principal.role === 'host' || (principal.role === 'player' && onlyReveal), 'FORBIDDEN');

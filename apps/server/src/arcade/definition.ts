@@ -1,4 +1,4 @@
-import { arcadeSettings, HEAD_TO_HEAD_GAMES, MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, type ArcadeGame, type ArcadeTeams, type GraphData } from '@party/contracts';
+import { arcadeSettings, HEAD_TO_HEAD_GAMES, MINIGAMES, SOLO_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, type ArcadeGame, type ArcadeTeams, type GraphData } from '@party/contracts';
 import { parseDefinition, type GameDefinition } from '../game/definition.js';
 
 // The room's standard texts speak of a host; in the arcade the leader runs the round.
@@ -9,7 +9,8 @@ const LEADER_TEXTS = {
 };
 
 /** Whether the requested team mode fits the game. */
-export const arcadeRoundFits = (game: ArcadeGame, teams: ArcadeTeams | null) => isHeadToHeadKey(game) ? teams === null : teams !== null || !TEAM_MINIGAMES.includes(game);
+export const arcadeRoundFits = (game: ArcadeGame, teams: ArcadeTeams | null) => isHeadToHeadKey(game) ? teams === null
+  : SOLO_MINIGAMES.includes(game) ? teams === null : teams !== null || !TEAM_MINIGAMES.includes(game);
 
 /**
  * An arcade minigame uses standard settings and

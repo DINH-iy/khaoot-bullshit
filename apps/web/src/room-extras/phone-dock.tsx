@@ -34,9 +34,12 @@ type Sheet = 'menu' | 'scores' | 'players' | 'react' | 'chat' | 'settings' | 'ga
  * scoreboard (when the host allows it), the players, reactions to the big
  * screen, and sound on or off. Nothing to scroll for.
  */
-export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak, challengeTick }: {
+export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, onBreak, challengeTick, onSound, soundUntil = 0, offset = 0 }: {
   state: RoomSnapshot; scores: ReactNode; canSeeScores: boolean; onChangeLook: () => void; onReact: (reaction: number) => void; onBreak: (vote: boolean) => void; challengeTick: number;
+  onSound?: (sound: number) => void; soundUntil?: number; offset?: number;
 }) {
+  // The soundboard shows while the host allows it and the game has sounds.
+  const sounding = state.settings.soundboard !== false && (state.view.party?.sounds.length ?? 0) > 0;
   const t = useText(); const chat = useTexts(CHAT_TEXTS); const preferences = useTexts(PHONE_FEEDBACK_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const [birthdayError, setBirthdayError] = useState(false); const [birthdayBusy, setBirthdayBusy] = useState(false);
   const language = useLanguage(); const [sheet, setSheet] = useState<Sheet>(null); const [sound, setSoundState] = useState(soundOn);
@@ -82,7 +85,7 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
     {sideGames && <ChallengeAlert state={state} challenges={sheet === 'challenges' ? [] : challenges.data?.challenges ?? []} needed={needed} onOpen={() => setSheet('challenges')} />}
     {/* One button instead of a row of icons; the menu holds everything. */}
     <div className="phone-dock-buttons">
-      {state.settings.reactions && <button type="button" className="dock-button dock-react" aria-haspopup="dialog"
+      {(state.settings.reactions || sounding) && <button type="button" className="dock-button dock-react" aria-haspopup="dialog"
         aria-expanded={sheet === 'react'} aria-label={t('react.open')} onClick={() => setSheet(sheet === 'react' ? null : 'react')}>
         {icon('react')}
       </button>}
@@ -95,7 +98,7 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
       {canSeeScores && <button type="button" onClick={() => setSheet('scores')}>{icon('scores')}<small>{t('scores.title')}</small></button>}
       <button type="button" onClick={() => setSheet('players')}>{icon('players')}<small>{t('players.title', { count: state.players.length })}</small></button>
       {state.settings.chat && <button type="button" onClick={() => setSheet('chat')}>{icon('chat')}<small>{chat('title')}</small></button>}
-      {state.settings.reactions && <button type="button" onClick={() => setSheet('react')}>{icon('react')}<small>{x('react')}</small></button>}
+      {(state.settings.reactions || sounding) && <button type="button" onClick={() => setSheet('react')}>{icon('react')}<small>{x('react')}</small></button>}
       {state.settings.breakVotes && state.view.status === 'RUNNING' && <button type="button" aria-pressed={state.break.voted} onClick={() => { onBreak(!state.break.voted); close(); }}>
         {icon('break')}<small>{t('break.vote')} {state.break.votes}/{state.break.needed}</small></button>}
       {state.settings.sideGames && <button type="button" aria-disabled={needed} onClick={() => { if (!needed) setSheet('games'); }}>
@@ -135,6 +138,8 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
       <Challenges sessionId={sessionId} selfId={state.selfPlayerId} players={state.players} withChips={chips} state={challenges} />
     </BottomSheet>}
     {sheet === 'chat' && state.settings.chat && <BottomSheet title={chat('title')} onClose={close}><RoomChat state={state} /></BottomSheet>}
-    {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} choices={state.settings.reactionChoices} limit={state.settings.reactionLimit} /></BottomSheet>}
+    {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} choices={state.settings.reactionChoices} limit={state.settings.reactionLimit}
+      own={state.view.party?.reactions ?? []} reactions={state.settings.reactions} onSound={onSound}
+      sounds={sounding ? { list: state.view.party?.sounds ?? [], waitUntil: soundUntil, offset } : undefined} /></BottomSheet>}
   </>;
 }

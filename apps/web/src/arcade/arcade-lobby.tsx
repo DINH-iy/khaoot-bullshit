@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader } from '../ui/loader.js';
-import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeGameSettings, type ArcadeLobbyView, type ArcadePick, type ArcadeTeams, type GraphLibraryEntry, ArcadeGraphsSchema } from '@party/contracts';
+import { ARCADE_PASSWORD_MIN, ARCADE_PASSWORD_MAX, ARCADE_MAX_TEAMS, ArcadeLobbyViewSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SHARED_SCREEN_MINIGAMES, SOLO_MINIGAMES, TEAM_MINIGAMES, isHeadToHeadKey, isMinigameKey, type ArcadeGame, type ArcadeGameSettings, type ArcadeLobbyView, type ArcadePick, type ArcadeTeams, type GraphLibraryEntry, ArcadeGraphsSchema } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { isUnavailablePageError, navigate, replaceWithHome } from '../navigation.js';
 import { CopyButton, useQr } from '../room/join-qr.js';
@@ -242,9 +242,11 @@ function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
   };
   const duel = isHeadToHeadKey(game);
   const teamOnly = !duel && TEAM_MINIGAMES.includes(game);
+  // Games always played alone (Undercover, Draw the Graph…) offer no teams.
+  const soloOnly = !duel && SOLO_MINIGAMES.includes(game);
   // Never more teams than players; a team-only minigame needs at least two.
   const most = Math.min(ARCADE_MAX_TEAMS, Math.max(2, players));
-  const count = duel ? 0 : teamOnly && teamCount < 2 ? 2 : Math.min(teamCount, most);
+  const count = duel || soloOnly ? 0 : teamOnly && teamCount < 2 ? 2 : Math.min(teamCount, most);
   const enough = players >= Math.max(duel ? 2 : 1, count);
   const teamCounts = Array.from({ length: most - 1 }, (_, index) => index + 2);
   // Switching back to teams brings back the last number of teams the leader chose.
@@ -268,7 +270,7 @@ function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
         onChange={next => { const { [game]: _old, ...others } = settings; choose({ settings: next.seconds === undefined && !Object.keys(next.values ?? {}).length ? others : { ...others, [game]: next } }); }} />
     </BottomSheet>}
     {/* Alone or in teams; choosing teams opens how many and how they are made. Others see the same, read-only. */}
-    {!duel && <Segments label="Play" value={count > 0 ? 'teams' : 'alone'} disabled={watching}
+    {!duel && !soloOnly && <Segments label="Play" value={count > 0 ? 'teams' : 'alone'} disabled={watching}
       onChange={value => choose({ teamCount: value === 'teams' ? Math.min(lastCount, most) : 0 })}
       options={[...(teamOnly ? [] : [{ value: 'alone' as const, text: 'Alone', name: 'Alone' }]), { value: 'teams' as const, text: 'In teams', name: 'In teams' }]} />}
     {count > 0 && <div className="arcade-teams-more">

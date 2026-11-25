@@ -7,6 +7,7 @@ import { useTexts } from '../../i18n/texts.js';
 import { rich } from '../../i18n/rich.js';
 import { SETTINGS_TEXTS } from './settings.text.js';
 import type { HostRole } from '../../owner/use-host-access.js';
+import { GameSharingFields } from './game-sharing.js';
 
 /** An invite: opens this game's editor and signs the device in as the person (their personal key, after #, never in server logs). */
 const inviteLink = (gameId: string, key: string) => `${location.origin}/?edit=${gameId}#person=${key}`;
@@ -25,7 +26,8 @@ export function InvitePanel({ gameId, role, onClose }: { gameId: string; role: H
   const paging = usePeoplePage({ enabled: owner }); const { data, query, search, setSearch } = paging; const people = data?.people;
   useEffect(() => { if (paging.failed) setError(t('peopleFailed')); }, [paging.failed, t]);
   const copy = (what: string, text: string) => { void navigator.clipboard.writeText(text).then(() => setCopied(what), () => setError(t('copyBlocked'))); };
-  const invite = (person: PersonRow) => { setBusy(true); setError(''); void roomApi(`/api/host/people/${person.id}/key`).then(data => copy(person.id, inviteLink(gameId, PersonKeyViewSchema.parse(data).key)))
+  const [added, setAdded] = useState<string | null>(null);
+  const invite = (person: PersonRow) => { setBusy(true); setError(''); void roomApi(`/api/host/people/${person.id}/key`).then(data => { copy(person.id, inviteLink(gameId, PersonKeyViewSchema.parse(data).key)); setAdded(person.id); })
     .catch(() => setError(t('noKey', { name: person.name }))).finally(() => setBusy(false)); };
   const allow = (person: PersonRow) => { setBusy(true); setError(''); void roomApi(`/api/host/people/${person.id}/editor`, { canEdit: true }).then(paging.reload).catch(() => setError(t('didNotWork'))).finally(() => setBusy(false)); };
   const plain = `${location.origin}/?edit=${gameId}`;
@@ -48,6 +50,8 @@ export function InvitePanel({ gameId, role, onClose }: { gameId: string; role: H
       <PeoplePager paging={paging} />
       <p className="hint">{t('inviteHint')}</p>
     </div>}
+    {/* Who may edit this game: its author and the owner choose; an editor only sees the games they made or that are shared with them. */}
+    <GameSharingFields gameId={gameId} added={added} />
     <div className="invite-people">
       <h3>{t('linkToGame')}</h3>
       <p className="hint">For people already signed in as an editor{owner ? ' (or you on another device)' : ''}.</p>

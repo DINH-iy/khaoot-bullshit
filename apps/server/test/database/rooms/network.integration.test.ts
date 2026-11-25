@@ -56,6 +56,33 @@ async function hostCommand(socket: Socket, sessionId: string, type: string, extr
 }
 
 describe('verified HTTP admission and actual Socket.IO networking', () => {
+  it('plays soundboard sounds on the screens only, one at a time and with a wait per player; keeps the host\'s own words from the phones', async () => {
+    const f = await room(); const alex = await player(f, 'Alex'); const sam = await player(f, 'Sam');
+    const host = await socketFor(f.sessionId, f.cookie); const one = await socketFor(f.sessionId, alex.cookie); const two = await socketFor(f.sessionId, sam.cookie);
+    const next = <T>(socket: Socket, event: string) => new Promise<T>((resolve, reject) => { const timeout = setTimeout(() => reject(new Error(`Missing ${event}`)), 3000); socket.once(event, (data: T) => { clearTimeout(timeout); resolve(data); }); });
+    const silent = (socket: Socket, event: string) => new Promise<boolean>(resolve => { const heard = () => resolve(false); socket.once(event, heard); setTimeout(() => { socket.off(event, heard); resolve(true); }, 400); });
+    // The game has no soundboard of its own: the four standard sounds. A sound number past them is ignored.
+    expect((await sync(one, f.sessionId)).view.party?.sounds).toHaveLength(4);
+    const nothing = silent(host, 'room.sound'); one.emit('room.sound', { sound: 7 }); expect(await nothing).toBe(true);
+    const heard = next<{ playerId: string; sound: number }>(host, 'room.sound'); const sent = next<{ until: number }>(one, 'room.soundSent');
+    one.emit('room.sound', { sound: 1 });
+    expect(await heard).toMatchObject({ sound: 1 }); expect((await sent).until).toBeGreaterThan(Date.now() + 15_000);
+    // Phones never hear sounds; the same player waits, and while a sound plays nobody else can start one.
+    const quietPhone = silent(two, 'room.sound');
+    const again = next<{ until: number }>(one, 'room.soundBusy'); one.emit('room.sound', { sound: 0 }); await again;
+    const other = next<{ until: number }>(two, 'room.soundBusy'); two.emit('room.sound', { sound: 0 }); await other;
+    expect(await quietPhone).toBe(true);
+    // The host switches the soundboard off: no sound at all.
+    expect((await api(`/api/rooms/${f.sessionId}/settings`, { soundboard: false }, f.cookie)).statusCode).toBe(200);
+    const off = silent(host, 'room.sound'); two.emit('room.sound', { sound: 2 }); expect(await off).toBe(true);
+    // The host's own words: only the host sets and sees them.
+    expect((await api(`/api/rooms/${f.sessionId}/words`, { words: ['molen'], pairs: [] }, alex.cookie)).statusCode).toBe(403);
+    expect((await api(`/api/rooms/${f.sessionId}/words`, { words: ['molen'], pairs: [['zon', 'maan']] }, f.cookie)).statusCode).toBe(200);
+    expect((await sync(host, f.sessionId)).ownWords).toEqual({ words: ['molen'], pairs: [['zon', 'maan']] });
+    const phoneView = await sync(one, f.sessionId);
+    expect(phoneView.ownWords).toBeUndefined(); expect(JSON.stringify(phoneView)).not.toMatch(/molen|maan/);
+  });
+
   it('keeps moderation and closing host-only and bans a linked account in this room only', async () => {
     const f = await room(); const guest = await player(f); const host = await socketFor(f.sessionId, f.cookie);
     const phone = await socketFor(f.sessionId, guest.cookie);

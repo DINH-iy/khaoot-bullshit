@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ANIMATION_PRESETS, AWARD_RULES, GameRoomSettingsSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MinigameSettingsSchemas, MOMENTS, PHONE_MENU_ACTIONS, PHONE_MENU_GLYPHS, RevealEasingSchema, THEME_PRESETS, ThemeSchema } from '@party/contracts';
+import { BUILTIN_SOUNDS, ANIMATION_PRESETS, AWARD_RULES, GameRoomSettingsSchema, HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MinigameSettingsSchemas, MOMENTS, PHONE_MENU_ACTIONS, PHONE_MENU_GLYPHS, RevealEasingSchema, THEME_PRESETS, ThemeSchema } from '@party/contracts';
 
 // The instructions the app copies for an AI ("Copy instructions for an AI") must know every
 // feature an author can use, or AI-made games silently miss them. When a feature is added,
@@ -53,6 +53,9 @@ describe('the instructions for an AI know every feature', () => {
   });
   it('the intro before a round: its points, picture and shared-screen-only setting', () => {
     expect(missing(['explain', 'showPoints', 'screenOnly', 'picture'])).toEqual([]);
+  });
+  it('the game\'s own reactions and its soundboard with every built-in sound', () => {
+    expect(missing(['ownReactions', 'soundboard', ...BUILTIN_SOUNDS])).toEqual([]);
   });
   it('how team captains are picked', () => {
     expect(missing(['captains', 'elected'])).toEqual([]);

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../../src/app.js';
-import { createAuthoring } from '../../../src/authoring/drafts.js';
+import { createAuthoring, OWNER_ACCESS } from '../../../src/authoring/drafts.js';
 import { readConfig } from '../../../src/config.js';
 import { db, prisma } from '../game-fixture.js';
 
@@ -20,6 +20,38 @@ afterAll(async () => { await app.close(); await db.close(); });
 const creator = () => prisma.creator.create({ data: { issuer: 'https://identity.example/', subject: randomUUID() } });
 
 describe('authoring drafts and publishing', () => {
+  it('shows editors only the games they made or that are shared with them; the owner sees all, with who made each; existing games stay the owner\'s', async () => {
+    const author = await creator();
+    const editor = async (name: string) => { const full = `${name} ${randomUUID().slice(0, 8)}`; return prisma.person.create({ data: { name: full, nameKey: full.toLowerCase(), linkHash: randomUUID().replace(/-/g, '').padEnd(64, '0'), canEdit: true } }); };
+    const ann = await editor('Ann'); const bo = await editor('Bo');
+    const as = (person: { id: string } | null) => ({ personId: person?.id ?? null });
+    // A game from before authors were kept: made by the owner, nothing about it changes.
+    const old = await authoring.create(author.id, { gameId: randomUUID(), title: 'Old favourite', startFrom: null });
+    const anns = await authoring.create(author.id, { gameId: randomUUID(), title: 'Ann quiz', startFrom: null }, as(ann));
+    expect((await authoring.list(author.id, as(ann))).map(game => [game.title, game.author])).toEqual([['Ann quiz', { name: ann.name, you: true }]]);
+    expect(await authoring.list(author.id, as(bo))).toEqual([]);
+    const all = await authoring.list(author.id, OWNER_ACCESS);
+    expect(all.map(game => [game.title, game.author?.name ?? null]).sort()).toEqual([['Ann quiz', ann.name], ['Old favourite', null]]);
+    // Bo cannot open, save, copy or remove Ann's game.
+    await expect(authoring.get(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(authoring.save(author.id, anns.gameId, { expectedRevision: 0, definition: anns.definition }, as(bo))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(authoring.create(author.id, { gameId: randomUUID(), title: 'Copy', startFrom: null, copyOf: anns.gameId }, as(bo))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(authoring.archive(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    // Ann shares it with Bo: Bo sees and edits it, but cannot remove or re-share it, nor say who made it.
+    await expect(authoring.share(author.id, anns.gameId, { sharedWith: [bo.id], authorPersonId: bo.id }, as(ann))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await authoring.share(author.id, anns.gameId, { sharedWith: [bo.id] }, as(ann))).toMatchObject({ authorPersonId: ann.id, sharedWith: [bo.id], canChangeAuthor: false });
+    expect((await authoring.list(author.id, as(bo))).map(game => [game.title, game.author?.name, game.shared])).toEqual([['Ann quiz', ann.name, true]]);
+    expect((await authoring.save(author.id, anns.gameId, { expectedRevision: 0, definition: anns.definition }, as(bo))).revision).toBe(1);
+    await expect(authoring.archive(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(authoring.sharing(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    // The owner gives the old game to Bo (who made it before authors were kept): Bo sees it, Ann does not.
+    await authoring.share(author.id, old.gameId, { sharedWith: [], authorPersonId: bo.id }, OWNER_ACCESS);
+    expect((await authoring.list(author.id, as(bo))).map(game => game.title).sort()).toEqual(['Ann quiz', 'Old favourite']);
+    expect((await authoring.list(author.id, as(ann))).map(game => game.title)).toEqual(['Ann quiz']);
+    // Nothing was lost: every game still has its draft.
+    expect(await prisma.gameDraft.count({ where: { gameId: { in: [old.gameId, anns.gameId] } } })).toBe(2);
+  });
+
   it('creates a blank or template game once, even when the request is repeated', async () => {
     const author = await creator(); const gameId = randomUUID();
     const first = await authoring.create(author.id, { gameId, title: 'Quiz night', startFrom: null });
@@ -32,10 +64,10 @@ describe('authoring drafts and publishing', () => {
     const stranger = await creator();
     await expect(authoring.get(stranger.id, gameId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(authoring.create(stranger.id, { gameId, title: 'Mine now', startFrom: null })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect((await authoring.list(author.id)).map(game => game.title).sort()).toEqual(['My Friday', 'Quiz night']);
+    expect((await authoring.list(author.id, OWNER_ACCESS)).map(game => game.title).sort()).toEqual(['My Friday', 'Quiz night']);
     await expect(authoring.archive(stranger.id, gameId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await authoring.archive(author.id, gameId);
-    expect((await authoring.list(author.id)).map(game => game.title)).toEqual(['My Friday']);
+    expect((await authoring.list(author.id, OWNER_ACCESS)).map(game => game.title)).toEqual(['My Friday']);
     await expect(authoring.get(author.id, gameId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
@@ -126,7 +158,7 @@ describe('authoring drafts and publishing', () => {
     expect(onlyMusic.definition as { startNodeKey: string; nodes: { key: string }[]; edges: unknown[] }).toMatchObject({ startNodeKey: 'music', nodes: [{ key: 'music' }], edges: [] });
     // Nothing was published, and rehearsal games never appear in the list.
     expect((await authoring.get(author.id, draft.gameId)).published).toBeNull();
-    expect((await authoring.list(author.id)).map(game => game.title)).toEqual(['Practice']);
+    expect((await authoring.list(author.id, OWNER_ACCESS)).map(game => game.title)).toEqual(['Practice']);
     await expect(authoring.rehearsalVersion(author.id, draft.gameId, { expectedRevision: 3, startNodeKey: null, ...ids() })).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
     await expect(authoring.rehearsalVersion(author.id, draft.gameId, { expectedRevision: 0, startNodeKey: 'nowhere', ...ids() })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     // A vote cannot be rehearsed without the round it votes on.

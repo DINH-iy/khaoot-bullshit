@@ -96,18 +96,38 @@ model Game {
   // The owner's own version of a built-in game (its key in game/templates.ts): edited and published like any
   // game, and used instead of the built-in once published. Restoring the original archives it and clears this.
   builtInKey String?   @db.VarChar(64)
+  // The editor (a person with editor rights) who made the game; null when the owner made it, which includes
+  // every game made before games had an author. Editors see their own games and the games shared with them.
+  authorPersonId String? @db.Uuid
   archivedAt DateTime? @db.Timestamptz(3)
   createdAt  DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
 
   creator    Creator         @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  author     Person?         @relation("AuthoredGames", fields: [authorPersonId], references: [id], onDelete: Restrict)
   draft      GameDraft?
   versions   GameVersion[]
   savePoints GameSavePoint[]
+  shares     GameShare[]
 
   @@unique([creatorId, builtInKey])
   @@index([creatorId, archivedAt])
+  @@index([authorPersonId])
   @@map("games")
+}
+
+/// A game shared with an editor by its author or the owner: they see and edit it like their own.
+model GameShare {
+  gameId    String   @db.Uuid
+  personId  String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@id([gameId, personId])
+  @@index([personId])
+  @@map("game_shares")
 }
 
 model GameDraft {
@@ -586,6 +606,8 @@ model Person {
   removedAt DateTime? @db.Timestamptz(3)
 
   devices PersonDevice[]
+  authoredGames Game[] @relation("AuthoredGames")
+  gameShares GameShare[]
   players SessionPlayer[]
   chips   ChipEntry[]
   rounds  SideRound[]

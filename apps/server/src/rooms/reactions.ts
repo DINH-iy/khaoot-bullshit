@@ -1,12 +1,12 @@
 import type { Server, Socket } from 'socket.io';
-import { ReactionSchema } from '@party/contracts';
+import { DEFAULT_SOUNDBOARD, REACTIONS, ReactionSchema, SOUND_COOLDOWN_SECONDS, SOUND_MAX_SECONDS, SoundRequestSchema } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Principal } from './gateway.js';
 import { readRoomState } from './reclaim.js';
 
 /** Per room: at most 25 a second reach the screen, whatever the per-player limit. */
 const ROOM_PER_SECOND = 25;
-interface Rules { on: boolean; finished: boolean; limit: number; choices: Set<number> }
+interface Rules { on: boolean; finished: boolean; limit: number; choices: Set<number>; own: number; sounds: boolean; soundCount: number }
 
 /**
  * Emoji and stickers from phones, floating up on the shared screen. Passed on
@@ -18,13 +18,19 @@ export function registerReactions(io: Server, client: PrismaClient) {
   const cached = new Map<string, { at: number; rules: Rules }>();
   const rules = async (sessionId: string): Promise<Rules> => {
     const hit = cached.get(sessionId); if (hit && Date.now() - hit.at < 2000) return hit.rules;
-    const room = await client.gameSession.findUnique({ where: { id: sessionId }, select: { state: true, status: true } });
+    const room = await client.gameSession.findUnique({ where: { id: sessionId }, select: { state: true, status: true, gameVersion: { select: { definition: true } } } });
     const state = readRoomState(room?.state);
-    const result = { on: Boolean(room && !state.roomClosed && state.reactions), finished: room?.status === 'FINISHED', limit: state.reactionLimit, choices: new Set(state.reactionChoices) };
+    // The game's own reactions and sounds (the definition was checked when it was saved): only how many there are matters here.
+    const definition = room?.gameVersion.definition as { ownReactions?: unknown[]; soundboard?: unknown[] } | undefined;
+    const result = { on: Boolean(room && !state.roomClosed && state.reactions), finished: room?.status === 'FINISHED', limit: state.reactionLimit, choices: new Set(state.reactionChoices),
+      own: Array.isArray(definition?.ownReactions) ? definition.ownReactions.length : 0,
+      sounds: Boolean(room && !state.roomClosed && state.soundboard), soundCount: Array.isArray(definition?.soundboard) ? definition.soundboard.length : DEFAULT_SOUNDBOARD.length };
     cached.set(sessionId, { at: Date.now(), rules: result }); if (cached.size > 1024) cached.delete(cached.keys().next().value!);
     return result;
   };
   const roomRate = new Map<string, { second: number; count: number }>();
+  // The soundboard: when each player may play again, and until when the room's current sound plays.
+  const soundAt = new Map<string, number>(); const playingUntil = new Map<string, number>();
   // Each player's recent reactions (all their phones and tabs together), for the "per 10 seconds" limit.
   const sent = new Map<string, number[]>();
   let next = 0;
@@ -47,10 +53,25 @@ export function registerReactions(io: Server, client: PrismaClient) {
     connect(socket: Socket, principal: Principal) {
       if (principal.actor.role !== 'player') return;
       const playerId = principal.actor.playerId; const sessionId = principal.sessionId;
+      // A sound on the shared screen: one at a time in the room, and each player waits between two.
+      socket.on('room.sound', (input: unknown) => {
+        const now = Date.now(); const parsed = SoundRequestSchema.safeParse(input); if (!parsed.success) return;
+        void rules(sessionId).then(room => {
+          if (!room.sounds || parsed.data.sound >= room.soundCount) return;
+          const key = `${sessionId}:${playerId}`;
+          if ((soundAt.get(key) ?? 0) > now || (playingUntil.get(sessionId) ?? 0) > now) { socket.emit('room.soundBusy', { until: Math.max(soundAt.get(key) ?? 0, playingUntil.get(sessionId) ?? 0) }); return; }
+          soundAt.set(key, now + SOUND_COOLDOWN_SECONDS * 1000); playingUntil.set(sessionId, now + SOUND_MAX_SECONDS * 1000);
+          if (soundAt.size > 4096) soundAt.delete(soundAt.keys().next().value!); if (playingUntil.size > 1024) playingUntil.delete(playingUntil.keys().next().value!);
+          socket.emit('room.soundSent', { until: now + SOUND_COOLDOWN_SECONDS * 1000 });
+          io.to(`display:${sessionId}`).to(`host:${sessionId}`).emit('room.sound', { id: ++next, playerId, sound: parsed.data.sound });
+        }).catch(() => undefined);
+      });
       socket.on('room.react', (input: unknown) => {
         const now = Date.now(); const parsed = ReactionSchema.safeParse(input); if (!parsed.success) return;
         void rules(sessionId).then(room => {
-          if (!room.on || !room.choices.has(parsed.data.reaction)) return;
+          // A standard reaction the host allows, or one of the game's own (always allowed while reactions are on).
+          const reaction = parsed.data.reaction;
+          if (!room.on || (reaction < REACTIONS.length ? !room.choices.has(reaction) : reaction - REACTIONS.length >= room.own)) return;
           const key = `${sessionId}:${playerId}`; const recent = (sent.get(key) ?? []).filter(at => now - at < 10_000);
           if (recent.length >= room.limit) return; recent.push(now); sent.delete(key); sent.set(key, recent); if (sent.size > 4096) sent.delete(sent.keys().next().value!);
           const second = Math.floor(now / 1000); const rate = roomRate.get(sessionId);

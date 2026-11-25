@@ -1,3 +1,4 @@
+import { SHARE_TEXTS } from '../editor/shell/share.text.js';
 import { Dropdown } from '../ui/dropdown.js';
 import { useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
@@ -23,7 +24,7 @@ function Badges({ game }: { game: Game }) {
 /** openRoom is null for editors: they publish and rehearse, but only the owner opens real rooms. */
 export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: () => void; openRoom: ((gameId: string) => void) | null }) {
   const [title, setTitle] = useState(''); const [startFrom, setStartFrom] = useState('');
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS); const s = useTexts(SHARE_TEXTS);
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
   const run = (work: Promise<unknown>) => { setBusy(true); setError(''); void work.then(reload).catch(cause => { setError(explain(cause)); reload(); }).finally(() => setBusy(false)); };
   const showProblems = (gameId: string) => { void roomApi(`/api/host/games/${gameId}`).then(data => setProblems(current => ({ ...current, [gameId]: DraftSchema.parse(data).issues }))).catch(cause => setError(explain(cause))); };
@@ -32,7 +33,9 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
     <div className="my-games-head"><h2 id="my-games-heading">{t('yourGames')}</h2>{menu.myGames.length > 0 && <span className="my-games-count">{menu.myGames.length}</span>}</div>
     {error && <p role="alert" className="error">{error}</p>}
     {menu.myGames.length === 0 ? <p className="my-games-empty">{t('noGamesYet')}</p> : <ul className="plain-list my-games">{menu.myGames.map(game => <li key={game.gameId} className="my-game">
-      <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} /></div>
+      <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} />
+        {/* Who made it: the owner sees each editor's games by name; an editor sees who shared a game with them. */}
+        {(game.author || game.shared) && <span className="my-game-author">{game.author?.you ? s('byYou') : game.author ? s('byAuthor', { name: game.author.name }) : s('byOwner')}{game.shared ? ` · ${s('shared')}` : ''}</span>}</div>
       <div className="my-game-actions">
         <a className="button-link primary" href={`/?edit=${game.gameId}`} aria-label={t('editLabel', { title: game.title })}>{t('edit')}</a>
         {game.issueCount > 0 && (problems[game.gameId]
@@ -42,7 +45,8 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
         <button type="button" disabled={busy} onClick={() => run(roomApi('/api/host/games', { gameId: newId(), title: t('copyTitle', { title: game.title }).slice(0, 160), startFrom: null, copyOf: game.gameId }))}
           aria-label={t('copyLabel', { title: game.title })}>{t('copy')}</button>
         {game.published && openRoom && <button type="button" disabled={busy} onClick={() => openRoom(game.gameId)} aria-label={t('openRoomLabel', { title: game.title })}>{t('openRoom')}</button>}
-        {removing === game.gameId
+        {/* Only its maker or the owner removes a game; someone it was shared with cannot. */}
+        {game.shared ? null : removing === game.gameId
           ? <span className="my-game-confirm"><button type="button" className="danger" disabled={busy} onClick={() => { setRemoving(null); run(roomApi(`/api/host/games/${game.gameId}/archive`, {})); }} aria-label={t('yesRemoveLabel', { title: game.title })}>{t('yesRemove')}</button><button type="button" onClick={() => setRemoving(null)}>{t('keepIt')}</button></span>
           : <button type="button" className="quiet-danger" onClick={() => setRemoving(game.gameId)} aria-label={t('removeLabel', { title: game.title })}>{t('remove')}</button>}
       </div>

@@ -11,8 +11,8 @@ import { ROOM_MANAGEMENT_TEXTS } from '../room/room-management.text.js';
 import { HOST_TEXTS } from '../room/host.text.js';
 import './room-extras.css';
 
-type Setting = 'showScores' | 'reactions' | 'autoClose' | 'breakVotes' | 'confirmLooks';
-const LABELS = { showScores: 'sShowScores', reactions: 'sReactions', autoClose: 'sAutoClose', breakVotes: 'sBreakVotes', confirmLooks: 'sConfirmLooks' } as const satisfies Record<Setting, keyof typeof HOST_TEXTS.en>;
+type Setting = 'showScores' | 'reactions' | 'soundboard' | 'autoClose' | 'breakVotes' | 'confirmLooks';
+const LABELS = { showScores: 'sShowScores', reactions: 'sReactions', soundboard: 'sSoundboard', autoClose: 'sAutoClose', breakVotes: 'sBreakVotes', confirmLooks: 'sConfirmLooks' } as const satisfies Record<Setting, keyof typeof HOST_TEXTS.en>;
 
 /** Host: how the room behaves. Changes apply straight away for everyone. */
 export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapshot; sessionId: string; onError: (message: string) => void }) {
@@ -32,7 +32,7 @@ export function RoomSettings({ state, sessionId, onError }: { state: RoomSnapsho
   };
   return <fieldset className="room-settings"><legend>{h('duringGame')}</legend>
     {(Object.keys(LABELS) as Setting[]).map(setting => <SettingToggle key={setting} label={h(LABELS[setting])}
-      checked={shown[setting]} disabled={busy || (setting === 'autoClose' && closeLocked)} {...(setting === 'autoClose' && closeLocked ? { hint: h('setByGame') } : {})} onChange={value => change(setting, value)} />)}
+      checked={shown[setting] ?? true} disabled={busy || (setting === 'autoClose' && closeLocked)} {...(setting === 'autoClose' && closeLocked ? { hint: h('setByGame') } : {})} onChange={value => change(setting, value)} />)}
     {state.role === 'host' && <>
       <SettingToggle label={chat('enable')} checked={shown.chat === true} disabled={busy} onChange={value => change('chat', value)} />
       {state.settings.chat && <ChatModeration state={state} />}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, TEAM_MINIGAMES, arcadeSettings, type SessionView } from '@party/contracts';
+import { HEAD_TO_HEAD_KEYS, MINIGAME_KEYS, SOLO_MINIGAMES, TEAM_MINIGAMES, arcadeSettings, type SessionView } from '@party/contracts';
 import { arcadeDefinition, arcadeRoundFits } from '../../src/arcade/definition.js';
 import { roundResults } from '../../src/arcade/results.js';
 import { assertExecutable } from '../../src/game/definition.js';
@@ -9,9 +9,10 @@ const seats = [{ memberId: 'm-a', playerId: ids.a, personId: 'p-a' }, { memberId
 const viewWith = (stage: Record<string, unknown>) => ({ stage }) as unknown as SessionView;
 
 describe('arcade rounds', () => {
-  it('makes a playable one-scene game of every minigame, alone where possible and in teams', () => {
+  it('makes a playable one-scene game of every minigame: alone where possible, in teams unless it is always played alone', () => {
     for (const game of MINIGAME_KEYS) {
       expect(arcadeRoundFits(game, null)).toBe(!TEAM_MINIGAMES.includes(game));
+      expect(arcadeRoundFits(game, { count: 2, formation: 'random' })).toBe(!SOLO_MINIGAMES.includes(game));
       if (arcadeRoundFits(game, null)) expect(() => assertExecutable(arcadeDefinition(game, null))).not.toThrow();
       for (const formation of ['random', 'players'] as const) expect(() => assertExecutable(arcadeDefinition(game, { count: 2, formation }))).not.toThrow();
     }

@@ -30,8 +30,16 @@ test('the host keeps scores secret, players react on the big screen, and a round
     await (await openPhoneMenu(page)).getByRole('button', { name: 'React' }).click();
     await page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Send 🔥' }).click();
     await expect(host.locator('.reactions-overlay')).toContainText('🔥');
+    // The soundboard under the reactions: the sound plays on the host's screen (no shared screen here), which names who played it.
+    await page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Sounds', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Play Air horn on the shared screen' }).click();
+    await expect(host.getByRole('status').filter({ hasText: '🔊 Rea: Air horn' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Send a reaction' }).getByText(/Next sound in \d+ s/)).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Play Fanfare on the shared screen' })).toBeDisabled();
+    if (process.env['TEAM_SHOTS']) await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/soundboard-phone.png` });
     await page.getByRole('dialog', { name: 'Send a reaction' }).getByRole('button', { name: 'Close' }).click();
     // The host blocks a reaction: it disappears from the phone.
+    await host.getByText('Allowed reactions', { exact: true }).click();
     await host.getByRole('button', { name: '🔥, allowed' }).click();
     await (await openPhoneMenu(page)).getByRole('button', { name: 'React' }).click();
     await expect(page.getByRole('button', { name: 'Send 🔥' })).toHaveCount(0);

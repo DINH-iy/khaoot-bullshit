@@ -24,7 +24,7 @@ async function game() {
 const point = (gameId: string, body: Record<string, unknown>, cookie = owner) => call('POST', `/api/host/games/${gameId}/save-points`, { savePointId: randomUUID(), name: 'Point', expectedRevision: 0, ...body }, cookie);
 async function person(canEdit: boolean) {
   const name = `S ${randomUUID().slice(0, 8)}`; const made = await call('POST', '/api/host/people', { name, canEdit });
-  return { name, cookie: cookieOf(await call('POST', '/api/people/claim', { token: made.json().data.key }, '')) };
+  return { name, id: made.json().data.id as string, cookie: cookieOf(await call('POST', '/api/people/claim', { token: made.json().data.key }, '')) };
 }
 
 describe('save points', () => {
@@ -39,6 +39,9 @@ describe('save points', () => {
     const changed = { ...definition, title: 'Changed', editor: { positions: { welcome: { x: 40, y: 80 } } } };
     expect((await call('PUT', `/api/host/games/${gameId}/draft`, { expectedRevision: 0, definition: changed })).statusCode).toBe(200);
     const editor = await person(true);
+    // Only a game shared with an editor (or made by them) shows its save points to them.
+    expect((await call('GET', `/api/host/games/${gameId}/save-points`, undefined, editor.cookie)).statusCode).toBe(404);
+    expect((await call('POST', `/api/host/games/${gameId}/sharing`, { sharedWith: [editor.id] })).statusCode).toBe(200);
     const listed = (await call('GET', `/api/host/games/${gameId}/save-points`, undefined, editor.cookie)).json().data;
     expect(listed).toMatchObject({ limit: MAX_SAVE_POINTS, savePoints: [{ id: savePointId }] });
     expect((await call('GET', `/api/host/games/${gameId}/save-points/${savePointId}`, undefined, editor.cookie)).json().data.definition).toEqual(definition);

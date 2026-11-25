@@ -112,3 +112,5 @@ main.host-page { max-width: 1180px; padding: 24px 28px 48px; }
 .game-detail-actions button { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 8px 14px; border-radius: 10px; font-weight: 600; background: transparent; color: inherit; border: 1px solid light-dark(#cfc7e6, #4a4466); }
 .game-detail-actions button.danger { background: light-dark(#b42318, #d92d20); border-color: transparent; color: #fff; }
 .restore-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 600; }
+/* Who made a game (and whether it was shared with you), as a small label under its title. */
+.my-game-author { flex-basis: 100%; color: light-dark(#5d5873, #b8b2cf); font-size: .85rem; font-weight: 700; }

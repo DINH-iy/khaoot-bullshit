@@ -1,6 +1,6 @@
 import { ballotTally } from './scoring/ballot.js';
 import { introView, readExplain } from './explain.js';
-import { isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
+import { DEFAULT_SOUNDBOARD, isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/shared/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
@@ -197,6 +197,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
         presentation: viewPresentation(definition.presentation, entry?.stage.presentation),
         wheel: await wheelView(tx, session.id, definition, current, actor.data.role === 'host'),
         ...(definition.phoneEffects ? { phoneEffects: true } : {}),
+        party: { reactions: definition.ownReactions ?? [], sounds: definition.soundboard ?? DEFAULT_SOUNDBOARD },
         music: musicView(definition, current && entry ? entry.stage : null, await songInfo(tx, definition, current && entry ? entry.stage : null)),
         awards: session.status === 'FINISHED' ? await finaleSlides(tx, session.id, definition) : null,
       });

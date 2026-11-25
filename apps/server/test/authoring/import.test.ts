@@ -108,6 +108,13 @@ describe('importing a game from text', () => {
     expect((elected.definition as { nodes: { stages: Record<string, unknown>[] }[] }).nodes[0]!.stages[0]).toMatchObject({ captains: true, form: { captainPick: 'elected' } });
   });
 
+  it('imports the game\'s own reactions and soundboard, leaving out what does not fit', () => {
+    const { issues, definition } = check(JSON.stringify({ title: 'Party', ownReactions: ['🍻', 'Skol!', 'This text is far too long for a reaction'], soundboard: ['airhorn', 'kazoo', 'tada'], room: { soundboard: false },
+      scenes: [{ id: 'q', type: 'quiz', question: 'Q?', answers: ['A', 'B'], correct: 'A' }] }));
+    expect(issues).toEqual([]);
+    expect(definition).toMatchObject({ ownReactions: [{ kind: 'emoji', text: '🍻' }, { kind: 'text', text: 'Skol!' }], soundboard: [{ kind: 'builtin', name: 'airhorn' }, { kind: 'builtin', name: 'tada' }], room: { soundboard: false } });
+  });
+
   it('imports Undercover with its own word pairs and counts, the rest from the standard settings', () => {
     const { issues, definition } = check(JSON.stringify({ title: 'Spies', scenes: [{ id: 'a', type: 'minigame', game: 'undercover', pairs: [['koffie', 'thee']], undercovers: 2, mrWhite: false, seconds: 900 }] }));
     expect(issues).toEqual([]);

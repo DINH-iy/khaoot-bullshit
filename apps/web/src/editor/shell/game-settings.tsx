@@ -8,6 +8,7 @@ import { GameMusicFields } from '../scene/fields/music-fields.js';
 import { Section } from '../controls/section.js';
 import { FinaleSettings, WheelSettings } from './show-settings.js';
 import { RoomStartSettings } from './room-start-settings.js';
+import { PartyFields } from './party-fields.js';
 import { estimateMinutes, type Definition } from '../model.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SETTINGS_TEXTS } from './settings.text.js';
@@ -68,6 +69,7 @@ export function GameSettingsPanel({ definition, onChange, onLook, onClose, readO
     <Section title={t('music')} memory="Music" summary={(() => { const count = (definition['music'] as { tracks?: unknown[] } | undefined)?.tracks?.length ?? 0; return count ? t(count === 1 ? 'songOne' : 'songMany', { count }) : t('noMusic'); })()}>
       <GameMusicFields definition={definition} onChange={onChange} />
     </Section>
+    <PartyFields definition={definition} onChange={onChange} />
     <RoomStartSettings definition={definition} onChange={onChange} problems={problemsIn('room')} />
     <Section title={t('hostTools')} memory="Host tools" problems={problemsIn('host')} summary={t('quickTime', { seconds: Number(definition['quickTimeSeconds'] ?? 30) })}>
       <label>{t('quickTimeLabel')}<input type="number" inputMode="numeric" min={5} max={600} step={5} value={Number(definition['quickTimeSeconds'] ?? 30)}

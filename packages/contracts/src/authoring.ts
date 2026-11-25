@@ -17,8 +17,21 @@ const Published = z.object({ number: z.number().int().min(1), publishedAt: z.str
 export const GameSummarySchema = z.object({
   gameId: GameIdSchema, title: z.string().min(1).max(160), revision: RevisionSchema, updatedAt: z.string().datetime(),
   issueCount: z.number().int().min(0), published: Published,
+  // Who made the game: an editor's name (`you`: the one looking), or null when the owner made it. `shared`: shared with the one looking.
+  author: z.object({ name: z.string(), you: z.boolean() }).strict().nullable().optional(), shared: z.boolean().optional(),
 }).strict();
 export type GameSummary = z.infer<typeof GameSummarySchema>;
+/**
+ * Who may see and edit a game: the owner always; an editor when they made it or it is shared with them.
+ * The game's author and the owner choose whom to share it with; only the owner changes who made it
+ * (for games from before authors were kept, which all count as the owner's).
+ */
+export const GameSharingSchema = z.object({
+  authorPersonId: GameIdSchema.nullable(), sharedWith: z.array(GameIdSchema),
+  editors: z.array(z.object({ personId: GameIdSchema, name: z.string() }).strict()), canChangeAuthor: z.boolean(),
+}).strict();
+export type GameSharing = z.infer<typeof GameSharingSchema>;
+export const UpdateGameSharingSchema = z.object({ sharedWith: z.array(GameIdSchema).max(100), authorPersonId: GameIdSchema.nullable().optional() }).strict();
 export const DraftSchema = GameSummarySchema.extend({ definition: z.unknown(), issues: z.array(DefinitionIssueSchema),
   // Set when this is the owner's own version of a built-in game: which one (its key and original title).
   builtIn: z.object({ key: z.string(), title: z.string() }).strict().nullable().optional() }).strict();

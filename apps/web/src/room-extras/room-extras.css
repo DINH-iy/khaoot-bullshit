@@ -221,3 +221,16 @@
 .room-words label { display: grid; gap: 4px; font-size: .88rem; }
 .room-words textarea { width: 100%; min-height: 5em; resize: vertical; }
 .room-words-count { color: var(--r-muted); font-weight: 600; }
+/* The game's own reactions and the soundboard. */
+.reaction-grid.own { margin-bottom: 8px; }
+.own-reaction-picture { display: block; width: 44px; height: 44px; object-fit: contain; border-radius: 8px; }
+.reaction.own-picture .own-reaction-picture { width: 72px; height: 72px; }
+.sound-board { display: grid; gap: 8px; margin-top: 12px; }
+.sound-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr)); gap: 6px; }
+.room .sound-grid button { min-height: 44px; margin: 0; font-weight: 800; }
+.sound-toast { pointer-events: none; position: fixed; left: 50%; bottom: 24px; z-index: 70; transform: translateX(-50%); margin: 0; padding: 8px 16px; border-radius: 999px; background: var(--r-card-strong); color: var(--r-text); font-weight: 800; box-shadow: 0 6px 20px rgb(0 0 0 / .35); }
+
+.tray-tabs { display: flex; gap: 4px; margin-bottom: 10px; padding: 4px; border-radius: 999px; background: var(--r-card-strong); border: 1px solid var(--r-line); }
+.room .tray-tabs button { flex: 1 1 0; min-height: 38px; margin: 0; border: 0; border-radius: 999px; background: transparent; color: var(--r-text); font-weight: 800; box-shadow: none; }
+.room .tray-tabs button[aria-pressed=true] { background: var(--r-accent); color: var(--r-accent-ink); }
+.sound-board { margin-top: 0; }

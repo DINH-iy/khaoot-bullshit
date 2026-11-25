@@ -1,4 +1,4 @@
-import { HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
+import { BUILTIN_SOUNDS, MAX_OWN_REACTIONS, MAX_SOUNDS, HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
 import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
@@ -302,6 +302,11 @@ export function importDefinition(input: string): Json | null {
     ...(GameMusicSchema.safeParse(raw['music']).success ? { music: raw['music'] } : {}),
     // The game's starting room settings: `"room": { "showScores": false, "autoCloseSeconds": 5 }` (see roomSettings).
     ...(isObject(raw['room']) && Object.keys(roomSettings(raw['room'])).length ? { room: roomSettings(raw['room']) } : {}),
+    // The game's own reactions (emoji or short texts) and its soundboard (built-in sound names).
+    ...(Array.isArray(raw['ownReactions']) ? (() => { const own = raw['ownReactions'].map(entry => text(entry).trim()).filter(entry => entry && entry.length <= 16).slice(0, MAX_OWN_REACTIONS)
+      .map(entry => ({ kind: /\p{L}/u.test(entry) ? 'text' : 'emoji', text: entry })); return own.length ? { ownReactions: own } : {}; })() : {}),
+    ...(Array.isArray(raw['soundboard']) ? (() => { const sounds = [...new Set(raw['soundboard'].map(entry => text(entry)).filter(entry => (BUILTIN_SOUNDS as readonly string[]).includes(entry)))].slice(0, MAX_SOUNDS)
+      .map(name => ({ kind: 'builtin', name })); return sounds.length ? { soundboard: sounds } : {}; })() : {}),
     // Open challenge invites per player at once (default 3).
     ...(Number.isFinite(Number(raw['openInvites'])) && raw['openInvites'] !== undefined ? { openInvites: Math.max(1, Math.min(MAX_OPEN_INVITES, Math.round(Number(raw['openInvites'])))) } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
@@ -313,5 +318,5 @@ export function importDefinition(input: string): Json | null {
 function roomSettings(raw: Record<string, unknown>) {
   const flag = (key: string) => typeof raw[key] === 'boolean' ? { [key]: raw[key] } : {};
   const number = (key: string, min: number, max: number) => raw[key] !== undefined && raw[key] !== null && Number.isFinite(Number(raw[key])) ? { [key]: Math.max(min, Math.min(max, Math.round(Number(raw[key])))) } : {};
-  return { ...flag('showScores'), ...flag('reactions'), ...number('reactionLimit', 1, 30), ...flag('breakVotes'), ...number('breakPercent', 10, 100), ...flag('autoClose'), ...number('autoCloseSeconds', 1, 30) };
+  return { ...flag('showScores'), ...flag('reactions'), ...number('reactionLimit', 1, 30), ...flag('soundboard'), ...flag('breakVotes'), ...number('breakPercent', 10, 100), ...flag('autoClose'), ...number('autoCloseSeconds', 1, 30) };
 }

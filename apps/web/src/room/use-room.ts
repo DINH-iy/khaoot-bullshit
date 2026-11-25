@@ -21,6 +21,8 @@ export function useRoom(sessionId: string | undefined, display = false) {
   // Counts challenge updates pushed to this phone; the challenges sheet reloads when it changes.
   const [challengeTick, setChallengeTick] = useState(0);
   const [go, setGo] = useState<{ stageRunId: string; goAt: string; receivedAt: number } | null>(null); const [progress, setProgress] = useState<{ stageRunId: string; counts: { playerId: string; count: number }[] } | null>(null);
+  // The soundboard: the latest sound to play (screens), and until when this phone waits before its next one (server time).
+  const [soundEvent, setSoundEvent] = useState<{ id: number; playerId: string; sound: number } | null>(null); const [soundUntil, setSoundUntil] = useState(0);
   const [liveStrokes] = useState(createLiveStrokes); const [reactions] = useState(createReactionStore); const [poolAims] = useState(createPoolAimStore);
   const socketRef = useRef<Socket | undefined>(undefined); const pendingRef = useRef<GameCommand | undefined>(undefined); const sendRef = useRef<(command: GameCommand) => void>(() => {});
   // What the host was looking at when acting: used to decide whether a conflicting action is still meant.
@@ -153,6 +155,11 @@ export function useRoom(sessionId: string | undefined, display = false) {
     socket.on('minigame.go', (data: { stageRunId?: unknown; goAt?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && typeof data.goAt === 'string') { setGo({ stageRunId: data.stageRunId, goAt: data.goAt, receivedAt: performance.now() }); requestSync(); } });
     socket.on('drawing.live', (data: unknown) => { if (mounted) liveStrokes.apply(data); });
     socket.on('room.reaction', (data: unknown) => { if (mounted) reactions.add(data); });
+    socket.on('room.sound', (data: { id?: unknown; playerId?: unknown; sound?: unknown }) => {
+      if (mounted && typeof data?.id === 'number' && typeof data.playerId === 'string' && typeof data.sound === 'number') setSoundEvent({ id: data.id, playerId: data.playerId, sound: data.sound });
+    });
+    const waitUntil = (data: { until?: unknown }) => { if (mounted && typeof data?.until === 'number') setSoundUntil(data.until); };
+    socket.on('room.soundSent', waitUntil); socket.on('room.soundBusy', waitUntil);
     socket.on('room.pool-aim', (data: unknown) => { if (mounted) poolAims.add(data); });
     socket.on('minigame.progress', (data: { stageRunId?: unknown; counts?: unknown }) => { if (mounted && typeof data?.stageRunId === 'string' && Array.isArray(data.counts)) setProgress({ stageRunId: data.stageRunId, counts: (data.counts as { playerId: string; count: number }[]).filter(entry => typeof entry?.playerId === 'string' && Number.isInteger(entry.count)).slice(0, 512) }); });
     socket.on('room.error', (error: { code: string }) => {
@@ -170,7 +177,9 @@ export function useRoom(sessionId: string | undefined, display = false) {
     /** A tap race's running count; fire-and-forget, the final result is the saved one. */
     // Not volatile: a report waits for a busy connection instead of being dropped, so the server sees every tap it can.
     sendTaps(stageRunId: string, count: number) { socketRef.current?.emit('minigame.taps', { stageRunId, count }); },
-    liveStrokes, reactions, poolAims,
+    liveStrokes, reactions, poolAims, soundEvent, soundUntil,
+    /** A sound of the game's soundboard on the shared screen; the server says when this phone may play the next. */
+    sendSound(sound: number) { socketRef.current?.emit('room.sound', { sound }); },
     /** The 8-ball shooter's aim while lining up; dropped when the connection is busy, the next one replaces it. */
     sendPoolAim(aim: PoolAim) { socketRef.current?.volatile.emit('room.pool-aim', aim); },
     /** An emoji or sticker for the shared screen; fire-and-forget (the server limits the pace). */

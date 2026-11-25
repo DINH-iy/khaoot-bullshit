@@ -93,6 +93,8 @@ describe('people with editor rights', () => {
 
   it('are disconnected from live editing when the rights are taken away', async () => {
     const editor = await makePerson(true); const game = await newGame(owner);
+    // An editor works on the owner's game once it is shared with them.
+    expect((await call('POST', `/api/host/games/${game.gameId}/sharing`, { sharedWith: [editor.id] }, owner)).statusCode).toBe(200);
     const ticket = (await call('POST', `/api/host/games/${game.gameId}/live`, {}, editor.cookie)).json().data.ticket as string;
     const socket = connect(`${url}${EDITOR_NAMESPACE}`, { auth: { ticket, name: 'Ed' }, transports: ['websocket'], reconnection: false, extraHeaders: { origin: config.PUBLIC_ORIGIN } }); sockets.push(socket);
     await new Promise<void>((resolve, reject) => { socket.once('connect', () => resolve()); socket.once('connect_error', reject); });
