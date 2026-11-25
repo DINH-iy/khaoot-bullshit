@@ -196,3 +196,29 @@ test('answer marks can be numbers, square and after the answer, and answers neve
   await expect(phoneTiles.first().locator('.answer-mark')).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 10_000 });
 });
+
+test("the clock timer's example stays small, and its own colours reach the clock", async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await section.getByLabel('Game text').fill(JSON.stringify({ title: `Clock colours ${Date.now()}`, scenes: [
+    { id: 'q1', type: 'quiz', question: 'Capital of France?', answers: ['Paris', 'Lyon'], correct: 'Paris', seconds: 60 },
+  ] }));
+  await section.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('tab', { name: 'Look & feel' }).click();
+  const timer = page.locator('details.ed-section').filter({ has: page.locator('summary', { hasText: /^Timer/ }) });
+  await timer.locator('summary').click();
+  await timer.getByRole('button', { name: 'Shrinking clock' }).click();
+  const sample = timer.getByRole('img', { name: 'Timer example' });
+  // Reported: the example took a whole screen's height.
+  expect((await sample.boundingBox())!.height).toBeLessThan(80);
+  await timer.getByRole('button', { name: /^Time left Standard/ }).click();
+  const picker = page.getByRole('dialog', { name: 'Time left' });
+  await picker.getByRole('button', { name: 'HEX', exact: true }).click();
+  await picker.getByLabel('Hex code').fill('#00ff00');
+  await picker.getByLabel('Hex code').press('Enter');
+  await picker.getByLabel('Hex code').press('Escape');
+  await expect(sample.locator('.timer-clock-slice').first()).toHaveCSS('fill', 'rgb(0, 255, 0)');
+  await timer.screenshot({ path: 'test-results/timer-colours.png' });
+});

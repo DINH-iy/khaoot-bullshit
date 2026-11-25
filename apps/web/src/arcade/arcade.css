@@ -157,10 +157,13 @@
 .room .arcade-graph-option[aria-pressed=true] { border-color: var(--r-accent); }
 .arcade-graph-option small { color: var(--r-muted); font-size: .85rem; }
 
-/* The game and its ⚙ settings side by side; a lit ⚙ when the game plays with its own settings. */
-.arcade-game-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
-.room .arcade-settings-button { height: auto; min-height: 44px; }
-.room .arcade-settings-button[data-changed] { border-color: var(--r-accent); color: var(--r-accent); }
+/* The game's settings: one row under the game tile, its summary on the right; lit when the game has its own settings. */
+.room .arcade-settings-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; align-items: center; width: 100%; min-height: 48px; margin: 0; padding: 0 14px;
+  box-sizing: border-box; border-radius: 14px; border: 1px solid var(--r-line); background: var(--r-card-strong); color: var(--r-text); font-weight: 750; text-align: start; }
+.arcade-settings-row > span { white-space: nowrap; }
+.arcade-settings-row small { color: var(--r-muted); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room .arcade-settings-row[data-changed] { border-color: var(--r-accent); } .arcade-settings-row[data-changed] small { color: var(--r-accent); }
+.arcade-settings-row .fa-icon { width: 16px; height: 16px; }
 .arcade-game-settings { display: grid; gap: 12px; }
 .arcade-game-settings > .ghost { justify-self: start; display: inline-flex; align-items: center; gap: 8px; margin: 0; }
 /* − value + : the label on its own line on narrow phones, beside the buttons when there is room. */

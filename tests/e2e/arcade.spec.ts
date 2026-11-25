@@ -259,3 +259,35 @@ test('the leader picks a graph from the library, and Play again starts the same 
     }
   } finally { await Promise.all([ann.context().close(), bo.context().close()]); }
 });
+
+test("the leader sets a game's own settings; the others see them read-only", async ({ browser, page, baseURL }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/?arcade');
+  await page.getByLabel('Your name').fill('Setter');
+  await page.getByRole('button', { name: 'Open a lobby' }).click();
+  await pickGame(page, 'Stop the clock');
+  await page.getByRole('button', { name: /^Stop the clock settings/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Stop the clock settings' });
+  await sheet.getByRole('button', { name: 'More round time' }).click();
+  await sheet.getByRole('button', { name: 'More stop at' }).click();
+  await expect(sheet.getByRole('group', { name: 'Stop at' }).locator('output')).toHaveText('10.5 s');
+  await page.screenshot({ path: 'test-results/arcade-settings-360.png' });
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: /^Stop the clock settings/ })).toContainText('35 s · own settings');
+  await page.screenshot({ path: 'test-results/arcade-pick-360.png' });
+  const url = await inviteLink(page);
+  const context = await browser.newContext({ baseURL, viewport: { width: 360, height: 740 } });
+  const friend = await context.newPage();
+  try {
+    await friend.goto(url);
+    await friend.getByLabel('Your name').fill('Watcher');
+    await friend.getByRole('button', { name: 'Join the lobby' }).click();
+    await friend.getByRole('button', { name: /^Stop the clock settings/ }).click();
+    const seen = friend.getByRole('dialog', { name: 'Stop the clock settings' });
+    await expect(seen.getByRole('group', { name: 'Stop at' }).locator('output')).toHaveText('10.5 s');
+    await expect(seen.getByRole('button', { name: 'More stop at' })).toBeDisabled();
+  } finally { await context.close(); }
+  // The round starts (that it plays with these settings is checked against the database in the server tests).
+  await page.getByRole('button', { name: /^Play Stop the clock/ }).click();
+  await expect(page.getByRole('heading', { name: 'Stop the clock', level: 2 })).toBeVisible();
+});

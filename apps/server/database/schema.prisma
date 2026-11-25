@@ -862,7 +862,7 @@ model ArcadeRound {
   lobbyId   String    @db.Uuid
   sessionId String    @unique @db.Uuid
   number    Int
-  game      String    @db.VarChar(20)
+  game      String    @db.VarChar(32)
   // Null for everyone on their own; otherwise the number of teams.
   teams     Int?
   startedAt DateTime  @default(now()) @db.Timestamptz(3)
@@ -899,7 +899,7 @@ model ArcadeResult {
   roundId     String   @db.Uuid
   memberId    String   @db.Uuid
   personId    String?  @db.Uuid
-  game        String   @db.VarChar(20)
+  game        String   @db.VarChar(32)
   // 1 for a win (own place, or the team's); null when unranked or no result.
   place       Int?
   pointsMilli BigInt

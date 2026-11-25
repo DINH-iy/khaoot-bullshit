@@ -220,6 +220,14 @@ describe('arcade lobbies', () => {
     expect((await call('POST', `${lobby}/round/end`, {}, leader)).statusCode).toBe(200);
   });
 
+  it('starts a round of the game with the longest name (red-or-black roulette did not fit its column)', async () => {
+    const { lobbyId, leader } = await open();
+    const roundId = randomUUID();
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/rounds`, { roundId, game: 'red-or-black-roulette', teams: null }, leader)).statusCode).toBe(200);
+    expect((await view(lobbyId, leader)).round).toMatchObject({ game: 'red-or-black-roulette', seated: true });
+    expect((await call('POST', `/api/arcade/lobbies/${lobbyId}/round/end`, {}, leader)).statusCode).toBe(200);
+  });
+
   it('requires two duelists and records a drawn duel without a win or points', async () => {
     const { lobbyId, leader } = await open();
     const lobby = `/api/arcade/lobbies/${lobbyId}`;

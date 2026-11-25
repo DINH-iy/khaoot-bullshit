@@ -237,7 +237,16 @@ export function ThemePanel({ theme, below, title = '', onChange, noAnswers = fal
           <button key={key} type="button" aria-pressed={full.timerTurn === key} onClick={() => set({ timerTurn: key })}>{t(key === 'clockwise' ? 'timerClockwise' : 'timerCounter')}</button>)}</div>
         {/* A live example: full, then emptying, then the red end. */}
         <div className="timer-samples room" role="img" aria-label={t('timerSample')} style={themeStyle(full)}>
-          {[[20, 20], [14, 20], [3, 20], [0, 20]].map(([left, total]) => <ClockFace key={left} left={left! * 1000} total={total! * 1000} ending={left! <= 5} up={left === 0} clockwise={full.timerTurn !== 'counterclockwise'} />)}</div></>}
+          {[[20, 20], [14, 20], [3, 20], [0, 20]].map(([left, total]) => <ClockFace key={left} left={left! * 1000} total={total! * 1000} ending={left! <= 5} up={left === 0} clockwise={full.timerTurn !== 'counterclockwise'} />)}</div>
+        {/* The clock's colours: its rim, the time left and the last seconds (standard: the look's text, accent and danger colours). */}
+        <p className="field-title">{t('timerColours')}</p>
+        <div className="color-grid timer-colors">{([['face', 'text', 'timerFace'], ['time', 'accent', 'timerTime'], ['ending', 'danger', 'timerEnding']] as const).map(([name, standard, label]) => {
+          const value = full.timerColors[name] ?? full.colors[standard];
+          return <ColorPicker key={name} className="color-field" value={value} label={t(label)} suggestions={lookColors} onChange={color => set({ timerColors: { ...full.timerColors, [name]: color } })}>
+            <span className="color-field-text"><span>{t(label)}</span><code>{full.timerColors[name] ? value.toUpperCase() : t('timerStandard')}</code></span>
+          </ColorPicker>;
+        })}</div>
+        {Object.keys(full.timerColors).length > 0 && <button type="button" className="small-button" onClick={() => set({ timerColors: undefined })}>{t('timerColoursReset')}</button>}</>}
       <p className="hint">{t('timerHint')}</p>
     </Section>}
 

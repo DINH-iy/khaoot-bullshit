@@ -1,3 +1,4 @@
+import { FaIcon } from '../../presentation/icons.js';
 import { COURSE_WIDTH, SPEED_RUN_COURSE, SPEED_RUN_START, type MinigameSettings, type RaceDirection } from '@party/contracts';
 import { defineTexts, translate, useTexts } from '../../i18n/texts.js';
 import type { StepRenderer } from '../shared/steps/step-game.js';
@@ -16,9 +17,10 @@ const ARROWS = { up: '↑', left: '←', down: '↓', right: '→' } as const;
 export function SpeedRunBoard({ cell = SPEED_RUN_START, course = SPEED_RUN_COURSE }: { cell?: number; course?: readonly string[] }) {
   const t = useTexts(TEXTS);
   return <div className="speed-run-board" role="img" aria-label={`${t('course')}. ${t('position', { row: Math.floor(cell / COURSE_WIDTH) + 1, column: cell % COURSE_WIDTH + 1 })}`}>
+    {/* A little track: raised walls, a start pad, a checkered finish with its flag, and the runner as a glowing ball. */}
     {course.join('').split('').map((tile, index) => <span key={index} aria-hidden="true"
-      className={`race-cell${tile === '#' ? ' wall' : ''}${index === cell ? ' runner' : ''}${tile === 'F' ? ' finish' : ''}`}>
-      {index === cell ? '●' : tile === 'F' ? '⚑' : tile === 'S' ? '○' : ''}
+      className={`race-cell${tile === '#' ? ' wall' : ''}${index === cell ? ' runner' : ''}${tile === 'F' ? ' finish' : ''}${tile === 'S' ? ' start' : ''}`}>
+      {index === cell ? <span className="race-ball" /> : tile === 'F' ? <FaIcon name="flag" /> : null}
     </span>)}
   </div>;
 }

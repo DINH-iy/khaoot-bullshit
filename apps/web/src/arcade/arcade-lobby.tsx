@@ -255,16 +255,13 @@ function PickRound({ lobbyId, players, pick, chooser, onPick, onStart }: {
     onSubmit={event => { event.preventDefault(); if (enough) onStart?.(game, count ? { count, formation } : null, game === 'draw-the-graph' ? graph : undefined, chosen); }}>
     <h2 id="pick-heading" className="arcade-kicker">Next round</h2>
     {watching && <p className="arcade-meta" role="status"><FaIcon name="star" /> {chooser} is choosing</p>}
-    <div className="arcade-game-pick">
-      {watching ? <div className="arcade-game-tile static">{tile}</div>
-        : <button type="button" className="arcade-game-tile" aria-haspopup="dialog" onClick={() => setChoosing(true)}>
-          {tile}<span className="arcade-change">Change</span></button>}
-      {/* The game's own settings (round time, targets, a duel's rules); the others can look but not change. */}
-      {hasArcadeSettings(game) && <button type="button" className="arcade-icon-button arcade-settings-button" aria-haspopup="dialog"
-        aria-label={`${gameName(game)} settings${arcadeSettingsSummary(game, chosen) ? `: ${arcadeSettingsSummary(game, chosen)}` : ''}`} data-changed={Boolean(arcadeSettingsSummary(game, chosen)) || undefined}
-        onClick={() => setSetting(true)}><FaIcon name="gear" /></button>}
-    </div>
-    {arcadeSettingsSummary(game, chosen) && <p className="arcade-meta"><FaIcon name="gear" /> {arcadeSettingsSummary(game, chosen)}</p>}
+    {watching ? <div className="arcade-game-tile static">{tile}</div>
+      : <button type="button" className="arcade-game-tile" aria-haspopup="dialog" onClick={() => setChoosing(true)}>
+        {tile}<span className="arcade-change">Change</span></button>}
+    {/* The game's own settings (round time, targets, a duel's rules) in one row under the game; the others can look but not change. */}
+    {hasArcadeSettings(game) && <button type="button" className="arcade-settings-row" aria-haspopup="dialog" data-changed={Boolean(arcadeSettingsSummary(game, chosen)) || undefined}
+      aria-label={`${gameName(game)} settings${arcadeSettingsSummary(game, chosen) ? `: ${arcadeSettingsSummary(game, chosen)}` : ''}`} onClick={() => setSetting(true)}>
+      <FaIcon name="gear" /><span>Game settings</span><small>{arcadeSettingsSummary(game, chosen) || 'Standard'}</small><FaIcon name="chevron-down" turn={-90} /></button>}
     {setting && <BottomSheet title={`${gameName(game)} settings`} onClose={() => setSetting(false)}>
       {watching && <p className="arcade-meta"><FaIcon name="star" /> {chooser} sets these</p>}
       <ArcadeGameSettingsFields game={game} chosen={chosen} disabled={watching}

@@ -210,7 +210,10 @@
 .style-change-actions { display: grid; gap: 8px; }
 .style-change-actions button { min-height: 44px; }
 .ed-dialog .style-change-actions button.primary { background: var(--e-accent); border-color: var(--e-accent); color: light-dark(#fff, #1d1730); font-weight: 700; }
-.timer-samples { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--r-bg1, #241a4d); font-size: 1.2rem; }
+/* The example borrows the room's look (class room) but none of its page size: no full-screen height or bottom padding. */
+.look-panel .timer-samples.room { display: flex; gap: 12px; align-items: center; min-height: 0; padding: 10px 12px; border-radius: 12px; background: var(--r-bg1, #241a4d); font-size: 1rem; }
+.look-panel .timer-samples .timer-clock { width: 36px; height: 36px; flex: none; }
+.timer-colors { display: grid; gap: 8px; }
 .timer-samples .timer-clock.up { animation: none; }
 /* "This scene" uses the same frame as the other moments: the shared screen two thirds, the phone one third, same captions. */
 .look-scene .preview { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }

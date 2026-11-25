@@ -633,14 +633,14 @@
 .round-info .chip-timer:has(.timer-as-clock) { padding: 0; background: transparent; }
 .round-info .timer-clock { width: 2.6rem; height: 2.6rem; }
 /* The face is empty (time gone); only the slice left is filled. */
-.timer-clock-face { fill: transparent; stroke: var(--r-text); stroke-width: 1.6; stroke-opacity: .85; }
-.timer-clock-slice { fill: var(--r-accent); transition: fill .3s; }
-.timer-clock-hub { fill: var(--r-text); }
+.timer-clock-face { fill: transparent; stroke: var(--r-clock-face, var(--r-text)); stroke-width: 1.6; stroke-opacity: .85; }
+.timer-clock-slice { fill: var(--r-clock-time, var(--r-accent)); transition: fill .3s; }
+.timer-clock-hub { fill: var(--r-clock-face, var(--r-text)); }
 .timer-clock.paused .timer-clock-slice { fill: var(--r-muted); }
-.timer-clock.ending .timer-clock-slice { fill: var(--r-bad, #ff6b6b); animation: timer-clock-pulse 1s ease-in-out infinite; }
+.timer-clock.ending .timer-clock-slice { fill: var(--r-clock-ending, var(--r-bad, #ff6b6b)); animation: timer-clock-pulse 1s ease-in-out infinite; }
 .timer-clock.up { animation: timer-clock-flash .5s steps(1, end) 6; }
-.timer-clock.up .timer-clock-face { stroke: var(--r-bad, #ff6b6b); stroke-width: 2.4; stroke-opacity: 1; }
-.timer-clock.up .timer-clock-hub { fill: var(--r-bad, #ff6b6b); }
+.timer-clock.up .timer-clock-face { stroke: var(--r-clock-ending, var(--r-bad, #ff6b6b)); stroke-width: 2.4; stroke-opacity: 1; }
+.timer-clock.up .timer-clock-hub { fill: var(--r-clock-ending, var(--r-bad, #ff6b6b)); }
 @keyframes timer-clock-pulse { 50% { opacity: .7; } }
 @keyframes timer-clock-flash { 50% { opacity: .2; } }
 @media (prefers-reduced-motion: reduce) { .timer-clock.ending .timer-clock-slice, .timer-clock.up { animation: none; } }

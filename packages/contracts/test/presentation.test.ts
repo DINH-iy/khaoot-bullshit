@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANIMATION_PRESETS, answerMark, contrast, DEFAULT_ANIMATIONS, fillText, MOMENTS, PresentationSchema, resolveAnimation, resolveTheme, TEXT_DEFAULTS, THEME_PRESETS } from '../src/index.js';
+import { ANIMATION_PRESETS, answerMark, contrast, DEFAULT_ANIMATIONS, fillText, MOMENTS, PresentationSchema, resolveAnimation, resolveTheme, TEXT_DEFAULTS, THEME_PRESETS, ThemeSchema } from '../src/index.js';
 
 describe('game look', () => {
   it.each(Object.entries(THEME_PRESETS))('keeps every text readable in the “%s” theme', (_key, { theme }) => {
@@ -60,4 +60,13 @@ describe('answer marks', () => {
     expect([0, 1].map(index => answerMark(theme('numbers'), index, 2, true))).toEqual(['←', '→']);
     expect([0, 1].map(index => answerMark(theme('numbers', 'answers'), index, 2, true))).toEqual(['1', '2']);
   });
+});
+
+it("keeps the clock's own colours per layer: a scene changes one and keeps the game's others", () => {
+  const game = { timerStyle: 'clock' as const, timerColors: { face: '#ffffff', time: '#4ade80' } };
+  expect(resolveTheme(game, { timerColors: { time: '#ff00ff' } }).timerColors).toEqual({ face: '#ffffff', time: '#ff00ff' });
+  expect(resolveTheme(game).timerColors).toEqual({ face: '#ffffff', time: '#4ade80' });
+  expect(resolveTheme().timerColors).toEqual({});
+  expect(ThemeSchema.safeParse({ timerColors: { ending: 'red' } }).success).toBe(false);
+  expect(ThemeSchema.safeParse({ timerColors: { hand: '#ffffff' } }).success).toBe(false);
 });

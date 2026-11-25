@@ -24,6 +24,10 @@ export function themeStyle(theme: ReturnType<typeof resolveTheme>): CSSPropertie
     '--a-shine': shine(colors.answerText), '--r-accent-shine': shine(colors.accentText),
     '--r-radius': `${theme.radius}px`, '--r-font': fontCssFamily(theme.font), '--r-heading-font': fontCssFamily(theme.headingFont), '--r-scale': String(theme.textScale),
   };
+  // The clock's own colours, only when chosen (the room styles fall back to text, accent and danger).
+  if (theme.timerColors.face) vars['--r-clock-face'] = theme.timerColors.face;
+  if (theme.timerColors.time) vars['--r-clock-time'] = theme.timerColors.time;
+  if (theme.timerColors.ending) vars['--r-clock-ending'] = theme.timerColors.ending;
   colors.answers.forEach((color, index) => { vars[`--a${index + 1}`] = color; });
   for (let index = colors.answers.length; index < 8; index++) vars[`--a${index + 1}`] = colors.answers[index % colors.answers.length]!;
   return vars as CSSProperties;

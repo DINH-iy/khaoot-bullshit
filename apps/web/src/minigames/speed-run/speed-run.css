@@ -1,20 +1,47 @@
 .speed-run-board {
+  --race-floor: color-mix(in srgb, var(--r-surface, #22252b) 82%, var(--r-text, #fff));
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
-  width: min(100%, 21rem);
+  gap: 4px;
+  width: min(100%, 24rem);
+  box-sizing: border-box;
   margin-inline: auto;
+  padding: 8px;
+  border-radius: 16px;
+  /* The track sits in a dark tray, so the floor, walls and finish read at a glance. */
+  background: color-mix(in srgb, var(--r-surface, #22252b) 70%, #000);
+  box-shadow: inset 0 2px 8px #0008, 0 0 0 1px color-mix(in srgb, var(--r-line, #fff3) 80%, transparent);
 }
 .speed-run-board .race-cell {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--r-muted, #a9acbc) 15%, transparent);
+  border-radius: 6px;
+  background: var(--race-floor);
+  box-shadow: inset 0 0 0 1px #ffffff0d;
 }
-.speed-run-board .race-cell.wall { background: color-mix(in srgb, var(--r-muted, #a9acbc) 58%, var(--r-surface, #22252b)); }
-.speed-run-board .race-cell.finish { color: var(--r-accent, #baa4ff); outline: 1px solid currentColor; outline-offset: -1px; }
-.speed-run-board .race-cell.runner { background: var(--r-accent, #baa4ff); color: var(--r-accent-ink, #111); }
+/* Walls: raised blocks with a light top edge and a shadow below. */
+.speed-run-board .race-cell.wall {
+  background: linear-gradient(color-mix(in srgb, var(--r-muted, #a9acbc) 70%, #fff), color-mix(in srgb, var(--r-muted, #a9acbc) 45%, #000));
+  box-shadow: inset 0 2px 0 #ffffff40, inset 0 -3px 0 #0005, 0 2px 4px #0006;
+}
+.speed-run-board .race-cell.start { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--r-ok, #4ade80) 70%, transparent); }
+.speed-run-board .race-cell.finish {
+  color: #fff;
+  background: repeating-conic-gradient(#f4f4f4 0 25%, #1b1b1f 0 50%) 0 0 / 50% 50%;
+  box-shadow: 0 0 0 2px var(--r-accent, #baa4ff), 0 0 12px color-mix(in srgb, var(--r-accent, #baa4ff) 60%, transparent);
+}
+.speed-run-board .race-cell.finish .fa-icon { width: 64%; height: 64%; box-sizing: border-box; padding: 10%; border-radius: 50%; background: #111c; color: var(--r-accent, #baa4ff); }
+.speed-run-board .race-cell.runner { background: var(--race-floor); }
+.speed-run-board .race-ball {
+  width: 70%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--r-accent, #baa4ff) 45%, color-mix(in srgb, var(--r-accent, #baa4ff) 60%, #000));
+  box-shadow: 0 0 10px var(--r-accent, #baa4ff), 0 2px 3px #0008;
+  animation: race-ball-glow 1.4s ease-in-out infinite;
+}
+@keyframes race-ball-glow { 50% { box-shadow: 0 0 18px var(--r-accent, #baa4ff), 0 2px 3px #0008; } }
+@media (prefers-reduced-motion: reduce) { .speed-run-board .race-ball { animation: none; } }
 .mg-speed-run .step-sides { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
 .mg-speed-run .step-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
