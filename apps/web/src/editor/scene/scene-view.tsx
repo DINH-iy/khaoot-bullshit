@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { DefinitionIssue, EditorPeer } from '@party/contracts';
 import { peersOn, PeerTags } from '../live/presence.js';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { StageFields } from './inspector.js';
-import { ActionMenu } from '../controls/action-menu.js';
+import { ActionMenu, ContextMenu } from '../controls/action-menu.js';
 import { ReplaceSceneDialog, REPLACE_TEXTS } from './replace-scene.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
 import { Section } from '../controls/section.js';
-import { isWheelScene, addDrawGames, addScene, COLUMN_STEP, cardText, connect, deleteScene, freeSpot, insertOnEdge, insertTeamsBefore, isRoute, newStage, optionsOf, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
-import { grouped } from '../flow/groups.js';
+import { isWheelScene, addDrawGames, addScene, COLUMN_STEP, cardText, connect, deleteScene, duplicateScenes, freeSpot, insertOnEdge, insertTeamsBefore, isRoute, newStage, optionsOf, pasteScenes, prefabFrom, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
+import { sceneMenuActions } from '../flow/scene-menu.js';
+import { copyScenesToClipboard, readSceneClipboard } from '../flow/scene-clipboard.js';
+import { SavePrefab } from '../flow/save-prefab.js';
+import { FLOW_TEXTS } from '../flow/flow.text.js';
+import { grouped, ungrouped } from '../flow/groups.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
 import { ScenePreview, ScenePreviewDialog } from './scene-preview.js';
@@ -63,9 +67,46 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   const current = definition.nodes.find(node => node.key === selected[0]) ?? rows[0]?.node ?? definition.nodes[0]!;
   const [part, setPart] = useState(0); const [adding, setAdding] = useState<'scene' | 'part' | null>(null); const [confirming, setConfirming] = useState(false);
   const addButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => { setPart(0); setConfirming(false); }, [current.key]);
   const index = Math.min(part, current.stages.length - 1);
   const problems = d.issues.filter(issue => issue.nodeKey === current.key);
+  const [rowMenu, setRowMenu] = useState<{ node: Node; at: { x: number; y: number }; button: HTMLButtonElement }>();
+  const closeRowMenu = useCallback(() => setRowMenu(undefined), []);
+  const [prefabRequest, setPrefabRequest] = useState(0);
+  useEffect(() => { setPart(0); setConfirming(false); setPrefabRequest(0); }, [current.key]);
+  const openRowMenu = (node: Node, button: HTMLButtonElement, clientX = 0, clientY = 0) => {
+    const box = button.getBoundingClientRect();
+    setAdding(null); setHoveredScene(undefined); setFocusedScene(undefined); setSelected([node.key]);
+    setRowMenu({ node, button, at: clientX || clientY ? { x: clientX, y: clientY } : { x: box.left + 16, y: box.bottom } });
+  };
+  const actionsFor = (node: Node) => {
+    const clip = readSceneClipboard();
+    return sceneMenuActions({ count: 1, isStart: definition.startNodeKey === node.key, readOnly, canPaste: Boolean(clip),
+      oneGroup: false, anyGrouped: false, openInFlow: t('changeLeads') }, {
+      open: () => onOpenFlow(node.key),
+      startHere: () => change({ ...definition, startNodeKey: node.key }),
+      duplicate: () => {
+        const result = duplicateScenes(definition, positions, [node.key]);
+        change(result.definition, result.positions);
+        setSelected(result.keys);
+      },
+      copy: () => {
+        const copied = copyScenesToClipboard(definition, positions, [node.key], d.draft?.gameId ?? null);
+        d.setNotice(translate(FLOW_TEXTS, copied ? 'sceneCopiedFromMenu' : 'noCopy'));
+      },
+      paste: () => {
+        if (!clip) return;
+        const source = clip.positions[clip.keys[0]!] ?? { x: 0, y: 0 };
+        const target = positions[node.key] ?? { x: 0, y: 0 };
+        const result = pasteScenes(definition, positions, clip.from, clip.positions, clip.keys,
+          { x: target.x + COLUMN_STEP - source.x, y: target.y - source.y });
+        change(result.definition, result.positions);
+        setSelected(result.keys);
+      },
+      replace: () => setReplacing(true),
+      savePrefab: () => setPrefabRequest(request => request + 1),
+      remove: () => setConfirming(true),
+    });
+  };
   const replacement = useTexts(REPLACE_TEXTS); const [replacing, setReplacing] = useState(false);
   const [canvasDevice, setCanvasDevice] = useState<'sharedScreen' | 'phone'>('sharedScreen');
   const [previewDevice, setPreviewDevice] = useState<'sharedScreen' | 'phone'>();
@@ -161,6 +202,11 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       className={`scene-row${selected ? ' current' : ''}${count ? ' has-problems' : ''}`} style={{ paddingLeft: 12 + depth * 18 }} aria-current={selected ? 'true' : undefined}
       onPointerEnter={event => { if (event.pointerType === 'mouse' && matchMedia(TIMELINE_LAYOUT).matches) setHoveredScene(node.key); }}
       onFocus={event => { if (event.currentTarget.matches(':focus-visible')) { setHoveredScene(undefined); setFocusedScene(node.key); } }} onBlur={() => setFocusedScene(undefined)}
+      onContextMenu={event => { event.preventDefault(); openRowMenu(node, event.currentTarget, event.clientX, event.clientY); }}
+      onKeyDown={event => {
+        if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+        event.preventDefault(); openRowMenu(node, event.currentTarget);
+      }}
       onClick={() => setSelected([node.key])}>
       <span className={`row-icon thumb-${text.kind}${text.input ? ` thumb-${text.input}` : ''}`}><Icon name={sceneIcon(text.kind, text.input)} size={18} /></span>
       <span className="row-text"><small>{definition.startNodeKey === node.key ? t('start') : ''}{text.label}</small><span>{text.banner || text.title}</span></span>
@@ -192,6 +238,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         <strong>{timelineDetail.label}</strong><span>{timelineDetail.banner || timelineDetail.title}</span>
       </p>
     </nav>
+    {rowMenu && <ContextMenu label={t('sceneActions')} actions={actionsFor(rowMenu.node)} at={rowMenu.at}
+      returnFocus={rowMenu.button} onClose={closeRowMenu} />}
     {/* Floating over the preview, next to the list (on top of everything, so nothing covers it). */}
     {adding === 'scene' && <FloatingMenu anchor={addButton.current} onClose={() => setAdding(null)}><ScenePalette label={t('addAfterLabel')} onPick={insertAfter} onCancel={() => setAdding(null)} /></FloatingMenu>}
     <section className="scene-stage" aria-label={t('preview')}>
@@ -218,6 +266,9 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         <ActionMenu label={t('sceneActions')} actions={[...(definition.startNodeKey === current.key || readOnly ? [] : [{ label: t('startHere'), icon: 'start', onSelect: () => change({ ...definition, startNodeKey: current.key }) }]),
           { label: t('changeLeads'), icon: 'route', onSelect: () => onOpenFlow(current.key) }, ...(readOnly ? [] : [{ label: replacement('action'), icon: 'edit', onSelect: () => setReplacing(true) }, { label: t('deleteScene'), icon: 'trash', danger: true, onSelect: () => setConfirming(true) }])]} /></div>
       {replacing && !readOnly && <ReplaceSceneDialog key={current.key} definition={definition} node={current} onChange={next => { change(next); setPart(0); }} onClose={() => setReplacing(false)} />}
+      {prefabRequest > 0 && !readOnly && <SavePrefab key={prefabRequest} startOpen
+        content={() => prefabFrom(definition, positions, [current.key])} defaultName={cardText(definition, current).title}
+        onClose={() => setPrefabRequest(0)} />}
       {definition.startNodeKey === current.key && <p className="start-note">{t('startsHere')}</p>}
       {problems.length > 0 && <Problems problems={problems} parts={current.stages.length} />}
       <div className="scene-edit-fields">
@@ -237,7 +288,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       </div>
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>
       {confirming && <ConfirmDialog title={t('deleteAsk', { title: cardText(definition, current).title })} text={t('deleteText')} confirm={t('deleteConfirm')}
-        onConfirm={() => { const kept = { ...positions }; delete kept[current.key]; setConfirming(false); change(deleteScene(definition, current.key), kept); setSelected([]); }} onCancel={() => setConfirming(false)} />}
+        onConfirm={() => { const kept = ungrouped(positions, [current.key]); delete kept[current.key]; setConfirming(false); change(deleteScene(definition, current.key), kept); setSelected([]); }} onCancel={() => setConfirming(false)} />}
     </aside>
   </div>;
 }

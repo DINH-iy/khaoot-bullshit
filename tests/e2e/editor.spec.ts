@@ -1067,6 +1067,39 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   expect(timer?.width).toBeCloseTo(longest!.width);
 });
 
+test('right-clicking a Scene editor row opens actions for that scene', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'Desktop context menu.');
+  await openCopy(page, baseURL!, `Scene actions ${Date.now()}`);
+  await page.getByRole('tab', { name: 'Scene editor' }).click();
+  const list = page.getByRole('navigation', { name: 'Scenes in play order' });
+  const scene = list.getByRole('button', { name: /Music Mayhem/ });
+  const menu = page.getByRole('menu', { name: 'Scene actions' });
+  await scene.click({ button: 'right' });
+  await expect(scene).toHaveAttribute('aria-current', 'true');
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Change where it leads (Flow editor)', 'Start the game here', 'Duplicate', 'Copy',
+    'Replace scene type…', 'Save as prefab…', 'Delete scene…',
+  ]);
+  const screenshots = process.env['FLOW_GROUP_SCREENSHOTS'];
+  if (screenshots) await page.screenshot({ path: joinPath(screenshots, 'scene-editor-context-menu.png') });
+  await menu.getByRole('menuitem', { name: 'Copy', exact: true }).click();
+  const other = list.getByRole('button', { name: /Living Sculpture/ });
+  await other.press('Shift+F10');
+  await expect(menu.getByRole('menuitem', { name: 'Paste', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(other).toBeFocused();
+  await other.click({ button: 'right' });
+  await menu.getByRole('menuitem', { name: 'Paste', exact: true }).click();
+  await expect(list.getByRole('button', { name: /Music Mayhem/ })).toHaveCount(2);
+  const copied = list.locator('.scene-row.current');
+  await expect(copied).toContainText('Music Mayhem');
+  await copied.click({ button: 'right' });
+  await menu.getByRole('menuitem', { name: 'Delete scene…' }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Music Mayhem');
+  await page.keyboard.press('Escape');
+  await expect(list.getByRole('button', { name: /Music Mayhem/ })).toHaveCount(2);
+});
+
 test('right-clicking a scene or an arrow opens its own menu instead of the browser’s', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Right-click menus are for a mouse.');
   await page.setViewportSize({ width: 1440, height: 900 });

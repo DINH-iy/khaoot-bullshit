@@ -43,8 +43,8 @@ function DraftField({ value, onCommit, label, className, inputMode, visibleLabel
  * where the browser has one. It hands back `#rrggbb`, or `#rrggbbaa` when see-through.
  * `children` is shown inside the trigger next to the colour (such as the colour's name).
  */
-export function ColorPicker({ value, onChange, label, suggestions = [], className, children, title }: {
-  value: string; onChange: (hex: string) => void; label: string; suggestions?: string[]; className?: string; children?: ReactNode; title?: string;
+export function ColorPicker({ value, onChange, label, suggestions = [], className, children, title, opaque = false }: {
+  value: string; onChange: (hex: string) => void; label: string; suggestions?: string[]; className?: string; children?: ReactNode; title?: string; opaque?: boolean;
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null); const pop = useRef<HTMLDivElement>(null); const area = useRef<HTMLDivElement>(null);
@@ -63,7 +63,7 @@ export function ColorPicker({ value, onChange, label, suggestions = [], classNam
     if (hex !== emitted.current) { emitted.current = hex; onChange(hex); }
   };
   // A colour typed, pasted or picked: greys keep the hue that was set, so the hue slider does not jump.
-  const setRgba = (rgba: Rgba) => { const next = rgbToHsv(rgba); update(next.s === 0 || next.v === 0 ? { ...next, h: hsva.h } : next); };
+  const setRgba = (rgba: Rgba) => { const next = rgbToHsv(opaque ? { ...rgba, a: 1 } : rgba); update(next.s === 0 || next.v === 0 ? { ...next, h: hsva.h } : next); };
   const rgba = hsvToRgb(hsva); const hex = toHex(rgba); const solid = toHex({ ...rgba, a: 1 });
   const close = (focus = true) => { setOpen(false); if (focus) trigger.current?.focus(); };
   // Opening starts from the colour as it is now (a change can be held back or cancelled while closed).
@@ -148,13 +148,13 @@ export function ColorPicker({ value, onChange, label, suggestions = [], classNam
       <div className="color-sliders">
         <div className="color-slider-stack">
           <input type="range" className="color-hue" min={0} max={359} value={Math.round(hsva.h)} aria-label={t('colourHue')} onChange={event => update({ ...hsva, h: Number(event.target.value) })} />
-          <input type="range" className="color-alpha" min={0} max={100} value={Math.round(hsva.a * 100)} aria-label={t('colourOpacity')} aria-valuetext={`${Math.round(hsva.a * 100)}%`}
-            onChange={event => update({ ...hsva, a: Number(event.target.value) / 100 })} />
+          {!opaque && <input type="range" className="color-alpha" min={0} max={100} value={Math.round(hsva.a * 100)} aria-label={t('colourOpacity')} aria-valuetext={`${Math.round(hsva.a * 100)}%`}
+            onChange={event => update({ ...hsva, a: Number(event.target.value) / 100 })} />}
         </div>
         <span className="color-chip color-preview" aria-hidden="true"><i style={{ background: hex }} /></span>
       </div>
       <div className="color-format" role="group" aria-label={t('colourFormat')}>
-        {(['hex', 'rgba'] as const).map(option => <button key={option} type="button" aria-pressed={format === option} onClick={() => chooseFormat(option)}>{option.toUpperCase()}</button>)}
+        {(['hex', 'rgba'] as const).map(option => <button key={option} type="button" aria-pressed={format === option} onClick={() => chooseFormat(option)}>{opaque && option === 'rgba' ? 'RGB' : option.toUpperCase()}</button>)}
         {eyeDropper() && <button type="button" className="color-dropper" aria-label={t('colourFromScreen')} title={t('colourFromScreen')} onClick={() => void pickFromScreen()}>
           <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m14 7 3 3M5 16l9.6-9.6a2.1 2.1 0 0 1 3 3L8 19H5z" /><path d="m13 5 1.5-1.5a2.1 2.1 0 0 1 3 0l3 3a2.1 2.1 0 0 1 0 3L19 11" /></svg>
         </button>}
@@ -165,7 +165,7 @@ export function ColorPicker({ value, onChange, label, suggestions = [], classNam
           <DraftField visibleLabel="R" value={String(rgba.r)} label={t('colourRed')} inputMode="numeric" onCommit={channel('r')} />
           <DraftField visibleLabel="G" value={String(rgba.g)} label={t('colourGreen')} inputMode="numeric" onCommit={channel('g')} />
           <DraftField visibleLabel="B" value={String(rgba.b)} label={t('colourBlue')} inputMode="numeric" onCommit={channel('b')} />
-          <DraftField visibleLabel="A %" value={String(Math.round(hsva.a * 100))} label={t('colourOpacity')} inputMode="decimal" onCommit={alphaField} />
+          {!opaque && <DraftField visibleLabel="A %" value={String(Math.round(hsva.a * 100))} label={t('colourOpacity')} inputMode="decimal" onCommit={alphaField} />}
         </div>}
       <p className="color-code-other" aria-live="polite">{format === 'hex' ? toRgbaText(rgba) : hex.toUpperCase()}</p>
       {quick.length > 0 && <div className="color-quick" role="group" aria-label={t('colourUsed')}>

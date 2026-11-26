@@ -3,19 +3,22 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { DefinitionIssue } from '@party/contracts';
 import { Icon, sceneIcon } from '../controls/icons.js';
 import { Inspector } from '../scene/inspector.js';
-import { Minimap } from './minimap.js';
-import { anyGrouped, groupFrame, grouped, groupsIn, isOneGroup, ungrouped, withWholeGroups } from './groups.js';
+import { Minimap, type FlowBox } from './minimap.js';
+import { anyGrouped, collapsedConnections, grouped, groupAppearance, groupsIn, groupView, type FlowGroup, isOneGroup, updateGroupAppearance, ungrouped, withWholeGroups } from './groups.js';
 import {
-  addConnectedScene, addDrawGames, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  bendsOf, closestPointOnRoute, insertOnEdge, insertPrefab, isBendKey, isGroupKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  addConnectedScene, addDrawGames, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_HEIGHT, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
+  bendsOf, closestPointOnRoute, insertOnEdge, insertPrefab, isBendKey, isGroupKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, PORT_Y, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Guides, type Point, type Positions,
 } from '../model.js';
 import { ActionMenu, ContextMenu } from '../controls/action-menu.js';
+import { copyScenesToClipboard, readSceneClipboard } from './scene-clipboard.js';
 import { arrowMenuActions, sceneMenuActions } from './scene-menu.js';
 import { InfoTip } from '../controls/info-tip.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
+import { GroupColourDialog, RenameGroupDialog } from './group-dialog.js';
 import { SavePrefab } from './save-prefab.js';
 import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import type { PrefabContent } from '@party/contracts';
+import { readMemory, rememberPlace } from '../shell/editor-memory.js';
 import type { DraftState } from '../shell/use-draft.js';
 import type { LiveState } from '../live/use-live.js';
 import { translate } from '../../i18n/texts.js';
@@ -26,12 +29,6 @@ import { PeerCursors, peerOutline, peersOn, PeerTags } from '../live/presence.js
 interface Connecting { from: string; option: string | undefined; pointer: Point; target: string | null; blocked: string | null; rewire: string | null }
 interface Box { from: Point; to: Point }
 interface BendDrag { edge: string; index: number; anchor: Point; origin: Point; insert: boolean; pointerId: number; moved: boolean }
-// The editor's clipboard: only the copied scenes and the connections between them, kept in this
-// browser so they can be pasted into another game after opening it. A convenience; never required.
-interface Clip { keys: string[]; from: Definition; positions: Positions; game: string | null }
-const CLIP = 'party-editor-clipboard';
-function writeClip(clip: Clip) { try { localStorage.setItem(CLIP, JSON.stringify(clip)); return true; } catch { return false; } }
-function readClip(): Clip | null { try { const value = JSON.parse(localStorage.getItem(CLIP) ?? 'null') as Clip | null; return value && Array.isArray(value.keys) && value.from && Array.isArray(value.from.nodes) ? value : null; } catch { return null; } }
 // ⌘ on a Mac, Ctrl elsewhere: how shortcuts are written in the menus.
 const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const t = (key: keyof typeof FLOW_TEXTS.en, values?: Record<string, string | number>) => translate(FLOW_TEXTS, key, values);
@@ -41,6 +38,19 @@ const blockedText = (reason: string) => reason in BLOCKED ? t(BLOCKED[reason as 
 export function FlowView({ d, selected, setSelected, focus = null, live, onOpenScene, onHelp, zoomShortcuts }: { zoomShortcuts: ZoomShortcuts; d: DraftState; selected: string[]; setSelected: (keys: string[]) => void; focus?: { key: string; at: number } | null; live: LiveState; onOpenScene: (key: string) => void; onHelp: () => void }) {
   const readOnly = d.readOnly;
   const definition = d.definition!; const { positions, setPositions, change, setNotice } = d;
+  const gameId = d.draft?.gameId;
+  const [collapsed, setCollapsed] = useState(() => gameId ? readMemory(gameId).collapsedGroups ?? [] : []);
+  useEffect(() => { if (gameId) rememberPlace(gameId, { collapsedGroups: collapsed }); }, [gameId, collapsed]);
+  const groups = useMemo(() => [...groupsIn(definition, positions).values()].map(members => groupView(definition, positions, members)), [definition, positions]);
+  const hidden = useMemo(() => new Map(groups.filter(group => collapsed.includes(group.key))
+    .flatMap(group => group.members.map(member => [member, group] as const))), [groups, collapsed]);
+  const boxes = useMemo<FlowBox[]>(() => definition.nodes.flatMap(node => {
+    const group = hidden.get(node.key);
+    if (group) return group.frame.first === node.key ? [{ key: node.key, at: group.at, height: CARD_HEIGHT }] : [];
+    const at = positions[node.key];
+    return at ? [{ key: node.key, at, height: cardHeight(node) }] : [];
+  }), [definition, positions, hidden]);
+  const visibleLinks = useMemo(() => collapsedConnections(definition, hidden), [definition, hidden]);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [view, setView] = useState({ x: 48, y: 48, zoom: 1 }); const [guides, setGuides] = useState<Guides>({ x: null, y: null });
   const [connecting, setConnecting] = useState<Connecting | null>(null); const [box, setBox] = useState<Box | null>(null);
@@ -53,6 +63,12 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   // A scene card's right-click menu: where it opens (client pixels), the scenes it acts on, and the card to focus after Escape.
   const [sceneMenu, setSceneMenu] = useState<{ at: Point; keys: string[]; card: HTMLElement } | null>(null);
   const closeSceneMenu = useCallback(() => setSceneMenu(null), []);
+  const [editingGroup, setEditingGroup] = useState<{ key: string; card: HTMLElement; field: 'name' | 'colour' } | null>(null);
+  const groupToEdit = groups.find(group => group.key === editingGroup?.key);
+  const closeGroupEdit = () => {
+    if (editingGroup) requestAnimationFrame(() => editingGroup.card.focus());
+    setEditingGroup(null);
+  };
   // An arrow's right-click menu: where it opens and which arrow.
   const [arrowMenu, setArrowMenu] = useState<{ at: Point; edge: string } | null>(null);
   const closeArrowMenu = useCallback(() => setArrowMenu(null), []);
@@ -79,7 +95,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     if (!keys.length) return;
     const copied = duplicateScenes(definition, positions, keys, offset);
     // A copy of a whole group is a group of its own.
-    change(copied.definition, isOneGroup(definition, positions, keys) ? grouped(copied.positions, copied.keys) : copied.positions); select(copied.keys);
+    change(copied.definition, isOneGroup(definition, positions, keys) ? grouped(copied.positions, copied.keys, groupAppearance(positions, keys)) : copied.positions); select(copied.keys);
     setNotice(t(keys.length === 1 ? 'duplicatedOne' : 'duplicatedMany', { count: keys.length }));
   };
 
@@ -98,40 +114,70 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     });
   }, []);
 
-  // ---------- cards: click to select (Shift/Cmd adds; a grouped scene brings its group, Alt takes it alone), drag to move all selected ----------
+  // Cards and group frames share the same movement and undo transaction.
+  const dragScenes = (event: ReactPointerEvent<HTMLElement>, anchor: string, keys: string[], onEnd: (moved: boolean) => void) => {
+    const element = event.currentTarget; const pointerId = event.pointerId;
+    element.setPointerCapture(pointerId);
+    const origin = toCanvas(event.clientX, event.clientY);
+    const anchorStart = positions[anchor]!;
+    let moved = false; let latest = positions;
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId || readOnly) return;
+      const at = toCanvas(moveEvent.clientX, moveEvent.clientY);
+      if (!moved && Math.hypot(at.x - origin.x, at.y - origin.y) < 4 / view.zoom) return;
+      moved = true;
+      const snapped = snapCard(definition, positions, anchor, { x: anchorStart.x + at.x - origin.x, y: anchorStart.y + at.y - origin.y });
+      const dx = snapped.point.x - anchorStart.x; const dy = snapped.point.y - anchorStart.y;
+      latest = { ...positions, ...Object.fromEntries(keys.map(key => [key, { x: positions[key]!.x + dx, y: positions[key]!.y + dy }])) };
+      setGuides(keys.length === 1 ? snapped.guides : { x: null, y: null }); setPositions(latest);
+    };
+    const finish = () => {
+      element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', up);
+      element.removeEventListener('pointercancel', cancel); element.removeEventListener('lostpointercapture', cancel);
+      setGuides({ x: null, y: null });
+    };
+    const cancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId || (cancelEvent.type === 'lostpointercapture' && cancelEvent.target !== element)) return;
+      finish();
+      if (moved) setPositions(positions);
+    };
+    const up = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      finish();
+      if (moved) {
+        const settled = keys.length === 1 ? { ...latest, [anchor]: freeSpot(definition, latest, anchor, latest[anchor]!) } : latest;
+        if (keys.some(key => settled[key]!.x !== positions[key]!.x || settled[key]!.y !== positions[key]!.y)) {
+          change(definition, settled, '', positions);
+        }
+      }
+      onEnd(moved);
+    };
+    element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
+    element.addEventListener('pointercancel', cancel); element.addEventListener('lostpointercapture', cancel);
+  };
+
   const startCardDrag = (event: ReactPointerEvent<HTMLElement>, key: string) => {
     // Ctrl-click on a Mac is a right-click: it opens the scene's menu instead.
     if (event.button !== 0 || (event.ctrlKey && MOD === '⌘')) return;
     if ((event.target as HTMLElement).closest('.port, .port-plus')) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
     const additive = event.shiftKey || event.metaKey || event.ctrlKey;
     const clicked = event.altKey ? [key] : withWholeGroups(definition, positions, [key]);
-    const group = selected.includes(key) && !additive && !event.altKey ? selected : clicked;
-    const origin = toCanvas(event.clientX, event.clientY); const starts = Object.fromEntries(group.map(member => [member, positions[member]!]));
-    let moved = false; let latest = positions; const element = event.currentTarget;
-    const move = (moveEvent: PointerEvent) => {
-      const at = toCanvas(moveEvent.clientX, moveEvent.clientY);
-      if (readOnly) return; // viewing: a press only selects
-      if (!moved && Math.hypot(at.x - origin.x, at.y - origin.y) < 4 / view.zoom) return;
-      moved = true;
-      // The grabbed card snaps; the rest of the selection keeps its distance to it.
-      const snapped = snapCard(definition, positions, key, { x: starts[key]!.x + at.x - origin.x, y: starts[key]!.y + at.y - origin.y });
-      const dx = snapped.point.x - starts[key]!.x; const dy = snapped.point.y - starts[key]!.y;
-      latest = { ...positions, ...Object.fromEntries(group.map(member => [member, { x: starts[member]!.x + dx, y: starts[member]!.y + dy }])) };
-      setGuides(group.length === 1 ? snapped.guides : { x: null, y: null }); setPositions(latest);
-    };
-    const up = () => {
-      element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', up); element.removeEventListener('pointercancel', up);
-      setGuides({ x: null, y: null });
+    const keys = selected.includes(key) && !additive && !event.altKey ? selected : clicked;
+    dragScenes(event, key, keys, moved => {
       if (moved) {
-        const settled = group.length === 1 ? { ...latest, [key]: freeSpot(definition, latest, key, latest[key]!) } : latest;
-        change(definition, settled, '', positions);
-        if (!selected.includes(key) || event.altKey) select(group);
+        if (!selected.includes(key) || event.altKey) select(keys);
       } else if (pending) finishPending(key);
       else if (additive) select(clicked.every(member => selected.includes(member)) ? selected.filter(member => !clicked.includes(member)) : [...new Set([...selected, ...clicked])]);
       else select(clicked);
-    };
-    element.addEventListener('pointermove', move); element.addEventListener('pointerup', up); element.addEventListener('pointercancel', up);
+    });
+  };
+
+  const startGroupDrag = (event: ReactPointerEvent<HTMLDivElement>, members: string[]) => {
+    if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey) return;
+    event.stopPropagation();
+    setAdding(null);
+    if (pending) { setPending(null); setNotice(''); }
+    dragScenes(event, members[0]!, members, () => select(members));
   };
 
   // ---------- connections: drag from an output, or grab the end of an arrow to move it ----------
@@ -144,7 +190,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const nearestInput = useCallback((point: Point, from: string, option: string | undefined, without: string | null) => {
     let best: { key: string; distance: number } | null = null;
     for (const node of definition.nodes) {
-      const position = positions[node.key]; if (!position || node.key === from) continue;
+      const position = positions[node.key]; if (!position || hidden.has(node.key) || node.key === from) continue;
       const port = inputPort(position); const distance = Math.hypot(port.x - point.x, port.y - point.y);
       const inside = point.x >= position.x && point.x <= position.x + CARD_WIDTH && point.y >= position.y && point.y <= position.y + cardHeight(node);
       if ((distance <= SNAP_RADIUS / view.zoom || inside) && (!best || distance < best.distance)) best = { key: node.key, distance };
@@ -153,7 +199,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     // When moving an existing arrow, judge the new target as if the old arrow were gone.
     const base = without ? disconnect(definition, without) : definition;
     return { target: best.key, blocked: connectProblem(base, from, option, best.key) };
-  }, [definition, positions, view.zoom]);
+  }, [definition, positions, view.zoom, hidden]);
   const startConnect = (event: ReactPointerEvent<Element>, from: string, option: string | undefined, rewire: string | null = null) => {
     event.stopPropagation(); if (event.button !== 0 || readOnly) return;
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
@@ -185,8 +231,9 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
 
   // ---------- canvas: pan, or Shift-drag a selection box ----------
   const startCanvas = (event: ReactPointerEvent<HTMLDivElement>) => {
-    // Empty canvas is anything that is not a card, an arrow, a menu or a button.
-    if ((event.target as Element).closest('.scene-card, .edge, .add-menu, button')) return;
+    const target = event.target as Element;
+    // Cards, arrows and controls handle their own gestures.
+    if (target.closest('.scene-card, .edge, .add-menu, button')) return;
     // The right button opens the add menu (onContextMenu below) instead of panning.
     if (event.button === 2) return;
     setAdding(null); if (pending) { setPending(null); setNotice(''); }
@@ -202,7 +249,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
         finish();
         const left = Math.min(current.from.x, current.to.x); const right = Math.max(current.from.x, current.to.x);
         const top = Math.min(current.from.y, current.to.y); const bottom = Math.max(current.from.y, current.to.y);
-        const inside = definition.nodes.filter(node => { const at = positions[node.key]; return at && at.x < right && at.x + CARD_WIDTH > left && at.y < bottom && at.y + cardHeight(node) > top; }).map(node => node.key);
+        const inside = boxes.filter(({ at, height }) => at.x < right && at.x + CARD_WIDTH > left && at.y < bottom && at.y + height > top).map(entry => entry.key);
         select(withWholeGroups(definition, positions, [...new Set([...selected, ...inside])]));
       };
       element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
@@ -211,8 +258,11 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     select([]);
     const origin = { x: event.clientX - view.x, y: event.clientY - view.y };
     const move = (moveEvent: PointerEvent) => setView(current => ({ ...current, x: moveEvent.clientX - origin.x, y: moveEvent.clientY - origin.y }));
-    const up = () => { element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', up); };
-    element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
+    const finish = () => {
+      element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', finish);
+      element.removeEventListener('pointercancel', finish);
+    };
+    element.addEventListener('pointermove', move); element.addEventListener('pointerup', finish); element.addEventListener('pointercancel', finish);
   };
   const zoomBy = (factor: number, around?: Point) => setView(current => {
     const zoom = Math.min(1.75, Math.max(0.25, current.zoom * factor));
@@ -223,18 +273,23 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   // A scene asked for from outside (the problems box): centred on the map, zoomed in enough to read it.
   useEffect(() => {
     const point = focus ? positions[focus.key] : undefined; const rect = canvas.current?.getBoundingClientRect();
-    if (!point || !rect) return;
+    if (!focus || !point || !rect) return;
+    const group = hidden.get(focus.key);
+    if (group) setCollapsed(current => current.filter(key => key !== group.key));
     setView(current => { const zoom = Math.max(current.zoom, 0.8); return { zoom, x: rect.width / 2 - (point.x + CARD_WIDTH / 2) * zoom, y: rect.height / 2 - (point.y + 96) * zoom }; });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
   const fitTo = useCallback((keys?: string[]) => {
-    const rect = canvas.current?.getBoundingClientRect(); const all = keys?.length ? keys.map(key => positions[key]).filter((point): point is Point => Boolean(point)) : Object.entries(positions).filter(([key]) => !isGroupKey(key)).map(([, point]) => point);
+    const rect = canvas.current?.getBoundingClientRect(); const all = keys?.length ? keys.flatMap(key => {
+      const point = hidden.get(key)?.at ?? positions[key];
+      return point ? [point] : [];
+    }) : boxes.map(box => box.at);
     if (!rect || !all.length) return;
     const minX = Math.min(...all.map(point => point.x)); const minY = Math.min(...all.map(point => point.y));
     const maxX = Math.max(...all.map(point => point.x)) + CARD_WIDTH + 64; const maxY = Math.max(...all.map(point => point.y)) + 320;
     const zoom = Math.min(1, Math.max(0.25, Math.min((rect.width - 64) / (maxX - minX), (rect.height - 64) / (maxY - minY))));
     setView({ zoom, x: 32 - minX * zoom, y: 32 - minY * zoom });
-  }, [positions]);
+  }, [positions, hidden, boxes]);
   const fit = useCallback(() => fitTo(), [fitTo]);
   // Tidying the map (the Tidy up menu and its shortcuts). Each is one change, so Undo takes it back.
   // Tidying moves the cards; the groups stay.
@@ -254,7 +309,13 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     if (!anyGrouped(definition, positions, selected)) return;
     change(definition, ungrouped(positions, selected)); setNotice(t('ungroupedNotice'));
   };
-  const groups = useMemo(() => [...groupsIn(definition, positions).values()], [definition, positions]);
+  const toggleGroup = (group: FlowGroup) => {
+    setSelectedEdge(null); setPending(null); setAdding(null);
+    if (!collapsed.includes(group.key) && group.members.some(key => selected.includes(key))) {
+      select([...new Set([...selected, ...group.members])]);
+    }
+    setCollapsed(current => current.includes(group.key) ? current.filter(key => key !== group.key) : [...current, group.key]);
+  };
   const fitted = useRef(false);
   useEffect(() => { if (!fitted.current) { fitted.current = true; requestAnimationFrame(fit); } }, [fit]);
   useEffect(() => {
@@ -350,7 +411,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const contextMenu = (event: React.MouseEvent) => {
     const target = event.target as Element;
     // On a scene card: its own menu (text fields in a card keep the browser's).
-    const card = target.closest<HTMLElement>('.scene-card');
+    const card = target.closest<HTMLElement>('.scene-card[data-scene]');
     if (card && !target.closest('input, textarea, select')) { event.preventDefault(); openSceneMenu(event, card); return; }
     // On an arrow: its own menu (selecting it, as a click does).
     const edge = target.closest<SVGGElement>('.edge')?.dataset.edge;
@@ -372,6 +433,13 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const rect = card.getBoundingClientRect();
     const at = event.clientX === 0 && event.clientY === 0 ? { x: rect.left + 24, y: rect.top + 24 } : { x: event.clientX, y: event.clientY };
     setSceneMenu({ at, keys, card });
+  };
+  const openGroupMenu = (group: FlowGroup, frame: HTMLElement, x = 0, y = 0) => {
+    if (readOnly || connecting) return;
+    const card = frame.querySelector<HTMLButtonElement>('.flow-group-name') ?? frame;
+    const rect = card.getBoundingClientRect();
+    setPending(null); setAdding(null); select(group.members);
+    setSceneMenu({ keys: group.members, card, at: x || y ? { x, y } : { x: rect.left + 24, y: rect.top + 24 } });
   };
   // The palette lives outside the zoomed surface. Its list can change size when a category opens.
   const menuRef = useRef<HTMLDivElement>(null);
@@ -445,19 +513,17 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       if (action === 'selectAll') { event.preventDefault(); select(definition.nodes.map(node => node.key)); }
       if (action === 'duplicate' && selected.length) { event.preventDefault(); duplicate(selected); }
       if (action === 'copy' && selected.length) copyScenes(selected);
-      if (action === 'paste') { const clip = readClip(); if (clip) { event.preventDefault(); paste(clip); } }
+      if (action === 'paste') { const clip = readSceneClipboard(); if (clip) { event.preventDefault(); paste(clip); } }
       if (event.key === 'Escape') { setConnecting(null); setSelectedEdge(null); setPending(null); setAdding(null); setNotice(''); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
   });
 
   const copyScenes = (copied: string[]) => {
-    const keys = new Set(copied);
-    const from = { ...definition, nodes: definition.nodes.filter(node => keys.has(node.key)), edges: definition.edges.filter(edge => keys.has(edge.from) && keys.has(edge.to)) };
-    if (!writeClip({ keys: [...copied], from, positions: Object.fromEntries(copied.map(key => [key, positions[key]!])), game: d.draft?.gameId ?? null })) { setNotice(t('noCopy')); return; }
+    if (!copyScenesToClipboard(definition, positions, copied, d.draft?.gameId ?? null)) { setNotice(t('noCopy')); return; }
     setNotice(t(copied.length === 1 ? 'copiedOne' : 'copiedMany', { count: copied.length, key: navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl' }));
   };
-  const paste = (clip: Clip) => {
+  const paste = (clip: NonNullable<ReturnType<typeof readSceneClipboard>>) => {
     // In the same game the copies land a little offset; from another game, near the top left of the view.
     const first = clip.positions[clip.keys[0]!] ?? { x: 0, y: 0 };
     const offset = clip.game === d.draft?.gameId ? { x: GRID * 3, y: GRID * 3 } : { x: (-view.x + 160) / view.zoom - first.x, y: (-view.y + 160) / view.zoom - first.y };
@@ -504,12 +570,46 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       onPointerMove={event => { moveBend(event); live.sendCursor(toCanvas(event.clientX, event.clientY)); }} onPointerUp={endBend} onPointerCancel={endBend} onLostPointerCapture={endBend}
       onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
-        {/* Groups: a frame behind their cards; its name selects the whole group. */}
-        {groups.map(members => {
-          const frame = groupFrame(definition, positions, members); const on = members.every(member => selected.includes(member));
-          return <div key={members.join()} className={`flow-group${on ? ' selected' : ''}`} style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}>
-            <button type="button" className="flow-group-name" onPointerDown={event => event.stopPropagation()} onClick={() => select(members)}
-              title={t('groupTitle')}><Icon name="group" size={14} />{t('groupName', { title: sceneTitle(frame.first), count: members.length })}</button>
+        {/* The frame sits behind the cards and arrows so they keep their own gestures. */}
+        {groups.map(group => {
+          const { key, members, frame, at } = group;
+          const closed = hidden.has(frame.first);
+          const on = members.every(member => selected.includes(member));
+          const toggleLabel = t(closed ? 'expandGroup' : 'collapseGroup');
+          const title = group.groupName ?? sceneTitle(frame.first);
+          const groupName = t('groupName', { title, count: members.length });
+          const links = closed ? [...visibleLinks.values()] : [];
+          const customColour = group.groupColour?.startsWith('#') ? group.groupColour : undefined;
+          return <div key={key} className={`flow-group${closed ? ' collapsed scene-card' : ''}${on ? ' selected' : ''}`}
+            data-group-colour={group.groupColour} onPointerDown={event => startGroupDrag(event, members)}
+            onContextMenu={event => {
+              event.preventDefault(); event.stopPropagation();
+              openGroupMenu(group, event.currentTarget, event.clientX, event.clientY);
+            }}
+            tabIndex={closed ? 0 : undefined} role={closed ? 'group' : undefined}
+            aria-label={closed ? `${t('groupCard')}. ${groupName}` : undefined}
+            onKeyDown={event => {
+              if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                event.preventDefault(); openGroupMenu(group, event.currentTarget); return;
+              }
+              if (!closed || event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+              event.preventDefault(); select(members);
+            }}
+            style={{
+              ...(closed ? { left: at.x, top: at.y, width: CARD_WIDTH, height: CARD_HEIGHT } : { left: frame.x, top: frame.y, width: frame.width, height: frame.height }),
+              ...(customColour ? { '--group-colour': customColour } : {}),
+            } as CSSProperties}>
+            {closed ? <>
+              <p className="card-label">{t('groupCard')}</p>
+              <div className="card-thumb thumb-group" aria-hidden="true"><Icon name="group" size={26} /></div>
+              <p className="card-title">{title}</p>
+              <p className="card-line">{t('groupSceneCount', { count: members.length })}</p>
+              {links.some(edge => edge.to === frame.first) && <span className="port port-in flow-group-port" style={{ top: PORT_Y }} aria-hidden="true" />}
+              {links.some(edge => edge.from === frame.first) && <span className="port port-out flow-group-port" style={{ top: PORT_Y }} aria-hidden="true" />}
+            </> : <button type="button" className="flow-group-name" onClick={() => select(members)}
+              aria-pressed={on} title={t('groupTitle')}><Icon name="group" size={14} /><span>{groupName}</span></button>}
+            <button type="button" className="flow-group-toggle" onPointerDown={event => event.stopPropagation()} onClick={() => toggleGroup(group)}
+              aria-label={toggleLabel} aria-expanded={!closed} title={toggleLabel}><Icon name={closed ? 'unfold-all' : 'fold-all'} size={16} /></button>
           </div>;
         })}
         <svg className="flow-lines" width="1" height="1" overflow="visible" aria-hidden="true">
@@ -518,7 +618,23 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           {guides.x !== null && <line className="guide" x1={guides.x} y1={-5000} x2={guides.x} y2={5000} />}
           {guides.y !== null && <line className="guide" x1={-5000} y1={guides.y} x2={5000} y2={guides.y} />}
           {box && <rect className="select-box" x={Math.min(box.from.x, box.to.x)} y={Math.min(box.from.y, box.to.y)} width={Math.abs(box.to.x - box.from.x)} height={Math.abs(box.to.y - box.from.y)} />}
+          {[...visibleLinks].map(([key, edge]) => {
+            const source = hidden.get(edge.from); const target = hidden.get(edge.to);
+            const from = source?.at ?? positions[edge.from]; const to = target?.at ?? positions[edge.to];
+            const node = nodes.find(candidate => candidate.key === edge.from);
+            if (!node || !from || !to) return null;
+            const start = source ? { x: from.x + CARD_WIDTH, y: from.y + PORT_Y } : outputPort(node, from, edge.option);
+            const end = target ? { x: to.x, y: to.y + PORT_Y } : inputPort(to);
+            const segments = routeSegments(start, end, [], from.y + (source ? CARD_HEIGHT : cardHeight(node)));
+            const middle = pointOnRoute(segments, .5);
+            const label = edge.count > 1 ? t('groupLinks', { count: edge.count }) : edge.label;
+            return <g className="collapsed-edge" key={key}>
+              <path d={routedPath(segments)} className="edge-line" markerEnd="url(#arrow)" />
+              {label && <text x={middle.x} y={middle.y - 10} textAnchor="middle" className="edge-label">{label}</text>}
+            </g>;
+          })}
           {[...definition.edges].sort((a, b) => Number(a.key === selectedEdge) - Number(b.key === selectedEdge)).map(edge => {
+            if (hidden.has(edge.from) || hidden.has(edge.to)) return null;
             const fromNode = nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
             if (!fromNode || !from || !to) return null;
             const start = outputPort(fromNode, from, edge.option); const end = inputPort(to);
@@ -553,7 +669,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           })()}
         </svg>
         {nodes.map(node => {
-          const position = positions[node.key]; if (!position) return null;
+          const position = positions[node.key]; if (!position || hidden.has(node.key)) return null;
           const text = cardText(definition, node); const problems = problemsBy.get(node.key) ?? []; const isTarget = connecting?.target === node.key; const on = selected.includes(node.key);
           const incoming = definition.edges.some(edge => edge.to === node.key); const others = peersOn(live.peers, node.key);
           return <div key={node.key} className={`scene-card kind-${text.kind}${problems.length ? ' has-problems' : ''}${others.length ? ' peer-selected' : ''}${pending && pending.from !== node.key ? ' tap-target' : ''}${on ? ' selected' : ''}${isTarget ? (connecting?.blocked ? ' drop-blocked' : ' drop-target') : ''}`}
@@ -584,7 +700,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
         {selectedBends.length > 0 && <button type="button" onClick={() => straightenArrow(selectedEdge)}>{t('straighten')}</button>}
         <button type="button" className="danger-outline" aria-label={t('removeConnection')} onClick={() => removeArrow(selectedEdge)}>{t('remove')}</button>
       </div>}
-      <Minimap definition={definition} positions={positions} view={view} canvas={size} selected={selected}
+      <Minimap boxes={boxes} view={view} canvas={size} selected={selected}
         onMove={center => setView(current => ({ ...current, x: size.width / 2 - center.x * current.zoom, y: size.height / 2 - center.y * current.zoom }))} />
     </div>
     {single && <Inspector definition={definition} node={single} problems={problemsBy.get(single.key) ?? []} onChange={(next, group) => change(next, undefined, group)} onOpen={() => onOpenScene(single.key)}
@@ -597,15 +713,31 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     })()}
     {sceneMenu && (() => {
       const { keys } = sceneMenu; const one = keys.length === 1 ? keys[0]! : null;
+      const group = groups.find(candidate => candidate.members.length === keys.length && candidate.members.every(key => keys.includes(key)));
       const actions = sceneMenuActions(
-        { count: keys.length, isStart: definition.startNodeKey === one, readOnly, canPaste: readClip() !== null, oneGroup: isOneGroup(definition, positions, keys), anyGrouped: anyGrouped(definition, positions, keys) },
+        { count: keys.length, isStart: definition.startNodeKey === one, readOnly, canPaste: readSceneClipboard() !== null, oneGroup: isOneGroup(definition, positions, keys), anyGrouped: anyGrouped(definition, positions, keys) },
         {
           open: () => { if (one) onOpenScene(one); }, startHere: () => { if (one) change({ ...definition, startNodeKey: one }); },
-          duplicate: () => duplicate(keys), copy: () => copyScenes(keys), paste: () => { const clip = readClip(); if (clip) paste(clip); },
+          duplicate: () => duplicate(keys), copy: () => copyScenes(keys), paste: () => { const clip = readSceneClipboard(); if (clip) paste(clip); },
+          ...(group ? {
+            rename: () => setEditingGroup({ key: group.key, card: sceneMenu.card, field: 'name' }),
+            colour: () => setEditingGroup({ key: group.key, card: sceneMenu.card, field: 'colour' }),
+          } : {}),
           replace: () => setAsked('replace'), savePrefab: () => setAsked('prefab'), group: groupSelected, ungroup: ungroupSelected, remove: () => setAskDelete(true),
         }, zoomShortcuts);
-      return actions.length > 0 && <ContextMenu label={one ? t('sceneMenu') : t('scenesMenu', { count: keys.length })} actions={actions} at={sceneMenu.at} onClose={closeSceneMenu} returnFocus={sceneMenu.card} />;
+      return actions.length > 0 && <ContextMenu label={group ? t('groupMenu') : one ? t('sceneMenu') : t('scenesMenu', { count: keys.length })} actions={actions} at={sceneMenu.at} onClose={closeSceneMenu} returnFocus={sceneMenu.card} />;
     })()}
+    {groupToEdit && !readOnly && (editingGroup?.field === 'name'
+      ? <RenameGroupDialog name={groupToEdit.groupName} fallback={sceneTitle(groupToEdit.frame.first)}
+          onClose={closeGroupEdit} onSave={name => {
+            const groupName = name || undefined;
+            if (groupName !== groupToEdit.groupName) change(definition, updateGroupAppearance(positions, groupToEdit.members, { groupName }));
+            closeGroupEdit();
+          }} />
+      : <GroupColourDialog colour={groupToEdit.groupColour} onClose={closeGroupEdit} onSelect={groupColour => {
+          if (groupColour !== groupToEdit.groupColour) change(definition, updateGroupAppearance(positions, groupToEdit.members, { groupColour }));
+          closeGroupEdit();
+        }} />)}
     {askDelete && selected.length > 0 && <ConfirmDialog title={selected.length === 1 ? t('deleteOne', { title: sceneTitle(selected[0]!) }) : t('deleteMany', { count: selected.length })}
       text={t(selected.length === 1 ? 'deleteTextOne' : 'deleteTextMany')}
       confirm={selected.length === 1 ? t('deleteScene') : t('deleteScenes', { count: selected.length })} onConfirm={() => { setAskDelete(false); deleteSelected(); }} onCancel={() => setAskDelete(false)} />}
@@ -621,17 +753,21 @@ function MultiPanel({ count, asked, onAsked, onDelete, onClear, onDuplicate, onG
   // Counted, so picking it again opens a fresh form.
   const [opened, setOpened] = useState(0);
   useEffect(() => { if (asked) { setOpened(times => times + 1); onAsked(); } }, [asked, onAsked]);
-  return <aside className="inspector" aria-labelledby="multi-heading">
-    <div className="inspector-head"><h2 id="multi-heading">{t('selectedN', { count })}</h2><button className="small-button" onClick={onClear}>{t('clear')}</button></div>
-    <p className="hint">{t('multiHint')}</p>
-    {(onGroup || onUngroup) && <div className="actions">
+  return <aside className="inspector multi-inspector" aria-labelledby="multi-heading">
+    <div className="inspector-head">
+      <h2 id="multi-heading">{t('selectedN', { count })}</h2>
+      <button type="button" className="multi-clear" aria-label={t('clear')} title={t('clear')} onClick={onClear}><Icon name="close" size={18} /></button>
+    </div>
+    <div className="multi-selection-actions">
       {onGroup && <button type="button" className="with-icon" onClick={onGroup} title={`${MOD} + G`}><Icon name="group" />{t('groupThese')}</button>}
       {onUngroup && <button type="button" className="with-icon" onClick={onUngroup} title={`${MOD} + Shift + G`}><Icon name="ungroup" />{t('ungroup')}</button>}
-    </div>}
-    <button onClick={onDuplicate}>{t('duplicateN', { count })}</button>
-    {savePrefab(opened)}
-    <p className="hint">{t('copyHint')}</p>
-    {confirming ? <div className="actions"><button className="danger" onClick={onDelete}>{t('yesDelete', { count })}</button><button onClick={() => setConfirming(false)}>{t('keepThem')}</button></div>
-      : <button className="danger-outline" onClick={() => setConfirming(true)}>{t('deleteScenes', { count })}</button>}
+      <button type="button" onClick={onDuplicate}>{t('duplicateN', { count })}</button>
+      {savePrefab(opened)}
+      {confirming ? <div className="actions multi-confirm">
+        <button type="button" className="danger" onClick={onDelete}>{t('yesDelete', { count })}</button>
+        <button type="button" onClick={() => setConfirming(false)}>{t('keepThem')}</button>
+      </div> : <button type="button" className="danger-outline" onClick={() => setConfirming(true)}>{t('deleteScenes', { count })}</button>}
+    </div>
+    <p className="hint">{t('multiHint')}</p>
   </aside>;
 }

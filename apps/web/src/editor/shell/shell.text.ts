@@ -33,7 +33,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
   // history-labels.ts
   added: 'Added {scene}', addedMany: 'Added {count} scenes', removed: 'Removed {scene}', removedMany: 'Removed {count} scenes', changed: 'Changed {scene}', changedMany: 'Changed {count} scenes',
   changedConnections: 'Changed the connections', startsAt: 'Starts at {scene}', renamed: 'Renamed the game to “{title}”', changedLook: 'Changed the look', changedSettings: 'Changed the game settings',
-  moved: 'Moved {scene}', movedMany: 'Moved {count} scenes', bent: 'Bent or straightened arrows', grouped: 'Grouped or ungrouped scenes', changedMap: 'Changed the map',
+  moved: 'Moved {scene}', movedMany: 'Moved {count} scenes', bent: 'Bent or straightened arrows', grouped: 'Grouped or ungrouped scenes', renamedGroup: 'Renamed a group', colouredGroup: 'Changed a group colour', changedMap: 'Changed the map',
 }, {
   nl: {
     saved: 'Alle wijzigingen opgeslagen', pending: 'Zo meteen opslaan…', saving: 'Opslaan…', saveError: 'Niet opgeslagen: de server is niet bereikbaar. Opnieuw proberen…',
@@ -62,7 +62,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     now: 'Nu', undoAll: 'Alle beschikbare wijzigingen ongedaan maken', whenOpened: 'Vóór deze wijzigingen',
     added: '{scene} toegevoegd', addedMany: '{count} scènes toegevoegd', removed: '{scene} verwijderd', removedMany: '{count} scènes verwijderd', changed: '{scene} gewijzigd', changedMany: '{count} scènes gewijzigd',
     changedConnections: 'De verbindingen gewijzigd', startsAt: 'Begint bij {scene}', renamed: 'Het spel hernoemd naar “{title}”', changedLook: 'Het uiterlijk gewijzigd', changedSettings: 'De spelinstellingen gewijzigd',
-    moved: '{scene} verplaatst', movedMany: '{count} scènes verplaatst', bent: 'Pijlen gebogen of rechtgetrokken', grouped: 'Scènes gegroepeerd of losgemaakt', changedMap: 'De kaart gewijzigd',
+    moved: '{scene} verplaatst', movedMany: '{count} scènes verplaatst', bent: 'Pijlen gebogen of rechtgetrokken', grouped: 'Scènes gegroepeerd of losgemaakt', renamedGroup: 'Groep hernoemd', colouredGroup: 'Groepskleur gewijzigd', changedMap: 'De kaart gewijzigd',
   },
   de: {
     saved: 'Alle Änderungen gespeichert', pending: 'Gleich wird gespeichert…', saving: 'Wird gespeichert…', saveError: 'Nicht gespeichert: Der Server ist nicht erreichbar. Neuer Versuch…',
@@ -91,7 +91,7 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     now: 'Jetzt', undoAll: 'Alle verfügbaren Änderungen rückgängig machen', whenOpened: 'Vor diesen Änderungen',
     added: '{scene} hinzugefügt', addedMany: '{count} Szenen hinzugefügt', removed: '{scene} entfernt', removedMany: '{count} Szenen entfernt', changed: '{scene} geändert', changedMany: '{count} Szenen geändert',
     changedConnections: 'Die Verbindungen geändert', startsAt: 'Beginnt bei {scene}', renamed: 'Das Spiel in „{title}“ umbenannt', changedLook: 'Das Aussehen geändert', changedSettings: 'Die Spieleinstellungen geändert',
-    moved: '{scene} verschoben', movedMany: '{count} Szenen verschoben', bent: 'Pfeile gebogen oder begradigt', grouped: 'Szenen gruppiert oder getrennt', changedMap: 'Die Karte geändert',
+    moved: '{scene} verschoben', movedMany: '{count} Szenen verschoben', bent: 'Pfeile gebogen oder begradigt', grouped: 'Szenen gruppiert oder getrennt', renamedGroup: 'Gruppe umbenannt', colouredGroup: 'Gruppenfarbe geändert', changedMap: 'Die Karte geändert',
   },
   ro: {
     saved: 'Toate modificările au fost salvate', pending: 'Se salvează imediat…', saving: 'Se salvează…', saveError: 'Nesalvat: serverul nu poate fi accesat. Se reîncearcă…',
@@ -120,6 +120,6 @@ export const SHELL_TEXTS = defineTexts('editor-shell', {
     now: 'Acum', undoAll: 'Anulează toate modificările disponibile', whenOpened: 'Înaintea acestor modificări',
     added: 'Adăugat: {scene}', addedMany: '{count} scene adăugate', removed: 'Eliminat: {scene}', removedMany: '{count} scene eliminate', changed: 'Modificat: {scene}', changedMany: '{count} scene modificate',
     changedConnections: 'Conexiunile au fost modificate', startsAt: 'Începe la {scene}', renamed: 'Jocul a fost redenumit „{title}”', changedLook: 'Aspectul a fost modificat', changedSettings: 'Setările jocului au fost modificate',
-    moved: 'Mutat: {scene}', movedMany: '{count} scene mutate', bent: 'Săgeți îndoite sau îndreptate', grouped: 'Scene grupate sau separate', changedMap: 'Harta a fost modificată',
+    moved: 'Mutat: {scene}', movedMany: '{count} scene mutate', bent: 'Săgeți îndoite sau îndreptate', grouped: 'Scene grupate sau separate', renamedGroup: 'Grup redenumit', colouredGroup: 'Culoarea grupului a fost schimbată', changedMap: 'Harta a fost modificată',
   },
 });

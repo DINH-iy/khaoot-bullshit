@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 const token = process.env['LOCAL_OWNER_TOKEN'];
@@ -77,4 +78,137 @@ test('the Flow menu offers one shared continuation or a separate route per game'
     const branches = saved.filter(edge => edge.from === routedKey && edge.option);
     return branches.map(branch => saved.find(edge => edge.from === branch.to)?.to);
   }).toEqual(['finish', 'finish', 'finish']);
+
+  await page.getByRole('button', { name: /^\d+%$/ }).click();
+  await page.getByRole('menuitem', { name: 'Show the whole game' }).click();
+  const frame = page.locator('.flow-group');
+  await expect(frame).toBeVisible();
+  const background = await frame.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    for (let y = bounds.top + 8; y < bounds.bottom - 8; y += 12) {
+      for (let x = bounds.left + 6; x < bounds.right - 6; x += 12) {
+        if (document.elementFromPoint(x, y) === element) return { x, y };
+      }
+    }
+    throw new Error('No visible group background');
+  });
+  await page.mouse.click(background.x, background.y);
+  await expect(frame).toHaveClass(/selected/);
+  await expect(page.locator('.scene-card.selected')).toHaveCount(4);
+  const inspector = page.getByRole('complementary', { name: '4 scenes selected' });
+  const ungroup = await inspector.getByRole('button', { name: 'Ungroup' }).boundingBox();
+  const duplicate = await inspector.getByRole('button', { name: 'Duplicate 4 scenes' }).boundingBox();
+  expect(ungroup!.y).toBeCloseTo(duplicate!.y, 0);
+  expect(ungroup!.x).toBeLessThan(duplicate!.x);
+  const screenshots = process.env['FLOW_GROUP_SCREENSHOTS'];
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-selected.png') });
+
+  await inspector.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(frame.locator('.flow-group-name')).toHaveAttribute('aria-pressed', 'false');
+  await frame.locator('.flow-group-name').press('Enter');
+  await expect(page.locator('.scene-card.selected')).toHaveCount(4);
+
+  const positions = () => page.locator('.scene-card').evaluateAll(cards => Object.fromEntries(cards.map(card => {
+    const scene = card as HTMLElement;
+    return [scene.dataset.scene!, { x: parseFloat(scene.style.left), y: parseFloat(scene.style.top) }];
+  })));
+  const before = await positions();
+  const members = await page.locator('.scene-card.selected').evaluateAll(cards => cards.map(card => (card as HTMLElement).dataset.scene!));
+  await page.mouse.move(background.x, background.y);
+  await page.mouse.down();
+  await page.mouse.move(background.x + 145, background.y + 40, { steps: 6 });
+  await page.mouse.up();
+  const after = await positions();
+  const delta = { x: after[members[0]!]!.x - before[members[0]!]!.x, y: after[members[0]!]!.y - before[members[0]!]!.y };
+  expect(delta.x).toBeGreaterThan(0);
+  for (const [key, start] of Object.entries(before)) {
+    expect(after[key]).toEqual(members.includes(key) ? { x: start.x + delta.x, y: start.y + delta.y } : start);
+  }
+  await expect(frame).toHaveClass(/selected/);
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-moved.png') });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(positions).toEqual(before);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect.poll(positions).toEqual(after);
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.reload();
+  await expect.poll(positions).toEqual(after);
+
+  await frame.getByRole('button', { name: 'Collapse group' }).click();
+  await expect(frame).toHaveClass(/collapsed/);
+  await expect(frame).toHaveClass(/scene-card/);
+  await expect(frame.locator('.card-label')).toHaveText('Scene group');
+  await expect(frame.locator('.card-line')).toHaveText('4 scenes');
+  await expect(page.locator('.scene-card[data-scene]')).toHaveCount(2);
+  await expect(page.locator('.collapsed-edge')).toHaveCount(2);
+  await expect(page.locator('.collapsed-edge').filter({ hasText: '3 routes' })).toHaveCount(1);
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-collapsed.png') });
+
+  const collapsedBox = (await frame.boundingBox())!;
+  const collapsedLeft = await frame.evaluate(element => (element as HTMLElement).style.left);
+  await page.mouse.move(collapsedBox.x + 25, collapsedBox.y + collapsedBox.height - 7);
+  await page.mouse.down();
+  await page.mouse.move(collapsedBox.x + 125, collapsedBox.y + collapsedBox.height + 24, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(() => frame.evaluate(element => (element as HTMLElement).style.left)).not.toBe(collapsedLeft);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(() => frame.evaluate(element => (element as HTMLElement).style.left)).toBe(collapsedLeft);
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.reload();
+  await expect(frame.getByRole('button', { name: 'Expand group' })).toHaveAttribute('aria-expanded', 'false');
+  await frame.locator('.card-title').click({ button: 'right' });
+  const groupMenu = page.getByRole('menu', { name: 'Group actions' });
+  await groupMenu.getByRole('menuitem', { name: 'Rename group' }).click();
+  const rename = page.getByRole('dialog', { name: 'Rename group' });
+  await rename.getByLabel('Group name').fill('Arcade rotation');
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'rename-group-dialog.png') });
+  await rename.getByRole('button', { name: 'Save name' }).click();
+  await expect(frame.locator('.card-title')).toHaveText('Arcade rotation');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(frame.locator('.card-title')).not.toHaveText('Arcade rotation');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(frame.locator('.card-title')).toHaveText('Arcade rotation');
+  await frame.locator('.card-title').click({ button: 'right' });
+  await groupMenu.getByRole('menuitem', { name: 'Group colour' }).click();
+  const colours = page.getByRole('dialog', { name: 'Group colour' });
+  await expect(colours.getByRole('button', { name: 'Default', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-colour-picker.png') });
+  await colours.getByRole('button', { name: 'Teal', exact: true }).click();
+  await expect(frame).toHaveAttribute('data-group-colour', 'teal');
+  await expect(frame).toHaveCSS('border-top-color', 'rgb(24, 122, 116)');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(frame).not.toHaveAttribute('data-group-colour');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(frame).toHaveAttribute('data-group-colour', 'teal');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.reload();
+  await expect(frame.locator('.card-title')).toHaveText('Arcade rotation');
+  await expect(frame).toHaveAttribute('data-group-colour', 'teal');
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-coloured-card.png') });
+  await frame.getByRole('button', { name: 'Expand group' }).click();
+  await expect(frame.locator('.flow-group-name')).toContainText('Arcade rotation');
+  await expect(frame).toHaveCSS('border-top-color', 'rgb(24, 122, 116)');
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-coloured-frame.png') });
+  await frame.locator('.flow-group-name').click({ button: 'right' });
+  await groupMenu.getByRole('menuitem', { name: 'Group colour' }).click();
+  await expect(colours.getByRole('button', { name: 'Teal', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await colours.getByRole('button', { name: 'Default', exact: true }).click();
+  await expect(frame).not.toHaveAttribute('data-group-colour');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(frame).toHaveAttribute('data-group-colour', 'teal');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await expect.poll(positions).toEqual(after);
+  await expect(page.locator('.collapsed-edge')).toHaveCount(0);
+  await expect(page.locator('.edge-line')).toHaveCount(7);
+
+  await page.getByRole('button', { name: 'Game menu' }).click();
+  await page.getByRole('menuitem', { name: 'Export as text' }).click();
+  const text = await page.getByLabel('The game as text').inputValue();
+  const imported = await page.request.post(`${games}/import`, { headers, data: { gameId: randomUUID(), text } });
+  expect(imported.ok()).toBe(true);
+  const layout = (await imported.json()).data.definition.editor.positions;
+  expect(Object.values(layout).filter(position => {
+    const member = position as { groupName?: string; groupColour?: string };
+    return member.groupName === 'Arcade rotation' && member.groupColour === 'teal';
+  })).toHaveLength(4);
 });

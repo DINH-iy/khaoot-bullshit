@@ -1,5 +1,5 @@
 import { HOSTED_POOL_TEXTS } from '../head-to-head/eight-ball/hosted.text.js';
-import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, type PrefabContent } from '@party/contracts';
+import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type EditorLayout, type MinigameKey, type PrefabContent } from '@party/contracts';
 import { translate } from '../i18n/texts.js';
 import { LANGUAGES, type Language } from '../i18n/language.js';
 import { isDefaultGraphQuestion } from '../minigames/draw-the-graph/graph-question.js';
@@ -20,11 +20,12 @@ export interface Node { key: string; stages: Stage[] }
 export interface Edge { key: string; from: string; to: string; option?: string }
 export interface Definition extends Record<string, unknown> { formatVersion: number; title: string; startNodeKey: string; nodes: Node[]; edges: Edge[] }
 export interface Point { x: number; y: number }
-export type Positions = Record<string, Point>;
+export type Positions = EditorLayout['positions'];
 
 // Card geometry, in canvas units. Ports sit at fixed offsets so lines line up exactly.
 export const GRID = 24;
 export const CARD_WIDTH = 264;
+export const CARD_HEIGHT = 192;
 /** From one column of scenes to the next when tidying (a card and the gap after it). */
 export const COLUMN_STEP = CARD_WIDTH + GRID * 4;
 export const PORT_Y = 72;
@@ -35,7 +36,7 @@ export const SNAP_RADIUS = 56;
 const ALIGN = 12;
 export const isRoute = (node: Node | undefined) => node?.stages.length === 1 && node.stages[0]!.kind === 'route';
 export const optionsOf = (node: Node | undefined): Option[] => isRoute(node) ? (node!.stages[0]!['options'] as Option[] | undefined) ?? [] : [];
-export const cardHeight = (node: Node) => isRoute(node) ? ROUTE_FIRST + Math.max(0, optionsOf(node).length - 1) * OPTION_GAP + 32 : 192;
+export const cardHeight = (node: Node) => isRoute(node) ? ROUTE_FIRST + Math.max(0, optionsOf(node).length - 1) * OPTION_GAP + 32 : CARD_HEIGHT;
 export const inputPort = (position: Point): Point => ({ x: position.x, y: position.y + PORT_Y });
 export function outputPort(node: Node, position: Point, option?: string): Point {
   if (!isRoute(node)) return { x: position.x + CARD_WIDTH, y: position.y + PORT_Y };

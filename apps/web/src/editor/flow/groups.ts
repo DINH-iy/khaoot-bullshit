@@ -1,8 +1,8 @@
-import { CARD_WIDTH, cardHeight, GROUP, isGroupKey, type Definition, type Positions } from '../model.js';
+import { CARD_WIDTH, cardHeight, GROUP, isGroupKey, optionsOf, type Definition, type Positions } from '../model.js';
 
 // Groups on the Flow map: scenes that are selected and moved as one (a minigame draw and its games, a prefab…).
 // Layout only, like bend points: each grouped scene has "group--<scene>" in the positions with its group's number
-// as x, so saving, undo, live editing and export carry groups without anything new in the game itself.
+// as x, plus an optional name and colour. Saving, undo, live editing and export carry this editor layout.
 
 /** Layout keys are at most 64 characters; a scene whose key leaves no room for the prefix stays ungrouped. */
 const MAX_KEY = 64 - GROUP.length;
@@ -39,18 +39,38 @@ export const anyGrouped = (definition: Definition, positions: Positions, keys: s
 };
 
 /** These scenes as one new group (taken out of the groups they were in). Fewer than two: nothing changes. */
-export function grouped(positions: Positions, keys: string[]): Positions {
+export function grouped(positions: Positions, keys: string[], appearance: GroupAppearance = {}): Positions {
   const members = keys.filter(key => key.length <= MAX_KEY && positions[key]);
   if (members.length < 2) return positions;
   const used = Object.entries(positions).filter(([key]) => isGroupKey(key)).map(([, point]) => point.x);
   const id = Math.max(0, ...used) + 1; const next = ungrouped(positions, members);
-  for (const key of members) next[groupKey(key)] = { x: id, y: 0 };
+  for (const key of members) next[groupKey(key)] = { x: id, y: 0, ...appearance };
   return next;
 }
 
 /** These scenes out of their groups. */
 export function ungrouped(positions: Positions, keys: string[]): Positions {
   const next = { ...positions }; for (const key of keys) delete next[groupKey(key)]; return next;
+}
+
+type GroupAppearance = Pick<Positions[string], 'groupName' | 'groupColour'>;
+
+export function groupAppearance(positions: Positions, members: string[]): GroupAppearance {
+  const entries = members.map(member => positions[groupKey(member)]);
+  return {
+    groupName: entries.find(entry => entry?.groupName)?.groupName?.trim(),
+    groupColour: entries.find(entry => entry?.groupColour)?.groupColour,
+  };
+}
+
+/** Each member carries the appearance so it survives removing a member from the group. */
+export function updateGroupAppearance(positions: Positions, members: string[], appearance: GroupAppearance): Positions {
+  const next = { ...positions };
+  for (const member of members) {
+    const key = groupKey(member); const position = positions[key];
+    if (position) next[key] = { ...position, ...appearance };
+  }
+  return next;
 }
 
 /** The frame drawn behind a group: around its cards, with room above for its name. */
@@ -61,4 +81,34 @@ export function groupFrame(definition: Definition, positions: Positions, members
   // Named after its first scene (top left): a draw names the group of its games.
   const first = [...nodes].sort((a, b) => positions[a.key]!.y - positions[b.key]!.y || positions[a.key]!.x - positions[b.key]!.x)[0]!;
   return { x: left - 16, y: top - 40, width: right - left + 32, height: bottom - top + 56, first: first.key };
+}
+
+export function groupView(definition: Definition, positions: Positions, members: string[]) {
+  const frame = groupFrame(definition, positions, members);
+  return {
+    key: [...members].sort().join(','),
+    members,
+    frame,
+    ...groupAppearance(positions, members),
+    at: { x: frame.x + 16, y: frame.y + 40 },
+  };
+}
+
+export type FlowGroup = ReturnType<typeof groupView>;
+
+/** The visible connections of closed groups. Parallel routes to the same box share one line. */
+export function collapsedConnections(definition: Definition, hidden: ReadonlyMap<string, FlowGroup>) {
+  const links = new Map<string, { from: string; to: string; count: number; label: string | undefined; option: string | undefined }>();
+  for (const edge of definition.edges) {
+    const source = hidden.get(edge.from); const target = hidden.get(edge.to);
+    if ((!source && !target) || (source && source === target)) continue;
+    const from = source?.frame.first ?? edge.from; const to = target?.frame.first ?? edge.to;
+    const key = `${from}:${to}`;
+    const prior = links.get(key);
+    if (prior) { prior.count++; continue; }
+    const node = definition.nodes.find(entry => entry.key === edge.from);
+    const label = edge.option ? optionsOf(node).find(option => option.key === edge.option)?.label : undefined;
+    links.set(key, { from, to, count: 1, label, option: edge.option });
+  }
+  return links;
 }

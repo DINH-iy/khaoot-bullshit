@@ -276,6 +276,8 @@ Example:
 After importing this example, use **Game menu → Media library** to find or prepare a short piano clip. In the Scene editor, attach that clip to the music question under **Picture, video or song**.
 
 The example’s museum chart appears in **Game menu → Graph library**, where you can change the readings or the Visitors axis label.
+- Flow group names and colours are editor layout. In the Flow editor, right-click a group and choose **Rename group** or **Group colour**. Exported games carry the name and optional colour in the matching `group--<scene key>` entries under `editor.positions`. For example, `"group--welcome": { "x": 1, "y": 0, "groupName": "Opening", "groupColour": "teal" }` identifies group 1, named Opening and coloured teal. Each member has a matching entry with the same group number, name, and colour. The colour can be red, orange, amber, green, teal, blue, violet, pink, or a custom six-digit hex code such as `"#da405c"`. Use **Custom** in the group colour picker to set a hex colour. Omit the colour for the default. Text import retains these entries when importing an exported draft.
+
 <!-- ai-instructions:end -->
 
 ## Tips

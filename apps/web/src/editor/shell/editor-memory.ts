@@ -3,7 +3,7 @@
 // only (a convenience: without storage the editor simply opens as new).
 export type EditorTab = 'flow' | 'scene' | 'look';
 export type EditorPanel = 'settings' | 'invite' | 'export' | 'savePoints' | null;
-export interface EditorMemory { view?: EditorTab; selected?: string[]; panel?: EditorPanel; lookSection?: string }
+export interface EditorMemory { view?: EditorTab; selected?: string[]; panel?: EditorPanel; lookSection?: string; collapsedGroups?: string[] }
 
 const key = (gameId: string) => `party-editor-place:${gameId}`;
 
@@ -16,6 +16,7 @@ export function readMemory(gameId: string): EditorMemory {
       ...(['flow', 'scene', 'look'].includes(memory['view'] as string) ? { view: memory['view'] as EditorTab } : {}),
       ...(Array.isArray(memory['selected']) ? { selected: (memory['selected'] as unknown[]).filter((entry): entry is string => typeof entry === 'string').slice(0, 200) } : {}),
       ...(['settings', 'invite', 'export', 'savePoints'].includes(memory['panel'] as string) ? { panel: memory['panel'] as EditorPanel } : {}),
+      ...(Array.isArray(memory['collapsedGroups']) ? { collapsedGroups: (memory['collapsedGroups'] as unknown[]).filter((entry): entry is string => typeof entry === 'string') } : {}),
       ...(typeof memory['lookSection'] === 'string' ? { lookSection: memory['lookSection'] } : {}),
     };
   } catch { return {}; }

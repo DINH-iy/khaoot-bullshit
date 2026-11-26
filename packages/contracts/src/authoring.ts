@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { GameIdSchema, GameKeySchema, RevisionSchema } from './game.js';
+import { ColorSchema } from './presentation.js';
 import { GraphDataSchema } from './minigames/draw-the-graph/graph.js';
 
 export const AuthoredGraphSchema = z.object({
@@ -81,7 +82,22 @@ export const CreateGameSchema = z.object({
   copyOf: GameIdSchema.nullable().optional(),
 }).strict().refine(input => !(input.startFrom && input.copyOf), { message: 'Start from a built-in game or copy one of yours, not both' });
 // Where each scene card sits in the Flow editor. Layout only: never part of a published game.
-export const EditorLayoutSchema = z.object({ positions: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/), z.object({ x: z.number().finite().min(-100_000).max(100_000), y: z.number().finite().min(-100_000).max(100_000) }).strict()) }).strict();
+export const FLOW_GROUP_NAME_MAX = 80;
+export const FLOW_GROUP_COLOURS = ['red', 'orange', 'amber', 'green', 'teal', 'blue', 'violet', 'pink'] as const;
+const FlowGroupColourSchema = z.union([z.enum(FLOW_GROUP_COLOURS), ColorSchema.length(7)]);
+export type FlowGroupColour = z.infer<typeof FlowGroupColourSchema>;
+const EditorPositionSchema = z.strictObject({
+  x: z.number().finite().min(-100_000).max(100_000),
+  y: z.number().finite().min(-100_000).max(100_000),
+  groupName: z.string().min(1).max(FLOW_GROUP_NAME_MAX).refine(name => name.trim().length > 0).optional(),
+  groupColour: FlowGroupColourSchema.optional(),
+});
+export const EditorLayoutSchema = z.strictObject({
+  positions: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/), EditorPositionSchema),
+}).refine(layout => Object.entries(layout.positions).every(([key, position]) =>
+  key.startsWith('group--') || (position.groupName === undefined && position.groupColour === undefined)), {
+  path: ['positions'], message: 'Group names and colours belong on group positions',
+});
 export type EditorLayout = z.infer<typeof EditorLayoutSchema>;
 // A game pasted as text (JSON, also inside ```json fences): the exact format or the simple one for people and AI.
 export const ImportGameSchema = z.object({ gameId: GameIdSchema, text: z.string().min(2).max(MAX_DRAFT_BYTES) }).strict();

@@ -122,15 +122,26 @@
 .edge:hover .edge-end, .edge.selected .edge-end { fill: var(--e-accent-soft); stroke: var(--e-accent); stroke-width: 2; }
 .port-in.grabbable { pointer-events: auto; cursor: grab; }
 .port-in.grabbable:hover { border-color: var(--e-accent); }
-/* A group: a soft dashed frame behind its cards, named at the top; the name selects the whole group. */
-.flow-group { position: absolute; box-sizing: border-box; border: 2px dashed color-mix(in srgb, var(--e-muted) 55%, transparent); border-radius: 22px;
-  background: color-mix(in srgb, var(--e-accent) 5%, transparent); pointer-events: none; }
-.flow-group.selected { border-color: var(--e-accent); background: color-mix(in srgb, var(--e-accent) 10%, transparent); }
-.flow-group .flow-group-name { position: absolute; left: 12px; top: 6px; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); min-height: 28px; margin: 0;
+/* A selectable group frame behind its cards and arrows. */
+.flow-group:not(.collapsed) { position: absolute; box-sizing: border-box; border: 2px dashed color-mix(in srgb, var(--e-muted) 55%, transparent); border-radius: 22px;
+  background: color-mix(in srgb, var(--e-accent) 5%, transparent); cursor: pointer; }
+.editor-body:not(.viewing) :is(.flow-group, .flow-group .flow-group-name) { cursor: move; }
+.flow-group.selected:not(.collapsed) { border-color: var(--e-accent); background: color-mix(in srgb, var(--e-accent) 10%, transparent); }
+.flow-group .flow-group-name { position: absolute; left: 12px; top: 6px; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 64px); min-height: 28px; margin: 0;
   padding: 2px 10px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-card); color: var(--e-text); font-size: .85rem; font-weight: 700;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; cursor: pointer; }
 .flow-group.selected .flow-group-name { border-color: var(--e-accent); color: var(--e-accent); }
 .flow-group .flow-group-name svg { flex: none; }
+.flow-group-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.editor .flow-group .flow-group-toggle {
+  position: absolute; inset: 3px 9px auto auto; display: grid; place-items: center;
+  width: 36px; min-height: 32px; padding: 0; border-radius: 8px; cursor: pointer;
+  background: var(--e-panel); border-color: var(--e-border); color: var(--e-text);
+}
+.flow-group.collapsed .card-label { color: var(--e-accent); padding-inline-end: 36px; }
+.thumb-group { background: var(--e-accent-soft); color: var(--e-accent); }
+.flow-group-port { pointer-events: none; }
+.editor .flow-group.collapsed .flow-group-toggle { inset: 5px 9px auto auto; }
 .select-box { fill: color-mix(in srgb, var(--e-accent) 12%, transparent); stroke: var(--e-accent); stroke-dasharray: 5 5; }
 .scene-card.selected .card-label::after { content: ' · selected'; color: var(--e-accent); }
 
@@ -288,6 +299,18 @@
 .inspector { display: flex; flex-direction: column; gap: 12px; }
 .inspector-head { display: flex; align-items: center; gap: 10px; }
 .inspector-head .small-button { margin-left: auto; }
+@media (min-width: 701px) {
+  .editor-body.with-inspector:has(> .multi-inspector) { grid-template-columns: minmax(0, 1fr) min(340px, 42vw); }
+}
+.multi-inspector { gap: 10px; padding: 12px 14px; }
+.editor .multi-inspector .multi-clear { display: grid; place-items: center; flex: none; width: 44px; min-height: 44px; padding: 0; }
+.multi-selection-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.editor .multi-selection-actions > button, .editor .multi-selection-actions > .save-prefab > button {
+  width: 100%; min-height: 44px; margin: 0; padding: 6px 8px; font-size: .875rem; line-height: 1.2; overflow-wrap: anywhere;
+}
+.multi-selection-actions > .save-prefab:has(form, .hint), .multi-selection-actions > .multi-confirm { grid-column: 1 / -1; }
+.multi-selection-actions .with-icon { justify-content: center; }
+.multi-inspector .hint { font-size: .85rem; }
 .ed-kind { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--e-accent-soft); color: var(--e-accent); flex: none; }
 .ed-kind-text { display: grid; } .ed-kind-text small { color: var(--e-muted); font-size: .8rem; }
 .inspector-problems ul { margin: 0; padding-left: 18px; font-size: .9rem; }
@@ -345,6 +368,39 @@
 /* A confirmation in the middle of the editor (deleting with the keyboard). */
 .ed-dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / .45); }
 .ed-dialog { width: min(420px, 100%); display: grid; gap: 10px; padding: 20px; border-radius: 16px; border: 1px solid var(--e-border); background: var(--e-panel); color: var(--e-text); box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
+.ed-dialog.group-edit-dialog { width: min(420px, calc(100% - 24px)); margin: auto; }
+.group-edit-dialog:not([open]) { display: none; }
+.group-edit-dialog::backdrop { background: rgb(0 0 0 / .45); }
+.group-edit-dialog :is(form, label) { display: grid; gap: 8px; min-width: 0; }
+.group-edit-dialog input { min-width: 0; min-height: 44px; }
+.group-edit-dialog button { min-height: 44px; }
+.editor [data-group-colour="red"] { --group-colour: light-dark(#ad3f54, #f294a4); }
+.editor [data-group-colour="orange"] { --group-colour: light-dark(#ad542d, #f2a779); }
+.editor [data-group-colour="amber"] { --group-colour: light-dark(#8b640c, #edc467); }
+.editor [data-group-colour="green"] { --group-colour: light-dark(#418047, #9ed48e); }
+.editor [data-group-colour="teal"] { --group-colour: light-dark(#187a74, #74d3c6); }
+.editor [data-group-colour="blue"] { --group-colour: light-dark(#316eb3, #8ebaf8); }
+.editor [data-group-colour="violet"] { --group-colour: light-dark(#784eb3, #c2a5f6); }
+.editor [data-group-colour="pink"] { --group-colour: light-dark(#a74386, #ef9bcc); }
+.flow-group[data-group-colour]:not(.collapsed) { border-color: var(--group-colour); background: color-mix(in srgb, var(--group-colour) 9%, transparent); }
+.flow-group.selected[data-group-colour]:not(.collapsed) { background: color-mix(in srgb, var(--group-colour) 15%, transparent); }
+.flow-group[data-group-colour] .flow-group-name { border-color: var(--group-colour); color: var(--group-colour); }
+.flow-group.collapsed[data-group-colour] { border-color: var(--group-colour); }
+.flow-group.collapsed.selected[data-group-colour] { box-shadow: 0 0 0 3px var(--group-colour); }
+.flow-group.collapsed[data-group-colour] .card-label { color: var(--group-colour); }
+.flow-group[data-group-colour] .thumb-group { background: color-mix(in srgb, var(--group-colour) 16%, var(--e-card)); color: var(--group-colour); }
+.flow-group-colours { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.editor .flow-group-colours button { display: grid; place-items: center; gap: 5px; min-width: 0; padding: 8px 4px; font-size: .875rem; overflow-wrap: anywhere; }
+.editor .flow-group-colours button[aria-pressed="true"] { border-color: var(--e-accent); }
+.flow-group-swatch {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--group-colour, var(--e-accent)); color: light-dark(#fff, #1d1d22);
+}
+.flow-group[data-group-colour^="#"] :is(.flow-group-name, .card-label, .thumb-group) {
+  color: color-mix(in srgb, var(--group-colour) 46%, var(--e-text));
+}
+.flow-group-custom-colour { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--e-border); }
+.editor .flow-group-custom-colour .color-trigger { justify-content: start; gap: 8px; min-height: 44px; flex: 1; }
 .ed-dialog h2 { margin: 0; font-size: 1.1rem; overflow-wrap: anywhere; } .ed-dialog p { margin: 0; color: var(--e-muted); }
 .ed-dialog .actions { justify-content: flex-end; }
 .ed-dialog button { background: var(--e-panel); color: var(--e-text); border: 1px solid var(--e-border); }
