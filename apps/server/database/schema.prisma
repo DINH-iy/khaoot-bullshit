@@ -33,12 +33,16 @@ enum AssetKind {
   VIDEO
   // Strokes as validated JSON (see the drawing contract), never an image.
   DRAWING
+  // A short sound (a team's own winning sound).
+  AUDIO
 }
 
 // What a stored file is for: an answer in a round (or a part of a relay drawing), or a player's picture.
 enum AssetPurpose {
   ANSWER
   AVATAR
+  // A team's own winning sound, uploaded from a phone while teams are made.
+  SOUND
 }
 
 enum ScoreKind {

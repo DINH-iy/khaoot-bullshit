@@ -17,3 +17,15 @@
 .celebration-picker label { display: grid; gap: 4px; font-weight: 700; }
 .room .team-celebrate { margin: 6px 0 0; min-height: 40px; }
 .team-celebration-summary { margin: 4px 0 0; font-weight: 800; }
+
+/* Compact, so the whole sheet fits one phone screen: 13 emoji tiles in two rows of 7, small sound chips, one "+" tile each. */
+.celebration-picker { gap: 10px; }
+.celebration-emoji { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.room .celebration-emoji button { min-width: 0; min-height: 42px; font-size: 1.35rem; }
+.room .celebration-sounds button { min-height: 36px; padding: 2px 10px; font-size: .92rem; }
+.room .celebration-picker button.celebration-own { border-style: dashed; border-color: color-mix(in srgb, var(--r-text) 40%, transparent); font-size: 1.2rem; min-width: 44px; }
+.room .celebration-picker button.celebration-own[aria-checked=true] { border-style: solid; border-color: var(--r-accent); }
+.celebration-type { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.celebration-type input { min-height: 42px; font-size: 1.2rem; }
+.celebration-picker label input { min-height: 42px; }
+.celebration-actions { display: flex; gap: 8px; flex-wrap: nowrap; } .celebration-actions button { flex: 1; margin: 0; }

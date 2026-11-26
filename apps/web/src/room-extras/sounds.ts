@@ -38,11 +38,13 @@ const SYNTH: Record<BuiltinSound, (audio: AudioContext, start: number) => void> 
 };
 
 let playing: HTMLAudioElement | null = null;
+/** A sound file at an address: a team's own sound, uploaded in the room. */
+export type UrlSound = { kind: 'url'; url: string };
 /** Plays a sound here. Returns false when this browser does not allow sound yet (no tap on the page so far). */
-export function playSound(sound: Sound): boolean {
-  if (sound.kind === 'media') {
+export function playSound(sound: Sound | UrlSound): boolean {
+  if (sound.kind === 'media' || sound.kind === 'url') {
     playing?.pause();
-    const element = new Audio(`/api/media/${sound.id}`); playing = element;
+    const element = new Audio(sound.kind === 'url' ? sound.url : `/api/media/${sound.id}`); playing = element;
     const stop = setTimeout(() => element.pause(), SOUND_MAX_SECONDS * 1000);
     element.addEventListener('ended', () => clearTimeout(stop));
     void element.play().catch(() => clearTimeout(stop));

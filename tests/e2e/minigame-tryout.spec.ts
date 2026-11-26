@@ -245,6 +245,13 @@ test('Galgje: the phone guesses letters of a hidden word; the host screen sees o
   await expect(host.locator('.hangman-word')).toHaveCount(0);
   await expect(host.getByText(/^[1-9]\d* of \d+ letters found$/).or(host.getByText(/^0 of \d+ letters found$/)).first()).toBeVisible();
   if (process.env['TEAM_SHOTS']) { await page.waitForTimeout(800); await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/hangman-bench.png` }); }
+  // Guessing the whole word: a wrong word costs a life and is listed with the wrong letters.
+  const before = Number((await phone.getByRole('img', { name: /^Gallows:/ }).getAttribute('aria-label'))!.match(/(\d+) of/)![1]);
+  await phone.getByRole('button', { name: 'Guess the word' }).click();
+  await phone.getByLabel('The whole word').fill('Zzzzz');
+  await phone.getByRole('button', { name: 'Guess', exact: true }).click();
+  await expect(phone.getByLabel('Wrong words: ZZZZZ')).toBeVisible();
+  await expect(phone.getByRole('img', { name: `Gallows: ${before + 1} of 7 wrong` })).toBeVisible();
 });
 
 test('Undercover: three phones each see their own word, give clues in turn and vote; the host can always move on', async ({ page, baseURL }) => {

@@ -31,10 +31,10 @@ const download = (sessionId: string, assetId: string, cookie?: string, extra: Re
   app.inject({ method: 'GET', url: `/api/rooms/${sessionId}/assets/${assetId}`, headers: { host: '127.0.0.1:4173', ...(cookie ? { cookie } : {}), ...extra } });
 const stored = async (sessionId: string) => readdir(join(mediaDirectory, sessionId)).catch(() => [] as string[]);
 
-async function room() {
+async function room(gameKey = 'picture-party') {
   const owner = cookieOf(await json('/api/host/claim', { token: ownerToken }));
   const sessionId = randomUUID();
-  const created = await json('/api/host/rooms', { gameKey: 'picture-party', sessionId, commandId: randomUUID() }, owner);
+  const created = await json('/api/host/rooms', { gameKey, sessionId, commandId: randomUUID() }, owner);
   expect(created.statusCode).toBe(200); const host = cookieOf(created);
   const session = await prisma.gameSession.findUniqueOrThrow({ where: { id: sessionId } });
   const players: { cookie: string; id: string; actor: { role: 'player'; playerId: string } }[] = [];
@@ -123,5 +123,35 @@ describe('uploaded pictures, GIFs and videos as answers', () => {
     const service = createGameService(prisma);
     await expect(service.execute(ada.actor, { formatVersion: 1, commandId: randomUUID(), sessionId: r.sessionId, type: 'submission.submit', stageRunId: next, value: { kind: 'media', assetId } })).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
     await expect(service.execute(ben.actor, { formatVersion: 1, commandId: randomUUID(), sessionId: r.sessionId, type: 'submission.submit', stageRunId: next, value: { kind: 'media', assetId: clip.json().data.assetId } })).resolves.toMatchObject({ type: 'submission.submit' });
+  });
+});
+
+describe('a team’s own winning sound', () => {
+  const mp3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(200, 1)]);
+  const sound = (sessionId: string, cookie: string | undefined, body: Buffer) =>
+    app.inject({ method: 'POST', url: `/api/rooms/${sessionId}/sounds`, payload: body, headers: { ...headers, 'content-type': 'application/octet-stream', ...(cookie ? { cookie } : {}) } });
+  it('is uploaded by a team member while teams are made, only audio up to 2 MB, plays for the whole room, and only that team can use it', async () => {
+    const r = await room('team-party'); const [ada, ben] = r.players as [typeof r.players[number], typeof r.players[number]];
+    for (const [index, team] of [[0, 0], [1, 1]] as const) await r.command('teams.assign', { stageRunId: r.stageRunId, playerId: r.players[index]!.id, teamIndex: team });
+    expect((await sound(r.sessionId, r.host, mp3)).statusCode).toBe(403);
+    expect((await sound(r.sessionId, ada.cookie, png)).statusCode).toBe(415);
+    expect((await sound(r.sessionId, ada.cookie, Buffer.concat([mp3, Buffer.alloc(2 * 1024 * 1024)]))).statusCode).toBe(413);
+    const uploaded = await sound(r.sessionId, ada.cookie, mp3);
+    expect(uploaded.statusCode).toBe(200);
+    const { assetId } = uploaded.json().data as { assetId: string };
+    expect(await prisma.asset.findUniqueOrThrow({ where: { id: assetId } })).toMatchObject({ kind: 'AUDIO', purpose: 'SOUND', contentType: 'audio/mpeg', stageRunId: null });
+    // The shared screen (and everyone in the room) can play it.
+    const played = await download(r.sessionId, assetId, ben.cookie);
+    expect(played.statusCode).toBe(200); expect(played.headers['content-type']).toBe('audio/mpeg');
+    const service = createGameService(prisma);
+    const celebrate = (actor: typeof ada, teamIndex: number) => service.execute(actor.actor, { formatVersion: 1, commandId: randomUUID(), sessionId: r.sessionId, type: 'teams.celebration', stageRunId: r.stageRunId, teamIndex,
+      celebration: { emoji: '🎉', text: '', sound: null, upload: assetId } });
+    // Ben's team cannot take Ada's sound; Ada's team can.
+    await expect(celebrate(ben, 1)).rejects.toMatchObject({ code: 'INVALID_COMMAND' });
+    await celebrate(ada, 0);
+    expect((await readSessionView(prisma, ada.actor, r.sessionId)).stage!.teams!.teams[0]!.celebration).toMatchObject({ upload: assetId });
+    // Once the teams are set, no more sounds.
+    await r.command('teams.confirm', { stageRunId: r.stageRunId });
+    expect((await sound(r.sessionId, ada.cookie, mp3)).statusCode).toBe(409);
   });
 });

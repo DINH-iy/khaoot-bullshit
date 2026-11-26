@@ -7,12 +7,12 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AssetKind } from '../generated/prisma/client.js';
-import { MAX_DRAWING_BYTES } from '@party/contracts';
+import { MAX_DRAWING_BYTES, TEAM_SOUND_MAX_BYTES } from '@party/contracts';
 
 export interface MediaType { kind: AssetKind; contentType: string }
 // Per-kind size limits. Nothing is transcoded: the Pi stores and serves the
 // verified original, so limits are what keeps memory, disk and mobile data bounded.
-export const MEDIA_LIMITS: Record<AssetKind, number> = { IMAGE: 8 * 1024 * 1024, GIF: 12 * 1024 * 1024, VIDEO: 40 * 1024 * 1024, DRAWING: MAX_DRAWING_BYTES };
+export const MEDIA_LIMITS: Record<AssetKind, number> = { IMAGE: 8 * 1024 * 1024, GIF: 12 * 1024 * 1024, VIDEO: 40 * 1024 * 1024, DRAWING: MAX_DRAWING_BYTES, AUDIO: TEAM_SOUND_MAX_BYTES };
 export const MAX_UPLOAD_BYTES = Math.max(...Object.values(MEDIA_LIMITS));
 export const SESSION_MEDIA_BYTES = 1024 * 1024 * 1024;
 export const UPLOAD_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];

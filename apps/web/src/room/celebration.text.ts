@@ -1,13 +1,17 @@
 import { defineTexts } from '../i18n/texts.js';
 
 export const CELEBRATION_TEXTS = defineTexts('celebration', {
-  ours: 'Our celebration', pick: 'When your team wins a round or the game, the big screen plays this.', emoji: 'Emoji', cheer: 'Cheer (up to 24 characters)', sound: 'Sound', noSound: 'No sound',
+  ours: 'Our celebration', pick: 'When your team wins a round or the game, the big screen plays this.', emoji: 'Emoji', cheer: 'Cheer', sound: 'Sound', noSound: 'No sound',
   save: 'Save', saved: 'Saved', wins: '{team} wins!', clear: 'No celebration', placeholder: 'We are the champions!',
+  ownSound: 'Our own sound', ownEmoji: 'Our own emoji', typeEmoji: 'Type or paste an emoji', ok: 'OK', notEmoji: 'Use one emoji (or a few).', uploadSound: 'Upload our own sound (up to 2 MB, plays 6 seconds)', otherSound: 'Another file', uploading: 'Uploading…', ownHint: 'A short sound or recording: up to 2 MB, it plays for 6 seconds at most.', tooLarge: 'That file is too large: 2 MB at most (a few seconds).', notSound: 'That is not a sound file that can be played.', uploadFailed: 'Uploading did not work. Try again.',
 }, {
-  nl: { ours: 'Onze viering', pick: 'Als jullie team een ronde of het spel wint, speelt het grote scherm dit af.', emoji: 'Emoji', cheer: 'Yell (tot 24 tekens)', sound: 'Geluid', noSound: 'Geen geluid',
-    save: 'Bewaren', saved: 'Bewaard', wins: '{team} wint!', clear: 'Geen viering', placeholder: 'Wij zijn de kampioenen!' },
-  de: { ours: 'Unser Jubel', pick: 'Wenn euer Team eine Runde oder das Spiel gewinnt, spielt der große Bildschirm das ab.', emoji: 'Emoji', cheer: 'Schlachtruf (bis 24 Zeichen)', sound: 'Ton', noSound: 'Kein Ton',
-    save: 'Speichern', saved: 'Gespeichert', wins: '{team} gewinnt!', clear: 'Kein Jubel', placeholder: 'Wir sind die Champions!' },
-  ro: { ours: 'Sărbătoarea noastră', pick: 'Când echipa voastră câștigă o rundă sau jocul, ecranul mare redă asta.', emoji: 'Emoji', cheer: 'Strigăt (până la 24 de caractere)', sound: 'Sunet', noSound: 'Fără sunet',
-    save: 'Salvează', saved: 'Salvat', wins: '{team} câștigă!', clear: 'Fără sărbătoare', placeholder: 'Suntem campionii!' },
+  nl: { ours: 'Onze viering', pick: 'Als jullie team een ronde of het spel wint, speelt het grote scherm dit af.', emoji: 'Emoji', cheer: 'Yell', sound: 'Geluid', noSound: 'Geen geluid',
+    save: 'Bewaren', saved: 'Bewaard', wins: '{team} wint!', clear: 'Geen viering', placeholder: 'Wij zijn de kampioenen!',
+    ownSound: 'Ons eigen geluid', ownEmoji: 'Onze eigen emoji', typeEmoji: 'Typ of plak een emoji', ok: 'OK', notEmoji: 'Gebruik één emoji (of een paar).', uploadSound: 'Eigen geluid uploaden (tot 2 MB, speelt 6 seconden)', otherSound: 'Ander bestand', uploading: 'Uploaden…', ownHint: 'Een kort geluid of opname: tot 2 MB, het speelt hooguit 6 seconden.', tooLarge: 'Dat bestand is te groot: hooguit 2 MB (een paar seconden).', notSound: 'Dat is geen geluidsbestand dat afgespeeld kan worden.', uploadFailed: 'Uploaden lukte niet. Probeer het opnieuw.' },
+  de: { ours: 'Unser Jubel', pick: 'Wenn euer Team eine Runde oder das Spiel gewinnt, spielt der große Bildschirm das ab.', emoji: 'Emoji', cheer: 'Schlachtruf', sound: 'Ton', noSound: 'Kein Ton',
+    save: 'Speichern', saved: 'Gespeichert', wins: '{team} gewinnt!', clear: 'Kein Jubel', placeholder: 'Wir sind die Champions!',
+    ownSound: 'Unser eigener Ton', ownEmoji: 'Unser eigenes Emoji', typeEmoji: 'Emoji tippen oder einfügen', ok: 'OK', notEmoji: 'Nimm ein Emoji (oder ein paar).', uploadSound: 'Eigenen Ton hochladen (bis 2 MB, spielt 6 Sekunden)', otherSound: 'Andere Datei', uploading: 'Wird hochgeladen…', ownHint: 'Ein kurzer Ton oder eine Aufnahme: bis 2 MB, er spielt höchstens 6 Sekunden.', tooLarge: 'Die Datei ist zu groß: höchstens 2 MB (ein paar Sekunden).', notSound: 'Das ist keine Tondatei, die abgespielt werden kann.', uploadFailed: 'Hochladen hat nicht geklappt. Versuch es noch einmal.' },
+  ro: { ours: 'Sărbătoarea noastră', pick: 'Când echipa voastră câștigă o rundă sau jocul, ecranul mare redă asta.', emoji: 'Emoji', cheer: 'Strigăt', sound: 'Sunet', noSound: 'Fără sunet',
+    save: 'Salvează', saved: 'Salvat', wins: '{team} câștigă!', clear: 'Fără sărbătoare', placeholder: 'Suntem campionii!',
+    ownSound: 'Sunetul nostru', ownEmoji: 'Emoji-ul nostru', typeEmoji: 'Scrie sau lipește un emoji', ok: 'OK', notEmoji: 'Folosește un emoji (sau câteva).', uploadSound: 'Încarcă sunetul nostru (până la 2 MB, se aude 6 secunde)', otherSound: 'Alt fișier', uploading: 'Se încarcă…', ownHint: 'Un sunet scurt sau o înregistrare: până la 2 MB, se aude cel mult 6 secunde.', tooLarge: 'Fișierul e prea mare: cel mult 2 MB (câteva secunde).', notSound: 'Acesta nu e un fișier de sunet care poate fi redat.', uploadFailed: 'Încărcarea nu a mers. Încearcă din nou.' },
 });

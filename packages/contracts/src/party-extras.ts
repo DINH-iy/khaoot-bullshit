@@ -46,5 +46,10 @@ export type PartyExtras = z.infer<typeof PartyExtrasSchema>;
 export const CELEBRATION_EMOJI = ['🎉', '🔥', '🏆', '👑', '🚀', '💥', '🍻', '🦄', '⚡', '🎸', '🐐', '💪'] as const;
 export const TeamCelebrationSchema = z.object({
   emoji: z.string().trim().min(1).max(16), text: z.string().trim().max(24), sound: z.number().int().min(0).max(MAX_SOUNDS - 1).nullable(),
+  // The team's own sound, uploaded from a member's phone (it plays instead of `sound`, cut off like every sound).
+  upload: z.uuid().optional(),
 }).strict();
+/** The largest own sound a phone may upload (a few seconds of audio, also from a phone's recorder). */
+export const TEAM_SOUND_MAX_BYTES = 2 * 1024 * 1024;
+export const TEAM_SOUND_ACCEPT = 'audio/*,.m4a,.mp3,.ogg,.oga,.opus,.wav,.webm,.aac';
 export type TeamCelebration = z.infer<typeof TeamCelebrationSchema>;

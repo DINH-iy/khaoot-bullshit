@@ -51,13 +51,29 @@ test('the host adjusts proposed teams, a captain answers for the team, and team 
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
     expect((await new AxeBuilder({ page: ada }).analyze()).violations).toEqual([]);
     // Red picks its winning celebration on a phone.
+    // On a small phone the whole sheet fits one screen.
+    await ben.setViewportSize({ width: 375, height: 667 });
     await ben.getByRole('button', { name: '🎉 Our celebration' }).click();
     const sheet = ben.getByRole('dialog', { name: 'Our celebration' });
     await sheet.getByRole('radio', { name: '🚀' }).click();
-    await sheet.getByLabel('Cheer (up to 24 characters)').fill('GO RED');
+    await sheet.getByLabel('Cheer', { exact: true }).fill('GO RED');
+    // One "+" tile for an own emoji: typed once, it shows on the tile and is chosen.
+    await sheet.getByRole('radio', { name: 'Our own emoji' }).click();
+    await sheet.getByLabel('Type or paste an emoji').fill('🦖');
+    await sheet.getByRole('button', { name: 'OK' }).click();
+    await expect(sheet.getByRole('radio', { name: 'Our own emoji: 🦖' })).toHaveAttribute('aria-checked', 'true');
+    await sheet.getByRole('radio', { name: '🚀' }).click();
+    // A team can also upload its own sound (a short recording); it then plays instead of the game's sounds.
+    await sheet.locator('input[type=file]').setInputFiles({ name: 'cheer.mp3', mimeType: 'audio/mpeg', buffer: Buffer.concat([Buffer.from('ID3'), Buffer.alloc(400, 1)]) });
+    await expect(sheet.getByRole('radio', { name: 'Our own sound' })).toHaveAttribute('aria-checked', 'true');
+    const fits = await sheet.evaluate(element => { const box = element.getBoundingClientRect();
+      return box.top >= 0 && box.bottom <= innerHeight + 1 && [element, ...element.querySelectorAll('*')].every(node => node.scrollHeight <= node.clientHeight + 1 || getComputedStyle(node).overflowY === 'visible' || getComputedStyle(node).overflowY === 'hidden'); });
+    expect(fits).toBe(true);
+    if (process.env['TEAM_SHOTS']) await ben.screenshot({ path: `${process.env['TEAM_SHOTS']}/own-sound.png` });
     await sheet.getByRole('radio', { name: 'Air horn' }).click();
     await sheet.getByRole('button', { name: 'Save' }).click();
     await expect(host.locator('.team-celebration-summary')).toContainText('🚀 GO RED');
+    await ben.setViewportSize({ width: 1280, height: 720 });
     await host.getByRole('button', { name: 'Start round with these teams' }).click();
 
     // A player's team is a coloured flag in the round bar; the (i) says who is in it.

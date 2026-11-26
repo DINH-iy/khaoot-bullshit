@@ -211,6 +211,11 @@ export async function formingCommand(tx: Transaction, sessionId: string, forming
     requireGame(index >= 0 && index < forming.teams.length, 'INVALID_COMMAND');
     if (actorPlayerId) requireGame(forming.assignment[actorPlayerId] === index, 'FORBIDDEN');
     const celebration = command.celebration === null || command.celebration === undefined ? null : TeamCelebrationSchema.parse(command.celebration);
+    // An own sound: one uploaded in this room as a team sound, by a member of this team (or by the one choosing).
+    if (celebration?.upload) {
+      const sound = await tx.asset.findFirst({ where: { id: celebration.upload, sessionId, purpose: 'SOUND', removedAt: null }, select: { playerId: true } });
+      requireGame(sound && (sound.playerId === actorPlayerId || forming.assignment[sound.playerId] === index), 'INVALID_COMMAND');
+    }
     return { forming: { ...forming, teams: forming.teams.map((team, position) => position === index ? { ...team, celebration } : team) } };
   }
   if (command.type === 'teams.startTotal') {

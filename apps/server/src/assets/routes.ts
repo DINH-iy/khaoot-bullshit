@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import type { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { DrawingSchema, GameIdSchema, MAX_DRAWING_BYTES, type MediaKind, type RoomReply } from '@party/contracts';
+import { DrawingSchema, GameIdSchema, MAX_DRAWING_BYTES, TEAM_SOUND_MAX_BYTES, type MediaKind, type RoomReply } from '@party/contracts';
+import { sniffLibrary } from './library.js';
 import { z } from 'zod';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -87,6 +88,48 @@ export function registerAssetRoutes(app: FastifyInstance, client: PrismaClient, 
     });
   });
 
+  // A team's own winning sound: uploaded from a member's phone while teams are made, sent as plain bytes. It is
+  // recognised by its first bytes as audio (MP3, M4A, Ogg, WAV, FLAC), or as the MP4/WebM a phone's recorder makes.
+  const SOUND_RULES = {
+    sniff: (head: Uint8Array) => { const type = sniffLibrary(head); if (!type || type.kind === 'image') return null;
+      return { kind: 'AUDIO' as const, contentType: type.kind === 'audio' ? type.contentType : type.contentType === 'video/webm' ? 'audio/webm' : 'audio/mp4' }; },
+    limit: () => TEAM_SOUND_MAX_BYTES, max: TEAM_SOUND_MAX_BYTES,
+  };
+  void app.register(async scope => {
+    scope.addContentTypeParser('application/octet-stream', (_request, payload, done) => { done(null, payload); });
+    scope.post('/api/rooms/:sessionId/sounds', async (request, reply) => {
+      let stored: string | undefined; let sessionId = '';
+      try {
+        sessionId = ids(request).sessionId;
+        roomAssert(request.headers['x-party-request'] === '1' && allowedOrigin(request.headers, config), 'ORIGIN_REJECTED');
+        const principal = await gateway.authenticate(sessionId, request.headers.cookie);
+        roomAssert(principal.actor.role === 'player', 'FORBIDDEN'); const playerId = principal.actor.playerId;
+        roomAssert(limiter.allow(`sound:${principal.id}`, 6), 'RATE_LIMITED');
+        const declared = Number(request.headers['content-length']);
+        if (Number.isFinite(declared) && declared > TEAM_SOUND_MAX_BYTES) throw new UploadTooLarge();
+        // Only while teams are made, by a player who is in a team.
+        const teams = (await readSessionView(client, principal.actor, sessionId)).stage?.teams;
+        roomAssert(teams?.forming && teams.ownTeamIndex !== null, 'INVALID_STATE');
+        const used = await client.asset.aggregate({ where: { sessionId, removedAt: null }, _sum: { byteSize: true } });
+        roomAssert((used._sum.byteSize ?? 0) < SESSION_MEDIA_BYTES, 'STORAGE_FULL');
+        roomAssert(active < MAX_ACTIVE_UPLOADS, 'RATE_LIMITED');
+        active++;
+        try {
+          const assetId = randomUUID();
+          const sound = await storeUpload(request.body as Readable, directory, sessionId, assetId, SOUND_RULES);
+          roomAssert(sound, 'UNSUPPORTED_MEDIA'); stored = assetId;
+          await client.asset.create({ data: { id: assetId, sessionId, playerId, stageRunId: null, kind: 'AUDIO', purpose: 'SOUND', contentType: sound.contentType, byteSize: sound.byteSize, sha256: sound.sha256 } });
+          stored = undefined;
+          app.log.info({ event: 'asset_stored', kind: 'AUDIO', byteSize: sound.byteSize }, 'Team sound stored');
+          return { ok: true, data: { assetId } };
+        } finally { active--; }
+      } catch (error) {
+        if (stored) await removeStored(directory, sessionId, stored).catch(() => undefined);
+        return fail(reply, error);
+      }
+    });
+  });
+
   const DrawingUploadSchema = z.object({ purpose: z.enum(['answer', 'part', 'avatar']), drawing: DrawingSchema }).strict();
   /** Stores server-checked bytes as an asset of this player, within the room's storage budget. */
   const keep = async (sessionId: string, playerId: string, bytes: Buffer, data: { kind: 'DRAWING' | 'IMAGE'; contentType: string; stageRunId: string | null }) => {
@@ -160,8 +203,8 @@ export function registerAssetRoutes(app: FastifyInstance, client: PrismaClient, 
       roomAssert(limiter.allow(`download:${principal.id}`, 600), 'RATE_LIMITED');
       const asset = await client.asset.findFirst({ where: { id: assetId, sessionId }, include: { stage: { select: { revealedAt: true } }, submission: { select: { slotKey: true } } } });
       roomAssert(asset && !asset.removedAt, 'NOT_FOUND');
-      // Pictures of players and the turns of a relay drawing are for the whole room to see, straight away.
-      const open = asset.purpose === 'AVATAR' || Boolean(asset.submission?.slotKey.startsWith('part-'));
+      // Pictures of players, teams' own sounds and the turns of a relay drawing are for the whole room, straight away.
+      const open = asset.purpose === 'AVATAR' || asset.purpose === 'SOUND' || Boolean(asset.submission?.slotKey.startsWith('part-'));
       // Before the reveal only the uploader and the host can look; afterwards the whole room can.
       const own = principal.actor.role === 'player' && principal.actor.playerId === asset.playerId;
       // During a vote on that round, the room sees the uploads without names.

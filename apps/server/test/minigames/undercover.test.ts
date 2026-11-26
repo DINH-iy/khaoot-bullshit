@@ -49,13 +49,18 @@ describe('Undercover / Mr. White', () => {
     expect(refused(() => undercoverMove(clues(start), settings(), { action: 'clued', round: 2 }, ids[0]!, now), 'INVALID_STATE')).toBe(true);
   });
 
-  it('votes: never yourself; a tie sends nobody out; the most votes is out with their role shown; the civilians win once every impostor is out', () => {
+  it('votes: never yourself; a tie goes to a re-vote, a tie again sends nobody out; the most votes is out with their role shown; the civilians win once every impostor is out', () => {
     let state = clues(table(4, ['civilian', 'undercover']));
     expect(refused(() => vote(state, ids[0]!, ids[0]!), 'INVALID_SUBMISSION')).toBe(true);
     state = vote(vote(state, ids[0]!, ids[1]!), ids[1]!, ids[0]!);
     expect(undercoverView(state).voters).toEqual([ids[0], ids[1]]);
     state = vote(vote(state, ids[2]!, ids[3]!), ids[3]!, ids[2]!); // all voted: 1 each, a tie
+    expect(state).toMatchObject({ round: 1, phase: 'vote', votes: {}, out: [], runoff: ids.slice(0, 4) });
+    expect(undercoverView(state).runoff).toEqual(ids.slice(0, 4));
+    state = vote(vote(state, ids[0]!, ids[1]!), ids[1]!, ids[0]!);
+    state = vote(vote(state, ids[2]!, ids[3]!), ids[3]!, ids[2]!); // the re-vote ties too: nobody is out
     expect(state).toMatchObject({ round: 2, phase: 'clues', out: [] });
+    expect(state.runoff).toBeUndefined();
     expect(state.last?.outId).toBeNull();
     state = clues(state);
     for (const voter of [0, 2, 3]) state = vote(state, ids[voter]!, ids[1]!);
@@ -63,6 +68,19 @@ describe('Undercover / Mr. White', () => {
     expect(undercoverView(state).out).toEqual([{ playerId: ids[1], role: 'undercover', round: 2 }]);
     expect(state).toMatchObject({ phase: 'done', winner: 'civilians' });
     expect([...undercoverWinners(state)].sort()).toEqual([ids[0], ids[2], ids[3]].sort());
+  });
+
+  it('a re-vote is only between the tied players, and decides who is out', () => {
+    let state = clues(table(5, ['civilian', 'undercover']));
+    // 2 votes for player 1, 2 for player 2, 1 for player 3: a tie between 1 and 2.
+    for (const [voter, target] of [[0, 1], [3, 1], [1, 2], [4, 2], [2, 3]] as const) state = vote(state, ids[voter]!, ids[target]!);
+    expect(state).toMatchObject({ phase: 'vote', runoff: [ids[1], ids[2]] });
+    expect(state.last).toMatchObject({ round: 1, outId: null });
+    expect(refused(() => vote(state, ids[0]!, ids[3]!), 'INVALID_SUBMISSION')).toBe(true);
+    // The tied players vote too (for the other one).
+    for (const [voter, target] of [[0, 1], [1, 2], [2, 1], [3, 1], [4, 2]] as const) state = vote(state, ids[voter]!, ids[target]!);
+    expect(undercoverView(state).out).toEqual([{ playerId: ids[1], role: 'undercover', round: 1 }]);
+    expect(state.runoff).toBeUndefined();
   });
 
   it('the impostors win when they are as many as the civilians left', () => {
