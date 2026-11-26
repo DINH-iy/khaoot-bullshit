@@ -13,7 +13,7 @@ test('the host counts a wrong answer as correct after the reveal, and the player
   const [host, ada, ben] = await Promise.all(contexts.map(context => context.newPage())) as [Page, Page, Page];
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+    await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
     const gameId = randomUUID(); const roomId = randomUUID(); const games = `${baseURL}/api/host/games`;
     const text = JSON.stringify({ title: `Verdicts ${gameId.slice(0, 6)}`, scenes: [
       { id: 'q1', type: 'quiz', question: 'Capital of Australia?', answers: ['Canberra', 'Sidney'], correct: 'Canberra' }] });

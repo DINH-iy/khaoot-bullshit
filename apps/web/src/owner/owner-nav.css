@@ -54,3 +54,6 @@
 /* The language of the host, editor and admin screens (i18n/language-picker.tsx). */
 .app-menu-language { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: center; gap: 6px; margin-top: 4px; padding: 8px 6px 2px 10px; border-top: 1px solid var(--e-border); color: var(--e-muted); font-size: .8rem; }
 .app-menu-language select { width: 100%; min-height: 36px; border-radius: 8px; }
+/* Editor before any game was opened in this browser: shown, but gray and not a link. */
+.app-main .app-link-disabled { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-weight: 600; color: light-dark(#a7a3b3, #6c6880); cursor: not-allowed; }
+.app-navigation-links .app-link-disabled { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; color: light-dark(#a7a3b3, #6c6880); cursor: not-allowed; }

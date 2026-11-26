@@ -1,3 +1,4 @@
+import { forgetEditedGame, rememberEditedGame } from '../../owner/last-game.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftSchema, type DefinitionIssue, type Draft } from '@party/contracts';
 import { newId, roomApi } from '../../room/api.js';
@@ -51,6 +52,7 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
     void roomApi(`/api/host/games/${gameId}`).then(data => {
       if (!mounted) return;
       const loaded = DraftSchema.parse(data);
+      rememberEditedGame(gameId);
       setDraft(loaded); setIssues(loaded.issues); revision.current = loaded.revision; server.current = loaded.definition as Doc; waiting.current = undefined;
       show(fromDoc(loaded.definition as Doc)); setSave('saved'); dirty.current = false;
       // A game from before Pick teams scenes gets its teams as a scene at the start (left of the old start), and is saved like that.
@@ -62,6 +64,7 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
       }
     }).catch((cause: unknown) => {
       if (!mounted) return;
+      forgetEditedGame(gameId);
       if (isUnavailablePageError(cause)) replaceWithHome();
       else setLoadError('This game could not be opened. Try reloading the page.');
     });

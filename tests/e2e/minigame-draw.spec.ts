@@ -24,7 +24,7 @@ const definition = {
 test('a minigame draw: the author picks the games, the host draws, every screen lands on the same game, and it is played', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID(); const roomId = randomUUID();
   const api = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
   const draft = (await (await host.request.post(api, { headers, data: { gameId, title: 'Draw night', startFrom: 'timed-quiz' } })).json()).data;

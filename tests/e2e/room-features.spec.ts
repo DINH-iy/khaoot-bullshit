@@ -11,10 +11,9 @@ test('the host keeps scores secret, players react on the big screen, and a round
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
     await expect(host.getByText('about', { exact: false }).first()).toBeVisible();
-    await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await expect(host.locator('.game-detail').getByRole('heading', { name: 'Timed quiz', level: 3 })).toBeVisible();
+    await expect(host.getByRole('button', { name: 'Open room for Timed quiz' })).toBeVisible();
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Timed quiz' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await openHostFold(host, 'Room settings');
     await host.getByLabel('Players see the scores during the game').uncheck();

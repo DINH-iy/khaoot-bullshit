@@ -7,7 +7,7 @@ if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E
 
 async function createGame(page: Page, baseURL: string, definition: object & { title: string }) {
   await page.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const headers = { 'x-party-request': '1', origin: baseURL };
   const url = `${baseURL}/api/host/games`;
@@ -75,7 +75,7 @@ test('Clap the beat scores synthetic microphone input and taps, then releases th
     await expect(host.locator('html')).toHaveAttribute('data-test-minigame-animation', 'blur');
     await phone.getByRole('button', { name: 'Use microphone', exact: true }).click();
     await expect(phone.locator('html')).toHaveAttribute('data-test-mic', 'live');
-    const now = phone.getByText('Clap or tap now!', { exact: true });
+    const now = phone.locator('.clap-pad').getByText('Clap or tap now!', { exact: true });
     await expect(now).toBeVisible();
     await phone.evaluate(() => window.dispatchEvent(new Event('test-clap')));
     await expect(phone.getByText('1 of 6 beats')).toBeVisible();

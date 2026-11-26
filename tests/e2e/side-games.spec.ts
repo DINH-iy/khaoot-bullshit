@@ -11,7 +11,7 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
   const ownerContext = await browser.newContext(); const host = await ownerContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+    await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
     await host.goto(`${baseURL}/?admin=people`);
     await host.getByLabel('Name', { exact: true }).fill(name);
     await host.getByRole('button', { name: 'Add person' }).click();
@@ -28,8 +28,7 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
     await host.getByRole('button', { name: 'Done' }).click();
 
     await host.goto(`${baseURL}/?host=1`);
-    await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Timed quiz' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     // Side games are on and chips off in a new room; the host switches chips on in the lobby.
     await openHostFold(host, 'Room settings');

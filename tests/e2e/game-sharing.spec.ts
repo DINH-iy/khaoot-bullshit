@@ -10,7 +10,7 @@ test('editors see only their own games and games shared with them; the owner see
   await page.setViewportSize({ width: 1440, height: 900 });
   const headers = { 'x-party-request': '1', origin: baseURL! };
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const tag = randomUUID().slice(0, 6); const editorName = `Ed ${tag}`;
   const made = await page.request.post(`${baseURL}/api/host/people`, { headers, data: { name: editorName, canEdit: true } });
   const { key } = (await made.json()).data as { key: string };

@@ -15,8 +15,7 @@ test('Tryout switches and replays minigames without rejoining the phones or repl
   expect(denied.status()).toBe(401);
 
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await page.getByRole('button', { name: 'Open room for Timed quiz' }).click();
   const originalRoom = await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent();
   await openHostFold(page, 'Shared screen & invite');
   const benchHref = await page.getByRole('link', { name: 'Open test bench ↗' }).getAttribute('href');
@@ -299,8 +298,7 @@ test('the host types their own Galgje words and Undercover pairs in Room setting
   test.skip(test.info().project.name !== 'desktop-chrome', 'The bench is exercised on the desktop.');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await page.getByRole('button', { name: 'Open room for Timed quiz' }).click();
   await openHostFold(page, 'Room settings');
   await page.getByText('Your words (Galgje, Undercover)').click();
   await page.getByLabel('Galgje: one word or short phrase per line').fill('q\nquiz');

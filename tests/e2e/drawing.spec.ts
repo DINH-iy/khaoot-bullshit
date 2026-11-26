@@ -22,8 +22,7 @@ test('players draw blind and vote, draw the roundest circle, and pass the pencil
   const open = async (size: { width: number; height: number }) => (await browser.newContext({ viewport: size, reducedMotion: 'reduce' })).newPage();
   const host = await open({ width: 1280, height: 900 });
   await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await host.getByRole('radio', { name: /Draw party/ }).check();
-  await host.getByRole('button', { name: 'Open room', exact: true }).click();
+  await host.getByRole('button', { name: 'Open room for Draw party' }).click();
   const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
   await closeRoundsByHand(host);
   const phones: Page[] = [];

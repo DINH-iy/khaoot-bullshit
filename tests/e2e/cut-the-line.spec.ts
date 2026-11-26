@@ -8,7 +8,7 @@ if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E
 test('Cut the Line takes a cut in tenths of a percent on a phone and reveals its error', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;
@@ -92,7 +92,10 @@ test('Cut the Line takes a cut in tenths of a percent on a phone and reveals its
     const difference = Math.abs(cut - 240);
     const percent = (tenths: number) => (tenths / 10).toLocaleString('en', { maximumFractionDigits: 1 });
     await phone.getByRole('button', { name: 'Lock in cut' }).tap();
-    await expect(phone.getByText(new RegExp(` · ${percent(cut).replace('.', '\\.')}%$`))).toBeVisible();
+    // Locked in: the phone shows the target and its own cut; how far off waits for the reveal.
+    await expect(phone.locator('.cut-result dd')).toHaveText(['24%', `${percent(cut)}%`]);
+    await expect(phone.getByText('Done! Waiting for the others…')).toBeVisible();
+    await expect(phone.getByText(/percentage points? off/)).toHaveCount(0);
     await expect(host.locator('.cut-result')).toHaveCount(0);
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();

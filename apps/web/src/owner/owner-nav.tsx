@@ -5,21 +5,24 @@ import { FaIcon, type IconName } from '../presentation/icons.js';
 import { useTexts, type Translate } from '../i18n/texts.js';
 import { LanguagePicker } from '../i18n/language-picker.js';
 import type { HostRole } from './use-host-access.js';
+import { lastEditedGame } from './last-game.js';
 import { OWNER_TEXTS } from './owner.text.js';
 import './owner-nav.css';
 
 export type OwnerSection = 'play' | 'host' | 'editor' | 'admin' | 'people' | 'packs' | 'look' | 'logs' | 'rooms' | 'storage' | 'actions' | 'health' | 'roles';
 type Text = Parameters<Translate<keyof typeof OWNER_TEXTS.en>>[0];
 type Link = { key: OwnerSection; label: Text; href: string; icon: IconName };
-// The main places, for everyone allowed (editors: Play and Editor). The editor opens per game, so "Editor" leads
-// to the list of games on the host menu.
-const MAIN: (Link & { editor: boolean })[] = [
-  { key: 'play', label: 'play', href: '/', icon: 'play', editor: true },
-  { key: 'host', label: 'host', href: '/?host=1', icon: 'tv', editor: false },
-  { key: 'editor', label: 'editor', href: '/?host=1#my-games', icon: 'diamond', editor: true },
-];
-const mainLinks = (role: HostRole | null, permissions: readonly string[] = []) => MAIN.filter(link =>
-  link.key === 'play' || role === 'owner' || (role === 'editor' && (link.editor || (link.key === 'host' && permissions.includes('rooms.host')))));
+// The main places: Play; Host (the games and rooms; "Games" for someone who may not host real rooms); and Editor,
+// which goes straight back to the last game edited in this browser (gray, not a link, until there is one).
+type MainLink = Link & { disabled?: boolean };
+const mainLinks = (role: HostRole | null, permissions: readonly string[] = []): MainLink[] => {
+  const last = lastEditedGame(); const hosts = role === 'owner' || permissions.includes('rooms.host');
+  return [
+    { key: 'play', label: 'play', href: '/', icon: 'play' },
+    ...(role ? [{ key: 'host' as const, label: hosts ? 'host' as const : 'games' as const, href: '/?host=1', icon: 'tv' as const },
+      { key: 'editor' as const, label: 'editor' as const, href: last ? `/?edit=${last}` : '', icon: 'diamond' as const, disabled: !last }] : []),
+  ];
+};
 // The owner's own pages, in the menu on the right.
 const OWNER: Link[] = [
   { key: 'admin', label: 'feedbackReports', href: '/?admin', icon: 'flag' },
@@ -64,7 +67,8 @@ export function OwnerNav({ current, role, permissions, mainAction }: { current: 
   return <header className="app-header">
     <a className="app-brand" href="/" aria-label={t('brand')}>party<span>.</span></a>
     <nav className="app-main" aria-label={t('main')}><ul>{mainLinks(role, permissions).map(link =>
-      <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{t(link.label)}</a></li>)}
+      <li key={link.key}>{link.disabled ? <span className="app-link-disabled" aria-disabled="true" title={t('editorNone')}>{t(link.label)}</span>
+        : <a href={link.href} aria-current={link.key === current ? 'page' : undefined}>{t(link.label)}</a>}</li>)}
       {mainAction && <li>{mainAction}</li>}</ul></nav>
     <div className="app-end">
       <LanguagePicker label={t('language')} />
@@ -81,10 +85,11 @@ export function OwnerNav({ current, role, permissions, mainAction }: { current: 
 /** In the editor's own header: its "p." logo opens the same places (and, for the owner, the owner's pages). */
 export function AppMenu({ role, permissions, current = 'editor' }: { role: HostRole | null; permissions?: readonly string[] | undefined; current?: OwnerSection }) {
   const menu = useMenu(); const t = useTexts(OWNER_TEXTS); const id = useId();
-  const links = (items: Link[]) => <ul className="app-navigation-links">{items.map(link =>
-    <li key={link.key}><a href={link.href} aria-current={link.key === current ? 'page' : undefined} onClick={() => menu.setOpen(false)}>
+  const links = (items: MainLink[]) => <ul className="app-navigation-links">{items.map(link =>
+    <li key={link.key}>{link.disabled ? <span className="app-link-disabled" aria-disabled="true" title={t('editorNone')}><FaIcon name={link.icon} /><span>{t(link.label)}</span></span>
+      : <a href={link.href} aria-current={link.key === current ? 'page' : undefined} onClick={() => menu.setOpen(false)}>
       <FaIcon name={link.icon} /><span>{t(link.label)}</span>{link.key === current && <FaIcon className="app-current-mark" name="check" />}
-    </a></li>)}</ul>;
+    </a>}</li>)}</ul>;
   return <div className="app-logo-menu" ref={menu.box}>
     <button type="button" className="editor-logo app-logo-button" aria-label={`p. ${t('logoMenu')}`} aria-expanded={menu.open} aria-controls={menu.open ? id : undefined}
       onClick={() => menu.setOpen(!menu.open)}>

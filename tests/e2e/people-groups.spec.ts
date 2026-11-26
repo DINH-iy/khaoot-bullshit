@@ -8,7 +8,7 @@ if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicate
 test('the owner groups people in admin and adds a whole group to a room at once', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Admin and hosting are checked on the desktop.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const tag = randomUUID().slice(0, 4);
   const [ann, bo, cy] = ['Ann', 'Bo', 'Cy'].map(name => `${name} ${tag}`);
   for (const name of [ann, bo, cy]) expect((await page.request.post(`${baseURL}/api/host/people`, { headers: { 'x-party-request': '1', origin: baseURL! }, data: { name } })).ok()).toBe(true);
@@ -33,8 +33,7 @@ test('the owner groups people in admin and adds a whole group to a room at once'
 
   // In a room: Add people, tick the group, and both are on the list (Cy is not).
   await page.goto(`${baseURL}/?host=1`);
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await page.getByRole('button', { name: 'Open room for Timed quiz' }).click();
   await expect(page.getByRole('button', { name: 'Start the game' })).toBeVisible();
   await page.getByRole('button', { name: 'Add people', exact: true }).click();
   // The room's list is the server's: the tick shows once the room has saved it.

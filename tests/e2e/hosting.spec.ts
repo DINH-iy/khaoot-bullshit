@@ -20,9 +20,9 @@ test('the start page signs in the local owner on both loopback addresses', async
     await page.getByRole('button', { name: 'Sign in as owner' }).click();
     expect((await claiming).ok()).toBe(true);
     await expect(page).toHaveURL(new URL('/?host=1', local).href);
-    await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: /Timed quiz/ })).toBeVisible();
-    expect((await (await page.request.get(new URL('/api/host/access', local).href, { headers })).json()).data).toEqual({ role: 'owner', localSignIn: false });
+    await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open room for Timed quiz' })).toBeVisible();
+    expect((await (await page.request.get(new URL('/api/host/access', local).href, { headers })).json()).data).toMatchObject({ role: 'owner', localSignIn: false });
     const cookie = (await page.context().cookies(`${local.origin}/api/host`)).find(item => item.name === 'party_owner');
     expect(cookie?.httpOnly).toBe(true);
     expect(cookie?.value).not.toBe(ownerToken);
@@ -36,8 +36,7 @@ test('the test bench caps at four phones in two columns and keeps reactions insi
   test.skip(test.info().project.name === 'android-chrome', 'The four-phone bench is exercised on the desktop.');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await page.getByRole('button', { name: 'Open room for Timed quiz' }).click();
   await openHostFold(page, 'Shared screen & invite');
   const url = await page.getByRole('link', { name: 'Open test bench ↗' }).getAttribute('href');
   await page.evaluate(() => localStorage.setItem('party_bench_phones', '8'));
@@ -87,8 +86,7 @@ test('an assigned host phone still answers and can close a round with immediate 
   const host = await hostContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Timed quiz' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
     await page.goto(`/?code=${roomCode}`);
@@ -117,7 +115,7 @@ test('an assigned host phone still answers and can close a round with immediate 
 
 test('ranked ballots preserve the saved choices and advance result cards on the timer', async ({ browser, page: host, baseURL }) => {
   await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const gameId = randomUUID();
   const title = 'Ranked answers';
@@ -183,17 +181,16 @@ test('owner opens a room from the host menu and stays in control of a timed stag
   await page.goto('/?host=1');
   await expect(page).toHaveURL('/');
   await expect(page.getByRole('button', { name: 'Sign in as owner' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open room', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open room for Timed quiz' })).toHaveCount(0);
 
   const hostContext = await browser.newContext(); const host = await hostContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+    await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
     await expect(host).not.toHaveURL(/owner=/);
     expect(await host.evaluate(() => document.cookie)).not.toContain('party_');
     expect((await new AxeBuilder({ page: host }).analyze()).violations).toEqual([]);
-    await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Timed quiz' }).click();
     await expect(host.getByRole('button', { name: 'Start the game' })).toBeVisible();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
@@ -330,8 +327,7 @@ test('the host goes back to the lobby: a fresh room with a new code, and the pho
   const hostContext = await browser.newContext(); const host = await hostContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Timed quiz' }).click();
     const firstCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await page.goto(`/?code=${firstCode}`);
     await page.getByLabel('Your name').fill('Stays along');
@@ -355,8 +351,7 @@ test('players can save the active look, leave the room, and see host moderation 
   const host = await hostContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /Timed quiz/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Timed quiz' }).click();
     const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await openHostFold(host, 'Room settings');
     await host.getByRole('switch', { name: /Players confirm their look/ }).check();

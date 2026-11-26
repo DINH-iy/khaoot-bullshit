@@ -11,8 +11,7 @@ test('a player builds their own look and plays minigames on the phone; the scree
   const earlyContext = await browser.newContext({ viewport: { width: 375, height: 667 } }); const early = await earlyContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /Minigame madness/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Minigame madness' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
 

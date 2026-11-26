@@ -12,8 +12,7 @@ test('a player answers with a picture, the room votes on it without names, then 
   const otherContext = await browser.newContext(); const other = await otherContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /Picture party/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Picture party' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
     for (const [device, name] of [[page, 'Uploader'], [other, 'Watcher']] as const) {

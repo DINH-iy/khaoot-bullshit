@@ -8,8 +8,7 @@ test('the owner sees open rooms and closes one, checks storage, and finds it in 
   test.skip(test.info().project.name === 'android-chrome', 'Admin is checked on the desktop.');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await page.getByRole('button', { name: 'Open room for Timed quiz' }).click();
   const code = (await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
 
   await page.goto(`${baseURL}/?admin=rooms`);

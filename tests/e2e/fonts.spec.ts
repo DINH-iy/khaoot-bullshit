@@ -11,7 +11,7 @@ test.use({ actionTimeout: 10000 });
 test('an uploaded font reaches every room screen and a scene can override the game font', async ({ page: host, browser, baseURL }, info) => {
   test.skip(info.project.name !== 'desktop-chrome', 'The editor and three room views are exercised together.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;
@@ -88,7 +88,7 @@ test('an uploaded font reaches every room screen and a scene can override the ga
 test('a shared font can be removed once no look uses it', async ({ page: host, baseURL }, info) => {
   test.skip(info.project.name !== 'desktop-chrome', 'Library management is an editor task.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   // A minimal TrueType header of its own, so the font is not shared with the other font test.
   const bytes = Buffer.alloc(60); bytes.writeUInt32BE(0x00010000, 0); bytes.writeUInt16BE(2, 4); Buffer.from(randomUUID()).copy(bytes, 44, 0, 15);

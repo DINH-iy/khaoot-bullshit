@@ -21,7 +21,7 @@ test('scene translations, background motion and a YouTube clip work from editor 
     });
   </script></html>`, contentType: 'text/html' }));
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   expect((await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: 'Translated clip', startFrom: 'timed-quiz' } })).ok()).toBe(true);
@@ -246,7 +246,7 @@ test('the Game menu opens the shared media library from the Flow editor', async 
   test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const gameId = randomUUID();
   const games = `${baseURL}/api/host/games`;
@@ -298,7 +298,7 @@ test('the Game menu opens the shared media library from the Flow editor', async 
 test('a song plays in one place only: the host screen when no shared screen is connected, and the phones are told to listen', async ({ browser, page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Set up from the desktop; the phone view is checked below.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const samples = silentWav(15);
   for (let offset = 44; offset < samples.length; offset += 2) {
@@ -385,7 +385,7 @@ test('a song plays in one place only: the host screen when no shared screen is c
 test('authors can import audio, trim it, and add the clip to the playlist from the editor', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const gameId = randomUUID();
   const creation = await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId, title: `Audio clip ${gameId.slice(0, 4)}`, startFrom: 'timed-quiz' } });
@@ -444,7 +444,7 @@ test('authors can import audio, trim it, and add the clip to the playlist from t
 test('background playlist advances in order, repeats, and follows the scene and host volume', async ({ page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Set up from the desktop.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const upload = async (name: string, duration: number) => (await (await page.request.post(`${baseURL}/api/host/media?name=${encodeURIComponent(name)}`,
     { headers: { ...headers, 'content-type': 'application/octet-stream' }, data: silentWav(duration) })).json()).data;

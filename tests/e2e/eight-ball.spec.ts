@@ -16,7 +16,7 @@ test('8-ball plays as a phone challenge and a hosted round with a live TV table'
   test.skip(test.info().project.name !== 'desktop-chrome', 'Uses CDP for the cue gesture.');
   test.setTimeout(70_000);
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const url = `${baseURL}/api/host/games`;

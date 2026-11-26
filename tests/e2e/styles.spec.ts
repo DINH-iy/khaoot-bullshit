@@ -8,7 +8,7 @@ const headers = (baseURL: string) => ({ 'x-party-request': '1', origin: baseURL 
 
 async function openLook(page: Page, baseURL: string) {
   await page.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   expect((await page.request.post(`${baseURL}/api/host/games`, { headers: headers(baseURL), data: { gameId, title: 'Styled', startFrom: null } })).ok()).toBe(true);
   await page.goto(`${baseURL}/?edit=${gameId}&view=look`);

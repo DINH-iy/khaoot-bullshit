@@ -13,7 +13,7 @@ test('teams made again start with the points the host types, and the end show cr
   const [host, ada, ben] = await Promise.all(contexts.map(context => context.newPage())) as [Page, Page, Page];
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+    await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
     const gameId = randomUUID(); const roomId = randomUUID(); const games = `${baseURL}/api/host/games`;
     const text = JSON.stringify({ title: `Carry ${gameId.slice(0, 6)}`, awards: ['teamWinner', 'winner'], scenes: [
       { id: 't1', type: 'pick-teams', teams: 2, how: 'host', next: 'q1' },

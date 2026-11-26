@@ -11,12 +11,11 @@ test('a player whose phone dies continues on a new phone, after the host approve
   const newContext = await browser.newContext({ viewport: { width: 390, height: 844 } }); const newPhone = await newContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /First reliable game/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for First reliable game' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
     await openHostFold(host, 'Room settings');
-    const ask = host.getByRole('checkbox', { name: 'Ask me before a new phone takes over a seat' });
+    const ask = host.getByRole('switch', { name: 'Ask me before a new phone takes over a seat' });
     await expect(ask).not.toBeChecked();
     // The box reflects the saved room setting, so it ticks once the server has stored it.
     await ask.click();
@@ -33,8 +32,8 @@ test('a player whose phone dies continues on a new phone, after the host approve
 
     // While the old phone is connected, its seat is not offered.
     await newPhone.goto(`${baseURL}/?code=${roomCode}`);
-    await newPhone.getByText('More options').click();
-    const signIn = newPhone.getByRole('button', { name: /^Sign in/ });
+    await newPhone.getByText('More options', { exact: true }).click();
+    const signIn = newPhone.getByRole('button', { name: /^Sign in(?! as owner)/ });
     await signIn.click();
     await expect(newPhone.getByLabel('Your personal key')).toBeFocused();
     expect(await newPhone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

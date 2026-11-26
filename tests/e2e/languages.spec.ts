@@ -30,15 +30,14 @@ test('the host chooses Dutch: the host menu and the host’s room controls switc
   await expect(page.getByRole('heading', { name: 'Host a game' })).toBeVisible();
   await chooseOption(page.getByRole('combobox', { name: 'Language' }), 'nl');
   await expect(page.getByRole('heading', { name: 'Een spel hosten' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Kies een spel' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ingebouwde spellen' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.lang)).toBe('nl');
   // Remembered in this browser.
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Een spel hosten' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Hoofdmenu' }).getByRole('link', { name: 'Spelen' })).toBeVisible();
 
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Kamer openen', exact: true }).click();
+  await page.getByRole('button', { name: 'Kamer openen voor Timed quiz' }).click();
   await expect(page.getByRole('complementary', { name: 'Hostbediening' })).toBeVisible();
   await page.getByRole('group', { name: 'Meer' }).getByRole('button', { name: 'Kamerinstellingen' }).click();
   await expect(page.getByRole('dialog', { name: 'Kamerinstellingen' })).toContainText('Tijdens het spel');
@@ -87,8 +86,7 @@ test('the editor’s frame in Dutch: tabs, menus, help and game settings', async
 test('a phone chooses its own language: the game’s standard texts follow it, the host keeps English', async ({ browser, page, baseURL }) => {
   test.skip(test.info().project.name === 'android-chrome', 'Set up from the desktop; the phone is its own context below.');
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await page.getByRole('radio', { name: /Timed quiz/ }).check();
-  await page.getByRole('button', { name: 'Open room', exact: true }).click();
+  await page.getByRole('button', { name: 'Open room for Timed quiz' }).click();
   const roomCode = (await page.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
   const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } }); const phone = await phoneContext.newPage();
   try {

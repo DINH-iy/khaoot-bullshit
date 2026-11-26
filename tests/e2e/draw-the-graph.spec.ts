@@ -9,7 +9,7 @@ if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicate
 test('players finish the same graph in their own colors and the host reveals all guesses together', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'One player uses a separate touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;

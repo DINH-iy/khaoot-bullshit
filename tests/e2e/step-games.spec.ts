@@ -11,8 +11,7 @@ test('Bar games: teams drive the bus by voting on each guess, then everyone pick
   const open = async (size: { width: number; height: number }) => (await browser.newContext({ viewport: size, reducedMotion: 'reduce' })).newPage();
   const host = await open({ width: 1280, height: 900 });
   await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await host.getByRole('radio', { name: /Bar games/ }).check();
-  await host.getByRole('button', { name: 'Open room', exact: true }).click();
+  await host.getByRole('button', { name: 'Open room for Bar games' }).click();
   const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
   await closeRoundsByHand(host);
   const phones: Page[] = [];

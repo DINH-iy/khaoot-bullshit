@@ -8,7 +8,7 @@ if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E
 test('Count the Dots shows one pattern on both displays and accepts a guess while the dots are visible', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;

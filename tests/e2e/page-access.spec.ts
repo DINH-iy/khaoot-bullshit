@@ -148,5 +148,5 @@ test('the local owner action waits for sign-in before opening the host menu', as
   canClaim = true;
   await signIn.click();
   await expect(page).toHaveURL('/?host=1');
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
 });

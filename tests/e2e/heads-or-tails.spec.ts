@@ -8,7 +8,7 @@ if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E
 test('Heads or Tails settles a solo stake and reveals one shared coin after private guesses', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The playing phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;
@@ -89,7 +89,7 @@ test('Heads or Tails settles a solo stake and reveals one shared coin after priv
 test('Heads or Tails can wait for the host to flip the coin after the guesses close', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The playing phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID(); const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
   const draft = (await (await host.request.post(games, { headers, data: { gameId, title: 'Host flips', startFrom: 'timed-quiz' } })).json()).data;

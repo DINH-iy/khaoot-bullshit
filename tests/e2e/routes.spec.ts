@@ -10,8 +10,7 @@ test('the party votes on a route, the host announces it, and both routes rejoin 
   const [host, ada, ben, cleo, late] = await Promise.all(contexts.map(context => context.newPage())) as [Page, Page, Page, Page, Page];
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('radio', { name: /Friday Night Chaos/ }).check();
-    await host.getByRole('button', { name: 'Open room', exact: true }).click();
+    await host.getByRole('button', { name: 'Open room for Friday Night Chaos' }).click();
     const roomCode = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
     await closeRoundsByHand(host);
     for (const [phone, name] of [[ada, 'Ada'], [ben, 'Ben'], [cleo, 'Cleo']] as const) {

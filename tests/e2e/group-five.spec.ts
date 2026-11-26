@@ -9,7 +9,7 @@ test('Speed run can be played on a phone with a lobby-selected score effect and 
   test.skip(test.info().project.name !== 'desktop-chrome', 'The playing phone uses a separate narrow touch context.');
   test.setTimeout(70_000);
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const roomId = randomUUID();
@@ -79,7 +79,7 @@ test('Speed run can be played on a phone with a lobby-selected score effect and 
 test('Dutch editor diagnostics explain an unconnected scene', async ({ page, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The localized problem drawer is inspected on desktop.');
   await page.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const headers = { 'x-party-request': '1', origin: baseURL! };
   const url = `${baseURL}/api/host/games`;

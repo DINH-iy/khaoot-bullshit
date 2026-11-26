@@ -8,7 +8,7 @@ if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E
 test('Match the Angle works in editor practice and in a live room with a touch controller', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The playing phone uses a separate narrow touch context.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;
@@ -68,7 +68,9 @@ test('Match the Angle works in editor practice and in a live room with a touch c
     const difference = Math.abs(target - 91);
     const result = `91° · ${Math.min(difference, 360 - difference)}° off`;
     await phone.getByRole('button', { name: 'Lock in angle' }).tap();
-    await expect(phone.getByText(result, { exact: true })).toBeVisible();
+    // Locked in: the phone shows its own angle; how far off waits for the reveal.
+    await expect(phone.getByRole('region', { name: 'Aim your ray' }).getByText('91°', { exact: true })).toBeVisible();
+    await expect(phone.getByText(/° off/)).toHaveCount(0);
     await expect(host.getByText(result, { exact: true })).toHaveCount(0);
     await host.getByRole('button', { name: 'Close answers' }).click();
     await host.getByRole('button', { name: 'Reveal results' }).click();

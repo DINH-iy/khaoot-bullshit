@@ -31,43 +31,24 @@ export function GameCover({ game, size }: { game: Game; size: 'small' | 'large' 
 }
 
 /**
- * Built-in games: a list of cards on the left, the chosen game in detail on
- * the right (stacked on a phone). The list is a group of radio buttons, so it
- * works with the keyboard and screen readers like any choice.
+ * The built-in games, as compact rows under the host's own games: a small cover, the name and length, and
+ * Open room. The owner may also change one (their own version, edited and published like any game) or go back
+ * to the original. `onOpen` is null when this person may not host real rooms.
  */
-export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRestore }: { games: Game[]; chosen: string; onChoose: (key: string) => void; busy: boolean; onOpen: () => void; onEdit?: ((key: string) => void) | undefined; onRestore?: ((key: string) => void) | undefined }) {
-  const game = games.find(entry => entry.key === chosen) ?? games[0];
+export function BuiltInGames({ games, busy, onOpen, onEdit, onRestore }: { games: Game[]; busy: boolean; onOpen: ((key: string) => void) | null; onEdit?: ((key: string) => void) | undefined; onRestore?: ((key: string) => void) | undefined }) {
   const [restoring, setRestoring] = useState<string | null>(null); const t = useTexts(HOSTING_TEXTS);
-  return <form className="game-picker" onSubmit={event => { event.preventDefault(); onOpen(); }}>
-    <fieldset className="game-list"><legend className="visually-hidden">{t('availableGames')}</legend>
-      {games.map(entry => <label key={entry.key} className={`game-card${entry.key === chosen ? ' chosen' : ''}`}>
-        <input type="radio" name="game" value={entry.key} checked={entry.key === chosen} onChange={() => onChoose(entry.key)} />
-        <GameCover game={entry} size="small" />
-        <span className="game-card-text"><strong>{entry.title}</strong><small>{t(entry.branches ? 'cardRoundsUpTo' : 'cardRounds', { count: entry.stageCount, minutes: entry.minutes })}</small>
-          {entry.custom && <small className="custom-badge">{customLabel(entry.custom, t)}</small>}</span>
-      </label>)}
-    </fieldset>
-    {game && <article className="game-detail" aria-labelledby="game-detail-title">
-      <GameCover game={game} size="large" />
-      <div className="game-detail-body">
-        <h3 id="game-detail-title">{game.title}</h3>
-        <p className="game-detail-text">{game.description}</p>
-        <ul className="game-facts">
-          <li><strong>{game.branches ? t('upTo', { count: game.stageCount }) : game.stageCount}</strong> {t('rounds')}</li>
-          <li>{t('aboutMinutes', { minutes: game.minutes })}</li>
-          <li>{t(game.timed ? 'timedRounds' : 'noLimits')}</li>
-        </ul>
-        <ul className="feature-chips" aria-label={t('inThisGame')}>{game.features.map(feature => <li key={feature}><Icon name={FEATURES[feature].icon} size={16} />{t(FEATURES[feature].label)}</li>)}</ul>
-        {game.custom && <p className="custom-note"><Icon name="edit" size={16} /> {t(game.custom.inUse ? (game.custom.unpublished ? 'ownInUseChanged' : 'ownInUse') : 'ownNotPublished')}</p>}
-        <button type="submit" className="primary big" disabled={busy}>{t(busy ? 'opening' : 'openRoom')}</button>
-        {/* The owner may change a built-in game: their own version, edited and published like any game. */}
-        {onEdit && <div className="game-detail-actions">
-          <button type="button" className="ghost" disabled={busy} onClick={() => onEdit(game.key)}><Icon name="edit" size={18} /> {t(game.custom ? 'editYourVersion' : 'editThisGame')}</button>
-          {game.custom && onRestore && (restoring === game.key
-            ? <span className="restore-confirm">{t('restoreAsk')}<button type="button" className="danger" onClick={() => { setRestoring(null); onRestore(game.key); }}>{t('yesRestore')}</button><button type="button" className="ghost" onClick={() => setRestoring(null)}>{t('keepMine')}</button></span>
-            : <button type="button" className="ghost" disabled={busy} onClick={() => setRestoring(game.key)}>{t('restoreOriginal')}</button>)}
-        </div>}
-      </div>
-    </article>}
-  </form>;
+  return <ul className="plain-list builtin-games">{games.map(game => <li key={game.key} className="builtin-game" title={game.description}>
+    <GameCover game={game} size="small" />
+    <span className="builtin-game-text"><strong>{game.title}</strong><small>{t(game.branches ? 'cardRoundsUpTo' : 'cardRounds', { count: game.stageCount, minutes: game.minutes })}</small>
+      {game.custom && <small className="custom-badge">{customLabel(game.custom, t)}</small>}</span>
+    <span className="builtin-game-actions">
+      {restoring === game.key && onRestore
+        ? <span className="restore-confirm">{t('restoreAsk')}<button type="button" className="danger" onClick={() => { setRestoring(null); onRestore(game.key); }}>{t('yesRestore')}</button><button type="button" onClick={() => setRestoring(null)}>{t('keepMine')}</button></span>
+        : <>
+          {onEdit && <button type="button" disabled={busy} aria-label={t('editLabel', { title: game.title })} onClick={() => onEdit(game.key)}><Icon name="edit" size={16} /><span className="builtin-edit-label">{t('edit')}</span></button>}
+          {game.custom && onRestore && <button type="button" disabled={busy} onClick={() => setRestoring(game.key)}>{t('restoreOriginal')}</button>}
+          {onOpen && <button type="button" className="primary" disabled={busy} aria-label={t('openRoomLabel', { title: game.title })} onClick={() => onOpen(game.key)}><span className="open-long">{t('openRoom')}</span><span className="open-short">{t('openShort')}</span></button>}
+        </>}
+    </span>
+  </li>)}</ul>;
 }

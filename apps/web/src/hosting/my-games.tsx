@@ -1,12 +1,13 @@
 import { SHARE_TEXTS } from '../editor/shell/share.text.js';
 import { Dropdown } from '../ui/dropdown.js';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { DraftSchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { HOSTING_TEXTS } from './hosting.text.js';
 import { HostDialog } from './host-dialog.js';
-import { ImportGame } from './import-game.js';
+import { aiInstructions, ImportGame } from './import-game.js';
+import { forgetEditedGame } from '../owner/last-game.js';
 import { Icon } from '../editor/controls/icons.js';
 
 const failures = { REVISION_CONFLICT: 'changedElsewhere', INVALID_DEFINITION: 'stillProblems', NOT_FOUND: 'publishFirst' } as const;
@@ -25,12 +26,15 @@ function Badges({ game }: { game: Game }) {
 
 /** The owner's own games: create, see problems per scene, publish, and open a room for the published version. */
 /** openRoom is null for editors: they publish and rehearse, but only the owner opens real rooms. */
-export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: () => void; openRoom: ((gameId: string) => void) | null }) {
+export function MyGames({ menu, reload, openRoom, builtIn = null }: { menu: HostMenu; reload: () => void; openRoom: ((gameId: string) => void) | null; builtIn?: ReactNode }) {
   const [title, setTitle] = useState(''); const [startFrom, setStartFrom] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS); const s = useTexts(SHARE_TEXTS);
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
   // Making a game and importing one open in a dialog, so the list stays the page.
   const [dialog, setDialog] = useState<'new' | 'import' | null>(null);
+  // The instructions an AI needs to write a game, one tap away (the Import dialog explains the whole route).
+  const [copied, setCopied] = useState(false);
+  const copyAi = () => { void navigator.clipboard.writeText(aiInstructions).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }, () => setError(t('copyBlocked'))); };
   // What each person may do follows their role (and the game's role for them); the server checks it again.
   const make = menu.role === 'owner' || Boolean(menu.permissions?.includes('games.make'));
   const run = (work: Promise<unknown>) => { setBusy(true); setError(''); void work.then(reload).catch(cause => { setError(explain(cause)); reload(); }).finally(() => setBusy(false)); };
@@ -40,7 +44,8 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
     <div className="my-games-head"><h2 id="my-games-heading">{t('yourGames')}</h2>{menu.myGames.length > 0 && <span className="my-games-count">{menu.myGames.length}</span>}
       {make && <span className="my-games-tools">
         <button type="button" className="primary" onClick={() => setDialog('new')}><Icon name="plus" size={18} /> {t('newGame')}</button>
-        <button type="button" onClick={() => setDialog('import')}><Icon name="paste" size={18} /> {t('importOpen')}</button></span>}</div>
+        <button type="button" onClick={() => setDialog('import')}><Icon name="paste" size={18} /> {t('importOpen')}</button>
+        <button type="button" onClick={copyAi}><Icon name={copied ? 'check' : 'copy'} size={18} /> {t(copied ? 'instructionsCopied' : 'copyAi')}</button></span>}</div>
     {error && <p role="alert" className="error">{error}</p>}
     {menu.myGames.length === 0 ? <p className="my-games-empty">{t('noGamesYet')}</p> : <ul className="plain-list my-games">{menu.myGames.map(game => <li key={game.gameId} className="my-game">
       <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} />
@@ -57,12 +62,14 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
         {game.published && openRoom && <button type="button" disabled={busy} onClick={() => openRoom(game.gameId)} aria-label={t('openRoomLabel', { title: game.title })}>{t('openRoom')}</button>}
         {/* Its maker or the owner removes a game; someone it was shared with only when their role for it may. */}
         {!(game.can ?? []).includes('game.remove') ? null : removing === game.gameId
-          ? <span className="my-game-confirm"><button type="button" className="danger" disabled={busy} onClick={() => { setRemoving(null); run(roomApi(`/api/host/games/${game.gameId}/archive`, {})); }} aria-label={t('yesRemoveLabel', { title: game.title })}>{t('yesRemove')}</button><button type="button" onClick={() => setRemoving(null)}>{t('keepIt')}</button></span>
+          ? <span className="my-game-confirm"><button type="button" className="danger" disabled={busy} onClick={() => { setRemoving(null); forgetEditedGame(game.gameId); run(roomApi(`/api/host/games/${game.gameId}/archive`, {})); }} aria-label={t('yesRemoveLabel', { title: game.title })}>{t('yesRemove')}</button><button type="button" onClick={() => setRemoving(null)}>{t('keepIt')}</button></span>
           : <button type="button" className="quiet-danger" onClick={() => setRemoving(game.gameId)} aria-label={t('removeLabel', { title: game.title })}>{t('remove')}</button>}
       </div>
       {removing === game.gameId && <p className="my-game-note">{t('removeNote')}</p>}
       {problems[game.gameId] && <ul className="my-game-problems" aria-label={t('problemsIn', { title: game.title })}>{problems[game.gameId]!.map((issue, index) => <li key={index}>{issue.nodeKey ? (issue.stageIndex !== null ? t('scenePartProblem', { scene: issue.nodeKey, part: issue.stageIndex + 1 }) : t('sceneProblem', { scene: issue.nodeKey })) : ''}{issue.message}</li>)}</ul>}
     </li>)}</ul>}
+    {/* The built-in games, under the host's own: open a room for one, or (the owner) change it. */}
+    {builtIn && <div className="builtin-section"><h3>{t('builtInGames')}</h3>{builtIn}</div>}
     {dialog === 'import' && <HostDialog id="import-heading" title={t('importHeading')} wide onClose={() => setDialog(null)}><ImportGame /></HostDialog>}
     {dialog === 'new' && <HostDialog id="new-game-heading" title={t('newGame')} onClose={() => setDialog(null)}><form className="new-game" onSubmit={event => { event.preventDefault(); const own = startFrom.startsWith('own:') ? startFrom.slice(4) : null;
       run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: own || !startFrom ? null : startFrom, copyOf: own }).then(() => { setTitle(''); setDialog(null); })); }}>

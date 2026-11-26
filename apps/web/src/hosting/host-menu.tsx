@@ -3,7 +3,7 @@ import { Loader } from '../ui/loader.js';
 import { formatRoomCode, HostMenuSchema, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { MyGames } from './my-games.js';
-import { GamePicker } from './game-picker.js';
+import { BuiltInGames } from './game-picker.js';
 import { OwnerNav } from '../owner/owner-nav.js';
 import { PatchNotesButton } from '../patch-notes/patch-notes.js';
 import { Icon } from '../editor/controls/icons.js';
@@ -37,7 +37,7 @@ function CopyCode({ code }: { code: string }) {
 
 export function HostMenu() {
   const [menu, setMenu] = useState<HostMenu>(); const [error, setError] = useState(''); const [busy, setBusy] = useState(true);
-  const [gameKey, setGameKey] = useState(''); const t = useTexts(HOSTING_TEXTS);
+  const t = useTexts(HOSTING_TEXTS);
   // One request identity per page load: a repeated click or retry returns the same room.
   const [request] = useState(() => ({ sessionId: newId(), commandId: newId() }));
   const [tryoutRequest] = useState(() => ({ sessionId: newId(), commandId: newId() }));
@@ -53,7 +53,7 @@ export function HostMenu() {
       } else await pendingClaim();
       if (!mounted) return;
       const loaded = HostMenuSchema.parse(await roomApi('/api/host'));
-      if (mounted) { setMenu(loaded); setGameKey(loaded.games[0]?.key ?? ''); }
+      if (mounted) setMenu(loaded);
     })().catch(cause => {
       if (!mounted) return;
       if (isUnavailablePageError(cause)) {
@@ -94,7 +94,7 @@ export function HostMenu() {
   const owner = menu.role === 'owner';
   // What a role allows (the server checks it again): hosting real rooms, and the minigame tryout.
   const may = (permission: string) => owner || Boolean(menu.permissions?.includes(permission)); const host = may('rooms.host');
-  return <><OwnerNav current={hash === '#my-games' || !host ? 'editor' : 'host'} role={menu.role} permissions={menu.permissions}
+  return <><OwnerNav current="host" role={menu.role} permissions={menu.permissions}
     mainAction={may('rooms.rehearse') ? <button type="button" disabled={busy}
       onClick={() => open(roomApi('/api/host/minigame-tryout', tryoutRequest), 'bench')}>{t('minigameTryout')}</button> : undefined} /><main className="host-page">
     {/* One short title row: what this page is for, and what is new. */}
@@ -112,11 +112,9 @@ export function HostMenu() {
             : <span className="open-room-actions"><button className="primary" disabled={busy} aria-label={t('returnLabel', { code: room.roomCode })} onClick={() => open(roomApi(`/api/host/rooms/${room.sessionId}/enter`, {}))}>{t('returnToRoom')}</button>
               <button type="button" className="danger icon-only" disabled={busy} aria-label={t('closeLabel', { code: room.roomCode })} title={t('closeTitle')} onClick={() => setClosing(room.sessionId)}><Icon name="trash" size={20} /></button></span>}</li>)}</ul>
       </section>}
-      {host && <section className="host-games" aria-labelledby="games-heading"><h2 id="games-heading">{t('chooseGame')}</h2>
-        <GamePicker games={menu.games} chosen={gameKey} onChoose={setGameKey} busy={busy} onOpen={() => open(roomApi('/api/host/rooms', { gameKey, ...request }))}
+      <MyGames menu={menu} reload={reload} openRoom={host ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null}
+        builtIn={host || owner ? <BuiltInGames games={menu.games} busy={busy} onOpen={host ? key => open(roomApi('/api/host/rooms', { gameKey: key, ...request })) : null}
           onEdit={!owner ? undefined : key => { setBusy(true); void roomApi<{ gameId: string }>(`/api/host/builtins/${key}/edit`, {}).then(result => location.assign(`/?edit=${result.gameId}`)).catch(cause => { setError(explain(cause)); setBusy(false); }); }}
-          onRestore={!owner ? undefined : key => { void roomApi(`/api/host/builtins/${key}/restore`, {}).then(reload).catch(cause => setError(explain(cause))); }} />
-      </section>}
-      <MyGames menu={menu} reload={reload} openRoom={host ? gameId => open(roomApi('/api/host/rooms', { gameId, sessionId: newId(), commandId: newId() })) : null} />
+          onRestore={!owner ? undefined : key => { void roomApi(`/api/host/builtins/${key}/restore`, {}).then(reload).catch(cause => setError(explain(cause))); }} /> : null} />
   </main></>;
 }

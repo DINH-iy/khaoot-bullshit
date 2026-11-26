@@ -21,7 +21,7 @@ const definition = {
 test('teams pick their colour from a set, the host picks any colour, and a player’s page wears the team colour', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The phones use separate narrow contexts.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID(); const roomId = randomUUID();
   const api = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
   const draft = (await (await host.request.post(api, { headers, data: { gameId, title: 'Colour teams', startFrom: 'timed-quiz' } })).json()).data;
@@ -84,7 +84,7 @@ test('teams pick their colour from a set, the host picks any colour, and a playe
 test('the author renames teams in the editor; more teams get free standard names, and standard names are not stored', async ({ page, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The editor is desktop first.');
   await page.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(page.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID(); const api = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
   const draft = (await (await page.request.post(api, { headers, data: { gameId, title: 'Named teams', startFrom: 'timed-quiz' } })).json()).data;
   expect((await page.request.put(`${api}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).ok()).toBe(true);

@@ -38,7 +38,7 @@ async function fits(page: Page) {
 test('every drawing has the full toolbox with an eraser, and the host can give points for drawings', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The phones use separate narrow contexts.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID(); const roomId = randomUUID();
   const api = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
   const draft = (await (await host.request.post(api, { headers, data: { gameId, title: 'Art night', startFrom: 'timed-quiz' } })).json()).data;
@@ -118,8 +118,7 @@ test('the look sheet and its drawing tools fit a narrow phone', async ({ browser
   test.skip(test.info().project.name === 'android-chrome', 'The phone is emulated in its own context below.');
   const host = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await host.getByRole('radio', { name: /Draw party/ }).check();
-  await host.getByRole('button', { name: 'Open room', exact: true }).click();
+  await host.getByRole('button', { name: 'Open room for Draw party' }).click();
   const code = (await host.getByRole('heading', { name: /^Room [A-Z2-9]{6}$/ }).textContent())!.slice(5);
   for (const size of [{ width: 320, height: 640 }, { width: 360, height: 800 }]) {
     const phone = await (await browser.newContext({ viewport: size })).newPage();

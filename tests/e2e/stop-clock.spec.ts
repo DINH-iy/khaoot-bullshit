@@ -8,7 +8,7 @@ if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicate
 test('Stop the Clock has no time-left display once the game clock is hidden', async ({ page: host, browser, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'This flow opens the host, TV and phone together.');
   await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID();
   const roomId = randomUUID();
   const games = `${baseURL}/api/host/games`;

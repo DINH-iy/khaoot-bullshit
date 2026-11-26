@@ -7,7 +7,7 @@ if (!token || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E
 test('a minigame draw in one scene: the editor lists its games, the pencil sets each one, and the room plays the drawn game', async ({ page: host, baseURL }) => {
   test.skip(test.info().project.name !== 'desktop-chrome', 'The editor is desktop first.');
   await host.goto(`${baseURL}/?host=1#owner=${token}`);
-  await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+  await expect(host.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const gameId = randomUUID(); const games = `${baseURL}/api/host/games`; const headers = { 'x-party-request': '1', origin: baseURL! };
   const draft = (await (await host.request.post(games, { headers, data: { gameId, title: 'Lucky draw', startFrom: 'timed-quiz' } })).json()).data;
   const definition = { formatVersion: 2, title: 'Lucky draw', startNodeKey: 'lucky', edges: [], nodes: [{ key: 'lucky', stages: [{ key: 'main', kind: 'minigame', prompt: 'Which minigame will it be?',
