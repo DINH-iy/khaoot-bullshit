@@ -11,7 +11,8 @@ test('a person’s phone joins as them, plays side games, and the game pauses th
   const ownerContext = await browser.newContext(); const host = await ownerContext.newPage();
   try {
     await host.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-    await host.getByRole('link', { name: 'Admin: people (accounts)' }).click();
+    await expect(host.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
+    await host.goto(`${baseURL}/?admin=people`);
     await host.getByLabel('Name', { exact: true }).fill(name);
     await host.getByRole('button', { name: 'Add person' }).click();
     await expect(host.getByRole('heading', { name: `Personal key for ${name}` })).toBeVisible();

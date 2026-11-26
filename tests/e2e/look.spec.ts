@@ -22,7 +22,8 @@ test('the owner styles a game, rewrites its texts and picks animations, and phon
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const name = `Styled quiz ${Date.now()}`;
-  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: 'Import from text' }).click();
+  const section = page.getByRole('dialog', { name: 'Import a game from text' });
   await section.getByLabel('Game text').fill(JSON.stringify({ title: name, scenes: [
     { id: 'q1', type: 'quiz', question: 'Capital of France?', answers: ['Paris', 'Lyon'], correct: 'Paris', seconds: 60 },
     { id: 'end', type: 'scoreboard', title: 'Final scores' },
@@ -125,6 +126,7 @@ test('a colour palette from Canva, Figma or Coolors is imported, and the colours
   await page.goto(`${baseURL}/?host=1#owner=${process.env['LOCAL_OWNER_TOKEN']}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Palette test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
@@ -164,6 +166,7 @@ test('answer marks can be numbers, square and after the answer, and answers neve
   await page.goto(`${baseURL}/?host=1#owner=${process.env['LOCAL_OWNER_TOKEN']}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Marks test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
@@ -201,7 +204,8 @@ test("the clock timer's example stays small, and its own colours reach the clock
   test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: 'Import from text' }).click();
+  const section = page.getByRole('dialog', { name: 'Import a game from text' });
   await section.getByLabel('Game text').fill(JSON.stringify({ title: `Clock colours ${Date.now()}`, scenes: [
     { id: 'q1', type: 'quiz', question: 'Capital of France?', answers: ['Paris', 'Lyon'], correct: 'Paris', seconds: 60 },
   ] }));
@@ -227,7 +231,8 @@ test('scenes with their own look are tagged, explained in the preview, and can f
   test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: 'Import from text' }).click();
+  const section = page.getByRole('dialog', { name: 'Import a game from text' });
   await section.getByLabel('Game text').fill(JSON.stringify({ title: `Own looks ${Date.now()}`, scenes: [
     { id: 'hello', type: 'cutscene', text: 'Welcome!', look: { theme: { font: 'serif' } } },
     { id: 'q1', type: 'quiz', question: 'Capital of France?', answers: ['Paris', 'Lyon'], correct: 'Paris', seconds: 60, look: { theme: { font: 'mono' } } },

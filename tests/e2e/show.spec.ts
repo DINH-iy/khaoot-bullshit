@@ -11,7 +11,8 @@ test('a wheel of fortune picks the challenge, players vote for a break, and the 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const name = `Wheel night ${Date.now()}`;
-  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: 'Import from text' }).click();
+  const section = page.getByRole('dialog', { name: 'Import a game from text' });
   await section.getByLabel('Game text').fill(JSON.stringify({ title: name, awards: ['winner', 'mostCorrect'],
     wheels: [{ title: 'Forfeits', entries: ['Sing a song', 'Tell a joke', 'Do a dance'], removePicked: true, spinSeconds: 2 }],
     scenes: [

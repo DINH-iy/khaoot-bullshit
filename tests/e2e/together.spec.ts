@@ -22,6 +22,7 @@ async function twoEditors(browser: Browser, baseURL: string, startFrom: string, 
   }
   const [ada, ben] = pages as [Page, Page];
   const mine = ada.getByRole('region', { name: 'Your games' }); const name = `Together ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: startFrom });
   await mine.getByRole('button', { name: 'Create game' }).click();

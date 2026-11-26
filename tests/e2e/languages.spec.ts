@@ -56,6 +56,7 @@ test('the editor’s frame in Dutch: tabs, menus, help and game settings', async
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(`Taaltest ${Date.now()}`);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await chooseOption(page.getByRole('combobox', { name: 'Language' }), 'nl');

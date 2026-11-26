@@ -125,6 +125,7 @@ test('an author puts a picture in a quiz question, and the room shows it with th
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Picture quiz ${randomUUID().slice(0, 4)}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Timed quiz' });
   await mine.getByRole('button', { name: 'Create game' }).click();
@@ -488,6 +489,7 @@ test('in the editor, a song goes on the game’s playlist and a scene chooses si
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Music editor ${randomUUID().slice(0, 4)}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Timed quiz' });
   await mine.getByRole('button', { name: 'Create game' }).click();

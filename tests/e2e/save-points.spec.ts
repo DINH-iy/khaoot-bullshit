@@ -10,6 +10,7 @@ test('a save point brings the game back after a change, keeps what it was, and c
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Save points ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();

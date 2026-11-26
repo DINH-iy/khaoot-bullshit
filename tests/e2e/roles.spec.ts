@@ -33,7 +33,7 @@ test('the owner makes a role, chooses what it may do, and a person with it gets 
     expect((await person.request.post(`${baseURL}/api/people/claim`, { headers, data: { token: key } })).ok()).toBe(true);
     await person.goto(`${baseURL}/?host=1`);
     await expect(person.getByRole('heading', { name: 'Choose a game' })).toBeVisible();
-    await expect(person.getByRole('heading', { name: 'New game' })).toHaveCount(0);
+    await expect(person.getByRole('button', { name: 'New game', exact: true })).toHaveCount(0);
     expect((await person.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId: randomUUID(), title: 'Not allowed', startFrom: null } })).status()).toBe(403);
     // The role cannot be removed while someone has it.
     await page.reload();

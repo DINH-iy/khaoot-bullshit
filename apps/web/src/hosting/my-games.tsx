@@ -5,6 +5,9 @@ import { DraftSchema, type DefinitionIssue, type HostMenu } from '@party/contrac
 import { newId, roomApi } from '../room/api.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { HOSTING_TEXTS } from './hosting.text.js';
+import { HostDialog } from './host-dialog.js';
+import { ImportGame } from './import-game.js';
+import { Icon } from '../editor/controls/icons.js';
 
 const failures = { REVISION_CONFLICT: 'changedElsewhere', INVALID_DEFINITION: 'stillProblems', NOT_FOUND: 'publishFirst' } as const;
 const explain = (cause: unknown) => translate(HOSTING_TEXTS, failures[(cause instanceof Error ? cause.message : '') as keyof typeof failures] ?? 'didNotWork');
@@ -26,13 +29,18 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
   const [title, setTitle] = useState(''); const [startFrom, setStartFrom] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS); const s = useTexts(SHARE_TEXTS);
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
+  // Making a game and importing one open in a dialog, so the list stays the page.
+  const [dialog, setDialog] = useState<'new' | 'import' | null>(null);
   // What each person may do follows their role (and the game's role for them); the server checks it again.
   const make = menu.role === 'owner' || Boolean(menu.permissions?.includes('games.make'));
   const run = (work: Promise<unknown>) => { setBusy(true); setError(''); void work.then(reload).catch(cause => { setError(explain(cause)); reload(); }).finally(() => setBusy(false)); };
   const showProblems = (gameId: string) => { void roomApi(`/api/host/games/${gameId}`).then(data => setProblems(current => ({ ...current, [gameId]: DraftSchema.parse(data).issues }))).catch(cause => setError(explain(cause))); };
   // Visible labels stay short; the accessible names say which game (and start with the visible label).
   return <section id="my-games" className="my-games-section" aria-labelledby="my-games-heading">
-    <div className="my-games-head"><h2 id="my-games-heading">{t('yourGames')}</h2>{menu.myGames.length > 0 && <span className="my-games-count">{menu.myGames.length}</span>}</div>
+    <div className="my-games-head"><h2 id="my-games-heading">{t('yourGames')}</h2>{menu.myGames.length > 0 && <span className="my-games-count">{menu.myGames.length}</span>}
+      {make && <span className="my-games-tools">
+        <button type="button" className="primary" onClick={() => setDialog('new')}><Icon name="plus" size={18} /> {t('newGame')}</button>
+        <button type="button" onClick={() => setDialog('import')}><Icon name="paste" size={18} /> {t('importOpen')}</button></span>}</div>
     {error && <p role="alert" className="error">{error}</p>}
     {menu.myGames.length === 0 ? <p className="my-games-empty">{t('noGamesYet')}</p> : <ul className="plain-list my-games">{menu.myGames.map(game => <li key={game.gameId} className="my-game">
       <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} />
@@ -55,14 +63,15 @@ export function MyGames({ menu, reload, openRoom }: { menu: HostMenu; reload: ()
       {removing === game.gameId && <p className="my-game-note">{t('removeNote')}</p>}
       {problems[game.gameId] && <ul className="my-game-problems" aria-label={t('problemsIn', { title: game.title })}>{problems[game.gameId]!.map((issue, index) => <li key={index}>{issue.nodeKey ? (issue.stageIndex !== null ? t('scenePartProblem', { scene: issue.nodeKey, part: issue.stageIndex + 1 }) : t('sceneProblem', { scene: issue.nodeKey })) : ''}{issue.message}</li>)}</ul>}
     </li>)}</ul>}
-    {make && <form className="new-game" aria-labelledby="new-game-heading" onSubmit={event => { event.preventDefault(); const own = startFrom.startsWith('own:') ? startFrom.slice(4) : null;
-      run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: own || !startFrom ? null : startFrom, copyOf: own }).then(() => setTitle(''))); }}>
-      <h3 id="new-game-heading">{t('newGame')}</h3>
+    {dialog === 'import' && <HostDialog id="import-heading" title={t('importHeading')} wide onClose={() => setDialog(null)}><ImportGame /></HostDialog>}
+    {dialog === 'new' && <HostDialog id="new-game-heading" title={t('newGame')} onClose={() => setDialog(null)}><form className="new-game" onSubmit={event => { event.preventDefault(); const own = startFrom.startsWith('own:') ? startFrom.slice(4) : null;
+      run(roomApi('/api/host/games', { gameId: newId(), title: title.trim(), startFrom: own || !startFrom ? null : startFrom, copyOf: own }).then(() => { setTitle(''); setDialog(null); })); }}>
       <label>{t('newGameName')}<input value={title} maxLength={160} onChange={event => setTitle(event.target.value)} required placeholder={t('newGamePlaceholder')} /></label>
       <label>{t('startFrom')}<Dropdown value={startFrom} onChange={setStartFrom}
         options={[{ value: '', label: t('blankGame') }, ...menu.games.map(game => ({ value: game.key, label: t('copyOf', { title: game.title }), group: t('builtInGames') })),
           ...menu.myGames.map(game => ({ value: `own:${game.gameId}`, label: t('copyOf', { title: game.title }), group: t('yourGames') }))]} /></label>
+      {error && <p role="alert" className="error">{error}</p>}
       <button className="primary" disabled={busy || !title.trim()}>{t('createGame')}</button>
-    </form>}
+    </form></HostDialog>}
   </section>;
 }

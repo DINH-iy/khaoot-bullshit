@@ -2,6 +2,8 @@
 
 Browser frontend and authoritative TypeScript/Node.js backend. The current checkpoint has PostgreSQL/Prisma, durable game commands, verified room credentials, Socket.IO, and minimal host/phone connection-test screens. It is not the complete party-game builder. Product decisions live in [APP_PLAN.md](APP_PLAN.md).
 
+**Patch notes** on the join screen and host menu shows the update history, newest day first. New commits appear automatically when you open Patch notes in development or rebuild the hosted app. Descriptive commit titles appear as written. Generic titles such as “Save” get an English summary of the areas changed. Builds without the Git history still include the curated notes.
+
 ## Requirements and local commands
 
 Use Node.js 24 LTS (`nvm use`) and npm 11.
@@ -137,7 +139,7 @@ For testers (no account needed):
 3. Optional: **Point at something**, then tap the thing on the screen you mean. The tap picks it instead of pressing it. Up to five things.
 4. Optional: your name (the phone remembers it). **Send**. Keep the report ID from the confirmation if you want to follow up with the organiser.
 
-For you: open **Admin: feedback from testers** at the bottom of the host menu (`/?admin`).
+For you: open **Owner → Feedback reports** in the top bar (`/?admin`).
 
 - Filter by kind or status (open, all, new, planned, in progress, done, declined). Search by report ID or text.
 - Change a report's status or kind, write a note, or delete it.
@@ -150,7 +152,7 @@ Feedback can include one PNG, JPEG or WebP image up to 2 MB, or one MP4, WebM or
 
 ### 3. People: accounts so you are always yourself
 
-1. Host menu → **Admin: people (accounts)** (`/?admin=people`).
+1. Top bar → **Owner → People** (`/?admin=people`).
 2. Type a name (for example *Dinny*). Tick **Can edit games** for someone who should help make games (see below). **Add person**. Their personal key (like `K7QM-4XPT-9RWD`), a personal link and its QR code appear.
 3. On that person's phone: on the start page tap **Have a personal key? Sign in** and type the key (capitals, spaces and dashes do not matter), or scan the QR code / open the link. The phone says "This phone now plays as Dinny".
 4. From then on that phone joins every room as Dinny: the name is filled in, the character comes back, and the chips carry over between games. Joining the same room from a second phone of the same person continues the same seat. A new phone signs in with the same key.

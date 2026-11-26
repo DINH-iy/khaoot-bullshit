@@ -23,6 +23,7 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Space writing ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
@@ -118,6 +119,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Editor test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
@@ -274,6 +276,7 @@ test('the Flow editor moves, connects, adds and edits scenes, snapping everythin
 async function openCopy(page: Page, baseURL: string, name: string, desktop = true) {
   if (desktop) await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await page.getByRole('button', { name: 'New game', exact: true }).click();
   await page.getByLabel('Name of your new game').fill(name);
   await chooseOption(page.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await page.getByRole('button', { name: 'Create game' }).click();
@@ -289,7 +292,7 @@ test('the categorized minigame picker stays above the editor dock on a short scr
   await page.getByRole('tab', { name: 'Games', exact: true }).click();
   await page.getByRole('menuitem', { name: /^Minigame(?! draw)/ }).click();
   const categories = page.getByRole('tablist', { name: 'Minigame categories' });
-  await expect(categories.getByRole('tab')).toHaveText(['Speed', 'Precision', 'Drawing', 'Luck & choices', 'Drinking']);
+  await expect(categories.getByRole('tab')).toHaveText(['Speed', 'Precision', 'Drawing', 'Luck & choices', 'Words', 'Drinking']);
   await categories.getByRole('tab', { name: 'Speed', exact: true }).press('ArrowRight');
   await expect(categories.getByRole('tab', { name: 'Precision', exact: true })).toBeFocused();
   await expect(page.getByRole('menuitem', { name: /^Count the Dots/ })).toBeVisible();
@@ -311,6 +314,7 @@ test('choices that need a description open a popup with cards: a duel’s game a
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Cards test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
@@ -343,12 +347,12 @@ test('choices that need a description open a popup with cards: a duel’s game a
   // Each statistic once; "best in one scene" can be added more than once; the wooden spoon is new.
   await expect(awards.getByRole('button')).toHaveText([/^Luckiest.*Lucky doors/, /^Best in one scene/, /^Wooden spoon.*fewest points/, 'Cancel']);
   await awards.getByRole('button', { name: /^Luckiest/ }).click();
-  await expect(settings.getByLabel('Title of award 9')).toHaveAttribute('placeholder', 'Luckiest');
+  await expect(settings.getByLabel('Title of award 10')).toHaveAttribute('placeholder', 'Luckiest');
   // An award can have its own title; "best in one scene" asks which scene.
-  await settings.getByLabel('Title of award 1').fill('Champion of the night');
+  await settings.getByLabel('Title of award 1', { exact: true }).fill('Champion of the night');
   await settings.getByRole('button', { name: 'Add an award…' }).click();
   await page.getByRole('dialog', { name: 'Add an award' }).getByRole('button', { name: /^Best in one scene/ }).click();
-  await expect(settings.getByRole('combobox', { name: 'Scene of award 10' })).toBeVisible();
+  await expect(settings.getByRole('combobox', { name: 'Scene of award 11' })).toBeVisible();
   await expect(settings.getByRole('button', { name: 'Remove Champion of the night' })).toBeVisible();
   await saved(page);
 });
@@ -359,6 +363,7 @@ test('open sections follow you from scene to scene, also past a scene that does 
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Sections test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await mine.getByRole('button', { name: 'Create game' }).click();
   await mine.getByRole('link', { name: `Edit ${name}` }).click();
@@ -394,6 +399,7 @@ test('View mode: look through a game without changing it by accident; Edit chang
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `View test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();
@@ -464,7 +470,7 @@ test('the scroll wheel zooms (Shift + scroll moves), and Help & shortcuts opens 
   await expect(help).toBeVisible();
   await help.getByRole('button', { name: 'Close' }).click();
   const tips = page.getByRole('button', { name: 'Tips' });
-  const tip = page.getByText('Right-click the background to add a scene there.');
+  const tip = page.getByText(/the background to add a scene there/);
   await tips.hover();
   await expect(tip).toBeHidden();
   await tips.click();
@@ -985,7 +991,8 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
-  const section = page.getByRole('region', { name: 'Import a game from text' });
+  await page.getByRole('region', { name: 'Your games' }).getByRole('button', { name: 'Import from text' }).click();
+  const section = page.getByRole('dialog', { name: 'Import a game from text' });
   await section.getByRole('button', { name: 'Copy instructions for an AI' }).click();
   await expect(section.getByRole('button', { name: 'Instructions copied ✓' })).toBeVisible();
   const instructions = await page.evaluate(() => navigator.clipboard.readText());
@@ -1034,6 +1041,7 @@ test('right-clicking a scene or an arrow opens its own menu instead of the brows
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
   const name = `Menu test ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();

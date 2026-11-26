@@ -1,10 +1,10 @@
 # Making a game from text (for example with an AI)
 
-You can create a whole game by pasting text into **Your games → Import a game from text**. The text is JSON in a simple format described below. It is easy to write by hand and it is the format AI assistants such as Claude or ChatGPT produce reliably.
+You can create a whole game by pasting text into **Your games → Import from text** on the host menu. The text is JSON in a simple format described below. It is easy to write by hand and it is the format AI assistants such as Claude or ChatGPT produce reliably.
 
 ## How it works
 
-1. In the host menu, open **Import a game from text** and press **Copy instructions for an AI**. This copies the section "Instructions for the AI" below.
+1. In the host menu, press **Import from text** (next to *Your games*) and press **Copy instructions for an AI**. This copies the section "Instructions for the AI" below.
 2. Paste them into an AI chat, and below them describe the game you want. The AI first asks a few short questions (who plays, how long, teams or not, which kinds of rounds, a style) and waits for your answers; say "just make it" to skip them. For example: *"A 20-minute pub quiz about the 90s for 12 friends: a welcome screen, five timed questions, a caption contest with voting, and the party chooses between a music round and a movie round before the final scoreboard."*
 3. Copy the AI's answer and paste it into the import box. Code fences (```` ```json ````) and a sentence before or after the JSON are fine.
 4. Press **Import**. The game is created as a draft and the editor opens.

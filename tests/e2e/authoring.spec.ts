@@ -8,8 +8,9 @@ if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicate
 test('the owner creates a game, sees its problems per scene, publishes it and opens a room for it', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   const mine = page.getByRole('region', { name: 'Your games' });
-  await expect(mine.getByRole('button', { name: 'Create game' })).toBeVisible();
+  await expect(mine.getByRole('button', { name: 'New game', exact: true })).toBeVisible();
   const name = `Office party ${Date.now()}`;
+  await mine.getByRole('button', { name: 'New game', exact: true }).click();
   await mine.getByLabel('Name of your new game').fill(name);
   await chooseOption(mine.getByLabel('Start from'), { label: 'A copy of Friday Night Chaos' });
   await mine.getByRole('button', { name: 'Create game' }).click();

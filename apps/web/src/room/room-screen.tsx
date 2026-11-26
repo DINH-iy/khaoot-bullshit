@@ -45,6 +45,7 @@ import { hostMenuHref, useHostAccess } from '../owner/use-host-access.js';
 import { OWNER_TEXTS } from '../owner/owner.text.js';
 import { KeySignIn } from '../people/key-sign-in.js';
 import { JoinOption } from './join-option.js';
+import { PatchNotesButton } from '../patch-notes/patch-notes.js';
 import { ArcadeLeaderMenu, ArcadeLeaderNext, useArcadeRound } from '../arcade/arcade-round.js';
 import './room.css';
 import { LookContext, themeClass, useThemeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
@@ -109,7 +110,10 @@ function JoinScreen({ roomCode, setRoomCode, name, setName, busy, error, onJoin,
     {/* The phone's own language (the game's standard texts follow it; the author's own texts stay as written). */}
     <LanguagePicker label={translate(PHONE_TEXTS, 'language')} className="join-language" />
     <section className="join-card" aria-labelledby="join-heading">
-      <p className="brand">party<span>.</span></p>
+      <div className="join-brand-row">
+        <p className="brand">party<span>.</span></p>
+        <PatchNotesButton />
+      </div>
       <div className="join-head"><h1 id="join-heading">{t('join.title')}</h1>{title && <p className="room-game">{title}</p>}</div>
       {error && <p role="alert" className="join-error">{error}</p>}
       {linked && <p role="status" className={linked.name ? 'person-linked' : 'join-error'}>{linked.name ? r('linked', { name: linked.name }) : r('linkBroken')}</p>}

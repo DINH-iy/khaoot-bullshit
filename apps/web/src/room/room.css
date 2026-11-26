@@ -51,7 +51,8 @@
 .room-join { position: relative; display: grid; place-items: center; padding: 24px 16px; }
 .join-startup { min-height: 100dvh; display: grid; place-items: center; color: #d7d9e0; background: #161820; }
 .join-card { width: min(460px, 100%); display: grid; gap: 16px; padding: clamp(18px, 5vw, 30px) !important; border-radius: var(--r-radius) !important; background: var(--r-card) !important; border: 1px solid var(--r-line) !important; box-shadow: 0 20px 60px rgb(0 0 0 / .2); }
-.join-card > .brand { justify-self: start; padding: 8px 12px; border: 1px solid var(--r-line); border-radius: calc(var(--r-radius) * .6); background: var(--r-surface); }
+.join-brand-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.join-card > .brand, .join-brand-row > .brand { justify-self: start; padding: 8px 12px; border: 1px solid var(--r-line); border-radius: calc(var(--r-radius) * .6); background: var(--r-surface); }
 .join-card .join-head { overflow-wrap: anywhere; }
 .join-card .join-form .code-input { min-width: 0; font-size: clamp(1.45rem, 6vw, 2rem) !important; }
 .join-card h1 { margin: 0; font-size: 2rem; }

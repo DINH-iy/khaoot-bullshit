@@ -27,7 +27,6 @@ export function GameCover({ game, size }: { game: Game; size: 'small' | 'large' 
     <svg className="cover-pattern" viewBox="0 0 200 120" preserveAspectRatio="none">{Array.from({ length: 9 }, (_, index) =>
       <circle key={index} cx={(value >>> index) % 200} cy={(value >>> (index + 3)) % 120} r={8 + ((value >>> index) % 30)} fill="#fff" opacity={0.06 + (index % 3) * 0.03} />)}</svg>
     <div className="cover-icons">{icons.map(feature => <span key={feature}><Icon name={FEATURES[feature].icon} size={size === 'large' ? 40 : 22} /></span>)}</div>
-    {size === 'large' && <p className="cover-title">{game.title}</p>}
   </div>;
 }
 
@@ -40,7 +39,7 @@ export function GamePicker({ games, chosen, onChoose, busy, onOpen, onEdit, onRe
   const game = games.find(entry => entry.key === chosen) ?? games[0];
   const [restoring, setRestoring] = useState<string | null>(null); const t = useTexts(HOSTING_TEXTS);
   return <form className="game-picker" onSubmit={event => { event.preventDefault(); onOpen(); }}>
-    <fieldset className="game-list"><legend>{t('availableGames')}</legend>
+    <fieldset className="game-list"><legend className="visually-hidden">{t('availableGames')}</legend>
       {games.map(entry => <label key={entry.key} className={`game-card${entry.key === chosen ? ' chosen' : ''}`}>
         <input type="radio" name="game" value={entry.key} checked={entry.key === chosen} onChange={() => onChoose(entry.key)} />
         <GameCover game={entry} size="small" />
