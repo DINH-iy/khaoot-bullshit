@@ -61,12 +61,62 @@
 .side-paused-note { position: fixed; left: 50%; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 16; margin: 0; padding: 8px 14px; border-radius: 999px; background: var(--r-accent); color: var(--r-accent-ink); font-weight: 800; box-shadow: 0 8px 20px rgb(0 0 0 / .3); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .reels.spinning .reel, .pack-reveal li { animation: none; } }
 /* Challenges between players. */
-.challenges { display: grid; gap: 14px; }
-.challenge-group h3 { margin: 0 0 8px; font-size: 1rem; }
-.challenge-card { margin: 0 0 8px; padding: 12px; border-radius: 14px; background: rgb(255 255 255 / .06); display: grid; gap: 8px; }
-.challenge-card p { margin: 0; }
-.challenge-form { display: grid; gap: 12px; }
-.challenge-form select { min-height: 44px; border-radius: 8px; padding: 8px 10px; font: inherit; }
+.challenges { display: grid; gap: 14px; min-width: 0; }
+.challenge-hub { gap: 20px; }
+.challenge-heading, .challenge-group h3 { margin: 0; font-size: 1.125rem; }
+.challenge-group h3 { margin-bottom: 8px; }
+.room .challenge-create { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; text-align: left; padding: 12px 16px; min-height: 58px; }
+.room .sheet-head-title .challenge-back { flex: none; min-width: 44px; margin-inline: 0; padding-inline: 0; }
+.challenge-card { padding: 12px; border-radius: 14px; border: 1px solid var(--r-line); background: var(--r-card-strong); display: grid; gap: 8px; }
+.challenge-group .plain-list { display: grid; gap: 8px; }
+.challenge-card-line { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.challenge-card p { margin: 0; overflow-wrap: anywhere; }
+.challenge-invite-settings { display: grid; gap: 6px; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--r-surface); font-size: .875rem; line-height: 1.3; }
+.challenge-invite-settings > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: baseline; gap: 8px; }
+.challenge-invite-settings dt { color: var(--r-muted); }
+.challenge-invite-settings dd { margin: 0; text-align: end; font-weight: 600; }
+.challenge-invite-settings :is(dt, dd) { font-size: inherit; line-height: inherit; overflow-wrap: anywhere; }
+.challenge-meta { color: var(--r-muted); font-size: .875rem; }
+.challenge-form { display: grid; gap: 14px; }
+.challenge-form .hint { margin: 0; }
+.challenge-options { margin: 0; padding: 0; border: 0; min-width: 0; }
+.challenge-options legend { padding: 0; margin-bottom: 8px; font-weight: 700; }
+.challenge-game-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.room .challenge-game-grid button { display: grid; justify-items: center; align-content: center; gap: 6px; min-width: 0; min-height: 76px; padding: 6px; font-size: .875rem; overflow-wrap: anywhere; }
+.challenge-game-mark { display: grid; place-items: center; inline-size: 36px; block-size: 36px; border-radius: 9px; font-size: 1.25rem; font-weight: 800; background: var(--r-surface); color: var(--r-accent); }
+.challenge-game-mark[data-game="rps"] { background: #493722; color: #f6cf96; }
+.challenge-game-mark[data-game="tictactoe"] { background: #263d5c; color: #b9dbff; }
+.challenge-game-mark[data-game="brick-rally"] { background: #233b43; color: #9bd4c8; }
+.challenge-game-mark[data-game="chess"] { background: #413358; color: #e6c7ff; }
+.challenge-game-mark[data-game="eight-ball"] { background: #213d34; color: #cbedc8; }
+.challenge-game-mark[data-game="creature-duel"] { background: #493246; color: #ffd0dc; }
+.room button.challenge-picker-trigger { display: inline-grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 44px; max-width: 100%; padding: 5px 10px; text-align: left; }
+.challenge-picker-trigger span { overflow-wrap: anywhere; }
+.challenge-picker-trigger .brick-board { width: 30px; border-radius: 4px; touch-action: auto; }
+.room .challenge-picker { box-sizing: border-box; width: min(420px, calc(100% - 24px)); max-height: min(78dvh, 620px); padding: 0; border-radius: var(--r-radius); border: 1px solid var(--r-line); background: var(--r-surface); color: var(--r-text); overflow: hidden; }
+.challenge-picker::backdrop { background: rgb(0 0 0 / .62); }
+.challenge-picker-surface { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: inherit; }
+.challenge-picker header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--r-line); }
+.challenge-picker header h3 { margin: 0; font-size: 1.125rem; }
+.room .challenge-picker header button { min-width: 44px; margin: 0; }
+.challenge-picker-body { overflow: auto; overscroll-behavior: contain; padding: 12px 14px 14px; }
+.challenge-picker-footer { padding: 10px 14px; border-top: 1px solid var(--r-line); }
+.challenge-picker-footer button { width: 100%; }
+.challenge-opponent-list, .challenge-map-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.challenge-opponent-list { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.challenge-map-list { grid-template-columns: repeat(auto-fit, minmax(124px, 1fr)); }
+.room .challenge-picker-body li button { width: 100%; height: 100%; display: grid; align-content: start; justify-items: center; gap: 6px; padding: 8px; overflow-wrap: anywhere; }
+.challenge-map-list .brick-board { width: min(100%, 124px); border-radius: 6px; touch-action: auto; }
+.room .challenge-options button[aria-pressed="true"], .room .challenge-picker button[aria-pressed="true"] { border-color: var(--r-accent); box-shadow: inset 0 0 0 1px var(--r-accent); }
+.brick-challenge { display: grid; gap: 10px; }
+.brick-challenge h3, .brick-challenge p { margin: 0; }
+.brick-challenge-title { display: flex; align-items: center; gap: 10px; }
+.brick-challenge-title h3 { font-size: 1.25rem; }
+.brick-challenge .brick-board { width: min(100%, 21rem, max(150px, calc((88dvh - 320px) * .86))); }
+.brick-challenge .brick-board[role="img"] { width: min(100%, 17rem, max(128px, calc((88dvh - 370px) * .86))); touch-action: auto; }
+.brick-challenge-time { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: var(--r-surface); }
+.brick-challenge-time strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.brick-challenge-result > strong { font-size: 1.375rem; }
 .dock-dot { display: inline-block; width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; background: #ff3d7f; vertical-align: top; }
 
 /* Opening a pack (packs.tsx), like trading cards: a foil pack torn open, then the cards turned over one by one. */
@@ -213,3 +263,18 @@
 .side-picker-grid li { margin: 0; }
 .room .side-picker-grid button { width: 100%; height: 100%; display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 84px; padding: 10px 6px; border-radius: 12px; border: 1px solid var(--r-line); background: var(--r-card); color: var(--r-text); font-size: .85rem; font-weight: 700; text-align: center; }
 .room .side-picker-grid button[aria-current=true] { border-color: var(--r-accent); }
+
+.room button.challenge-settings-trigger { display: inline-flex; align-items: center; gap: 8px; }
+.challenge-pool-settings { display: grid; gap: 14px; }
+.challenge-pool-settings label { display: grid; gap: 6px; }
+.challenge-pool-settings :is(label, legend) { font-size: .875rem; line-height: 1.25; }
+.challenge-pool-start { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 8px; }
+.room .challenge-pool-settings :is(select, input) { min-width: 0; width: 100%; min-height: 44px; padding: 8px; }
+.challenge-pool-settings .pool-felt-fields { margin: 0; padding: 0; min-width: 0; border: 0; }
+.challenge-pool-settings .pool-felt-fields legend { margin-bottom: 8px; padding: 0; }
+.challenge-pool-settings .pool-felt-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.room .challenge-pool-settings button.pool-felt-swatch {
+  width: 44px; min-width: 44px; min-height: 44px; padding: 0;
+  background: var(--felt); border: 2px solid var(--felt-edge);
+}
+.room .challenge-pool-settings button.pool-felt-swatch[aria-pressed="true"] { outline: 2px solid var(--r-accent); outline-offset: 2px; }

@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import type { TeamCelebration } from '@party/contracts';
 import type { PoolBallBehavior, PoolStart } from '@party/contracts';
-import { UNDERCOVER_ROLES, ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
+import { BRICK_MAX_SECONDS, UNDERCOVER_ROLES, ANIMATION_WORDS, voteChoices, defaultLook, isSharedPrediction, isStepMinigame, MINIGAME_COUNTDOWN_MS, MINIGAMES, ROULETTE_BET_FLOOR, rouletteBetLimit, TEAM_MINIGAMES, PLAYER_COMMANDS, PlayerLookSchema, type GameCommand, type MediaKind, type MinigameSettings, type SubmissionValue } from '@party/contracts';
 import type { GameSession, StageRun } from '../generated/prisma/client.js';
 import { withRoomWords } from './room-settings.js';
 import { drawnStage, effectivePlay, isShowOnly, isVoteSource, judging, minigameRules, stagePlaces, type GameDefinition, type StageDefinition } from './definition.js';
@@ -145,6 +145,10 @@ function playableDuration(stage: StageDefinition, duration: number | null) {
   return duration === null ? null : duration + ('countdownSeconds' in stage ? (stage.countdownSeconds ?? 0) * 1000 : 0);
 }
 async function startedDuration(tx: Transaction, stage: StageDefinition, lineupId: string | null, presentation: unknown, now: Date) {
+  if (stage.kind === 'minigame' && stage.game === 'brick-rally') {
+    const countdown = stage.countdownSeconds === undefined ? MINIGAME_COUNTDOWN_MS : stage.countdownSeconds * 1000;
+    return countdown + Math.min(stage.durationMs ?? MINIGAMES[stage.game].defaultSeconds * 1000, BRICK_MAX_SECONDS * 1000);
+  }
   if (stage.kind === 'minigame' && stage.game === 'count-the-dots') {
     const dots = readMinigameRun(presentation)?.dots;
     requireGame(dots, 'INVALID_STATE');

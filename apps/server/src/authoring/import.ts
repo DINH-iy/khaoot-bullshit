@@ -1,4 +1,4 @@
-import { CARRYOVERS, BUILTIN_SOUNDS, MAX_OWN_REACTIONS, MAX_SOUNDS, HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
+import { BRICK_MAX_SECONDS, CARRYOVERS, BUILTIN_SOUNDS, MAX_OWN_REACTIONS, MAX_SOUNDS, HEX_COLOR, IdleCloseMinutesSchema, pointsAtStake } from '@party/contracts';
 import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKey, MAX_OPEN_INVITES, MINIGAME_KEYS, MINIGAME_SCORING_KINDS, MINIGAME_TIEBREAKS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey, SceneMediaSchema, SceneMusicSchema, GameMusicSchema } from '@party/contracts';
 // Text import. Accepts the exact game format, or a simpler one written for
 // people and AI assistants (documented in apps/web/src/hosting/ai-guide.ts):
@@ -69,7 +69,9 @@ function placesFrom(raw: Json): Json {
 /** One stage in the simple format (with `type`) becomes an exact stage. Exact stages (with `kind`) pass through. */
 function stageFrom(raw: Json, key: string): Json {
   if (typeof raw['kind'] === 'string' && !('type' in raw)) return { key, ...raw };
-  const type = TYPES[text(raw['type']).toLowerCase()] ?? (Array.isArray(raw['answers'] ?? raw['options']) ? 'quiz' : 'info');
+  const requested = TYPES[text(raw['type']).toLowerCase()] ?? (Array.isArray(raw['answers'] ?? raw['options']) ? 'quiz' : 'info');
+  // A single-scene draw uses the minigame fields and one ordinary next connection.
+  const type = requested === 'minigame-draw' && 'draw' in raw ? 'minigame' : requested;
   const prompt = text(raw['prompt'] ?? raw['question'] ?? raw['text'] ?? raw['title'], 'Untitled');
   const durationMs = seconds(raw);
   // `"inTeams": true` is short for playing the round in the teams made by the last Pick teams scene.
@@ -171,7 +173,8 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
         ...(count(raw['turnSeconds'], 10, 120) === undefined ? {} : { turnSeconds: count(raw['turnSeconds'], 10, 120) }), ...(count(raw['voteSeconds'], 15, 180) === undefined ? {} : { voteSeconds: count(raw['voteSeconds'], 15, 180) }),
         ...(Array.isArray(raw['pairs']) ? { pairs: raw['pairs'].filter(Array.isArray).map(pair => (pair as unknown[]).slice(0, 2).map(entry => text(entry).slice(0, 30))).slice(0, 100) } : {}),
         ...(['en', 'nl', 'de', 'ro'].includes(text(raw['wordLanguage'])) ? { wordLanguage: text(raw['wordLanguage']) } : {}) } } : {};
-      return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null),
+      const timer = durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null);
+      return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: game === 'brick-rally' && typeof timer === 'number' ? Math.min(timer, BRICK_MAX_SECONDS * 1000) : timer,
         ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...coinFlip, ...hangman, ...undercover, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
     }
     case 'duel': {

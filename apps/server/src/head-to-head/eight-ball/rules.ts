@@ -66,6 +66,12 @@ function targetPocket(data: Pool, seat: Seat) {
   return last === null ? null : oppositePoolPocket(last);
 }
 
+/** Start the opening shot clock when an invitation is accepted, retaining the original rack. */
+export function startPoolShotClock(data: unknown): Pool {
+  const pool = data as Pool;
+  return { ...pool, ...clockFor(pool, Date.now()) };
+}
+
 export function poolTimedOut(data: unknown) {
   return (data as Pool).timedOut === true;
 }

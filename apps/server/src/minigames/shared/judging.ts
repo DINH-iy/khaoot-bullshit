@@ -5,6 +5,7 @@ import type { MinigameRun } from './rules.js';
 export interface ClaimedResult {
   value: number;
   early?: true | undefined;
+  brickTrace?: string | undefined;
   stroke?: number[] | undefined;
   graphLine?: number[] | undefined;
   teamId?: string | undefined;

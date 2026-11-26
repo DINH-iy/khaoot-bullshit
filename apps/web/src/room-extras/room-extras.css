@@ -59,10 +59,16 @@
 
 .sheet-backdrop { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / .5); padding: 12px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 .room .bottom-sheet { width: min(560px, 100%); height: var(--sheet-height, auto); max-height: var(--sheet-height, min(80dvh, 720px)); display: grid; grid-template: "grip" auto "head" auto "body" minmax(0, 1fr) / minmax(0, 1fr); min-width: 0; border-radius: var(--r-radius) var(--r-radius) 18px 18px; background: var(--r-surface); border: 1px solid var(--r-line); overflow: hidden; }
+.sheet-backdrop-roomy { z-index: 42; }
+.room .sheet-backdrop-roomy .bottom-sheet { max-height: min(88dvh, 760px); width: min(560px, 100%); }
+.sheet-backdrop-roomy .sheet-head { padding: 10px 16px; border-bottom: 1px solid var(--r-line); }
+.sheet-backdrop-roomy .sheet-body { padding: 14px 16px 20px; }
+@media (max-width: 650px) { .sheet-backdrop-roomy { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); } }
 .room button.sheet-grip { grid-area: grip; justify-self: center; display: grid; place-items: center; width: 80px; min-height: 28px; padding: 0; border: 0; background: transparent; cursor: ns-resize; touch-action: none; user-select: none; }
 .sheet-grip > span { width: 38px; height: 4px; border-radius: 999px; background: var(--r-muted); }
 .sheet-grip + .sheet-head { padding-top: 0; }
 .sheet-head { grid-area: head; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px 10px; }
+.sheet-head-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .sheet-head h2 { min-width: 0; margin: 0; font-size: 1.25rem; overflow-wrap: anywhere; }
 .sheet-head-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .sheet-body { grid-area: body; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 6px 18px 20px; display: grid; gap: 14px; align-content: start; }

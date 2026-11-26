@@ -10,7 +10,8 @@ import { ConfirmDialog } from '../controls/confirm-dialog.js';
 import { ScenePalette, type SceneChoice } from '../controls/scene-palette.js';
 import { SpinFields } from '../shell/show-settings.js';
 import { Section } from '../controls/section.js';
-import { isWheelScene, addScene, COLUMN_STEP, cardText, connect, deleteScene, freeSpot, insertTeamsBefore, isRoute, newStage, optionsOf, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
+import { isWheelScene, addDrawGames, addScene, COLUMN_STEP, cardText, connect, deleteScene, freeSpot, insertOnEdge, insertTeamsBefore, isRoute, newStage, optionsOf, snap, uniqueKey, updateStage, type Definition, type Node, type SceneType } from '../model.js';
+import { grouped } from '../flow/groups.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
 import { ScenePreview, ScenePreviewDialog } from './scene-preview.js';
@@ -80,16 +81,24 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
 
   /** A new scene right after the current one: the current scene now leads to it, and it leads where the current one did. */
   const insertAfter = ({ type, variant }: SceneChoice) => {
-    const added = addScene(definition, type, variant); let next = added.definition;
-    if (!isRoute(current)) {
-      const old = definition.edges.find(edge => edge.from === current.key);
+    const old = isRoute(current) ? undefined : definition.edges.find(edge => edge.from === current.key);
+    const insertion = old && type === 'draw-routes' ? insertOnEdge(definition, old.key, type, variant) : null;
+    const added = insertion ?? addScene(definition, type, variant);
+    let next = added.definition;
+    let games = insertion?.games ?? [];
+    if (!insertion && !isRoute(current)) {
       next = connect(next, current.key, undefined, added.key);
-      if (old && type !== 'route') next = connect(next, added.key, undefined, old.to);
-      else if (old && type === 'route') { const first = optionsOf(next.nodes.find(node => node.key === added.key)).at(0); if (first) next = connect(next, added.key, first.key, old.to); }
+      if (old) next = connect(next, added.key, optionsOf(next.nodes.find(node => node.key === added.key))[0]?.key, old.to);
+    }
+    if (!insertion && type === 'draw-routes') {
+      const generated = addDrawGames(next, added.key);
+      next = generated.definition; games = generated.keys;
     }
     const base = positions[current.key] ?? { x: 0, y: 0 };
-    const raw = { ...positions, [added.key]: { x: snap(base.x + 360), y: snap(base.y) } };
-    change(next, { ...raw, [added.key]: freeSpot(next, raw, added.key, raw[added.key]!) });
+    const point = freeSpot(next, positions, added.key, { x: snap(base.x + 360), y: snap(base.y) });
+    const placed = { ...positions, [added.key]: point };
+    for (const key of games) placed[key] = freeSpot(next, placed, key, { x: point.x + COLUMN_STEP, y: point.y });
+    change(next, games.length ? grouped(placed, [added.key, ...games]) : placed);
     setSelected([added.key]); setAdding(null);
   };
   const addPart = ({ type, variant }: SceneChoice) => {

@@ -7,20 +7,18 @@ const AXIS_LABELS = [
   ['startLabel', 'firstLabel'], ['splitLabel', 'splitLabel'], ['endLabel', 'lastLabel'], ['yLabel', 'units'],
 ] as const;
 
-export function GraphFields({ graph, onChange }: { graph: GraphData | undefined; onChange: (graph?: GraphData) => void }) {
+export function GraphFields({ graph, onChange, required = false }: { graph: GraphData | undefined; onChange: (graph?: GraphData) => void; required?: boolean }) {
   const t = useTexts(GRAPH_TEXTS);
   return <div className="minigame-fields">
-    <label className="check"><input type="checkbox" checked={Boolean(graph)} onChange={event => onChange(
+    {!required && <label className="check"><input type="checkbox" checked={Boolean(graph)} onChange={event => onChange(
       event.target.checked ? { ...SAMPLE_GRAPH, hidden: [58, 60, 64, 70, 68, 76, 80, 87] } : undefined,
-    )} />{t('custom')}</label>
+    )} />{t('custom')}</label>}
     {graph && <>
-      {graph.scale ? <p className="hint">{t('importedRange', { start: graph.startLabel ?? '', end: graph.endLabel ?? '' })}</p> : <>
-        <p className="hint">{t('fixedScale')}</p>
-        <div className="field-pair">
-          <GraphReadings label={t('knownValues')} values={graph.visible} onCommit={visible => onChange({ ...graph, visible })} />
-          <GraphReadings label={t('actualValues')} values={graph.hidden} onCommit={hidden => onChange({ ...graph, hidden })} />
-        </div>
-      </>}
+      <p className="hint">{graph.scale ? t('editRange', { min: graph.scale.min, max: graph.scale.max }) : t('fixedScale')}</p>
+      <div className="field-pair">
+        <GraphReadings label={t('knownValues')} values={graph.visible} scale={graph.scale} onCommit={visible => onChange({ ...graph, visible })} />
+        <GraphReadings label={t('actualValues')} values={graph.hidden} scale={graph.scale} onCommit={hidden => onChange({ ...graph, hidden })} />
+      </div>
       <div className="field-pair">{AXIS_LABELS.map(([key, name]) => <label key={key}>{t(name)}
         <input value={graph[key] ?? ''} maxLength={32} onChange={event => {
           const next = { ...graph };
@@ -40,23 +38,30 @@ export function GraphFields({ graph, onChange }: { graph: GraphData | undefined;
   </div>;
 }
 
-function GraphReadings({ label, values, onCommit }: { label: string; values: number[]; onCommit: (values: number[]) => void }) {
+function GraphReadings({ label, values, scale, onCommit }: { label: string; values: number[]; scale: GraphData['scale']; onCommit: (values: number[]) => void }) {
   const t = useTexts(GRAPH_TEXTS);
   const [draft, setDraft] = useState<string>();
   const [invalid, setInvalid] = useState(false);
+  const { min, max } = scale ?? { min: 0, max: 100 };
+  const parse = (text: string) => GraphDataSchema.shape.visible.safeParse(text.split(',').map(value => {
+    const number = Number(value);
+    return /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i.test(value) && number >= min && number <= max
+      ? Math.min(100, Math.max(0, (number - min) / (max - min) * 100)) : NaN;
+  }));
+  const error = t('invalidGraphValues', { min, max });
   const commit = () => {
     if (draft === undefined) return;
-    const values = draft.split(',').map(value => /^\s*(?:\d+(?:\.\d+)?|\.\d+)\s*$/.test(value) ? Number(value) : NaN);
-    const parsed = GraphDataSchema.shape.visible.max(25).safeParse(values);
+    const parsed = parse(draft);
     setInvalid(!parsed.success);
     if (parsed.success) {
       setDraft(undefined);
       onCommit(parsed.data);
     }
   };
-  return <label>{label}<textarea rows={2} maxLength={175} spellCheck={false} value={draft ?? values.join(', ')}
-    aria-invalid={invalid} onChange={event => { setDraft(event.target.value); setInvalid(false); }}
+  const display = values.map(value => value === 0 ? min : value === 100 ? max : Math.min(max, Math.max(min, Number((min + (max - min) * value / 100).toPrecision(15)))));
+  return <label>{label}<textarea rows={2} maxLength={1500} spellCheck={false} value={draft ?? display.join(', ')}
+    aria-invalid={invalid} onChange={event => { const value = event.target.value; setDraft(value); setInvalid(false); event.target.setCustomValidity(parse(value).success ? '' : error); }}
     onBlur={commit} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); commit(); } }} />
-    {invalid && <span className="hint warn" role="alert">{t('invalidValues')}</span>}
+    {invalid && <span className="hint warn" role="alert">{error}</span>}
   </label>;
 }

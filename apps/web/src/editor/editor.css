@@ -38,7 +38,9 @@
 .flow-surface { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }
 .flow-lines { position: absolute; left: 0; top: 0; overflow: visible; }
 .edge-line { fill: none; stroke: var(--e-line); stroke-width: 2; pointer-events: none; }
-.edge-hit { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; pointer-events: stroke; }
+.edge-hit { fill: none; stroke: transparent; stroke-width: 16; vector-effect: non-scaling-stroke; cursor: pointer; pointer-events: stroke; }
+.editor-body:not(.viewing) .edge-hit { cursor: grab; }
+.editor-body:not(.viewing) .edge-hit:active { cursor: grabbing; }
 .edge.selected .edge-line { stroke: var(--e-accent); stroke-width: 3; }
 .edge-label { fill: var(--e-muted); font-size: 15px; pointer-events: none; }
 .edge-line.drafting { stroke-dasharray: 6 6; stroke: var(--e-accent); pointer-events: none; }

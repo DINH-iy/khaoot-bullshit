@@ -2,7 +2,7 @@ import { POOL_BALL_PRESETS, POOL_CUSTOM_RANGES, PoolBallBehaviorSchema, type Poo
 import { useId } from 'react';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 
-const TEXTS = defineTexts('pool-ball-behavior', {
+export const POOL_BEHAVIOR_TEXTS = defineTexts('pool-ball-behavior', {
   behavior: 'Ball behavior', realistic: 'Realistic Sim', arcade: 'Balanced Arcade', heavy: 'Casual / Heavy Felt', custom: 'Custom',
   rollingResistance: 'Rolling resistance', railBounce: 'Rail bounce', stopSpeed: 'Stop speed',
 }, {
@@ -12,7 +12,7 @@ const TEXTS = defineTexts('pool-ball-behavior', {
 });
 
 export function PoolBehaviorFields({ value, onChange }: { value: PoolBallBehavior; onChange: (next: PoolBallBehavior) => void }) {
-  const t = useTexts(TEXTS);
+  const t = useTexts(POOL_BEHAVIOR_TEXTS);
   const id = useId();
   return <>
     <label htmlFor={id}>{t('behavior')}<select id={id} value={value.preset} onChange={event => {

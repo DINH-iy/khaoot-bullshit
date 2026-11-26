@@ -20,6 +20,7 @@ export * from './minigames/undercover/undercover.js';
 export * from './minigames/red-or-black-roulette/roulette.js';
 export * from './phone-menu.js';
 export * from './minigames/speed-run/course.js';
+export * from './minigames/brick-rally/brick-rally.js';
 export * from './players.js';
 export * from './team-colors.js';
 export * from './drawing.js';

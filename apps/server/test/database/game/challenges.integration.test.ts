@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DEFAULT_ECONOMY } from '@party/contracts';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { BRICK_MAX_SECONDS, DEFAULT_ECONOMY, MINIGAME_COUNTDOWN_MS } from '@party/contracts';
 
 const START_CHIPS = DEFAULT_ECONOMY.startChips;
 import { buildApp } from '../../../src/app.js';
@@ -36,6 +36,63 @@ async function room() {
 const move = (r: Awaited<ReturnType<typeof room>>, phone: number, id: string, cell: number) => call('POST', `${r.base}/${id}/move`, { move: { game: 'tictactoe', cell } }, r.phones[phone]);
 
 describe('challenges between players', () => {
+  it('runs both Brick Rally players on one map and pays the fastest verified clear', async () => {
+    const r = await room(); const id = randomUUID();
+    const map = ['........', '........', '........', '........', '......#.'];
+    const action = (phone: number, name: string, body = {}) => call('POST', `${r.base}/${id}/${name}`, body, r.phones[phone]);
+    const clear = (phone: number, brickTrace: string) => action(phone, 'clear', { brickTrace });
+    const current = async (phone: number) => (await call('GET', r.base, undefined, r.phones[phone])).json().data.challenges[0];
+    const invite = await call('POST', r.base, { challengeId: id, opponentId: r.ids[1], game: 'brick-rally', stake: 50, settings: { map } }, r.phones[0]);
+    expect(invite.json().data.view.map).toEqual(map);
+    expect((await action(0, 'ready')).statusCode).toBe(409);
+    expect((await action(1, 'accept')).json().data.view).toMatchObject({ map, seat: 1, startsAt: null });
+    expect((await action(2, 'ready')).statusCode).toBe(404);
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const now = Date.now();
+      expect((await action(0, 'ready')).json().data.view).toMatchObject({ ready: [true, false], startsAt: null });
+      const { startsAt, deadlineAt } = (await action(1, 'ready')).json().data.view;
+      expect(Date.parse(startsAt) - now).toBe(MINIGAME_COUNTDOWN_MS);
+      expect(Date.parse(deadlineAt) - Date.parse(startsAt)).toBe(BRICK_MAX_SECONDS * 1000);
+      expect((await current(0)).view).toMatchObject({ startsAt, deadlineAt, map });
+      expect((await clear(0, 'g'.repeat(56))).statusCode).toBe(400);
+      vi.setSystemTime(Date.parse(startsAt) + 2000);
+      expect((await action(0, 'ready')).json().data.view.startsAt).toBe(startsAt);
+      expect((await clear(0, 'g')).statusCode).toBe(400);
+      expect((await clear(0, 'F'.repeat(103))).json().data).toMatchObject({ status: 'PLAYING', view: { times: [1717, null] } });
+      expect((await current(1)).view.times).toEqual([null, null]);
+      // A repeated submission cannot replace a recorded time.
+      expect((await clear(0, 'g'.repeat(56))).json().data.view.times).toEqual([1717, null]);
+      expect((await clear(1, 'g'.repeat(56))).json().data).toMatchObject({ status: 'FINISHED', view: { times: [1717, 933], outcome: { kind: 'win', seat: 1 } } });
+      await clear(1, 'g'.repeat(56));
+      expect(await r.balance(r.phones[0]!)).toBe(START_CHIPS - 50);
+      expect(await r.balance(r.phones[1]!)).toBe(START_CHIPS + 50);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each([true, false])('settles an expired Brick Rally once with a verified clear = %s', async (cleared) => {
+    const r = await room(); const id = randomUUID();
+    const map = ['........', '........', '........', '........', '......#.'];
+    const action = (phone: number, name: string, body = {}) => call('POST', `${r.base}/${id}/${name}`, body, r.phones[phone]);
+    await call('POST', r.base, { challengeId: id, opponentId: r.ids[1], game: 'brick-rally', stake: 50, settings: { map } }, r.phones[0]);
+    await action(1, 'accept');
+    await action(0, 'ready');
+    const { startsAt, deadlineAt } = (await action(1, 'ready')).json().data.view;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.parse(startsAt) + 2000);
+      if (cleared) expect((await action(0, 'clear', { brickTrace: 'g'.repeat(56) })).statusCode).toBe(200);
+      vi.setSystemTime(Date.parse(deadlineAt) + 1);
+      const results = await Promise.all(r.phones.slice(0, 2).map(phone => call('GET', r.base, undefined, phone)));
+      for (const result of results) expect(result.json().data.challenges[0]).toMatchObject({
+        status: 'FINISHED', view: { times: [cleared ? 933 : null, null], outcome: cleared ? { kind: 'win', seat: 0 } : { kind: 'draw' } },
+      });
+      expect(await r.balance(r.phones[0]!)).toBe(START_CHIPS + (cleared ? 50 : 0));
+      expect(await r.balance(r.phones[1]!)).toBe(START_CHIPS - (cleared ? 50 : 0));
+    } finally { vi.useRealTimers(); }
+  });
+
   it('plays 8-ball with a stake through the existing phone challenge flow', async () => {
     const r = await room(); const id = randomUUID();
     expect((await call('POST', r.base, { challengeId: id, opponentId: r.ids[1], game: 'eight-ball', stake: 50 }, r.phones[0])).statusCode).toBe(200);
@@ -46,6 +103,28 @@ describe('challenges between players', () => {
     expect((await call('POST', `${r.base}/${id}/resign`, {}, r.phones[1])).statusCode).toBe(200);
     expect(await r.balance(r.phones[0]!)).toBe(START_CHIPS + 50);
     expect(await r.balance(r.phones[1]!)).toBe(START_CHIPS - 50);
+  });
+
+  it('uses the selected pool settings and starts the shot clock when the opponent accepts', async () => {
+    const r = await room(); const id = randomUUID();
+    const settings = { felt: 'blue', start: { side: 'random', percent: 35 }, ballBehavior: { preset: 'heavy' }, shotSeconds: 15 };
+    const invited = await call('POST', r.base, { challengeId: id, opponentId: r.ids[1], game: 'eight-ball', stake: 0, settings }, r.phones[0]);
+    expect(invited.statusCode).toBe(200);
+    const incoming = await call('GET', r.base, undefined, r.phones[1]);
+    const invitation = incoming.json().data.challenges[0];
+    expect(invitation.poolSettings).toEqual(settings);
+    expect(['left', 'right']).toContain(invitation.view.board.start.side);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 60_000);
+      const accepted = await call('POST', `${r.base}/${id}/accept`, {}, r.phones[1]);
+      expect(accepted.statusCode).toBe(200);
+      const board = accepted.json().data.view.board;
+      expect(board).toMatchObject({ felt: 'blue', start: invitation.view.board.start, ballBehavior: settings.ballBehavior, shotClock: { seconds: 15, leftMs: 15_000 } });
+      expect(board.balls).toEqual(invited.json().data.view.board.balls);
+      const timeout = await call('POST', `${r.base}/${id}/move`, { move: { game: 'eight-ball', timeout: true, shot: 0 } }, r.phones[1]);
+      expect(timeout.statusCode).toBe(400);
+    } finally { vi.useRealTimers(); }
   });
 
   it('take both stakes when accepted and give the winner both', async () => {

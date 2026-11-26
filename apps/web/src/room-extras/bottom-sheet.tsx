@@ -9,8 +9,8 @@ const TEXTS = defineTexts('phone-sheet', {
   ro: { close: 'Închide', resize: 'Redimensionează panoul' },
 });
 
-export function BottomSheet({ title, onClose, children, actions, resizable = false }: {
-  title: string; onClose: () => void; children: ReactNode; actions?: ReactNode; resizable?: boolean;
+export function BottomSheet({ title, onClose, children, actions, leadingAction, resizable = false, roomy = false }: {
+  title: string; onClose: () => void; children: ReactNode; actions?: ReactNode; leadingAction?: ReactNode; resizable?: boolean; roomy?: boolean;
 }) {
   const t = useTexts(TEXTS);
   const titleId = useId();
@@ -26,7 +26,7 @@ export function BottomSheet({ title, onClose, children, actions, resizable = fal
     return () => window.removeEventListener('keydown', escape);
   }, [onClose]);
 
-  return <div ref={backdrop} className="sheet-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div ref={backdrop} className={roomy ? "sheet-backdrop sheet-backdrop-roomy" : "sheet-backdrop"} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div ref={panel} className="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}
       style={height === undefined ? undefined : { '--sheet-height': `${height}%` } as CSSProperties}>
       {resizable && <button type="button" className="sheet-grip" aria-label={t('resize')}
@@ -51,7 +51,8 @@ export function BottomSheet({ title, onClose, children, actions, resizable = fal
           if (event.detail === 0 || !drag.current?.moved) setHeight(height === undefined ? 100 : undefined);
           drag.current = null;
         }}><span /></button>}
-      <div className="sheet-head"><h2 id={titleId} ref={heading} tabIndex={-1}>{title}</h2>
+      <div className="sheet-head">
+        <div className="sheet-head-title">{leadingAction}<h2 id={titleId} ref={heading} tabIndex={-1}>{title}</h2></div>
         <div className="sheet-head-actions">
           {actions}
           <button type="button" className="ghost small-button" onClick={onClose} aria-label={t('close')}>✕</button>

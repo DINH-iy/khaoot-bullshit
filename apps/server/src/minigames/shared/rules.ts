@@ -13,6 +13,7 @@ import { countDots } from '../count-the-dots/judge.js';
 import { clapBeat } from '../clap-beat/judge.js';
 import { tapRace } from '../tap-race/judge.js';
 import { stopClock } from '../stop-clock/judge.js';
+import { brickRally } from '../brick-rally/judge.js';
 import { perfectCircle } from '../perfect-circle/judge.js';
 import { drawHangmanWord } from '../hangman/rules.js';
 import { CLOCK_SLACK_MS, NO_FAIRNESS, type Fairness } from './fairness.js';
@@ -85,6 +86,7 @@ const judges: Partial<Record<MinigameKey, ResultJudge>> = {
   'tap-race': tapRace,
   'stop-clock': stopClock,
   'perfect-circle': perfectCircle,
+  'brick-rally': brickRally,
 };
 
 /**

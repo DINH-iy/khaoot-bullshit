@@ -4,6 +4,15 @@
   background: #2a1d5c; color: #fff; opacity: .8; box-shadow: 0 4px 14px rgb(0 0 0 / .25); transition: opacity .15s; }
 .feedback-tab:hover, .feedback-tab:focus-visible { opacity: 1; }
 
+@media (max-width: 650px) {
+  body:has(.sheet-backdrop-roomy) .feedback-tab {
+    top: auto; right: 16px; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    min-height: 44px; padding: 8px 12px; border-radius: 8px;
+    writing-mode: horizontal-tb; transform: none;
+  }
+}
+
+
 .feedback-panel { position: fixed; right: 12px; bottom: 12px; z-index: 1001; width: min(400px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
   margin: 0; padding: 18px; border-radius: 18px; border: 1px solid light-dark(#ddd6f3, #3a3550); background: light-dark(#fff, #1e1c28); color: light-dark(#202020, #f4f4f4);
   box-shadow: 0 18px 50px rgb(0 0 0 / .35); font-family: system-ui, sans-serif; text-align: start; }

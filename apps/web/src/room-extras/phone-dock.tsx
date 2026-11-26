@@ -134,9 +134,8 @@ export function PhoneDock({ state, scores, canSeeScores, onChangeLook, onReact, 
     </BottomSheet>}
     {sheet === 'games' && sideGames && <SideGamesSheet title={x('sideGames')} onClose={close} sessionId={sessionId} selfId={state.selfPlayerId}
       selected={sideGame} onSelect={setSideGame} withChips={chips} icons={state.view.presentation.phoneMenuIcons} state={wallet} />}
-    {sheet === 'challenges' && sideGames && <BottomSheet key="challenges" title={x('challenges')} onClose={close} resizable>
-      <Challenges sessionId={sessionId} selfId={state.selfPlayerId} players={state.players} withChips={chips} state={challenges} />
-    </BottomSheet>}
+    {sheet === 'challenges' && sideGames && <Challenges title={x('challenges')} onClose={close}
+      sessionId={sessionId} selfId={state.selfPlayerId} players={state.players} withChips={chips} state={challenges} offset={offset} />}
     {sheet === 'chat' && state.settings.chat && <BottomSheet title={chat('title')} onClose={close}><RoomChat state={state} /></BottomSheet>}
     {sheet === 'react' && <BottomSheet title={t('react.open')} onClose={close}><ReactionTray onSend={onReact} choices={state.settings.reactionChoices} limit={state.settings.reactionLimit}
       own={state.view.party?.reactions ?? []} reactions={state.settings.reactions} onSound={onSound}

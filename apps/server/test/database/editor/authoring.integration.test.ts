@@ -1,8 +1,9 @@
-import { EDITOR_ROLE_ID } from '@party/contracts';
+import { EDITOR_ROLE_ID, VIEWER_ROLE_ID } from '@party/contracts';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../../src/app.js';
 import { createAuthoring, OWNER_ACCESS } from '../../../src/authoring/drafts.js';
+import { listAuthoredGraphs } from '../../../src/authoring/graph-library.js';
 import { readConfig } from '../../../src/config.js';
 import { db, prisma } from '../game-fixture.js';
 
@@ -21,6 +22,32 @@ afterAll(async () => { await app.close(); await db.close(); });
 const creator = () => prisma.creator.create({ data: { issuer: 'https://identity.example/', subject: randomUUID() } });
 
 describe('authoring drafts and publishing', () => {
+  it('lists only charts in accessible drafts and keeps answers out of the authoring library index', async () => {
+    const author = await creator();
+    const name = `Graph reader ${randomUUID().slice(0, 8)}`;
+    const reader = await prisma.person.create({ data: { name, nameKey: name.toLowerCase(), linkHash: randomUUID().replace(/-/g, '').padEnd(64, '0'), roleId: EDITOR_ROLE_ID } });
+    const access = { personId: reader.id };
+    const make = async (title: string) => {
+      const draft = await authoring.create(author.id, { gameId: randomUUID(), title, startFrom: null });
+      return authoring.save(author.id, draft.gameId, { expectedRevision: draft.revision, definition: {
+        title, formatVersion: 2, startNodeKey: 'chart', edges: [],
+        nodes: [{ key: 'chart', stages: [{ key: 'round', kind: 'minigame', game: 'draw-the-graph', prompt: title,
+          durationMs: 20_000, settings: { graph: { visible: [0, 25], hidden: [62, 79], yLabel: 'Visits' } } }] }],
+      } });
+    };
+    const shared = await make('Shared chart'); await make('Private chart');
+    expect((await call('GET', '/api/host/graphs', undefined, '')).statusCode).toBe(401);
+    expect(await listAuthoredGraphs(prisma, author.id, access)).toEqual([]);
+    await authoring.share(author.id, shared.gameId, { shares: [{ personId: reader.id, roleId: VIEWER_ROLE_ID }] }, OWNER_ACCESS);
+    expect(await listAuthoredGraphs(prisma, author.id, access)).toEqual([
+      { gameId: shared.gameId, title: 'Shared chart', question: 'Shared chart', label: 'Visits', nodeKey: 'chart', stageKey: 'round', inDraw: false, editable: false },
+    ]);
+    await authoring.share(author.id, shared.gameId, { shares: [{ personId: reader.id, roleId: EDITOR_ROLE_ID }] }, OWNER_ACCESS);
+    expect(await listAuthoredGraphs(prisma, author.id, access)).toMatchObject([{ editable: true }]);
+    await authoring.archive(author.id, shared.gameId);
+    expect(await listAuthoredGraphs(prisma, author.id, access)).toEqual([]);
+  });
+
   it('shows editors only the games they made or that are shared with them; the owner sees all, with who made each; existing games stay the owner\'s', async () => {
     const author = await creator();
     const editor = async (name: string) => { const full = `${name} ${randomUUID().slice(0, 8)}`; return prisma.person.create({ data: { name: full, nameKey: full.toLowerCase(), linkHash: randomUUID().replace(/-/g, '').padEnd(64, '0'), canEdit: true, roleId: EDITOR_ROLE_ID } }); };

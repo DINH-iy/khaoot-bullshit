@@ -1,5 +1,39 @@
 import { z } from 'zod';
-import { GameIdSchema, RevisionSchema } from './game.js';
+import { GameIdSchema, GameKeySchema, RevisionSchema } from './game.js';
+import { GraphDataSchema } from './minigames/draw-the-graph/graph.js';
+
+export const AuthoredGraphSchema = z.object({
+  gameId: GameIdSchema, title: z.string().max(160), nodeKey: GameKeySchema, stageKey: GameKeySchema, inDraw: z.boolean(),
+  question: z.string().max(500), label: z.string().max(32).optional(), editable: z.boolean(),
+}).strict();
+export const AuthoredGraphsSchema = z.array(AuthoredGraphSchema);
+export type AuthoredGraph = z.infer<typeof AuthoredGraphSchema>;
+
+const graphDraftShape = z.object({ nodes: z.array(z.unknown()) });
+const graphSceneShape = z.object({ key: GameKeySchema, stages: z.array(z.unknown()) });
+const graphStageShape = z.object({ kind: z.literal('minigame'), key: GameKeySchema, prompt: z.string().optional(), game: z.string(),
+  settings: z.unknown().optional(), draw: z.array(z.unknown()).optional() });
+const graphDrawShape = z.object({ game: z.literal('draw-the-graph'), settings: z.unknown().optional() });
+const graphSettingsShape = z.object({ graph: GraphDataSchema });
+
+/** Explicit charts in a draft, including charts inside a single-scene minigame draw. */
+export function authoredGraphs(definition: unknown) {
+  const draft = graphDraftShape.safeParse(definition);
+  if (!draft.success) return [];
+  return draft.data.nodes.flatMap(value => {
+    const node = graphSceneShape.safeParse(value);
+    if (!node.success) return [];
+    return node.data.stages.flatMap(part => {
+      const stage = graphStageShape.safeParse(part);
+      if (!stage.success) return [];
+      const { key: stageKey, prompt, game, settings, draw } = stage.data;
+      const drawn = draw?.map(entry => graphDrawShape.safeParse(entry)).find(entry => entry.success);
+      const chart = graphSettingsShape.safeParse(draw ? drawn?.data.settings : game === 'draw-the-graph' ? settings : undefined);
+      if (!chart.success) return [];
+      return [{ nodeKey: node.data.key, stageKey, inDraw: Boolean(draw), question: prompt?.trim().slice(0, 500) || '', graph: chart.data.graph }];
+    });
+  });
+}
 
 // Authoring: a game's editable draft and its published, playable versions.
 // Only the game's creator receives these; players never see a definition.

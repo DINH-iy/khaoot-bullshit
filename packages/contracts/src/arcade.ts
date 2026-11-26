@@ -3,6 +3,7 @@ import { GameIdSchema } from './game.js';
 import { MINIGAME_KEYS, MINIGAMES, MinigameSettingsSchemas, isMinigameKey, type MinigameKey } from './minigames/shared/catalog.js';
 import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, parseHeadToHeadSettings, type HeadToHeadKey } from './head-to-head.js';
 import { PlayerLookSchema } from './players.js';
+import { BRICK_MAX_SECONDS } from './minigames/brick-rally/brick-rally.js';
 import { GraphLibraryEntrySchema, GraphLibraryIdSchema } from './minigames/draw-the-graph/graph.js';
 
 /**
@@ -53,7 +54,8 @@ export function arcadeSettings(game: ArcadeGame, chosen?: ArcadeGameSettings): {
     return parsed && chosen?.seconds === undefined ? { seconds: null, values: parsed } : null;
   }
   const parsed = MinigameSettingsSchemas[game].safeParse({ ...MINIGAMES[game].defaults, ...values });
-  return parsed.success ? { seconds: chosen?.seconds ?? MINIGAMES[game].defaultSeconds, values: parsed.data as Record<string, unknown> } : null;
+  const seconds = chosen?.seconds ?? MINIGAMES[game].defaultSeconds;
+  return parsed.success ? { seconds: game === 'brick-rally' ? Math.min(seconds, BRICK_MAX_SECONDS) : seconds, values: parsed.data as Record<string, unknown> } : null;
 }
 
 /** What the leader has chosen so far for the next round; everyone else watches it (read-only) until the round starts. */

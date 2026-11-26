@@ -1,7 +1,8 @@
+import { BrickMapFields } from '../minigames/brick-rally/map-fields.js';
 import type { ReactNode } from 'react';
 import {
-  ARCADE_SECONDS_MAX, ARCADE_SECONDS_MIN, DOT_COUNT_MAX, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, POOL_FELTS, POOL_SHOT_SECONDS, ROULETTE_BET_FLOOR, arcadeSettings,
-  isHeadToHeadKey, type ArcadeGame, type ArcadeGameSettings,
+  ARCADE_SECONDS_MAX, ARCADE_SECONDS_MIN, BRICK_MAX_SECONDS, DOT_COUNT_MAX, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, POOL_FELTS, POOL_SHOT_SECONDS, ROULETTE_BET_FLOOR, arcadeSettings,
+  isHeadToHeadKey, type ArcadeGame, type ArcadeGameSettings, type BrickSettings,
 } from '@party/contracts';
 import { FaIcon } from '../presentation/icons.js';
 import { POOL_FELT_COLORS } from '../head-to-head/eight-ball/table.js';
@@ -58,9 +59,12 @@ export function ArcadeGameSettingsFields({ game, chosen, disabled, onChange }: {
   const setValues = (patch: Values) => onChange({ ...chosen, values: Object.fromEntries(Object.entries({ ...own, ...patch }).filter(([, value]) => value !== undefined)) as ArcadeGameSettings['values'] });
   const fields: ReactNode[] = [];
   const add = (node: ReactNode) => fields.push(node);
-  if (now.seconds !== null) add(<Stepper key="seconds" label="Round time" value={now.seconds} min={ARCADE_SECONDS_MIN} max={ARCADE_SECONDS_MAX} step={5} unit="s" disabled={disabled}
+  if (now.seconds !== null) add(<Stepper key="seconds" label="Round time" value={now.seconds} min={ARCADE_SECONDS_MIN} max={game === 'brick-rally' ? BRICK_MAX_SECONDS : ARCADE_SECONDS_MAX} step={5} unit="s" disabled={disabled}
     onChange={value => onChange({ ...chosen, seconds: value })} />);
   switch (game) {
+    case 'brick-rally':
+      add(<BrickMapFields key="map" settings={values as BrickSettings} disabled={disabled} onChange={next => onChange({ ...chosen, values: next.map ? { map: next.map } : next.preset ? { preset: next.preset } : {} })} />);
+      break;
     case 'reaction': {
       const min = Number(values['minWaitMs']); const max = Number(values['maxWaitMs']);
       add(<Stepper key="min" label="GO at the earliest" value={min} min={1000} max={Math.min(10_000, max)} step={500} unit="s" format={seconds} disabled={disabled} onChange={minWaitMs => setValues({ minWaitMs })} />);

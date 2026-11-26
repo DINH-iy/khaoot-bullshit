@@ -39,7 +39,8 @@ export function roundResults(view: SessionView, game: ArcadeGame, seats: Seat[])
     const team = teams?.find(entry => entry.memberIds.includes(seat.playerId));
     const place = teams ? (team?.teamId ? answer.entries.find(entry => entry.playerId === null && entry.teamId === team.teamId)?.place ?? null : null) : own?.place ?? null;
     const value = own?.value ?? null;
-    const bestKey = !teams && ranked && value !== null ? rankValue(game, MINIGAMES[game].defaults, { value }) : null;
+    // Brick Rally clear times are only comparable within the same map.
+    const bestKey = game !== 'brick-rally' && !teams && ranked && value !== null ? rankValue(game, MINIGAMES[game].defaults, { value }) : null;
     return { memberId: seat.memberId, personId: seat.personId, place, pointsMilli: points < 0n ? 0n : points, value, bestKey };
   });
 }

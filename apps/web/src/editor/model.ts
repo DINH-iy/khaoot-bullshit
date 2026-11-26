@@ -110,8 +110,25 @@ export function pointOnRoute(segments: Point[][], fraction: number): Point {
   return segments.at(-1)!.at(-1)!;
 }
 
+/** Find where a pointer hits the route and which gap between bend points it belongs to. */
+export function closestPointOnRoute(segments: Point[][], pointer: Point): { index: number; point: Point } {
+  let closest = { index: 0, point: segments[0]![0]! };
+  let distance = Infinity;
+  segments.forEach((points, index) => {
+    for (let i = 1; i < points.length; i++) {
+      const start = points[i - 1]!;
+      const end = points[i]!;
+      const x = Math.min(Math.max(pointer.x, Math.min(start.x, end.x)), Math.max(start.x, end.x));
+      const y = Math.min(Math.max(pointer.y, Math.min(start.y, end.y)), Math.max(start.y, end.y));
+      const squared = (pointer.x - x) ** 2 + (pointer.y - y) ** 2;
+      if (squared < distance) { distance = squared; closest = { index, point: { x, y } }; }
+    }
+  });
+  return closest;
+}
+
 // ---------- scene types ----------
-export type SceneType = 'intro' | 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel' | 'draw';
+export type SceneType = 'intro' | 'info' | 'quiz' | 'writing' | 'upload' | 'drawing' | 'order' | 'challenge' | 'vote' | 'route' | 'teams' | 'scoreboard' | 'minigame' | 'duel' | 'wheel' | 'draw' | 'draw-routes';
 // `name` and `hint` are read in the current language each time.
 export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: string }[] = [
   { type: 'intro', icon: 'start', get name() { return t('tIntro'); }, get hint() { return t('hIntro'); } },
@@ -128,19 +145,21 @@ export const SCENE_TYPES: { type: SceneType; name: string; icon: string; hint: s
   { type: 'scoreboard', icon: 'scoreboard', get name() { return t('tScoreboard'); }, get hint() { return t('hScoreboard'); } },
   { type: 'minigame', icon: 'minigame', get name() { return t('tMinigame'); }, get hint() { return t('hMinigame'); } },
   { type: 'draw', icon: 'draw', get name() { return t('tDraw'); }, get hint() { return t('hDraw'); } },
+  { type: 'draw-routes', icon: 'draw', get name() { return t('tDrawRoutes'); }, get hint() { return t('hDrawRoutes'); } },
   { type: 'duel', icon: 'duel', get name() { return t('tDuel'); }, get hint() { return t('hDuel'); } },
   { type: 'wheel', icon: 'wheel', get name() { return t('tWheel'); }, get hint() { return t('hWheel'); } },
 ];
 /** The add menu's tabs: every scene type is in exactly one group. */
 export const SCENE_GROUPS: { key: string; name: string; types: SceneType[] }[] = [
   { key: 'rounds', get name() { return t('gRounds'); }, types: ['quiz', 'writing', 'upload', 'drawing', 'order', 'challenge', 'vote'] },
-  { key: 'games', get name() { return t('gGames'); }, types: ['minigame', 'draw', 'duel', 'wheel'] },
+  { key: 'games', get name() { return t('gGames'); }, types: ['minigame', 'draw', 'draw-routes', 'duel', 'wheel'] },
   { key: 'between', get name() { return t('gBetween'); }, types: ['intro', 'info', 'scoreboard', 'route', 'teams'] },
 ];
 /** A Wheel of fortune scene: a show scene whose purpose is spinning one of the game's wheels. */
 export const isWheelScene = (stage: Stage | undefined) => stage?.kind === 'info' && Boolean((stage['spin'] as { wheel?: string } | undefined)?.wheel);
 /** A Minigame draw scene: a party choice that a random draw decides; each route is one minigame's scene. */
 export const isDrawScene = (stage: Stage | undefined) => stage?.kind === 'route' && (stage['decide'] as { method?: string } | undefined)?.method === 'draw';
+const isSharedDraw = (stage: Stage) => stage.kind === 'minigame' && Array.isArray(stage['draw']);
 /** The minigames a new draw starts with: quick ones for any group, no teams needed. */
 export const DRAW_START: MinigameKey[] = ['tap-race', 'reaction', 'stop-clock'];
 const wheelEntries = () => (['w1', 'w2', 'w3', 'w4', 'w5', 'w6'] as const).map(key => t(key));
@@ -224,8 +243,10 @@ function baseStage(type: SceneType, definition: Definition): Stage {
     }
     case 'route': return { key: 'main', kind: 'route', prompt: t('nRoute'), durationMs: 20_000,
       options: [{ key: 'left', label: t('left') }, { key: 'right', label: t('right') }], decide: { method: 'players', tie: 'random', noVotes: 'random', counts: 'reveal' } };
+    case 'draw': return { ...minigameStage(DRAW_START[0]!, definition), prompt: t('nDraw'),
+      draw: DRAW_START.map(game => ({ game, durationMs: MINIGAMES[game].defaultSeconds * 1000 })) };
     // Each option names a minigame; addDrawGames gives each its own connected minigame scene.
-    case 'draw': return { key: 'main', kind: 'route', prompt: t('nDraw'), durationMs: null, options: DRAW_START.map(game => ({ key: game, label: gameName(game) })), decide: { method: 'draw' } };
+    case 'draw-routes': return { key: 'main', kind: 'route', prompt: t('nDraw'), durationMs: null, options: DRAW_START.map(game => ({ key: game, label: gameName(game) })), decide: { method: 'draw' } };
     case 'scoreboard': return { key: 'main', kind: 'scoreboard', prompt: t('nScoreboard'), show: 'players', durationMs: null };
     case 'teams': return { key: 'main', kind: 'teams', prompt: t('nTeams'), durationMs: null, form: { split: { kind: 'count', teams: 2 }, formation: 'players' } };
     case 'order': return { key: 'main', kind: 'collect', prompt: t('nOrder'), durationMs: 30_000,
@@ -262,7 +283,8 @@ export function uniqueKey(prefix: string, taken: Iterable<string>): string {
 // ---------- card text ----------
 const KIND_LABEL: Record<string, keyof typeof MODEL_TEXTS.en> = { draw: 'kDraw', info: 'kInfo', route: 'kRoute', challenge: 'kChallenge', vote: 'kVote', scoreboard: 'kScoreboard', minigame: 'kMinigame', duel: 'kDuel', teams: 'kTeams' };
 function stageLabel(stage: Stage): string {
-  if (isDrawScene(stage)) return t('kDraw');
+  if (isDrawScene(stage)) return t('tDrawRoutes');
+  if (isSharedDraw(stage)) return t('kDraw');
   if (stage.kind !== 'collect') return KIND_LABEL[stage.kind] ? t(KIND_LABEL[stage.kind]!) : stage.kind;
   const input = (stage['input'] as { kind?: string } | undefined)?.kind;
   return t(input === 'choice' ? 'kQuiz' : input === 'order' ? 'kOrdering' : input === 'media' ? 'kUpload' : input === 'text' ? 'kWriting' : input === 'drawing' ? 'kDrawing' : 'kQuestion');
@@ -306,7 +328,7 @@ export function cardText(definition: Definition, node: Node) {
   const title = first.prompt ?? node.key;
   const banner = first.kind === 'info' ? String(first.title ?? '') : null;
   const line = node.stages.length > 1 ? t('partsN', { count: node.stages.length, line: stageLine(first) }) : stageLine(first);
-  return { label, title: String(title), banner, line, kind: isWheelScene(first) ? 'wheel' : isDrawScene(first) ? 'draw' : first.kind, input: (first['input'] as { kind?: string } | undefined)?.kind ?? null };
+  return { label, title: String(title), banner, line, kind: isWheelScene(first) ? 'wheel' : isDrawScene(first) || isSharedDraw(first) ? 'draw' : first.kind, input: (first['input'] as { kind?: string } | undefined)?.kind ?? null };
 }
 
 // ---------- layout and snapping ----------
@@ -413,7 +435,7 @@ export const disconnect = (definition: Definition, edgeKey: string): Definition 
 
 // ---------- scenes ----------
 export function addScene(definition: Definition, type: SceneType, variant?: string): { definition: Definition; key: string } {
-  const key = uniqueKey(type === 'route' ? 'choice' : type === 'draw' ? 'draw' : 'scene', definition.nodes.map(node => node.key));
+  const key = uniqueKey(type === 'route' ? 'choice' : type === 'draw' || type === 'draw-routes' ? 'draw' : 'scene', definition.nodes.map(node => node.key));
   if (type === 'wheel') {
     // Each wheel scene gets a wheel of its own (at most ten in a game; after that it shares the last).
     const wheels = (definition['wheels'] as { key: string }[] | undefined) ?? [];
@@ -423,7 +445,7 @@ export function addScene(definition: Definition, type: SceneType, variant?: stri
     return { key, definition: { ...definition, ...(wheel ? { wheels: [...wheels, wheel] } : {}), nodes: [...definition.nodes, node] } };
   }
   const node: Node = { key, stages: [newStage(type, definition, variant)] };
-  return { key, definition: { ...definition, ...(type === 'route' || type === 'draw' ? { formatVersion: 2 } : {}), nodes: [...definition.nodes, node] } };
+  return { key, definition: { ...definition, ...(isRoute(node) ? { formatVersion: 2 } : {}), nodes: [...definition.nodes, node] } };
 }
 export function deleteScene(definition: Definition, key: string): Definition {
   const nodes = definition.nodes.filter(node => node.key !== key);
@@ -517,7 +539,7 @@ export function insertOnEdge(definition: Definition, edgeKey: string, type: Scen
   const edge = definition.edges.find(entry => entry.key === edgeKey); if (!edge) return null;
   const added = addScene(definition, type, variant);
   let next: Definition = { ...added.definition, edges: added.definition.edges.map(entry => entry.key === edgeKey ? { ...entry, to: added.key } : entry) };
-  if (type === 'draw') {
+  if (type === 'draw-routes') {
     // A minigame draw: each game gets its own scene, and each of those leads on to where the arrow went.
     const games = addDrawGames(next, added.key); next = games.definition;
     for (const key of games.keys) next = connect(next, key, undefined, edge.to);

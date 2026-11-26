@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { POOL_FELT_COLORS } from './table.js';
 
-const TEXTS = defineTexts('pool-felt', {
+export const POOL_FELT_TEXTS = defineTexts('pool-felt', {
   felt: 'Table cloth', green: 'Green', blue: 'Blue', teal: 'Teal', red: 'Red', purple: 'Purple', gray: 'Gray',
 }, {
   nl: { felt: 'Kleed', green: 'Groen', blue: 'Blauw', teal: 'Petrol', red: 'Rood', purple: 'Paars', gray: 'Grijs' },
@@ -12,7 +12,7 @@ const TEXTS = defineTexts('pool-felt', {
 });
 
 export function PoolFeltFields({ value, onChange }: { value: PoolFelt; onChange: (felt: PoolFelt) => void }) {
-  const t = useTexts(TEXTS);
+  const t = useTexts(POOL_FELT_TEXTS);
   return <fieldset className="pool-felt-fields">
     <legend>{t('felt')}</legend>
     <div className="pool-felt-swatches">

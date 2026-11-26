@@ -79,7 +79,7 @@ export function MinigamePhoneResult({ stage, state, answer, reveal, label, offse
       break;
     case 'tap-race': facts = [[t('taps'), reading]]; break;
     case 'clap-beat': facts = [[t('beats'), value == null ? '—' : `${value} / ${CLAP_BEATS_MS.length}`]]; break;
-    case 'speed-run': facts = [[t('finish'), value == null ? '—' : seconds(value)]]; break;
+    case 'speed-run': case 'brick-rally': facts = [[t('finish'), value == null ? '—' : seconds(value)]]; break;
     case 'perfect-circle':
       if (own?.stroke) visual = <div className="mg-personal-circle"><DrawingView drawings={[{ v: 1, strokes: [{ c: 0, w: 14, p: own.stroke }] }]} label={t('roundness')} /></div>;
       facts = [[t('roundness'), own?.value == null ? '—' : percentage(own.value / 10)]];

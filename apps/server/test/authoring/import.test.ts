@@ -43,7 +43,10 @@ describe('importing a game from text', () => {
     expect(game.edges.filter(edge => edge.from === 'draw').map(edge => edge.to)).toEqual(['draw-tap', 'draw-relay']);
     expect(stage('draw-relay')).toMatchObject({ kind: 'minigame', game: 'relay-drawing', play: { kind: 'teams', lineup: { kind: 'round' } } });
     expect(stage('draw-tap')).not.toHaveProperty('play');
-    expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(18);
+    expect(stage('shared-draw')).toMatchObject({ kind: 'minigame', draw: [{ game: 'reaction' }, { game: 'stop-clock', durationMs: 20_000 }] });
+    expect(game.edges.filter(edge => edge.from === 'shared-draw')).toEqual([{ key: 'shared-draw-to-draw', from: 'shared-draw', to: 'draw' }]);
+    expect(stage('bricks')).toMatchObject({ game: 'brick-rally', durationMs: 60_000, settings: { preset: 'circuit' } });
+    expect(maxPathStages(inspectDefinition(definition).definition!)).toBe(20);
   });
 
   it('gives writing, upload and drawing rounds host points with maxPoints (and places); without them they stay votable', () => {

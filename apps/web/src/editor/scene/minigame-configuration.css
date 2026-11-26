@@ -71,8 +71,10 @@
   .configuration-columns[data-panel="preview"] .configuration-fields { display: none; }
   .configuration-fields, .configuration-preview, .configuration-actions { padding-inline: 12px; }
 }
-.configuration-launch { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.configuration-launch .small-button { min-height: 44px; margin-top: 0; }
+.ed-chosen:has(.configuration-launch) { gap: 10px; padding: 12px; }
+.configuration-launch { display: flex; align-items: stretch; flex-wrap: wrap; gap: 10px; }
+.editor .configuration-launch > .small-button { min-height: 44px; margin: 0; }
+.configuration-launch:has(.graph-import-launch) > button { flex: 1 1 11rem; text-align: center; }
 .editor .configuration-launch .graph-import-launch {
   display: inline-flex;
   align-items: center;

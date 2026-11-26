@@ -18,7 +18,7 @@ export function minigameResult(game: MinigameKey, value: number | null, settings
   if (game === 'heads-or-tails') return translate(COIN_TEXTS, COIN_SIDES[value] ?? 'heads');
   if (game === 'red-or-black-roulette') return value === 0 ? translate(ROULETTE_TEXTS, 'freePick') : translate(ROULETTE_TEXTS, 'bet', { amount: value });
   if (game === 'reaction') return `${value} ms`;
-  if (game === 'speed-run') return `${(value / 1000).toLocaleString(currentLanguage(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} s`;
+  if (game === 'speed-run' || game === 'brick-rally') return `${(value / 1000).toLocaleString(currentLanguage(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} s`;
   if (game === 'clap-beat') return `${value} / ${CLAP_BEATS_MS.length}`;
   if (game === 'tap-race') return t(value === 1 ? 'tap' : 'tapMany', { value });
   if (game === 'stop-clock') {

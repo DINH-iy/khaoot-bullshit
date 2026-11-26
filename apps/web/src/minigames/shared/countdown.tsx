@@ -4,7 +4,7 @@ import { useText } from '../../presentation/look.js';
 import { CONTROL_TEXTS } from './controls.text.js';
 import { useServerNow } from './clock.js';
 
-export interface Result { value: number; early?: true; stroke?: number[]; graphLine?: number[]; teamId?: string; bets?: RouletteBets }
+export interface Result { value: number; early?: true; stroke?: number[]; graphLine?: number[]; teamId?: string; bets?: RouletteBets; brickTrace?: string }
 export interface ControllerProps<S> { settings: S; startsAt: string; goAt: string | null; offset: number; disabled: boolean; onResult: (result: Result) => void }
 
 /** "3, 2, 1" until play starts, the same moment on every phone. Renders children once it has. */

@@ -13,5 +13,5 @@ export const chips = (amount: number) => st(Math.abs(amount) === 1 ? 'chip' : 'c
 /** Animations are skipped for people who ask for less motion. */
 export const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Whether this player has to move in a running challenge (in rock paper scissors: has not picked yet this round). */
-export const isMyTurn = (entry: Challenge) => entry.status === 'PLAYING' && (entry.view.turn === 'both'
+export const isMyTurn = (entry: Challenge) => entry.status === 'PLAYING' && (entry.game === 'brick-rally' ? !entry.view.ready[entry.view.seat] : entry.view.turn === 'both'
   ? !(entry.view.board.game === 'rps' && entry.view.seat !== null && entry.view.board.picked[entry.view.seat]) : entry.view.turn === entry.view.seat);

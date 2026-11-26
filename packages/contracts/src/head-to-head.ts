@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BrickMapSchema, BrickTraceSchema } from './minigames/brick-rally/brick-rally.js';
 import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolFeltSchema, PoolShotSchema, PoolShotSecondsSchema, PoolStartSchema, PoolTimeoutSchema } from './minigames/eight-ball/pool.js';
 
 /**
@@ -105,17 +106,35 @@ export type HeadToHeadView = z.infer<typeof HeadToHeadViewSchema>;
 // head-to-head game, optionally for a stake in chips (each puts it in; the winner
 // takes both; a draw gives them back). Kept only while the room is on.
 export const ChallengeStatusSchema = z.enum(['INVITED', 'PLAYING', 'FINISHED', 'DECLINED', 'CANCELLED']);
+export const CHALLENGE_GAMES = [...HEAD_TO_HEAD_KEYS, 'brick-rally'] as const;
+export type ChallengeGame = typeof CHALLENGE_GAMES[number];
 export const MAX_CHALLENGE_STAKE = 100_000;
 export const NewChallengeSchema = z.object({
-  challengeId: z.uuid(), opponentId: z.uuid(), game: HeadToHeadKeySchema,
+  challengeId: z.uuid(), opponentId: z.uuid(), game: z.enum(CHALLENGE_GAMES),
   stake: z.number().int().min(0).max(MAX_CHALLENGE_STAKE), settings: z.record(z.string(), z.json()).optional(),
 }).strict();
 export const ChallengeMoveSchema = z.object({ move: HeadToHeadMoveSchema }).strict();
-export const ChallengeSchema = z.object({
-  id: z.uuid(), game: HeadToHeadKeySchema, stake: z.number().int().min(0), status: ChallengeStatusSchema,
-  challengerId: z.uuid(), opponentId: z.uuid(), mine: z.enum(['challenger', 'opponent']),
-  view: HeadToHeadViewSchema, updatedAt: z.string(),
-}).strict();
+export const BrickChallengeClearSchema = z.strictObject({ brickTrace: BrickTraceSchema });
+const BrickChallengeTime = z.number().int().positive().nullable();
+export const BrickChallengeViewSchema = z.strictObject({
+  seat: Seat, map: BrickMapSchema, ready: z.tuple([z.boolean(), z.boolean()]),
+  startsAt: z.iso.datetime().nullable(), deadlineAt: z.iso.datetime().nullable(),
+  times: z.tuple([BrickChallengeTime, BrickChallengeTime]), outcome: HeadToHeadOutcomeSchema.nullable(),
+});
+export type BrickChallengeView = z.infer<typeof BrickChallengeViewSchema>;
+
+const ChallengeDetails = z.strictObject({
+  id: z.uuid(), stake: z.number().int().min(0), status: ChallengeStatusSchema,
+  challengerId: z.uuid(), opponentId: z.uuid(), mine: z.enum(['challenger', 'opponent']), updatedAt: z.string(),
+});
+export const ChallengeSchema = z.discriminatedUnion('game', [
+  ChallengeDetails.extend({
+    game: HeadToHeadKeySchema, view: HeadToHeadViewSchema,
+    // The invite shows the chosen rules. The board's starting side can already be randomized.
+    poolSettings: SETTINGS['eight-ball'].optional(),
+  }),
+  ChallengeDetails.extend({ game: z.literal('brick-rally'), view: BrickChallengeViewSchema }),
+]);
 export type Challenge = z.infer<typeof ChallengeSchema>;
 // `chips`: whether challenges in this room may have a stake (else they are for fun only).
 export const ChallengeListSchema = z.object({ challenges: z.array(ChallengeSchema), balance: z.number().int(), chips: z.boolean() }).strict();

@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  ANGLE_TARGETS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, chooseCutTarget, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_BET_FLOOR, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
+  ANGLE_TARGETS, BRICK_MAX_SECONDS, BUS_GUESSES, CLAP_END_MS, COIN_SIDES, chooseCutTarget, MINIGAMES, MINIGAME_COUNTDOWN_MS, ROULETTE_BET_FLOOR, ROULETTE_POCKETS, SPEED_RUN_COURSE, SPEED_RUN_FINISH, SPEED_RUN_START, SUITS,
   DEFAULT_REVEAL_EASING, SAMPLE_GRAPH, graphError, angleError, busGuessRight, busRainbowOpen, BUS_RAINBOW, circleScore, createDotPattern, emptyDrawing, isRainbow, parseMinigameSettings, raceOptions, rouletteMatches, rouletteNet, isSharedPrediction,
   type BusGuess, type Drawing, type MinigameKey, type MinigameSettings, type StepSideView,
   HANGMAN_ALPHABET, HANGMAN_WORDS, howToPlayKey, hangmanPattern, hangmanProgress, hangmanView, readHangmanWordMove,
@@ -93,11 +93,12 @@ function PracticeAttempt({ game, settings, stage, attempt, shared }: {
   const [pocket] = useState(() => game === 'red-or-black-roulette' ? random(ROULETTE_POCKETS) : undefined);
   const [result, setResult] = useState<Result>();
   const [expired, setExpired] = useState(false);
-  const limit = game === 'speed-run' ? 600_000
+  const limit = game === 'brick-rally' ? BRICK_MAX_SECONDS * 1000
+    : game === 'speed-run' ? 600_000
     : game === 'perfect-circle' ? (settings as MinigameSettings<'perfect-circle'>).seconds * 1000
     : game === 'stop-clock' ? (settings as MinigameSettings<'stop-clock'>).targetMs * 3
     : game === 'reaction' && goAt ? Date.parse(goAt) - starts + 10_000 : Infinity;
-  const duration = Math.min(stage.durationMs ?? ((isSharedPrediction(game) || game === 'draw-the-graph') ? MINIGAMES[game].defaultSeconds * 1000 : Infinity), limit);
+  const duration = Math.min(stage.durationMs ?? ((isSharedPrediction(game) || game === 'draw-the-graph' || game === 'brick-rally') ? MINIGAMES[game].defaultSeconds * 1000 : Infinity), limit);
   useEffect(() => {
     if (result || game !== 'reaction') return;
     const { minWaitMs, maxWaitMs } = settings as MinigameSettings<'reaction'>;

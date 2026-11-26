@@ -28,6 +28,33 @@ const play = (w: ReturnType<typeof world>, f: Fixture, index: number, stageRunId
   w.service.execute({ role: 'player', playerId: f.players[index]!.id }, { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'submission.submit', stageRunId, value: { kind: 'minigame', value, ...(early ? { early } : {}) } });
 
 describe('minigames', () => {
+  it('ranks verified Brick Rally clears by play time and refuses an unfinished replay', async () => {
+    const w = world();
+    const map = ['........', '........', '........', '........', '......#.'];
+    const f = await fixture(2, game({ game: 'brick-rally', settings: { map }, durationMs: 15_000 }));
+    const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
+    const submit = (index: number, brickTrace: string) => w.service.execute(
+      { role: 'player', playerId: f.players[index]!.id },
+      { formatVersion: 1, commandId: randomUUID(), sessionId: f.sessionId, type: 'submission.submit', stageRunId,
+        value: { kind: 'minigame', value: 0, brickTrace } },
+    );
+    w.advance(3000);
+    await expect(submit(0, 'g'.repeat(56))).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    w.advance(2000);
+    await expect(submit(0, 'g'.repeat(55))).rejects.toMatchObject({ code: 'INVALID_SUBMISSION' });
+    await submit(1, 'F'.repeat(103));
+    w.advance(700);
+    await submit(0, 'g'.repeat(56));
+    await host(w, f, 'stage.close', { stageRunId });
+    await host(w, f, 'stage.reveal', { stageRunId });
+    const view = await readSessionView(prisma, f.host, f.sessionId);
+    expect(view.stage?.reveal?.answer).toMatchObject({ kind: 'minigame', game: 'brick-rally', entries: expect.arrayContaining([
+      expect.objectContaining({ playerId: f.players[0]!.id, value: 933, place: 1 }),
+      expect.objectContaining({ playerId: f.players[1]!.id, value: 1717, place: 2 }),
+    ]) });
+    expect(JSON.stringify(view)).not.toContain('brickTrace');
+  });
+
   it('only lets the host replay rounds in a designated rehearsal, keeping the seats and ignoring stale attempts', async () => {
     const w = world();
     const regular = await fixture(2, minigameTryout);
@@ -368,9 +395,13 @@ describe('minigames', () => {
     ]));
   });
 
-  it('draws one game in a single scene, plays it with its own time and keeps it through pause and reveal', async () => {
+  it('draws one game in a single scene, keeps it through pause and reveal, and follows the shared connection', async () => {
     const w = world();
-    const f = await fixture(2, game({ game: 'cut-the-line', draw: [{ game: 'cut-the-line', durationMs: 20_000 }, { game: 'match-the-angle', durationMs: 40_000 }] }));
+    const draw = game({ game: 'cut-the-line', draw: [{ game: 'cut-the-line', durationMs: 20_000 }, { game: 'match-the-angle', durationMs: 40_000 }] });
+    const f = await fixture(2, parseDefinition({ ...draw,
+      nodes: [...draw.nodes, { key: 'finish', stages: [{ key: 'main', kind: 'info', title: 'Finish', prompt: 'Thanks for playing!', durationMs: null }] }],
+      edges: [{ key: 'mini-to-finish', from: 'mini', to: 'finish' }],
+    }));
     const stageRunId = (await host(w, f, 'session.start')).stageRunId!;
     const display = { role: 'display' as const, sessionId: f.sessionId };
     const view = () => readSessionView(prisma, display, f.sessionId);
@@ -390,6 +421,8 @@ describe('minigames', () => {
     await host(w, f, 'stage.reveal', { stageRunId });
     expect((await view()).stage!.reveal!.answer).toMatchObject({ game: drawn, entries: expect.arrayContaining([
       expect.objectContaining({ playerId: f.players[0]!.id, value: 0, place: 1 }), expect.objectContaining({ playerId: f.players[1]!.id, value: 50, place: 2 })]) });
+    await host(w, f, 'stage.advance', { stageRunId });
+    expect((await view()).stage).toMatchObject({ kind: 'info', prompt: 'Thanks for playing!' });
   });
 
   it('uses one Cut the Line target, keeps it on recovery and awards places by absolute error', async () => {

@@ -1,0 +1,39 @@
+.brick-board {
+  display: block;
+  width: min(100%, 20rem, 44dvh);
+  height: auto;
+  margin-inline: auto;
+  border: 1px solid #38506e;
+  border-radius: 12px;
+  background: #101b30;
+  touch-action: none;
+}
+.brick-rally { display: grid; gap: 8px; width: min(100%, 22rem); margin-inline: auto; }
+.brick-hud, .brick-status { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.brick-hud { font-variant-numeric: tabular-nums; font-size: .9rem; }
+.brick-help { text-align: center; margin: 0; font-size: .9rem; }
+.brick-settings { display: grid; gap: 10px; min-inline-size: 0; }
+.brick-settings p { margin: 0; }
+.brick-grid-scroll { min-width: 0; max-height: min(45dvh, 440px); padding: 4px; overflow: auto; overscroll-behavior: contain; }
+.brick-grid { display: grid; grid-template-columns: repeat(var(--brick-columns, 32), minmax(26px, 1fr)); gap: 2px; min-width: max-content; }
+.brick-grid button:is(.brick-tile) {
+  min-width: 0;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  font-size: .75rem;
+  color: #19273a;
+  background: #b1c1d4;
+  font-weight: 800;
+}
+.brick-grid .brick-tile[data-tile="#"] { background: #60e4c6; }
+.brick-grid .brick-tile[data-tile="+"] { background: #ffc384; }
+.brick-solo {
+  color: var(--r-text); background: var(--r-surface); border: 1px solid var(--r-line);
+  border-radius: 16px; width: min(32rem, calc(100% - 24px)); max-height: calc(100dvh - 24px);
+  padding: 14px; overflow: auto;
+}
+.brick-solo::backdrop { background: rgb(0 0 0 / .65); }
+.brick-solo[open] { display: grid; gap: 10px; }
+.brick-solo-header, .brick-solo-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.brick-solo-header h2 { margin: 0; }

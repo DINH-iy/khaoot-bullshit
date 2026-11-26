@@ -7,7 +7,7 @@ import { Minimap } from './minimap.js';
 import { anyGrouped, groupFrame, grouped, groupsIn, isOneGroup, ungrouped, withWholeGroups } from './groups.js';
 import {
   addConnectedScene, addDrawGames, addScene, autoLayout, duplicateScenes, pasteScenes, CARD_WIDTH, cardHeight, cardText, connect, connectProblem, deleteScene, disconnect, freeSpot, GRID, inputPort,
-  bendsOf, insertOnEdge, insertPrefab, isBendKey, isGroupKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
+  bendsOf, closestPointOnRoute, insertOnEdge, insertPrefab, isBendKey, isGroupKey, isRoute, lineUp, prefabFrom, optionsOf, outputPort, pointOnRoute, routeSegments, routedPath, snap, snapCard, straightenAll, withBends, SNAP_RADIUS, type Definition, type Guides, type Point, type Positions,
 } from '../model.js';
 import { ActionMenu, ContextMenu } from '../controls/action-menu.js';
 import { arrowMenuActions, sceneMenuActions } from './scene-menu.js';
@@ -25,6 +25,7 @@ import { PeerCursors, peerOutline, peersOn, PeerTags } from '../live/presence.js
 
 interface Connecting { from: string; option: string | undefined; pointer: Point; target: string | null; blocked: string | null; rewire: string | null }
 interface Box { from: Point; to: Point }
+interface BendDrag { edge: string; index: number; anchor: Point; origin: Point; insert: boolean; pointerId: number; moved: boolean }
 // The editor's clipboard: only the copied scenes and the connections between them, kept in this
 // browser so they can be pasted into another game after opening it. A convenience; never required.
 interface Clip { keys: string[]; from: Definition; positions: Positions; game: string | null }
@@ -59,6 +60,13 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const [asked, setAsked] = useState<'replace' | 'prefab' | null>(null);
   const clearAsked = useCallback(() => setAsked(null), []);
   const canvas = useRef<HTMLDivElement>(null);
+  const bendDrag = useRef<BendDrag | null>(null);
+  const [bendPreview, setBendPreview] = useState<{ edge: string; points: Point[] } | null>(null);
+  const cancelBend = useCallback(() => { bendDrag.current = null; setBendPreview(null); }, []);
+  useEffect(() => {
+    window.addEventListener('blur', cancelBend);
+    return () => window.removeEventListener('blur', cancelBend);
+  }, [cancelBend]);
   const select = (keys: string[]) => { setSelected(keys); setSelectedEdge(null); };
   const [size, setSize] = useState({ width: 800, height: 600 });
   useEffect(() => {
@@ -256,6 +264,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const wheel = (event: WheelEvent) => {
       if ((event.target as Element).closest('.add-menu, .edge-actions')) return;
       event.preventDefault();
+      if (bendDrag.current) return;
       const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
       if (event.shiftKey && !event.ctrlKey && !event.metaKey) { const dx = (event.deltaX || event.deltaY) * lines; const dy = event.deltaX ? event.deltaY * lines : 0; setView(current => ({ ...current, x: current.x - dx, y: current.y - dy })); return; }
       const rect = element.getBoundingClientRect();
@@ -283,7 +292,7 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
     const spot = freeSpot(result.definition, raw, result.key, raw[result.key]!);
     // A minigame draw comes with a scene for each of its games, in a column to its right.
     const inserted: string[] | undefined = 'games' in result ? (result.games as string[] | undefined) : undefined;
-    const games = inserted ? { definition: result.definition, keys: inserted } : type === 'draw' ? addDrawGames(result.definition, result.key) : { definition: result.definition, keys: [] as string[] };
+    const games = inserted ? { definition: result.definition, keys: inserted } : type === 'draw-routes' ? addDrawGames(result.definition, result.key) : { definition: result.definition, keys: [] as string[] };
     let placed: Positions = { ...raw, [result.key]: spot };
     games.keys.forEach((key, index) => { placed = { ...placed, [key]: freeSpot(games.definition, placed, key, { x: snap(spot.x + CARD_WIDTH + GRID * 4), y: snap(spot.y + index * (192 + GRID)) }) }; });
     // The draw and its games are one group: selected and moved together, Alt-click takes one scene.
@@ -301,33 +310,40 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   const addOnSelectedArrow = () => { if (selectedEdge && edgeMid) setAdding({ from: null, option: undefined, at: { x: edgeMid.x + 24, y: edgeMid.y + 24 }, place: { x: edgeMid.x - CARD_WIDTH / 2, y: edgeMid.y + GRID * 2 }, onEdge: selectedEdge }); };
   const straightenArrow = (edge: string) => change(definition, withBends(positions, edge, []));
   const removeArrow = (edge: string) => { change(disconnect(definition, edge)); setSelectedEdge(null); };
-  /**
-   * Drags a bend point of an arrow (index), or with `insert` a new one at that place in its list; the scenes stay put.
-   * Followed on the window, since a new point's + handle is replaced by the point itself while dragging.
-   */
-  const dragBend = (event: ReactPointerEvent<Element>, edge: string, index: number, insert: boolean) => {
-    if (event.button !== 0 || readOnly) return; event.stopPropagation(); event.preventDefault();
-    const before = positions;
-    const points = [...bendsOf(positions, edge)];
-    let latest: Positions | undefined;
-    const move = (moveEvent: PointerEvent) => {
-      if (!latest && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < 4) return;
-      const here = toCanvas(moveEvent.clientX, moveEvent.clientY);
-      const point = { x: snap(here.x), y: snap(here.y) };
-      if (insert && !latest) points.splice(index, 0, point);
-      else points[index] = point;
-      latest = withBends(before, edge, points);
-      setPositions(latest);
-    };
-    const up = (endEvent: PointerEvent) => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-      if (!latest) return;
-      if (endEvent.type === 'pointercancel') setPositions(before);
-      else change(definition, latest, '', before);
-    };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  const startBend = (event: ReactPointerEvent<Element>, edge: string, index: number, anchor: Point, insert: boolean, capture = event.currentTarget) => {
+    if (readOnly || event.button !== 0 || !(event.buttons & 1) || (event.ctrlKey && MOD === '⌘') || bendDrag.current) return;
+    event.preventDefault();
+    capture.setPointerCapture(event.pointerId);
+    bendDrag.current = { edge, index, anchor, origin: { x: event.clientX, y: event.clientY }, insert, pointerId: event.pointerId, moved: false };
+  };
+  const bendAt = (event: ReactPointerEvent<HTMLDivElement>, drag: BendDrag) => {
+    const dx = event.clientX - drag.origin.x; const dy = event.clientY - drag.origin.y;
+    if (Math.hypot(dx, dy) < 4) return null;
+    const point = { x: snap(drag.anchor.x + dx / view.zoom), y: snap(drag.anchor.y + dy / view.zoom) };
+    const points = bendsOf(positions, drag.edge);
+    points.splice(drag.index, drag.insert ? 0 : 1, point);
+    return points;
+  };
+  const moveBend = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = bendDrag.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const points = bendAt(event, drag);
+    if (!points) { if (drag.moved) setBendPreview(null); return; }
+    // The canvas stays mounted even when selecting the arrow reorders it or its handles move.
+    if (!drag.moved) event.currentTarget.setPointerCapture(event.pointerId);
+    drag.moved = true;
+    setBendPreview({ edge: drag.edge, points });
+  };
+  const endBend = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = bendDrag.current;
+    if (!drag || event.pointerId !== drag.pointerId || (event.type === 'lostpointercapture' && event.target !== event.currentTarget)) return;
+    cancelBend();
+    if (event.type !== 'pointerup') return;
+    const points = bendAt(event, drag);
+    if (!points) return;
+    const original = bendsOf(positions, drag.edge);
+    if (!drag.insert && points[drag.index]?.x === original[drag.index]?.x && points[drag.index]?.y === original[drag.index]?.y) return;
+    change(definition, withBends(positions, drag.edge, points));
   };
   const removeBend = (edge: string, index: number) => { if (!readOnly) change(definition, withBends(positions, edge, bendsOf(positions, edge).filter((_, at) => at !== index))); };
   // Right-click (or the menu key) on empty canvas: the add menu, and the new scene lands where you clicked.
@@ -403,6 +419,10 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      if (bendDrag.current) {
+        if (event.key === 'Escape') { event.preventDefault(); cancelBend(); }
+        return;
+      }
       if ((event.target as HTMLElement).closest('input, textarea, select, [role=combobox], dialog, [aria-modal=true], [contenteditable=true]')) return;
       if (askDelete) return;
       const fitAll = event.code === `Digit${zoomShortcuts.all}`;
@@ -480,7 +500,9 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
       {readOnly && <span className="flow-hint">{t('viewingShort')}</span>}
     </div>
     {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
-    <div className="flow-canvas" ref={canvas} style={{ backgroundSize: `${GRID * view.zoom}px ${GRID * view.zoom}px`, backgroundPosition: `${view.x - GRID * view.zoom / 2}px ${view.y - GRID * view.zoom / 2}px` }} onPointerDown={startCanvas} onContextMenu={contextMenu}onPointerMove={event => live.sendCursor(toCanvas(event.clientX, event.clientY))} onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
+    <div className="flow-canvas" ref={canvas} style={{ backgroundSize: `${GRID * view.zoom}px ${GRID * view.zoom}px`, backgroundPosition: `${view.x - GRID * view.zoom / 2}px ${view.y - GRID * view.zoom / 2}px` }} onPointerDown={startCanvas} onContextMenu={contextMenu}
+      onPointerMove={event => { moveBend(event); live.sendCursor(toCanvas(event.clientX, event.clientY)); }} onPointerUp={endBend} onPointerCancel={endBend} onLostPointerCapture={endBend}
+      onPointerLeave={() => live.sendCursor(null)} aria-label={t('gameFlow')} role="application" aria-roledescription="flow canvas">
       <div className="flow-surface" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
         {/* Groups: a frame behind their cards; its name selects the whole group. */}
         {groups.map(members => {
@@ -499,22 +521,28 @@ export function FlowView({ d, selected, setSelected, focus = null, live, onOpenS
           {[...definition.edges].sort((a, b) => Number(a.key === selectedEdge) - Number(b.key === selectedEdge)).map(edge => {
             const fromNode = nodes.find(node => node.key === edge.from); const from = positions[edge.from]; const to = positions[edge.to];
             if (!fromNode || !from || !to) return null;
-            const start = outputPort(fromNode, from, edge.option); const end = inputPort(to); const bends = bendsOf(positions, edge.key); const segments = routeSegments(start, end, bends, from.y + cardHeight(fromNode)); const path = routedPath(segments);
+            const start = outputPort(fromNode, from, edge.option); const end = inputPort(to);
+            const bends = bendPreview?.edge === edge.key ? bendPreview.points : bendsOf(positions, edge.key);
+            const segments = routeSegments(start, end, bends, from.y + cardHeight(fromNode)); const path = routedPath(segments);
             const label = edge.option ? optionsOf(fromNode).find(option => option.key === edge.option)?.label : undefined; const on = selectedEdge === edge.key;
             // Incoming paths can share their last leg at a rejoin. Keep the grip on this arrow's own leg there.
             const rejoins = definition.edges.some(other => other.key !== edge.key && other.to === edge.to);
             const grip = pointOnRoute(segments, rejoins ? 0.25 : 0.82);
             // While an arrow is being moved it stays mounted (the pointer is captured by its handle), just hidden.
             return <g key={edge.key} data-edge={edge.key} className={`edge${on ? ' selected' : ''}${connecting?.rewire === edge.key ? ' moving' : ''}`} onPointerDown={event => { event.stopPropagation(); setSelectedEdge(edge.key); setSelected([]); }}>
-              <path d={path} className="edge-hit" /><path d={path} className="edge-line" markerEnd={on ? 'url(#arrow-on)' : 'url(#arrow)'} />
+              <path d={path} className="edge-hit" onPointerDown={event => {
+                if (readOnly || event.button !== 0 || !(event.buttons & 1)) return;
+                const { index, point } = closestPointOnRoute(segments, toCanvas(event.clientX, event.clientY));
+                startBend(event, edge.key, index, point, true, canvas.current!);
+              }} /><path d={path} className="edge-line" markerEnd={on ? 'url(#arrow-on)' : 'url(#arrow)'} />
               {label && <text x={end.x - 12} y={end.y - 12} textAnchor="end" className="edge-label">{label}</text>}
               {(!readOnly && (on || connecting?.rewire === edge.key)) && <rect x={grip.x - 6} y={grip.y - 6} width={12} height={12} rx={2} className="edge-end" onPointerDown={event => { setSelectedEdge(edge.key); startConnect(event, edge.from, edge.option, edge.key); }}><title>{t('moveArrow')}</title></rect>}
               {on && !readOnly && <>
                 {segments.map((points, index) => {
                   const mid = pointOnRoute([points], 0.5);
-                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={7} className="edge-bend-add" onPointerDown={event => dragBend(event, edge.key, index, true)}><title>{t('bendHere')}</title></circle>;
+                  return <circle key={`add-${index}`} cx={mid.x} cy={mid.y} r={7} className="edge-bend-add" onPointerDown={event => startBend(event, edge.key, index, mid, true)}><title>{t('bendHere')}</title></circle>;
                 })}
-                {bends.map((point, index) => <circle key={`bend-${index}`} cx={point.x} cy={point.y} r={8} className="edge-bend" onPointerDown={event => dragBend(event, edge.key, index, false)} onDoubleClick={event => { event.stopPropagation(); removeBend(edge.key, index); }}><title>{t('moveBend')}</title></circle>)}
+                {bends.map((point, index) => <circle key={`bend-${index}`} cx={point.x} cy={point.y} r={8} className="edge-bend" onPointerDown={event => startBend(event, edge.key, index, point, false)} onDoubleClick={event => { event.stopPropagation(); removeBend(edge.key, index); }}><title>{t('moveBend')}</title></circle>)}
               </>}
             </g>;
           })}

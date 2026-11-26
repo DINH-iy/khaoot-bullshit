@@ -30,3 +30,51 @@ test('a minigame draw in one scene: the editor lists its games, the pencil sets 
   await expect.poll(async () => (await (await host.request.get(`${games}/${gameId}`, { headers })).json()).data.definition.nodes[0].stages[0].draw[1])
     .toMatchObject({ game: 'cut-the-line', durationMs: 35_000, settings: { target: { mode: 'exact', value: 42 } } });
 });
+
+test('the Flow menu offers one shared continuation or a separate route per game', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${token}`);
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+  const gameId = randomUUID();
+  const games = `${baseURL}/api/host/games`;
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const draft = (await (await page.request.post(games, { headers, data: { gameId, title: 'Draw routes', startFrom: 'timed-quiz' } })).json()).data;
+  const nodes = ['start', 'finish'].map(key => ({ key, stages: [{ key: 'main', kind: 'info', title: key, prompt: key, durationMs: null }] }));
+  const definition = { formatVersion: 2, title: 'Draw routes', startNodeKey: 'start', nodes, edges: [{ key: 'start-to-finish', from: 'start', to: 'finish' }] };
+  expect((await page.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).ok()).toBe(true);
+  await page.goto(`${baseURL}/?edit=${gameId}`);
+  const addOnArrow = async () => {
+    await page.locator('[data-edge="start-to-finish"] .edge-hit').dispatchEvent('pointerdown');
+    await page.getByRole('button', { name: /Add a scene on (this|the) arrow/ }).click();
+    await page.getByRole('tab', { name: 'Games', exact: true }).click();
+  };
+  await addOnArrow();
+  await page.getByRole('menuitem', { name: /^Minigame draw Play one/ }).click();
+  const draw = page.locator('.scene-card.kind-draw');
+  await expect(draw).toContainText('Minigame draw');
+  await expect(draw.locator('.port-out')).toHaveCount(1);
+  await expect(draw.locator('.port-row')).toHaveCount(0);
+  await expect(draw.locator('.card-problems')).toHaveCount(0);
+  await expect(page.locator('.scene-card')).toHaveCount(3);
+  await expect(page.locator('.edge-line')).toHaveCount(2);
+  const load = async () => (await (await page.request.get(`${games}/${gameId}`, { headers })).json()).data;
+  const sharedKey = await draw.getAttribute('data-scene');
+  const edges = async () => (await load()).definition.edges as { from: string; to: string; option?: string }[];
+  await expect.poll(async () => (await edges()).map(({ from, to, option }) => [from, to, option])).toEqual([
+    ['start', sharedKey, undefined], [sharedKey, 'finish', undefined],
+  ]);
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await addOnArrow();
+  await page.getByRole('menuitem', { name: /^Minigame draw with routes/ }).click();
+  await expect(draw.locator('.port-row')).toHaveCount(3);
+  await expect(draw.locator('.card-problems')).toHaveCount(0);
+  await expect(page.locator('.scene-card')).toHaveCount(6);
+  const routedKey = await draw.getAttribute('data-scene');
+  await expect.poll(async () => {
+    const saved = await edges();
+    const branches = saved.filter(edge => edge.from === routedKey && edge.option);
+    return branches.map(branch => saved.find(edge => edge.from === branch.to)?.to);
+  }).toEqual(['finish', 'finish', 'finish']);
+});

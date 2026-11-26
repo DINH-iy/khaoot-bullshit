@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { type DotPattern, type GraphRoundView, type MinigameKey, type MinigameSettings } from '@party/contracts';
+import { brickMap, type BrickSettings, type DotPattern, type GraphRoundView, type MinigameKey, type MinigameSettings } from '@party/contracts';
 import { Countdown, type Result } from './countdown.js';
 import { PerfectCircle } from '../perfect-circle/perfect-circle.js';
 import { ReactionPad } from '../reaction/reaction.js';
@@ -11,6 +11,7 @@ import { DotPhone } from '../count-the-dots/count-dots.js';
 import { CoinPhone } from '../heads-or-tails/coin.js';
 import { RoulettePhone } from '../red-or-black-roulette/roulette.js';
 import { GraphPhone } from '../draw-the-graph/graph-phone.js';
+import { BrickRallyBoard } from '../brick-rally/board.js';
 import { ClapBeat } from '../clap-beat/clap-beat.js';
 import './minigames.css';
 
@@ -41,6 +42,7 @@ export function TimedMinigame({ game, ...props }: Props & { game: MinigameKey })
     : game === 'count-the-dots' ? <DotPhone pattern={dots?.pattern} guessAt={dots?.guessAt} offset={offset} disabled={disabled} onResult={onResult} />
     : game === 'heads-or-tails' ? <CoinPhone disabled={disabled} onResult={onResult} />
     : game === 'red-or-black-roulette' ? <RoulettePhone limit={rouletteLimit ?? 0} disabled={disabled} onResult={onResult} />
+    : game === 'brick-rally' ? <BrickRallyBoard map={brickMap(props.settings as BrickSettings)} disabled={disabled} onClear={onResult} />
     : null;
   return Controller || targetController ? <div className={`mg-play mg-${game}`}>
     {Controller ? <Controller key={startsAt} {...props} /> : <Countdown key={startsAt} startsAt={startsAt} offset={offset}>

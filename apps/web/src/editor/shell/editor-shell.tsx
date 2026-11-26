@@ -24,6 +24,8 @@ import { SavePointsPanel } from './save-points-panel.js';
 import { SAVE_POINT_TEXTS } from './save-points.text.js';
 import { MediaLibraryDialog } from '../scene/fields/media-field.js';
 import { MEDIA_TEXTS } from '../scene/fields/media.text.js';
+import { GraphLibraryDialog } from '../graph-library/graph-library.js';
+import { GRAPH_LIBRARY_TEXTS } from '../graph-library/graph-library.text.js';
 import { useTexts } from '../../i18n/texts.js';
 import { SHELL_TEXTS } from './shell.text.js';
 import { newId, roomApi } from '../../room/api.js';
@@ -61,10 +63,12 @@ type Allowed = { host: boolean; make: boolean; media: boolean; permissions: read
 function EditorBody({ gameId, role, allowed, historyIdentity }: { gameId: string; role: HostRole | null; allowed: Allowed; historyIdentity: string | undefined }) {
   const d = useDraft(gameId, historyIdentity); const t = useTexts(SHELL_TEXTS);
   const mediaText = useTexts(MEDIA_TEXTS); const savePointText = useTexts(SAVE_POINT_TEXTS);
+  const graphText = useTexts(GRAPH_LIBRARY_TEXTS);
   const [zoomShortcuts, setZoomShortcuts] = useState(readZoomShortcuts);
   const changeZoomShortcuts = (shortcuts: ZoomShortcuts) => { setZoomShortcuts(shortcuts); rememberZoomShortcuts(shortcuts); };
   const [rehearsing, setRehearsing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [graphsOpen, setGraphsOpen] = useState(false);
   const [compactHeader, setCompactHeader] = useState(() => matchMedia(COMPACT_HEADER).matches);
   useEffect(() => {
     const query = matchMedia(COMPACT_HEADER);
@@ -156,6 +160,7 @@ function EditorBody({ gameId, role, allowed, historyIdentity }: { gameId: string
         ]} />
         <ActionMenu label={t('gameMenu')} actions={[{ label: t('gameSettings'), icon: 'gear', onSelect: () => openPanel('settings'), problems: gameProblems },
           ...(role ? [{ label: mediaText('library'), icon: 'upload', onSelect: () => setLibraryOpen(true) }] : []),
+          ...(role ? [{ label: graphText('title'), icon: 'bars' as const, onSelect: () => setGraphsOpen(true) }] : []),
           ...(compactHeader ? [
             { label: t('undo'), icon: 'undo', disabled: !d.canUndo, onSelect: d.undo },
             { label: t('redo'), icon: 'redo', disabled: !d.canRedo, onSelect: d.redo },
@@ -181,6 +186,7 @@ function EditorBody({ gameId, role, allowed, historyIdentity }: { gameId: string
     ]} />}
     {helping && <HelpPanel zoomShortcuts={zoomShortcuts} onZoomShortcuts={changeZoomShortcuts} onClose={() => setHelping(false)} />}
     {libraryOpen && <MediaLibraryDialog readOnly={d.readOnly || !allowed.media} onClose={() => setLibraryOpen(false)} />}
+    {graphsOpen && <GraphLibraryDialog d={d} onClose={() => setGraphsOpen(false)} />}
     {savePoints && <SavePointsPanel gameId={gameId} d={d} onClose={() => setSavePoints(false)} />}
     {inviting && <InvitePanel gameId={gameId} role={role} onClose={() => setInviting(false)} />}
     {settings && <GameSettingsPanel readOnly={d.readOnly} definition={definition} problems={gameIssues.map(issue => ({ message: issue.message, path: issue.path ?? '' }))} onChange={(next, group) => d.change(next, undefined, group)} onLook={() => setView('look')} onClose={() => setSettings(false)} />}

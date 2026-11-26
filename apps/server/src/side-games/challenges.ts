@@ -1,11 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Server } from 'socket.io';
-import { ChallengeListSchema, ChallengeMoveSchema, ChallengeSchema, GameIdSchema, NewChallengeSchema, type HeadToHeadKey } from '@party/contracts';
+import { BrickChallengeClearSchema, ChallengeListSchema, ChallengeMoveSchema, ChallengeSchema, GameIdSchema, NewChallengeSchema, parseHeadToHeadSettings, type HeadToHeadOutcome } from '@party/contracts';
 import type { PrismaClient, SideChallenge } from '../generated/prisma/client.js';
 import type { Transaction } from '../game/model.js';
+import { startPoolShotClock } from '../head-to-head/eight-ball/rules.js';
 import { IllegalMove, type Seat as BoardSeat } from '../head-to-head/engine.js';
 import { matchOutcome, matchView, playMove, readMatch, resignMatch, startMatch, type MatchState } from '../head-to-head/match.js';
 import { RoomError, roomAssert } from '../rooms/security.js';
+import { brickRaceOutcome, brickRaceView, newBrickRace, readBrickRace, readyBrickRace, submitBrickRaceClear } from './brick-race.js';
 import { balanceOf, entryFor, lockWallet, startWallet, type Seat } from './wallet.js';
 
 // Challenges between two players of a room, on their phones: rock paper scissors,
@@ -19,6 +21,8 @@ interface Access {
   fail(reply: FastifyReply, error: unknown): unknown;
 }
 const OPEN = ['INVITED', 'PLAYING'];
+const challengeLock = (tx: Transaction, id: string) => tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`challenge:${id}`}, 0))::text AS locked`;
+const boardSeat = (row: SideChallenge, playerId: string): BoardSeat => row.challengerId === playerId ? 0 : 1;
 
 export function registerChallenges(app: FastifyInstance, client: PrismaClient, access: Access, io: Server | undefined) {
   const base = '/api/rooms/:sessionId/side/challenges';
@@ -27,10 +31,14 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
     for (const playerId of [row.challengerId, row.opponentId]) io?.to(`player:${row.sessionId}:${playerId}`).emit('side.challenge', { challengeId: row.id });
   };
   const view = (row: SideChallenge, me: string) => {
+    const seat = boardSeat(row, me);
+    const details = { id: row.id, game: row.game, stake: row.stake, status: row.status, challengerId: row.challengerId, opponentId: row.opponentId,
+      mine: seat === 0 ? 'challenger' : 'opponent', updatedAt: row.updatedAt.toISOString() };
+    if (row.game === 'brick-rally') return ChallengeSchema.parse({ ...details, view: brickRaceView(readBrickRace(row.state), seat) });
     const match = readMatch(row.state); roomAssert(match, 'INVALID_STATE');
-    const seat: BoardSeat = row.challengerId === me ? 0 : 1;
-    return ChallengeSchema.parse({ id: row.id, game: row.game, stake: row.stake, status: row.status, challengerId: row.challengerId, opponentId: row.opponentId,
-      mine: seat === 0 ? 'challenger' : 'opponent', view: matchView(match, row.status === 'PLAYING' || row.status === 'FINISHED' ? seat : null), updatedAt: row.updatedAt.toISOString() });
+    const poolSettings = row.status === 'INVITED' && match.game === 'eight-ball'
+      ? parseHeadToHeadSettings(match.game, match.settings) ?? undefined : undefined;
+    return ChallengeSchema.parse({ ...details, poolSettings, view: matchView(match, row.status === 'PLAYING' || row.status === 'FINISHED' ? seat : null) });
   };
   const idOf = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { challengeId?: string }).challengeId); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   const seatRow = (tx: Transaction, sessionId: string, playerId: string) => tx.sessionPlayer.findFirstOrThrow({ where: { id: playerId, sessionId }, select: { id: true, sessionId: true, personId: true } });
@@ -38,29 +46,56 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
   const lockBoth = async (tx: Transaction, a: Seat, b: Seat) => { for (const seat of [a, b].sort((x, y) => (x.personId ?? x.id) < (y.personId ?? y.id) ? -1 : 1)) await lockWallet(tx, seat); };
   /** One challenge at a time: every change to it holds its lock and reads it fresh. */
   const locked = async (tx: Transaction, id: string, me: Seat) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`challenge:${id}`}, 0))::text AS locked`;
+    await challengeLock(tx, id);
     const row = await tx.sideChallenge.findUnique({ where: { id } });
     roomAssert(row && row.sessionId === me.sessionId && (row.challengerId === me.id || row.opponentId === me.id), 'NOT_FOUND');
     return row;
   };
   /** A finished game pays out: the winner takes both stakes; a draw returns each. */
-  const finish = async (tx: Transaction, row: SideChallenge, match: MatchState) => {
-    const outcome = matchOutcome(match); if (!outcome) return;
+  const finish = async (tx: Transaction, row: SideChallenge, outcome: HeadToHeadOutcome) => {
     const [challenger, opponent] = await Promise.all([seatRow(tx, row.sessionId, row.challengerId), seatRow(tx, row.sessionId, row.opponentId)]);
     if (row.stake > 0) {
       await lockBoth(tx, challenger, opponent);
       const pay = (seat: Seat, amount: number) => ({ ...entryFor(seat), game: row.game, reason: 'PAYOUT' as const, amount });
       await tx.chipEntry.createMany({ data: outcome.kind === 'win' ? [pay(outcome.seat === 0 ? challenger : opponent, row.stake * 2)] : [pay(challenger, row.stake), pay(opponent, row.stake)] });
     }
-    await tx.sideChallenge.update({ where: { id: row.id }, data: { status: 'FINISHED' } });
+    return tx.sideChallenge.update({ where: { id: row.id }, data: { status: 'FINISHED' } });
+  };
+
+  const saveRace = async (tx: Transaction, row: SideChallenge, race: ReturnType<typeof readBrickRace>) => {
+    const updated = await tx.sideChallenge.update({ where: { id: row.id }, data: { state: race } });
+    return race.outcome ? finish(tx, updated, race.outcome) : updated;
+  };
+  const raceExpired = (row: SideChallenge, now: number) => {
+    if (row.game !== 'brick-rally' || row.status !== 'PLAYING') return false;
+    const { deadlineAt } = readBrickRace(row.state);
+    return deadlineAt !== null && Date.parse(deadlineAt) <= now;
+  };
+  const settleExpiredRace = async (id: string, now: number) => {
+    const settled = await client.$transaction(async tx => {
+      await challengeLock(tx, id);
+      const row = await tx.sideChallenge.findUnique({ where: { id } });
+      if (!row || !raceExpired(row, now)) return row;
+      const race = readBrickRace(row.state);
+      race.outcome = brickRaceOutcome(race, now);
+      return saveRace(tx, row, race);
+    });
+    if (settled?.status === 'FINISHED') notify(settled);
+    return settled;
   };
 
   app.get(base, async (request, reply) => {
     try {
       const { seat, chips } = await access.seatOf(request);
       const rows = await client.sideChallenge.findMany({ where: { sessionId: seat.sessionId, OR: [{ challengerId: seat.id }, { opponentId: seat.id }] }, orderBy: { createdAt: 'desc' }, take: 20 });
+      const now = Date.now();
+      const challenges = [];
+      for (const row of rows) {
+        const current = raceExpired(row, now) ? await settleExpiredRace(row.id, now) : row;
+        if (current) challenges.push(view(current, seat.id));
+      }
       const { balance } = await client.$transaction(tx => balanceOf(tx, seat));
-      return { ok: true, data: ChallengeListSchema.parse({ challenges: rows.map(row => view(row, seat.id)), balance, chips }) };
+      return { ok: true, data: ChallengeListSchema.parse({ challenges, balance, chips }) };
     } catch (error) { return access.fail(reply, error); }
   });
 
@@ -71,7 +106,7 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
       const { seat, enabled, chips, openInvites, paused } = await access.seatOf(request);
       // Without chips a challenge is for fun only: no stake.
       roomAssert(enabled, 'SIDE_GAMES_OFF'); roomAssert(chips || stake === 0, 'CHIPS_OFF'); roomAssert(!paused, 'SIDE_GAMES_PAUSED');
-      const match = startMatch(game as HeadToHeadKey, settings); roomAssert(match, 'INVALID_COMMAND');
+      const match = game === 'brick-rally' ? newBrickRace(settings) : startMatch(game, settings); roomAssert(match, 'INVALID_COMMAND');
       const row = await client.$transaction(async tx => {
         // A repeated tap returns the same challenge.
         const earlier = await tx.sideChallenge.findUnique({ where: { id: challengeId } });
@@ -105,6 +140,12 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
           for (const who of [challenger, seat]) roomAssert((await balanceOf(tx, who)).balance >= row.stake, 'NOT_ENOUGH_CHIPS');
           await tx.chipEntry.createMany({ data: [challenger, seat].map(who => ({ ...entryFor(who), game: row.game, reason: 'BET' as const, amount: -row.stake })) });
         }
+        if (row.game === 'eight-ball') {
+          const match = readMatch(row.state); roomAssert(match, 'INVALID_STATE');
+          return tx.sideChallenge.update({ where: { id: row.id }, data: {
+            status: 'PLAYING', state: { ...match, data: startPoolShotClock(match.data) } as object,
+          } });
+        }
         return tx.sideChallenge.update({ where: { id: row.id }, data: { status: 'PLAYING' } });
       });
       notify(row);
@@ -133,14 +174,20 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
       if (action === 'move') roomAssert(!paused, 'SIDE_GAMES_PAUSED');
       const row = await client.$transaction(async tx => {
         const row = await locked(tx, idOf(request), seat); roomAssert(row.status === 'PLAYING', 'INVALID_STATE');
+        const mySeat = boardSeat(row, seat.id);
+        if (row.game === 'brick-rally') {
+          roomAssert(action === 'resign', 'INVALID_COMMAND');
+          const race = readBrickRace(row.state);
+          race.outcome = brickRaceOutcome(race, Date.now()) ?? { kind: 'win', seat: mySeat === 0 ? 1 : 0, reason: 'resigned' };
+          return saveRace(tx, row, race);
+        }
         const match = readMatch(row.state); roomAssert(match, 'INVALID_STATE');
-        const mySeat: BoardSeat = row.challengerId === seat.id ? 0 : 1;
         let next: MatchState;
         try { next = action === 'resign' ? resignMatch(match, mySeat) : playMove(match, mySeat, parsed!.data!.move); }
         catch (error) { if (error instanceof IllegalMove) throw new RoomError('INVALID_SUBMISSION'); throw error; }
         const updated = await tx.sideChallenge.update({ where: { id: row.id }, data: { state: next as object } });
-        await finish(tx, updated, next);
-        return tx.sideChallenge.findUniqueOrThrow({ where: { id: row.id } });
+        const outcome = matchOutcome(next);
+        return outcome ? finish(tx, updated, outcome) : updated;
       });
       notify(row);
       return { ok: true, data: view(row, seat.id) };
@@ -149,13 +196,58 @@ export function registerChallenges(app: FastifyInstance, client: PrismaClient, a
   app.post(`${base}/:challengeId/move`, playOrResign('move'));
   app.post(`${base}/:challengeId/resign`, playOrResign('resign'));
 
+  const raceCommand = (action: 'ready' | 'clear') => async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const parsed = action === 'clear' ? BrickChallengeClearSchema.safeParse(request.body) : null;
+      if (parsed) roomAssert(parsed.success, 'INVALID_COMMAND');
+      const { seat, paused } = await access.seatOf(request);
+      roomAssert(!paused, 'SIDE_GAMES_PAUSED');
+      const row = await client.$transaction(async tx => {
+        const row = await locked(tx, idOf(request), seat);
+        roomAssert(row.game === 'brick-rally' && (row.status === 'PLAYING' || row.status === 'FINISHED'), 'INVALID_STATE');
+        if (row.status === 'FINISHED') return row;
+        const race = readBrickRace(row.state);
+        const me = boardSeat(row, seat.id);
+        const now = Date.now();
+        race.outcome = brickRaceOutcome(race, now);
+        if (!race.outcome) {
+          if (parsed) submitBrickRaceClear(race, me, parsed.data!.brickTrace, now);
+          else readyBrickRace(race, me, now);
+          race.outcome = brickRaceOutcome(race, now);
+        }
+        return saveRace(tx, row, race);
+      });
+      notify(row);
+      return { ok: true, data: view(row, seat.id) };
+    } catch (error) { return access.fail(reply, error); }
+  };
+  app.post(`${base}/:challengeId/ready`, raceCommand('ready'));
+  app.post(`${base}/:challengeId/clear`, raceCommand('clear'));
+
+  // Finish timed races even when both phones have disconnected.
+  let sweeping: Promise<unknown> | undefined;
+  const sweeper = setInterval(() => {
+    if (sweeping || closing) return;
+    sweeping = (async () => {
+      const now = new Date();
+      const rows = await client.$queryRaw<{ id: string }[]>`
+        SELECT id FROM side_challenges
+        WHERE game = 'brick-rally' AND status = 'PLAYING' AND state->>'deadlineAt' <= ${now.toISOString()}
+        ORDER BY state->>'deadlineAt' LIMIT 100
+      `;
+      for (const { id } of rows) await settleExpiredRace(id, now.getTime());
+    })().catch(() => app.log.warn({ event: 'brick_races_settlement_failed' }, 'Brick Rally settlement failed; retrying later'))
+      .finally(() => { sweeping = undefined; });
+  }, 15_000);
+  sweeper.unref();
+
   // Every ten minutes: rooms that are over lose their challenges (stakes still in a game go back first).
   let cleaning: Promise<unknown> | undefined; let closing = false;
   const clean = () => { if (cleaning || closing) return; cleaning = cleanUpChallenges(client, new Date())
     .then(removed => { if (removed) app.log.info({ event: 'challenges_cleaned', removed }, 'Challenges of finished rooms removed'); })
     .catch(() => { app.log.warn({ event: 'challenge_cleanup_failed' }, 'Challenge clean-up failed; retrying later'); }).finally(() => { cleaning = undefined; }); };
   const timer = setInterval(clean, 10 * 60 * 1000); timer.unref();
-  app.addHook('preClose', async () => { closing = true; clearInterval(timer); await cleaning; });
+  app.addHook('preClose', async () => { closing = true; clearInterval(timer); clearInterval(sweeper); await Promise.all([cleaning, sweeping]); });
 }
 
 const HOUR = 60 * 60 * 1000;
@@ -176,7 +268,7 @@ export async function cleanUpChallenges(client: PrismaClient, now: Date): Promis
   let removed = 0;
   for (const { id } of rows) {
     await client.$transaction(async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`challenge:${id}`}, 0))::text AS locked`;
+      await challengeLock(tx, id);
       const row = await tx.sideChallenge.findUnique({ where: { id } }); if (!row) return;
       if (row.status === 'PLAYING' && row.stake > 0) {
         const seats = await tx.sessionPlayer.findMany({ where: { sessionId: row.sessionId, id: { in: [row.challengerId, row.opponentId] } }, select: { id: true, sessionId: true, personId: true } });

@@ -1,3 +1,6 @@
+import { BrickRallySolo } from '../minigames/brick-rally/solo.js';
+import { BRICK_TEXTS } from '../minigames/brick-rally/brick-rally.text.js';
+import { useTexts } from '../i18n/texts.js';
 import { gameName } from '../presentation/catalog.text.js';
 import { Loader } from '../ui/loader.js';
 import { useEffect, useState } from 'react';
@@ -18,6 +21,8 @@ export const openLobby = (lobbyId: string) => { navigate(`/?arcade=${lobbyId}`);
 /** The arcade's front page: open lobbies to join, opening your own, and the all-time leaderboards. */
 export function ArcadeHome() {
   const frame = useSiteLookFrame();
+  const brick = useTexts(BRICK_TEXTS);
+  const [solo, setSolo] = useState(false);
   const account = useMe();
   const [list, setList] = useState<ArcadeList | null>(null); const [board, setBoard] = useState<ArcadeLeaderboard | null>(null);
   const [name, setName] = useState(rememberedName); const [title, setTitle] = useState(''); const [password, setPassword] = useState('');
@@ -46,6 +51,8 @@ export function ArcadeHome() {
     <div className="arcade-page">
       <h1>Arcade</h1>
       <p className="arcade-lead">Play the minigames with friends, without a host or a game: open a lobby and send its link, or join one below.</p>
+      <button type="button" className="arcade-nav-button" onClick={() => setSolo(true)}>{brick('solo')}</button>
+      {solo && <BrickRallySolo onClose={() => setSolo(false)} />}
       {error && <p role="alert" className="join-error">{error}</p>}
       <section className="arcade-card" aria-labelledby="open-heading">
         <h2 id="open-heading">Open a lobby</h2>

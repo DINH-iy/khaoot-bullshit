@@ -1,10 +1,11 @@
+import { BrickMapPreview } from '../../minigames/brick-rally/board.js';
 import { GraphChart } from '../../minigames/draw-the-graph/graph-chart.js';
 import { isDefaultGraphQuestion } from '../../minigames/draw-the-graph/graph-question.js';
 import { GRAPH_TEXTS } from '../../minigames/draw-the-graph/graph.text.js';
 import { DotGuessForm } from '../../minigames/count-the-dots/count-dots.js';
 import { SpeedRunBoard } from '../../minigames/speed-run/speed-run.js';
 import { useEffect, useId, useRef, useState } from 'react';
-import { GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
+import { brickMap, BrickSettingsSchema, GraphSettingsSchema, SAMPLE_GRAPH, MINIGAMES, howToPlayKey, isMinigameKey, answerMark, DEFAULT_MEDIA_LAYOUT, MediaLayoutSchema, SceneMediaSchema, YouTubeClipSchema, mergePresentationTexts, sceneMediaUrl, type SceneTranslations } from '@party/contracts';
 import { useLanguage } from '../../i18n/language.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { DrawBoard } from '../../room/minigame-draw.js';
@@ -158,6 +159,7 @@ function MinigamePreview({ stage, game, text, compact }: { stage: Stage; game: k
   const cue = game === 'stop-clock' ? text('minigame.stop') : game === 'reaction' ? text('minigame.go') : game === 'lucky-doors' ? text('minigame.pickDoor') : null;
   return <div className={`minigame-preview${compact ? ' configuration-game-intro' : ''}`}>
     {game === 'speed-run' ? <SpeedRunBoard {...(settings?.course ? { course: settings.course } : {})} />
+      : game === 'brick-rally' ? <BrickMapPreview map={brickMap(BrickSettingsSchema.safeParse(settings).data)} label={gameName(game)} />
       : game === 'draw-the-graph' ? <GraphChart chart={GraphSettingsSchema.safeParse(settings).data?.graph ?? SAMPLE_GRAPH} />
       : <div className={`minigame-preview-symbol game-${game}`} aria-hidden="true">
       <GameSymbol game={game} />

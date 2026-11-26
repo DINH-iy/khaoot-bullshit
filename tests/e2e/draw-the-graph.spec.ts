@@ -256,3 +256,53 @@ test('players finish the same graph in their own colors and the host reveals all
     await Promise.all([touchContext.close(), keyboardContext.close(), display.close()]);
   }
 });
+
+test('the graph library lists other drafts and edits an imported graph in its original units', async ({ page, baseURL }) => {
+  await page.setViewportSize({ width: 1024, height: 680 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+  const api = `${baseURL}/api/host/games`;
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const make = async (title: string) => {
+    const gameId = randomUUID();
+    const response = await page.request.post(api, { headers, data: { gameId, title, startFrom: null } });
+    expect(response.ok()).toBe(true);
+    return (await response.json()).data as { gameId: string; revision: number };
+  };
+  const sourceTitle = `Museum graphs ${randomUUID().slice(0, 8)}`;
+  const source = await make(sourceTitle);
+  const current = await make('Other game');
+  const graph = { visible: [0, 25], hidden: [50, 75], scale: { min: 100, max: 500 }, yLabel: 'Visitors' };
+  const definition = { title: sourceTitle, formatVersion: 2, startNodeKey: 'chart', edges: [],
+    nodes: [{ key: 'chart', stages: [{ key: 'main', kind: 'minigame', game: 'draw-the-graph', prompt: 'How many museum visitors?',
+      durationMs: 20_000, settings: { graph, revealEasing: 'ease-out' } }] }],
+  };
+  expect((await page.request.put(`${api}/${source.gameId}/draft`, { headers, data: { expectedRevision: source.revision, definition } })).ok()).toBe(true);
+
+  await page.goto(`${baseURL}/?edit=${current.gameId}`);
+  await page.getByRole('button', { name: 'Game menu' }).click();
+  await page.getByRole('menuitem', { name: 'Graph library', exact: true }).click();
+  const library = page.getByRole('dialog', { name: 'Graph library' });
+  await library.getByRole('searchbox').fill(sourceTitle);
+  await library.getByRole('button', { name: /How many museum visitors/ }).click();
+  const editor = page.getByRole('dialog', { name: 'Edit graph' });
+  const visible = editor.getByLabel('Visible values');
+  await expect(visible).toHaveValue('100, 200');
+  await visible.fill('125, 250');
+  await visible.press('Tab');
+  await editor.getByLabel('Hidden values').fill('320, 410');
+  await editor.getByRole('button', { name: 'Save graph', exact: true }).click();
+  await expect(library.getByRole('status')).toHaveText('Graph updated.');
+  const saved = (await (await page.request.get(`${api}/${source.gameId}`, { headers })).json()).data;
+  expect(saved.definition.nodes[0].stages[0].settings).toMatchObject({ revealEasing: 'ease-out',
+    graph: { ...graph, visible: [6.25, 37.5], hidden: [expect.closeTo(55), 77.5] } });
+
+  await page.goto(`${baseURL}/?edit=${source.gameId}&view=scene`);
+  const importButton = page.getByRole('button', { name: 'Import graph data', exact: true });
+  const configure = page.getByRole('button', { name: 'Configure minigame', exact: true });
+  await expect(importButton).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const first = (await importButton.boundingBox())!;
+  const second = (await configure.boundingBox())!;
+  expect(Math.max(second.x - first.x - first.width, second.y - first.y - first.height)).toBeGreaterThanOrEqual(8);
+});

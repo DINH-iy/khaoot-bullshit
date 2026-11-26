@@ -64,12 +64,13 @@ export interface EditorAccess { personId: string | null; permissions?: ReadonlyS
 export const OWNER_ACCESS: EditorAccess = { personId: null };
 const ALL_GAME = new Set<GamePermission>(GAME_PERMISSIONS);
 const seesAll = (access: EditorAccess) => access.personId === null || Boolean(access.permissions?.has('games.all'));
+export const controlsGame = (game: { authorPersonId: string | null }, access: EditorAccess) => seesAll(access) || game.authorPersonId === access.personId;
 /** The games one may see: every game for the owner (and `games.all`); else the games one made and those shared with one to view. */
 export const visibleTo = (access: EditorAccess) => seesAll(access) ? {} : { OR: [{ authorPersonId: access.personId }, { shares: { some: { personId: access.personId!, role: { permissions: { has: 'game.view' } } } } }] };
 
 /** What one may do with a game: everything as its maker, the owner or with `games.all`; else what one's share's role allows. */
 export async function gamePermissions(client: PrismaClient, game: { id: string; authorPersonId: string | null }, access: EditorAccess): Promise<Set<GamePermission>> {
-  if (seesAll(access) || game.authorPersonId === access.personId) return ALL_GAME;
+  if (controlsGame(game, access)) return ALL_GAME;
   const share = await client.gameShare.findUnique({ where: { gameId_personId: { gameId: game.id, personId: access.personId! } }, select: { role: { select: { permissions: true } } } });
   return new Set((share?.role.permissions ?? []).filter((permission): permission is GamePermission => (GAME_PERMISSIONS as readonly string[]).includes(permission)));
 }

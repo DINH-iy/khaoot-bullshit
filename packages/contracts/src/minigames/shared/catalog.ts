@@ -6,6 +6,7 @@ import { GraphHueSchema, GraphLineSchema, GraphRoundViewSchema, GraphSettingsSch
 import { CutGuessSchema, CutSettingsSchema, CutTargetSchema } from '../cut-the-line/target.js';
 import { MinigameScoringSchema, type Closeness, type MinigameScoring } from './scoring.js';
 import { COURSE_HEIGHT, COURSE_WIDTH, raceCourseHasRoute } from '../speed-run/course.js';
+import { BrickSettingsSchema, BrickTraceSchema } from '../brick-rally/brick-rally.js';
 import { HangmanSettingsSchema } from '../hangman/hangman.js';
 import { UNDERCOVER_ROLES, UndercoverOwnSchema, UndercoverRevealSchema, UndercoverSettingsSchema, UndercoverViewSchema } from '../undercover/undercover.js';
 
@@ -28,6 +29,7 @@ export const MinigameSettingsSchemas = {
     /^S[.#]{6}$/.test(course[0] ?? '') && /^[.#]{6}F$/.test(course[COURSE_HEIGHT - 1] ?? '')
     && course.slice(1, -1).every(row => /^[.#]{7}$/.test(row)) && raceCourseHasRoute(course),
   'Keep an open route from the start to the flag').optional() }).strict(),
+  'brick-rally': BrickSettingsSchema,
   // Stop a clock at exactly the target; it disappears after a while.
   'stop-clock': z.object({ targetMs: z.number().int().min(2000).max(60_000), visibleMs: z.number().int().min(0).max(60_000) }).strict()
     .refine(settings => settings.visibleMs < settings.targetMs, 'The clock must disappear before the target'),
@@ -118,6 +120,9 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
   'speed-run': { name: 'Speed run', description: 'Find the fastest route through an obstacle course.',
     howToPlay: 'Use the arrows to go around the walls and reach the flag. Fastest finish wins.',
     better: 'lower', defaults: {}, defaultSeconds: 45 },
+  'brick-rally': { name: 'Brick Rally', description: 'Bounce the ball and clear the map as fast as you can.',
+    howToPlay: 'Drag to move the paddle, or use the arrow keys. Clear every brick. Missed balls relaunch while the clock keeps running.',
+    better: 'lower', defaults: {}, defaultSeconds: 90 },
   'stop-clock': { name: 'Stop the clock', description: 'Stop a vanishing clock at exactly the target.', howToPlay: 'A clock starts counting. It disappears after a while. Tap Stop when you think it reaches the target.',
     better: 'lower', closeness: { unit: 'ms', perUnit: 1, max: 60_000, within: 250, scale: 2000 }, defaults: { targetMs: 10_000, visibleMs: 3000 }, defaultSeconds: 30 },
   'lucky-doors': { name: 'Lucky doors', description: 'Pick a door and hope for the best.', howToPlay: 'Choose one door. Each door hides a number of points. Nobody knows which is which.',
@@ -160,7 +165,7 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
 /** Minigames that only work as a team round. */
 export const TEAM_MINIGAMES: readonly MinigameKey[] = ['relay-drawing', 'bus'];
 /** Minigames always played alone, also in a team game (each player for themselves). */
-export const SOLO_MINIGAMES: readonly MinigameKey[] = ['draw-the-graph', 'heads-or-tails', 'red-or-black-roulette', 'undercover'];
+export const SOLO_MINIGAMES: readonly MinigameKey[] = ['draw-the-graph', 'heads-or-tails', 'red-or-black-roulette', 'undercover', 'brick-rally'];
 /** Games that require a host or shared display, unavailable in phone-only Arcade lobbies. */
 export const SHARED_SCREEN_MINIGAMES: readonly MinigameKey[] = ['count-the-dots', 'draw-the-graph', 'heads-or-tails', 'red-or-black-roulette'];
 export const isSharedPrediction = (game: string) => game === 'heads-or-tails' || game === 'red-or-black-roulette';
@@ -176,7 +181,7 @@ export function parseMinigameSettings(game: string, settings: unknown): Minigame
 export function formatMinigameResult(game: MinigameKey, value: number | null, settings: MinigameSettings): string {
   if (value === null) return game === 'reaction' ? 'False start' : game === 'hangman' ? 'Hanged' : 'No result';
   if (game === 'reaction') return `${value} ms`;
-  if (game === 'speed-run') return `${(value / 1000).toFixed(2)} s`;
+  if (game === 'speed-run' || game === 'brick-rally') return `${(value / 1000).toFixed(2)} s`;
   if (game === 'clap-beat') return `${value}/${CLAP_BEATS_MS.length} beats`;
   if (game === 'tap-race') return `${value} ${value === 1 ? 'tap' : 'taps'}`;
   if (game === 'stop-clock') { const off = Math.abs(value - (settings as MinigameSettings<'stop-clock'>).targetMs) / 1000; return `${(value / 1000).toFixed(2)} s · ${off.toFixed(2)} s off`; }
@@ -275,7 +280,7 @@ export const MinigameValueSchema = z.object({ kind: z.literal('minigame'), value
   // Roulette: the bets (value holds their total stake).
   bets: RouletteTableBetsSchema.optional(),
   // Undercover: written by the server when the game ends; `value` is the role's place in UNDERCOVER_ROLES, `won` marks the winning side.
-  won: z.literal(true).optional() }).strict();
+  won: z.literal(true).optional(), brickTrace: BrickTraceSchema.optional() }).strict();
 
 /** The minigame as a screen sees it while it runs. Never contains secret parts (which door hides what). */
 export const PublicMinigameSchema = z.object({

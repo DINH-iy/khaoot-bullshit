@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
-import { isMinigameKey, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameSettings } from '@party/contracts';
+import { BRICK_MAX_SECONDS, isMinigameKey, MINIGAME_COUNTDOWN_MS, MINIGAMES, parseMinigameSettings, type MinigameSettings } from '@party/contracts';
 import { defineTexts, useTexts } from '../../i18n/texts.js';
 import { isDefaultGraphQuestion } from '../../minigames/draw-the-graph/graph-question.js';
 import { GRAPH_TEXTS } from '../../minigames/draw-the-graph/graph.text.js';
@@ -60,6 +60,7 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, initia
   const [returnPanel, setReturnPanel] = useState<Exclude<Panel, 'import'>>();
   const game = String(draft['game'] ?? '');
   const graph = game === 'draw-the-graph';
+  const maxSeconds = game === 'brick-rally' ? BRICK_MAX_SECONDS : 3600;
   const importing = panel === 'import';
   const known = isMinigameKey(game);
   const valid = known && parseMinigameSettings(game, draft['settings']) !== null;
@@ -128,7 +129,7 @@ function ConfigurationDialog({ definition, node, index, onApply, initial, initia
           </label>
           <div className="configuration-timing">
             <label>{inspector(game === 'count-the-dots' ? 'dotGuessTime' : 'timer')}
-              <input type="number" inputMode="numeric" min={1} max={3600} placeholder={known ? String(MINIGAMES[game].defaultSeconds) : undefined}
+              <input type="number" inputMode="numeric" min={1} max={maxSeconds} placeholder={known ? String(MINIGAMES[game].defaultSeconds) : undefined}
                 value={typeof draft.durationMs === 'number' ? Math.round(draft.durationMs / 1000) : ''} onChange={event => {
                   const seconds = event.currentTarget.valueAsNumber;
                   const durationMs = Number.isFinite(seconds) ? Math.round(Math.min(3600, Math.max(1, seconds))) * 1000 : null;

@@ -10,6 +10,7 @@ import { allStages, maxPathStages } from '../game/graph.js';
 import { createGameService } from '../game/service.js';
 import { builtInGames } from '../game/templates.js';
 import { createAuthoring } from '../authoring/drafts.js';
+import { listAuthoredGraphs } from '../authoring/graph-library.js';
 import type { EditorLive } from '../authoring/live.js';
 import { lockRoom, makeRoomCode } from '../rooms/gateway.js';
 import { joinToken, newToken, roomAssert, roomCookie, tokenHash } from '../rooms/security.js';
@@ -202,6 +203,12 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   const gameParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { gameId?: string }).gameId); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   app.get('/api/host/games', async (request, reply) => {
     try { const access = await requireEditor(request); return { ok: true, data: await authoring.list((await ownerCreator()).id, access) }; } catch (error) { return fail(reply, error); }
+  });
+  app.get('/api/host/graphs', async (request, reply) => {
+    try {
+      const access = await requireEditor(request);
+      return { ok: true, data: await listAuthoredGraphs(client, (await ownerCreator()).id, access) };
+    } catch (error) { return fail(reply, error); }
   });
   app.post('/api/host/games', async (request, reply) => {
     try { const access = await requirePermission(request, 'games.make'); return { ok: true, data: await authoring.create((await ownerCreator()).id, request.body, access) }; } catch (error) { return fail(reply, error); }

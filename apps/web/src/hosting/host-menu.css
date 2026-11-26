@@ -117,7 +117,7 @@ main.host-page > section { margin: 0; }
 .import-game .actions button, .guide-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 10px; font-weight: 600;
   background: transparent; color: inherit; border: 1px solid light-dark(#cfc7e6, #4a4466); }
 .guide-toggle { justify-self: start; }
-.import-game pre.guide { margin: 0; max-height: 40vh; overflow: auto; padding: 12px; border-radius: 10px; background: light-dark(#f7f5fc, #25222f); font-size: .82rem; white-space: pre-wrap; }
+.import-game pre.guide { min-width: 0; margin: 0; overflow-wrap: anywhere; padding: 12px; border-radius: 10px; background: light-dark(#f7f5fc, #25222f); font-size: .82rem; white-space: pre-wrap; }
 
 /* No stray space under the last game in Your games. */
 .my-games { margin-bottom: 0; }

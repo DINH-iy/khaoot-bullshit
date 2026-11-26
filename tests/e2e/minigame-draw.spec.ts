@@ -88,6 +88,10 @@ test('a minigame draw: the author picks the games, the host draws, every screen 
     await ben.reload();
     await expect(ben.locator('.draw-card.is-drawn strong')).toHaveText(name);
     await host.getByRole('button', { name: 'Next', exact: true }).click();
+    if (name === 'Pass the pencil') {
+      await expect(ben.getByRole('region', { name: 'Team forming' })).toBeVisible();
+      await host.getByRole('button', { name: 'Start round with these teams' }).click();
+    }
     await expect(ben.getByRole('heading', { name: `${name}!` })).toBeVisible();
   } finally {
     await calm.close(); await lively.close();

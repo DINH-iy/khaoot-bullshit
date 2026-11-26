@@ -1,3 +1,4 @@
+import { join as joinPath } from 'node:path';
 import { chooseOption } from './helpers.js';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -592,13 +593,32 @@ test('an arrow gets bend points to lead it around something, while the scenes st
   const arrow = page.locator(`.edge[data-edge="${key}"]`);
   const cards = async () => page.locator('.scene-card').evaluateAll(all => all.map(card => (card as HTMLElement).style.cssText).join('|'));
   const before = await cards(); const line = await arrow.locator('.edge-line').getAttribute('d');
-  await arrow.locator('.edge-hit').dispatchEvent('pointerdown');
-  await expect(arrow.locator('.edge-bend-add')).toHaveCount(1);
-  // Drag the + handle down: a bend point there; the arrow passes through it; no scene moves.
-  const handle = await center(arrow.locator('.edge-bend-add'));
-  await drag(page, handle, { x: handle.x, y: handle.y + 160 });
+  const linePoint = await arrow.locator('.edge-hit').evaluate(element => {
+    const path = element as SVGPathElement;
+    const point = path.getPointAtLength(path.getTotalLength() / 3).matrixTransform(path.getScreenCTM()!);
+    return { x: point.x, y: point.y };
+  });
+  await page.mouse.click(linePoint.x, linePoint.y);
+  await expect(arrow.locator('.edge-bend')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await page.mouse.move(linePoint.x, linePoint.y);
+  await page.mouse.down();
+  await page.mouse.move(linePoint.x, linePoint.y + 100, { steps: 10 });
+  await expect(arrow.locator('.edge-line')).not.toHaveAttribute('d', line!);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(arrow.locator('.edge-line')).toHaveAttribute('d', line!);
+
+  // Grab the line directly, even before it is selected.
+  await drag(page, linePoint, { x: linePoint.x, y: linePoint.y + 100 });
   await expect(arrow.locator('.edge-bend')).toHaveCount(1);
-  expect(await arrow.locator('.edge-line').getAttribute('d')).not.toBe(line);
+  const bent = await arrow.locator('.edge-line').getAttribute('d');
+  expect(bent).not.toBe(line);
+  const handle = await center(arrow.locator('.edge-bend'));
+  await drag(page, handle, { x: handle.x, y: handle.y + 55 });
+  await expect(arrow.locator('.edge-bend')).toHaveCount(1);
+  await expect(arrow.locator('.edge-line')).not.toHaveAttribute('d', bent!);
   expect(await cards()).toBe(before);
   await saved(page);
   // Kept after a reload.
@@ -996,6 +1016,18 @@ test('a game written by an AI is imported from text, opens in the editor, and ca
   await section.getByRole('button', { name: 'Copy instructions for an AI' }).click();
   await expect(section.getByRole('button', { name: 'Instructions copied ✓' })).toBeVisible();
   const instructions = await page.evaluate(() => navigator.clipboard.readText());
+  const guideToggle = section.getByRole('button', { name: /^The full guide/ });
+  await guideToggle.click();
+  const guide = section.locator('pre.guide');
+  await guide.evaluate(element => element.scrollIntoView({ block: 'start' }));
+  const panel = (await section.boundingBox())!;
+  const start = await section.evaluate(element => element.scrollTop);
+  await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
+  await page.mouse.wheel(0, 650);
+  await expect.poll(() => section.evaluate(element => element.scrollTop)).toBeGreaterThan(start + 300);
+  const screenshots = process.env['CHALLENGE_SETTINGS_SCREENSHOTS'];
+  if (screenshots) await page.screenshot({ path: joinPath(screenshots, 'import-guide-scrolled.png') });
+  await guideToggle.click();
   // The AI asks its questions first, then answers with only the game.
   expect(instructions).toContain('First, ask before you write.');
   expect(instructions).toContain('reply with ONLY one JSON object');
