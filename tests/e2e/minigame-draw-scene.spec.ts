@@ -16,7 +16,7 @@ test('a minigame draw in one scene: the editor lists its games, the pencil sets 
   expect((await host.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).ok()).toBe(true);
   await host.goto(`${baseURL}/?edit=${gameId}&view=scene`);
   await host.getByRole('button', { name: 'Configure minigame', exact: true }).click();
-  await expect(host.getByRole('group', { name: 'Plays' }).getByRole('button', { name: 'A draw' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(host.getByRole('button', { name: 'A draw', exact: true })).toHaveCount(0);
   const list = host.getByRole('group', { name: 'Games in the draw' });
   await expect(list.getByRole('combobox')).toHaveCount(2);
   // The pencil comes before the (red) remove button and opens that game's own time and settings.
@@ -25,7 +25,6 @@ test('a minigame draw in one scene: the editor lists its games, the pencil sets 
   await settings.getByLabel('Time to play').fill('35');
   await settings.getByRole('group', { name: 'Target percentage' }).getByRole('button', { name: 'Exact' }).click();
   await settings.getByRole('spinbutton', { name: 'Target percentage' }).fill('42');
-  await host.screenshot({ path: '/private/tmp/claude-501/-Users-dinnyvanhuizen-Projects-khaoot-bullshit/bc186d07-022f-42a3-a49f-ebef257f7bdc/scratchpad/draw-pencil.png' });
   await settings.getByRole('button', { name: 'Done' }).click();
   await host.getByRole('button', { name: 'Apply changes' }).click();
   await expect.poll(async () => (await (await host.request.get(`${games}/${gameId}`, { headers })).json()).data.definition.nodes[0].stages[0].draw[1])
@@ -197,6 +196,21 @@ test('the Flow menu offers one shared continuation or a separate route per game'
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(frame).toHaveAttribute('data-group-colour', 'teal');
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await frame.locator('.flow-group-name').click({ button: 'right' });
+  await groupMenu.getByRole('menuitem', { name: 'Group colour' }).click();
+  await colours.getByRole('button', { name: 'Custom', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Custom', exact: true });
+  await expect(picker.locator('input.color-alpha')).toHaveCount(0);
+  await picker.locator('.color-code input').fill('#da405c');
+  await picker.locator('.color-code input').press('Enter');
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-custom-picker.png') });
+  await page.keyboard.press('Escape');
+  await colours.getByRole('button', { name: 'Apply custom colour' }).click();
+  await expect(frame).toHaveCSS('border-top-color', 'rgb(218, 64, 92)');
+  if (screenshots) await page.screenshot({ path: join(screenshots, 'flow-group-custom-frame.png') });
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.reload();
+  await expect(frame).toHaveAttribute('data-group-colour', '#da405c');
   await expect.poll(positions).toEqual(after);
   await expect(page.locator('.collapsed-edge')).toHaveCount(0);
   await expect(page.locator('.edge-line')).toHaveCount(7);
@@ -209,6 +223,6 @@ test('the Flow menu offers one shared continuation or a separate route per game'
   const layout = (await imported.json()).data.definition.editor.positions;
   expect(Object.values(layout).filter(position => {
     const member = position as { groupName?: string; groupColour?: string };
-    return member.groupName === 'Arcade rotation' && member.groupColour === 'teal';
+    return member.groupName === 'Arcade rotation' && member.groupColour === '#da405c';
   })).toHaveLength(4);
 });

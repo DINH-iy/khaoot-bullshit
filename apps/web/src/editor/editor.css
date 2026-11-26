@@ -197,16 +197,24 @@
 /* A phone preview: the chosen model (ui/phone-devices.tsx) in its own proportions, at its real width where there is
    room and smaller (never stretched) where there is not. `--phone-max-h` caps its height per place. */
 .phone { --phone-bezel: 7px;
-  /* How wide the screen is drawn: its real width, less when the height allows less, less again with --phone-cap-w. */
-  --phone-shown: min(calc(var(--phone-w, 393) * 1px), calc(var(--phone-max-h, 72dvh) * var(--phone-w, 393) / var(--phone-h, 852)), var(--phone-cap-w, 2000px));
+  --phone-shown: min(calc(var(--phone-w, 393) * 1px), calc(var(--phone-max-h, 72dvh) * var(--phone-w, 393) / var(--phone-h, 852)));
   flex: 0 1 calc(var(--phone-shown) + 2 * var(--phone-bezel)); min-width: 0; margin: 0; display: grid; justify-items: center; align-content: start; gap: 8px; }
-.phone > figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0;
+.phone > figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; min-width: 0;
   width: min(100%, calc(var(--phone-shown) + 2 * var(--phone-bezel))); }
-.editor .phone .phone-device-picker { width: auto; max-width: 70%; min-height: 36px; padding: 4px 8px 4px 10px; font-size: .82rem; text-transform: none; letter-spacing: 0; }
-.phone-device { position: relative; box-sizing: content-box; display: flex; overflow: hidden; background: #000;
+.editor .phone .phone-device-picker { width: auto; max-width: 100%; min-height: 44px; padding: 4px 8px 4px 10px; font-size: .82rem; text-transform: none; letter-spacing: 0; }
+.phone-device { position: relative; box-sizing: content-box; overflow: hidden; background: #000;
   width: min(calc(100% - 2 * var(--phone-bezel)), var(--phone-shown));
   aspect-ratio: var(--phone-w, 393) / var(--phone-h, 852); border: var(--phone-bezel) solid #111116; border-radius: 13% / 6%;
   box-shadow: 0 0 0 1px var(--e-border), 0 12px 32px rgb(0 0 0 / .28); }
+/* Lay out the preview at the chosen model’s logical resolution and scale the whole screen to its frame. */
+.phone-viewport {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: flex;
+  width: calc(var(--phone-w) * 1px);
+  height: calc(var(--phone-h) * 1px);
+  transform-origin: top left;
+}
 .phone-device[data-cutout=none] { border-radius: 9% / 5%; }
 /* The camera in the screen, and the home bar of phones without a button. */
 .phone-device::before { content: ''; position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); background: #000; pointer-events: none; }
@@ -1104,7 +1112,6 @@
 .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window { padding: 12px; gap: 8px; }
 .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window header { padding-bottom: 0; border-bottom: 0; }
 .scene-preview-dialog:has(.compact-game-preview) .practice-note { display: none; }
-.scene-preview-dialog .phone:has(.compact-game-preview) > figcaption { display: none; }
 .scene-preview-dialog .phone-screen.compact-game-preview {
   padding: calc(var(--phone-top, 0px) + 8px) 12px calc(var(--phone-bottom, 0px) + 12px);
   gap: 8px;
@@ -1174,21 +1181,6 @@
 .save-points-panel .save-point-actions .icon-only { width: 44px; justify-content: center; padding: 0; }
 .save-point-empty { display: grid; gap: 8px; }
 @media (max-width: 520px) { .save-point { flex-wrap: wrap; } .save-point-actions { width: 100%; justify-content: flex-end; } }
-/* On a phone (or a very short window) the editor is already on a phone: no phone drawn inside it, the page fills the space. */
-@media (max-width: 600px), (max-height: 500px) {
-  .phone { --phone-bezel: 0px; flex-basis: 100%; }
-  .phone > figcaption { width: 100%; }
-  .phone-device { width: 100%; aspect-ratio: auto; border: 0; border-radius: 12px; box-shadow: 0 0 0 1px var(--e-border); background: none; }
-  .phone-device::before, .phone-device::after { display: none; }
-  .preview .phone-screen, .look-phone .room-preview { --phone-top: 0px; --phone-bottom: 0px; }
-  /* As tall as a game needs, as before: the page itself scrolls. */
-  .preview .phone-screen { min-height: 200px; }
-  .scene-preview-dialog .phone-screen.compact-game-preview { min-height: min(29rem, calc(100dvh - 10rem)); }
-  .configuration-preview .preview .phone-screen.compact-game-preview { min-height: min(19rem, max(12rem, calc(100dvh - 16rem))); }
-}
-@media (orientation: landscape) and (max-height: 480px) {
-  .scene-preview-dialog .phone-screen.compact-game-preview { min-height: min(16rem, calc(100dvh - 6rem)); }
-}
 /* Game settings → Reactions & sounds. */
 .party-reactions { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
 .party-reactions li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 2px 2px 10px; border-radius: 999px; border: 1px solid var(--e-border); background: var(--e-panel); }

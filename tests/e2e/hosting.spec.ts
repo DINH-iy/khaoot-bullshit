@@ -45,6 +45,14 @@ test('the test bench caps at four phones in two columns and keeps reactions insi
   await expect(page.getByRole('button', { name: 'One phone more' })).toBeDisabled();
   const phones = page.locator('.bench-phone');
   await expect(phones).toHaveCount(4);
+  const model = page.getByRole('combobox', { name: 'Phone model' });
+  await model.click();
+  await page.getByRole('option', { name: 'iPhone SE', exact: true }).click();
+  await expect.poll(() => page.locator('.bench-screen').evaluateAll(screens => screens.every(screen =>
+    Math.abs(screen.clientWidth / screen.clientHeight - 375 / 667) < .005 &&
+    (screen.firstElementChild as HTMLElement).offsetWidth === 375))).toBe(true);
+  await model.click();
+  await page.getByRole('option', { name: 'iPhone 14 / 13', exact: true }).click();
   const boxes = await phones.evaluateAll(items => items.map(item => item.getBoundingClientRect().toJSON() as DOMRect));
   expect(boxes[0]!.y).toBe(boxes[1]!.y);
   expect(boxes[2]!.y).toBe(boxes[3]!.y);

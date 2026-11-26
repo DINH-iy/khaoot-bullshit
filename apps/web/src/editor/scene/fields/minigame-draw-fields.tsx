@@ -2,23 +2,22 @@ import { useState } from 'react';
 import { isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type MinigameKey } from '@party/contracts';
 import { updateStage, type Definition, type Node, type Stage } from '../../model.js';
 import { Dropdown } from '../../../ui/dropdown.js';
-import { Segmented } from '../../controls/segmented.js';
 import { Icon } from '../../controls/icons.js';
 import { defineTexts, useTexts } from '../../../i18n/texts.js';
 import { gameName } from '../../../presentation/catalog.text.js';
 
 const TEXTS = defineTexts('minigame draw fields', {
-  plays: 'Plays', one: 'One game', draw: 'A draw', games: 'Games in the draw', gameN: 'Game {number}', edit: 'Change the settings of {game}',
+  games: 'Games in the draw', gameN: 'Game {number}', edit: 'Change the settings of {game}',
   remove: 'Remove {game} from the draw', add: 'Add a game', hint: 'When the scene starts, one of these games is drawn at random and played here, with its own settings.',
   title: '{game} in the draw', seconds: 'Time to play', done: 'Done', teams: '(teams)',
 }, {
-  nl: { plays: 'Speelt', one: 'Eén spel', draw: 'Een loting', games: 'Spellen in de loting', gameN: 'Spel {number}', edit: 'Instellingen van {game} aanpassen',
+  nl: { games: 'Spellen in de loting', gameN: 'Spel {number}', edit: 'Instellingen van {game} aanpassen',
     remove: '{game} uit de loting halen', add: 'Spel toevoegen', hint: 'Als de scène begint, wordt een van deze spellen willekeurig gekozen en hier gespeeld, met zijn eigen instellingen.',
     title: '{game} in de loting', seconds: 'Speeltijd', done: 'Klaar', teams: '(teams)' },
-  de: { plays: 'Spielt', one: 'Ein Spiel', draw: 'Eine Auslosung', games: 'Spiele in der Auslosung', gameN: 'Spiel {number}', edit: 'Einstellungen von {game} ändern',
+  de: { games: 'Spiele in der Auslosung', gameN: 'Spiel {number}', edit: 'Einstellungen von {game} ändern',
     remove: '{game} aus der Auslosung nehmen', add: 'Spiel hinzufügen', hint: 'Beginnt die Szene, wird eines dieser Spiele zufällig gezogen und hier gespielt, mit seinen eigenen Einstellungen.',
     title: '{game} in der Auslosung', seconds: 'Spielzeit', done: 'Fertig', teams: '(Teams)' },
-  ro: { plays: 'Se joacă', one: 'Un joc', draw: 'O tragere', games: 'Jocuri în tragere', gameN: 'Jocul {number}', edit: 'Schimbă setările pentru {game}',
+  ro: { games: 'Jocuri în tragere', gameN: 'Jocul {number}', edit: 'Schimbă setările pentru {game}',
     remove: 'Scoate {game} din tragere', add: 'Adaugă un joc', hint: 'Când începe scena, unul dintre aceste jocuri este tras la sorți și jucat aici, cu propriile setări.',
     title: '{game} în tragere', seconds: 'Timp de joc', done: 'Gata', teams: '(echipe)' },
 });
@@ -45,27 +44,12 @@ export function MinigameDrawFields({ definition, node, index, onChange, settings
   const setDraw = (next: Entry[], field: string) => edit(current => ({ ...current, draw: next, game: next[0]!.game }), field);
   const playable = (key: MinigameKey) => teams || !TEAM_MINIGAMES.includes(key);
   const unused = MINIGAME_KEYS.find(key => playable(key) && !draw?.some(entry => entry.game === key));
-  const toDraw = () => edit(current => {
-    const first: Entry = { game: String(current['game']), ...(current['settings'] ? { settings: current['settings'] as Record<string, unknown> } : {}), ...(current.durationMs !== undefined ? { durationMs: current.durationMs } : {}) };
-    const second = MINIGAME_KEYS.find(key => key !== first.game && playable(key))!;
-    return { ...current, draw: [first, { game: second, durationMs: MINIGAMES[second].defaultSeconds * 1000 }] };
-  }, 'draw');
-  const toOne = () => edit(current => {
-    const [first] = (current['draw'] as Entry[]); const copy: Stage = { ...current, game: first!.game };
-    delete copy['draw']; delete copy['settings'];
-    if (first!.settings) copy['settings'] = first!.settings;
-    if (first!.durationMs !== undefined) copy.durationMs = first!.durationMs;
-    return copy;
-  }, 'draw');
-  const segmented = <Segmented label={t('plays')} value={draw ? 'draw' : 'one'} onChange={value => value === 'draw' ? toDraw() : toOne()}
-    choices={[{ value: 'one', label: t('one') }, { value: 'draw', label: t('draw') }]} />;
-  if (!draw) return segmented;
+  if (!draw) return null;
   const name = (game: string) => isMinigameKey(game) ? gameName(game) : game;
   const open = editing === null ? null : draw[editing];
   // The pencil: the game's usual settings, shown for a stand-in scene of that game; changes go back into its entry.
   const standIn = open ? { ...stage, game: open.game, settings: open.settings, durationMs: open.durationMs === undefined ? stage.durationMs : open.durationMs, draw: undefined } as Stage : null;
   return <>
-    {segmented}
     <fieldset className="draw-list"><legend>{t('games')}</legend>
       {draw.map((entry, position) => <div key={entry.game} className="option-row">
         <Dropdown label={t('gameN', { number: position + 1 })} value={entry.game}

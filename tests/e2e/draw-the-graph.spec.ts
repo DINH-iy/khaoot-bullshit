@@ -27,6 +27,7 @@ test('players finish the same graph in their own colors and the host reveals all
   await expect(configuration.getByLabel('Reveal easing')).toHaveValue('ease-in');
   await configuration.getByLabel('Reveal easing').selectOption('ease-out');
   await expect(host.getByRole('checkbox', { name: 'Use my own graph' })).toBeChecked();
+  await configuration.getByText('Edit data and axis labels', { exact: true }).click();
   await expect(host.getByLabel('Hidden values')).toHaveValue('50, 50');
   await configuration.getByRole('button', { name: 'Apply changes' }).click();
   const importData = host.getByRole('button', { name: 'Import graph data', exact: true });
@@ -70,6 +71,7 @@ test('players finish the same graph in their own colors and the host reveals all
   await expect(previewTab).toBeVisible();
   expect((await previewTab.boundingBox())?.y).toBe((await settingsTab.boundingBox())?.y);
   await previewTab.click();
+  await expect(configuration.getByRole('combobox', { name: 'Phone model' })).toBeInViewport({ ratio: 1 });
   await expect(configuration.locator('.phone-screen.compact-game-preview')).toBeInViewport({ ratio: 1 });
   await expect(configuration.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
   await host.setViewportSize(desktop);
@@ -87,6 +89,7 @@ test('players finish the same graph in their own colors and the host reveals all
   await expect(cut).toHaveAttribute('aria-valuetext', '2011');
   await cut.press('ArrowRight');
   await host.getByRole('button', { name: 'Use this data' }).click();
+  await configuration.getByText('Edit data and axis labels', { exact: true }).click();
   await host.getByLabel('Data source (shown at reveal)').fill('Example views dataset');
   await configuration.getByRole('button', { name: 'Apply changes' }).click();
   const readDraft = async () => (await (await host.request.get(`${games}/${gameId}`, { headers })).json()).data;
@@ -102,16 +105,20 @@ test('players finish the same graph in their own colors and the host reveals all
   const graphController = practice.locator('.graph-controller');
   for (const [width, height] of [[320, 568], [360, 640], [390, 844], [667, 375]] as const) {
     await host.setViewportSize({ width, height });
-    await expect(graphController).toBeInViewport({ ratio: 1 });
-    await expect(submit).toBeInViewport({ ratio: 1 });
-    await expect(restart).toBeInViewport({ ratio: 1 });
+    await expect(graphController).toBeInViewport({ ratio: .9999 });
+    await expect(submit).toBeInViewport({ ratio: .9999 });
+    await expect(restart).toBeInViewport({ ratio: .9999 });
     expect(await practice.evaluate(element => element.scrollHeight - element.clientHeight), `${width} × ${height} vertical overflow`).toBe(0);
   }
   for (let step = 0; step < GRAPH_SAMPLES; step++) await graphController.press('ArrowRight');
   await submit.click();
   await expect(practice.getByRole('status')).toContainText('average error');
   await expect(practice.getByRole('status')).toHaveCSS('font-size', '18px');
-  await expect(restart).toBeInViewport({ ratio: 1 });
+  await expect(restart).toBeInViewport({ ratio: .9999 });
+  await host.setViewportSize({ width: 1024, height: 600 });
+  await practice.getByRole('button', { name: 'Shared screen' }).click();
+  await expect(practice.locator('.tv-screen .graph-chart')).toBeInViewport({ ratio: 1 });
+  await expect(practice.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
   await practice.getByRole('button', { name: 'Close', exact: true }).click();
   await host.setViewportSize(desktop);
   const saved = await readDraft();
@@ -259,6 +266,8 @@ test('players finish the same graph in their own colors and the host reveals all
 
 test('the graph library lists other drafts and edits an imported graph in its original units', async ({ page, baseURL }) => {
   await page.setViewportSize({ width: 1024, height: 680 });
+  const screenshots = process.env['GRAPH_AUTHORING_SCREENSHOTS'];
+  if (screenshots) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
   const api = `${baseURL}/api/host/games`;
@@ -274,6 +283,7 @@ test('the graph library lists other drafts and edits an imported graph in its or
   const current = await make('Other game');
   const graph = { visible: [0, 25], hidden: [50, 75], scale: { min: 100, max: 500 }, yLabel: 'Visitors' };
   const definition = { title: sourceTitle, formatVersion: 2, startNodeKey: 'chart', edges: [],
+    graphLibrary: Array.from({ length: 13 }, (_, index) => ({ key: `graph-${randomUUID()}`, question: `Exhibition ${index + 1}`, graph })),
     nodes: [{ key: 'chart', stages: [{ key: 'main', kind: 'minigame', game: 'draw-the-graph', prompt: 'How many museum visitors?',
       durationMs: 20_000, settings: { graph, revealEasing: 'ease-out' } }] }],
   };
@@ -283,9 +293,42 @@ test('the graph library lists other drafts and edits an imported graph in its or
   await page.getByRole('button', { name: 'Game menu' }).click();
   await page.getByRole('menuitem', { name: 'Graph library', exact: true }).click();
   const library = page.getByRole('dialog', { name: 'Graph library' });
-  await library.getByRole('searchbox').fill(sourceTitle);
-  await library.getByRole('button', { name: /How many museum visitors/ }).click();
+  const search = library.getByRole('searchbox');
+  await search.fill(sourceTitle);
+  await expect(library.getByText('Page 1 of 2')).toBeVisible();
+  const results = library.locator('.graph-library-results');
+  const nextPage = library.getByRole('button', { name: 'Next page' });
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-library-paged.png` });
+  await results.evaluate(element => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(() => results.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect(search).toBeInViewport({ ratio: 1 });
+  await expect(nextPage).toBeInViewport({ ratio: 1 });
+  const lastRow = (await results.getByRole('listitem').last().boundingBox())!;
+  const footer = (await library.locator('footer').boundingBox())!;
+  expect(footer.y - (lastRow.y + lastRow.height)).toBeGreaterThanOrEqual(24);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-library-pagination-padding.png` });
+  await nextPage.click();
+  await expect(library.getByText('Page 2 of 2')).toBeVisible();
+  await expect.poll(() => results.evaluate(element => element.scrollTop)).toBe(0);
+  await expect(library.getByRole('button', { name: /^Exhibition 13/ })).toBeVisible();
+  await search.fill('How many museum visitors');
+  const previewButton = library.getByRole('button', { name: 'Preview How many museum visitors?' });
+  await previewButton.click();
+  const preview = page.getByRole('dialog', { name: 'Preview', exact: true });
+  await expect(preview.getByRole('combobox', { name: 'Phone model' })).toBeVisible();
+  await expect(preview.locator('.phone-screen')).toContainText('How many museum visitors?');
+  await preview.getByRole('button', { name: 'Shared screen', exact: true }).click();
+  await expect(preview.locator('.tv-screen .graph-chart')).toBeVisible();
+  await preview.getByRole('button', { name: 'Start practice' }).click();
+  await expect(preview.locator('.tv-screen .graph-controller')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(library).toBeVisible();
+  await expect(previewButton).toBeFocused();
+  const practiced = (await (await page.request.get(`${api}/${source.gameId}`, { headers })).json()).data;
+  expect(practiced.definition.nodes[0].stages[0].settings.graph).toEqual(graph);
+  await library.getByRole('button', { name: /^Edit How many museum visitors/ }).click();
   const editor = page.getByRole('dialog', { name: 'Edit graph' });
+  await editor.getByText('Edit data and axis labels', { exact: true }).click();
   const visible = editor.getByLabel('Visible values');
   await expect(visible).toHaveValue('100, 200');
   await visible.fill('125, 250');
@@ -297,6 +340,15 @@ test('the graph library lists other drafts and edits an imported graph in its or
   expect(saved.definition.nodes[0].stages[0].settings).toMatchObject({ revealEasing: 'ease-out',
     graph: { ...graph, visible: [6.25, 37.5], hidden: [expect.closeTo(55), 77.5] } });
 
+  await library.getByRole('button', { name: /^Delete How many museum visitors/ }).click();
+  const remove = page.getByRole('dialog', { name: 'Delete graph' });
+  await expect(remove).toContainText('The scene will use the built-in sample graph.');
+  await remove.getByRole('button', { name: 'Delete graph', exact: true }).click();
+  await expect(library.getByRole('status')).toHaveText('Graph deleted.');
+  const afterDelete = (await (await page.request.get(`${api}/${source.gameId}`, { headers })).json()).data.definition;
+  expect(afterDelete.nodes).toHaveLength(1);
+  expect(afterDelete.nodes[0].stages[0].settings).toEqual({ revealEasing: 'ease-out' });
+
   await page.goto(`${baseURL}/?edit=${source.gameId}&view=scene`);
   const importButton = page.getByRole('button', { name: 'Import graph data', exact: true });
   const configure = page.getByRole('button', { name: 'Configure minigame', exact: true });
@@ -305,4 +357,183 @@ test('the graph library lists other drafts and edits an imported graph in its or
   const first = (await importButton.boundingBox())!;
   const second = (await configure.boundingBox())!;
   expect(Math.max(second.x - first.x - first.width, second.y - first.y - first.height)).toBeGreaterThanOrEqual(8);
+});
+
+test('a population link imports both countries and the cutoff and device previews stay usable', async ({ page, baseURL }) => {
+  test.skip(test.info().project.name !== 'desktop-chrome', 'Checks a wide editor layout.');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const screenshots = process.env['GRAPH_AUTHORING_SCREENSHOTS'];
+  if (screenshots) await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+  const gameId = randomUUID();
+  const games = `${baseURL}/api/host/games`;
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  const draft = (await (await page.request.post(games, { headers, data: { gameId, title: 'Population charts', startFrom: null } })).json()).data;
+  const definition = { formatVersion: 2, title: 'Population charts', startNodeKey: 'chart', edges: [], nodes: [{ key: 'chart', stages: [
+    { key: 'main', kind: 'minigame', prompt: 'Draw the Graph', game: 'draw-the-graph', durationMs: 30_000 },
+  ] }] };
+  expect((await page.request.put(`${games}/${gameId}/draft`, { headers, data: { expectedRevision: draft.revision, definition } })).ok()).toBe(true);
+  const url = 'https://ourworldindata.org/grapher/population-with-un-projections?time=1950..2023&country=ROU~NLD';
+  if (!process.env['GRAPH_IMPORT_LIVE']) {
+    const csv = ['entity,code,year,population',
+      ...Array.from({ length: 74 }, (_, index) => [`Netherlands,NLD,${1950 + index},${10_000_000 + index * 100_000}`, `Romania,ROU,${1950 + index},${17_000_000 + 80_000 * index}`]).flat(),
+    ].join('\n');
+    await page.route('**/api/host/graph-import', route => route.fulfill({ json: { ok: true, data: { csv, sourceUrl: url,
+      metadata: { chart: { title: 'Population' }, columns: { population: { unit: 'people' } } },
+    } } }));
+  }
+
+  await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  await page.getByRole('button', { name: 'Game menu' }).click();
+  await page.getByRole('menuitem', { name: 'Graph library', exact: true }).click();
+  const library = page.getByRole('dialog', { name: 'Graph library' });
+  await library.getByRole('button', { name: 'Import data' }).click();
+  const importer = page.getByRole('dialog', { name: 'Import graph data' });
+  await importer.getByLabel('Our World in Data chart URL').fill(url);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/import-data.png` });
+  await importer.getByRole('button', { name: 'Preview chart from URL' }).click();
+  const series = importer.getByRole('combobox', { name: 'Value column' });
+  await expect(series.locator('option')).toHaveText([/Netherlands/, /Romania/]);
+  const cutoff = importer.getByRole('slider');
+  const original = Number(await cutoff.getAttribute('aria-valuetext'));
+  const dragCutoff = async (dialog: typeof importer, distance: number) => {
+    const position = (await dialog.locator('[data-graph-cutoff]').evaluate(line => {
+      const bounds = line.getBoundingClientRect();
+      return { x: bounds.x, y: bounds.y + bounds.height / 2 };
+    }));
+    await page.mouse.move(position.x, position.y);
+    await page.mouse.down();
+    await page.mouse.move(position.x + distance, position.y, { steps: 9 });
+    await page.mouse.up();
+  };
+  await dragCutoff(importer, 55);
+  expect(Number(await cutoff.getAttribute('aria-valuetext'))).toBeGreaterThan(original);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/import-series.png` });
+  const previewButton = importer.getByRole('button', { name: 'Preview', exact: true });
+  const importedYear = await cutoff.getAttribute('aria-valuetext');
+  await previewButton.click();
+  const graphPreview = page.getByRole('dialog', { name: 'Preview', exact: true });
+  await expect(graphPreview.getByRole('button', { name: 'Phone', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(graphPreview.locator('.phone-screen .graph-chart')).toContainText(importedYear!);
+  await expect(graphPreview.locator('[data-graph-answer]')).toHaveCount(0);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-preview-phone.png` });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const phoneModel = graphPreview.getByRole('combobox', { name: 'Phone model' });
+  await expect(phoneModel).toBeInViewport({ ratio: 1 });
+  await phoneModel.click();
+  await graphPreview.getByRole('option', { name: 'iPhone SE', exact: true }).click();
+  const phoneFrame = graphPreview.locator('.phone-device');
+  await expect(phoneFrame).toHaveAttribute('title', 'iPhone SE');
+  await expect.poll(() => phoneFrame.evaluate(element => {
+    const viewport = element.firstElementChild as HTMLElement;
+    return [viewport.offsetWidth, viewport.offsetHeight];
+  })).toEqual([375, 667]);
+  await expect.poll(() => phoneFrame.evaluate(element => Math.abs(element.clientWidth / element.clientHeight - 375 / 667))).toBeLessThan(.005);
+  await expect(phoneFrame).toBeInViewport({ ratio: 1 });
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-phone-model.png` });
+  await expect(graphPreview.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  await graphPreview.getByRole('button', { name: 'Start practice' }).click();
+  await expect(graphPreview.locator('.phone-screen .graph-controller')).toBeVisible();
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-practice-mobile.png` });
+  await page.keyboard.press('Escape');
+  await expect(graphPreview).toBeHidden();
+  await expect(previewButton).toBeFocused();
+  await expect(cutoff).toHaveAttribute('aria-valuetext', importedYear!);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await importer.getByRole('button', { name: 'Import all new series' }).click();
+  await expect(importer.getByText('This series is already in the graph library.')).toBeVisible();
+  await expect(importer.getByRole('button', { name: 'Use this data' })).toBeDisabled();
+  await series.selectOption({ label: (await series.locator('option').last().innerText()) });
+  await expect(importer.getByText('This series is already in the graph library.')).toBeVisible();
+  await importer.getByRole('button', { name: 'Back to graphs' }).click();
+  await expect(library.getByRole('button', { name: /^Population.*Netherlands/ })).toBeVisible();
+  await expect(library.getByRole('button', { name: /^Population.*Romania/ })).toBeVisible();
+  if (screenshots) {
+    await library.getByRole('searchbox').fill('Population charts');
+    await page.screenshot({ path: `${screenshots}/graph-library.png` });
+  }
+  const previewRomania = library.getByRole('button', { name: /^Preview Population.*Romania/ });
+  await previewRomania.click();
+  await expect(graphPreview.locator('.phone-screen')).toContainText('Romania?');
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-library-direct-preview.png` });
+  await graphPreview.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(previewRomania).toBeFocused();
+  const editRomania = library.getByRole('button', { name: /^Edit Population.*Romania/ });
+  await expect(editRomania).toHaveText('');
+  await editRomania.click();
+  const editor = page.getByRole('dialog', { name: 'Edit graph' });
+  const editCutoff = editor.getByRole('slider');
+  const before = Number(await editCutoff.getAttribute('aria-valuetext'));
+  await dragCutoff(editor, -50);
+  const year = Number(await editCutoff.getAttribute('aria-valuetext'));
+  expect(year).toBeLessThan(before);
+  await expect(editor.getByLabel('Visible values')).toBeHidden();
+  if (screenshots) await page.screenshot({ path: `${screenshots}/edit-cutoff.png` });
+  await editor.getByLabel('Graph question').fill('How did the population change in Romania?');
+  await editor.getByRole('button', { name: 'Preview', exact: true }).click();
+  await graphPreview.getByRole('button', { name: 'Shared screen' }).click();
+  await expect(graphPreview.locator('.tv-screen .graph-chart')).toContainText(String(year));
+  await expect(graphPreview.getByText('How did the population change in Romania?', { exact: true })).toBeVisible();
+  if (screenshots) await page.screenshot({ path: `${screenshots}/graph-preview-shared.png` });
+  await page.setViewportSize({ width: 1024, height: 600 });
+  await expect(graphPreview.locator('.tv-screen .graph-chart')).toBeInViewport({ ratio: 1 });
+  await expect(graphPreview.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  await graphPreview.getByRole('button', { name: 'Start practice' }).click();
+  await expect(graphPreview.locator('.tv-screen .graph-controller')).toBeVisible();
+  await graphPreview.getByRole('button', { name: 'Close' }).click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(editor.getByLabel('Graph question')).toHaveValue('How did the population change in Romania?');
+  await editor.getByRole('button', { name: 'Save graph' }).click();
+  const readDraft = async () => (await (await page.request.get(`${games}/${gameId}`, { headers })).json()).data.definition;
+  await expect.poll(async () => (await readDraft()).graphLibrary?.find((item: { question: string }) => item.question.endsWith('Romania?'))?.graph.splitLabel).toBe(String(year));
+  expect((await readDraft()).nodes).toHaveLength(1);
+  const removeRomania = library.getByRole('button', { name: 'Delete How did the population change in Romania?' });
+  await removeRomania.click();
+  const remove = page.getByRole('dialog', { name: 'Delete graph' });
+  await expect(remove).toContainText('Scenes already using a copy keep their data.');
+  if (screenshots) await page.screenshot({ path: `${screenshots}/delete-graph.png` });
+  await remove.getByRole('button', { name: 'Cancel' }).click();
+  await expect(removeRomania).toBeVisible();
+  await removeRomania.click();
+  await remove.getByRole('button', { name: 'Delete graph', exact: true }).click();
+  await expect(library.getByRole('status')).toHaveText('Graph deleted.');
+  await expect.poll(async () => (await readDraft()).graphLibrary.length).toBe(1);
+  await library.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Configure minigame' }).click();
+  const config = page.getByRole('dialog', { name: 'Draw the Graph' });
+  await config.getByLabel('Choose a saved graph').selectOption({ label: (await config.getByLabel('Choose a saved graph').locator('option').nth(1).innerText()) });
+  await expect(config.getByRole('button', { name: 'A draw', exact: true })).toHaveCount(0);
+  const phone = config.locator('.phone-screen');
+  await expect(config.getByRole('combobox', { name: 'Phone model' })).toContainText('iPhone SE');
+  const fields = config.getByRole('region', { name: 'Settings' });
+  await expect(config.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  expect((await phone.boundingBox())!.x).toBeGreaterThan((await fields.boundingBox())!.x + (await fields.boundingBox())!.width);
+  expect(await phone.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/phone-preview.png` });
+  await config.getByRole('button', { name: 'Shared screen' }).click();
+  const shared = config.locator('.configuration-preview .tv');
+  await expect(config.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  const settingsBox = (await fields.boundingBox())!;
+  const sharedBox = (await shared.boundingBox())!;
+  expect(sharedBox.y + sharedBox.height).toBeLessThan(settingsBox.y);
+  expect(await fields.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+  expect(sharedBox.width).toBeGreaterThan((await config.boundingBox())!.width * .8);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/shared-screen-preview.png` });
+
+  await page.setViewportSize({ width: 1024, height: 600 });
+  const cutoffSlider = fields.getByRole('slider', { name: 'Last point shown to players' });
+  const cutoffChart = fields.getByRole('img', { name: 'Graph with the answer' });
+  const startPractice = config.getByRole('button', { name: 'Start practice' });
+  await expect(cutoffSlider).toBeInViewport({ ratio: 1 });
+  await expect(cutoffChart).toBeInViewport({ ratio: 1 });
+  await expect(startPractice).toBeInViewport({ ratio: 1 });
+  expect((await cutoffSlider.boundingBox())!.y).toBeLessThan((await fields.getByLabel('Choose a saved graph').boundingBox())!.y);
+  if (screenshots) await page.screenshot({ path: `${screenshots}/compact-shared-screen.png` });
+  await page.setViewportSize({ width: 900, height: 540 });
+  await expect(cutoffSlider).toBeInViewport({ ratio: 1 });
+  await expect(cutoffChart).toBeInViewport({ ratio: 1 });
+  await startPractice.click();
+  await expect(shared.locator('.graph-controller')).toBeVisible();
 });

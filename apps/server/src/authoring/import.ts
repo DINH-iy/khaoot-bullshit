@@ -314,6 +314,7 @@ export function importDefinition(input: string): Json | null {
       .map(name => ({ kind: 'builtin', name })); return sounds.length ? { soundboard: sounds } : {}; })() : {}),
     // Open challenge invites per player at once (default 3).
     ...(Number.isFinite(Number(raw['openInvites'])) && raw['openInvites'] !== undefined ? { openInvites: Math.max(1, Math.min(MAX_OPEN_INVITES, Math.round(Number(raw['openInvites'])))) } : {}),
+    ...(raw['graphLibrary'] !== undefined ? { graphLibrary: raw['graphLibrary'] } : {}),
     nodes: nodes.map(node => ({ key: node.key, stages: node.stages })), edges,
   };
   return definition;

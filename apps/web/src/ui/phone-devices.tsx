@@ -50,10 +50,26 @@ export function PhoneDevicePicker({ label, className }: { label: string; classNa
  * `var(--phone-top)` and `var(--phone-bottom)`.
  */
 export function PhoneFrame({ caption, pickerLabel, picker = true, className, children }: { caption: string; pickerLabel: string; picker?: boolean; className?: string; children: ReactNode }) {
-  const [device] = usePhoneDevice(); const body = useRef<HTMLDivElement>(null); const maxHeight = useFit(body);
+  const [device] = usePhoneDevice();
+  const body = useRef<HTMLDivElement>(null);
+  const maxHeight = useFit(body);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const element = body.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setScale(entry.contentRect.width / device.width);
+    });
+    const bezel = parseFloat(getComputedStyle(element).borderInlineStartWidth) + parseFloat(getComputedStyle(element).borderInlineEndWidth);
+    setScale((element.getBoundingClientRect().width - bezel) / device.width);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [device.width]);
   return <figure className={`phone${className ? ` ${className}` : ''}`} style={{ ...phoneStyle(device), ...(maxHeight ? { '--phone-max-h': `${maxHeight}px` } : {}) } as CSSProperties}>
     <figcaption><span>{caption}</span>{picker && <PhoneDevicePicker label={pickerLabel} />}</figcaption>
-    <div ref={body} className="phone-device" data-cutout={device.cutout} title={device.name}>{children}</div>
+    <div ref={body} className="phone-device" data-cutout={device.cutout} title={device.name}>
+      <div className="phone-viewport" style={{ transform: `scale(${scale})` }}>{children}</div>
+    </div>
   </figure>;
 }
 
@@ -82,7 +98,7 @@ function useFit(body: React.RefObject<HTMLDivElement | null>) {
       // The floating editor tabs sit over the bottom of the page (not over a popup, which is above them).
       const tabs = dialog ? null : document.querySelector('.editor-tabs')?.getBoundingClientRect();
       if (tabs && tabs.left < box.right && tabs.right > box.left && tabs.top < bottom) bottom = Math.min(bottom, tabs.top);
-      const next = Math.max(260, Math.floor(bottom - box.top - 2 * 7 - 4));
+      const next = Math.max(160, Math.floor(bottom - box.top - 2 * 7 - 4));
       setHeight(current => current !== undefined && Math.abs(current - next) < 2 ? current : next);
     };
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };

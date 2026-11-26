@@ -6,6 +6,7 @@ import { GRAPH_TEXTS } from './graph.text.js';
 import './draw-the-graph.css';
 
 const LEFT = 36;
+type Plot = { left: number; start: number; top: number; right: number; bottom: number };
 const RIGHT = 364;
 const TOP = 24;
 const STANDARD_BOTTOM = 206;
@@ -14,9 +15,9 @@ export const chartInk = (hue: number) => `hsl(${hue} 78% 33%)`;
 
 type Trace = { id: string; line: number[]; hue: number; name?: string; winner?: boolean };
 
-export function GraphChart({ chart, traces = [], answer, cursor, portrait = false, showDifference = false, animateReveal = false, accessibleLabel, children }: {
+export function GraphChart({ chart, traces = [], answer, cursor, portrait = false, showDifference = false, animateReveal = false, accessibleLabel, children, fixedAxis = false }: {
   chart: GraphView; traces?: Trace[]; answer?: number[]; cursor?: { step: number; height: number; hue: number };
-  portrait?: boolean; showDifference?: boolean; animateReveal?: boolean; accessibleLabel?: string; children?: ReactNode;
+  portrait?: boolean; showDifference?: boolean; animateReveal?: boolean; accessibleLabel?: string; children?: ReactNode | ((plot: Plot) => ReactNode); fixedAxis?: boolean;
 }) {
   const t = useTexts(GRAPH_TEXTS);
   const revealClip = useId();
@@ -44,8 +45,8 @@ export function GraphChart({ chart, traces = [], answer, cursor, portrait = fals
       Math.max((labels[i - 1] ?? TOP - 19) + 19, y(trace.line.at(-1)!))));
   });
   return <div className={`graph-chart${revealing ? ' graph-chart-revealing' : ''}`}>
-    <svg role={children ? undefined : 'img'} aria-label={children ? undefined : accessibleLabel ?? t(answer ? 'revealed' : 'chart')}
-      viewBox={`-12 0 ${named.length ? 486 : 396} ${bottom + (lowerSplitLabel ? 40 : 26)}`}>
+    <svg role={children && !fixedAxis ? undefined : 'img'} aria-label={children && !fixedAxis ? undefined : accessibleLabel ?? t(answer ? 'revealed' : 'chart')}
+      viewBox={`-12 0 ${named.length ? 486 : 396} ${bottom + (fixedAxis || lowerSplitLabel ? 40 : 26)}`}>
       <rect x={split} y={TOP} width={RIGHT - split} height={bottom - TOP} className="graph-future" />
       {[0, 25, 50, 75, 100].map(mark => <g key={mark}>
         <line x1={LEFT} y1={y(mark * 10)} x2={RIGHT} y2={y(mark * 10)} className="graph-grid" />
@@ -82,7 +83,7 @@ export function GraphChart({ chart, traces = [], answer, cursor, portrait = fals
         <line className="graph-boundary" x1={xAt(cursor.step)} y1={TOP} x2={xAt(cursor.step)} y2={bottom} />
         <circle cx={xAt(cursor.step)} cy={y(cursor.height)} r={5} fill={chartInk(cursor.hue)} />
       </g>}
-      {children}
+      {typeof children === 'function' ? children({ left: LEFT, start: split, right: RIGHT, top: TOP, bottom }) : children}
     </svg>
   </div>;
 }

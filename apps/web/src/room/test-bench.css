@@ -13,12 +13,12 @@
 .bench-phones { --phone-height: min(710px, calc(100dvh - 150px)); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min-content; align-content: start; justify-items: center; gap: 14px; min-height: 0; overflow: auto; padding: 0 4px 4px; }
 .bench-phones:is([data-count="3"], [data-count="4"]) { --phone-height: clamp(280px, calc((100dvh - 185px) / 2), 560px); }
 .bench-phones[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
-.bench-phone { display: grid; gap: 6px; margin: 0; width: min(100%, calc(max(var(--phone-height), 220px) * var(--phone-ratio, .4621))); min-width: 0; }
+.bench-phone { display: grid; gap: 6px; margin: 0; width: min(100%, var(--bench-native-width), calc(max(var(--phone-height), 220px) * var(--phone-ratio, .4621))); min-width: 0; }
 .bench-phone figcaption { display: flex; justify-content: space-between; align-items: center; gap: 4px; font-size: .85rem; font-weight: 700; }
 .bench-phone-actions { display: flex; gap: 4px; }
 .bench .bench-orientation { width: auto; padding-inline: 5px; }
 .bench .bench-orientation[aria-pressed="true"] { border-color: #a990f0; background: #393055; }
-.bench-phone-landscape { grid-column: 1 / -1; width: min(100%, 680px); }
+.bench-phone-landscape { grid-column: 1 / -1; width: min(100%, var(--bench-native-width), 680px); }
 .bench-screen { position: relative; width: 100%; overflow: hidden; border-radius: 16px; box-shadow: 0 0 0 1px #3a3750; background: #000; }
 .bench-screen iframe { position: absolute; top: 0; left: 0; width: var(--bench-w, 390px); height: var(--bench-h, 844px); border: 0; transform-origin: top left; }
 @media (max-width: 900px) {

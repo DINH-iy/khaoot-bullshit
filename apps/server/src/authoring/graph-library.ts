@@ -1,4 +1,4 @@
-import { authoredGraphs, AuthoredGraphsSchema } from '@party/contracts';
+import { authoredGraphs, AuthoredGraphsSchema, graphDataKey } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { controlsGame, visibleTo, type EditorAccess } from './drafts.js';
 
@@ -12,7 +12,7 @@ export async function listAuthoredGraphs(client: PrismaClient, creatorId: string
   return AuthoredGraphsSchema.parse(games.flatMap(game => {
     const editable = controlsGame(game, access) || Boolean(game.shares[0]?.role.permissions.includes('game.edit'));
     return authoredGraphs(game.draft?.definition).map(({ graph, ...location }) => ({
-      ...location, gameId: game.id, title: game.title, label: graph.yLabel, editable,
+      ...location, gameId: game.id, title: game.title, label: graph.yLabel, sourceUrl: graph.sourceUrl, sourceSeries: graph.sourceSeries, dataKey: graphDataKey(graph), editable,
     }));
   }));
 }

@@ -98,6 +98,12 @@ Use shared tokens and room/editor patterns. The measurements below illustrate ho
 
 Use `minmax(0, 1fr)` and `min-inline-size: 0` in nested grids so content can shrink. Use a scoped height/container query to switch to compact spacing and smaller illustrations. Allocate a permanent row for primary actions and the pager. Use `object-fit: contain` for media. Content and visible keyboard focus stay within the bounds of the surface. [MDN viewport units](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/length) · [MDN container queries](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Containment/Container_queries)
 
+## Phone previews (required)
+
+Every phone preview must provide a visible **Phone model** picker whenever a phone is shown. Use the shared phone models and picker in `apps/web/src/ui/phone-devices.tsx` so the choice follows the user across the editor, preview dialogs, Look & feel, and Test Bench.
+
+Use the chosen model’s exact logical screen dimensions and aspect ratio at every viewport size. Use the native CSS screen size when space allows and scale the entire viewport uniformly when space is tight. Keep the frame and its safe areas. A narrow or short window still shows the selected phone in its correct proportions. The picker stays outside the scaled screen.
+
 ## Reference viewport sizes
 
 | Surface | CSS viewport sizes |

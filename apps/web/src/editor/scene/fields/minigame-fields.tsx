@@ -29,7 +29,9 @@ const ms = (text: string, min: number, max: number) => Math.round(Math.min(max, 
  * minigame is chosen when the scene is added; it is only asked here for a scene
  * whose minigame is still to be chosen (for example one imported from text).
  */
-export function MinigameFields({ part, definition, node, index, onChange, inDraw = false }: { part: 'settings' | 'points'; definition: Definition; node: Node; index: number; onChange: Change; inDraw?: boolean }) {
+export function MinigameFields({ part, definition, node, index, onChange, inDraw = false, compactGraph, graphSource }: {
+  part: 'settings' | 'points'; definition: Definition; node: Node; index: number; onChange: Change; inDraw?: boolean; compactGraph?: boolean; graphSource?: ReactNode;
+}) {
   const a = useTexts(ANIMATION_TEXTS);
   const numberText = useTexts(NUMBER_CHOICE_TEXTS);
   const stage = node.stages[index]!; const game = String(stage['game'] ?? '');
@@ -72,20 +74,18 @@ export function MinigameFields({ part, definition, node, index, onChange, inDraw
       onChange={tiebreak => edit(current => { const copy: Stage = { ...current }; if (tiebreak === 'shared') copy['tiebreak'] = 'shared'; else delete copy['tiebreak']; return copy; }, 'tiebreak')}
       choices={[{ value: 'faster', label: t('tieFaster') }, { value: 'shared', label: t('tieShared') }]} />}
   </> : null;
-  // One game or a draw in this one scene. A draw's games are each set with their pencil: the usual settings below,
-  // on a stand-in scene of that game (inside the draw, without the choice again).
-  const drawChoice = !inDraw && known && <MinigameDrawFields definition={definition} node={node} index={index} onChange={onChange}
+  // A Flow draw's individual minigames are configured on stand-in stages.
+  const drawChoice = !inDraw && Array.isArray(stage['draw']) && <MinigameDrawFields definition={definition} node={node} index={index} onChange={onChange}
     settingsFor={(standIn, onStage) => {
       const virtual = { ...definition, nodes: definition.nodes.map(entry => entry.key === node.key ? { ...entry, stages: entry.stages.map((current, at) => at === index ? standIn : current) } : entry) } as Definition;
       return <MinigameFields part="settings" inDraw definition={virtual} node={virtual.nodes.find(entry => entry.key === node.key)!} index={index}
         onChange={next => { const changed = next.nodes.find(entry => entry.key === node.key)?.stages[index]; if (changed) onStage(changed); }} />;
     }} />;
   if (!inDraw && Array.isArray(stage['draw'])) return <div className="minigame-fields">{drawChoice}</div>;
+  const gameButton = !inDraw && <button type="button" className="small-button" onClick={() => setPicking(true)}>{t(known ? 'changeMinigame' : 'chooseMinigame')}</button>;
+  const compact = compactGraph && game === 'draw-the-graph' && Boolean(settings);
   return <div className="minigame-fields">
-    {drawChoice}
-    {inDraw ? null : known ? <div className="configuration-game"><strong>{gameName(game)}</strong>
-      <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('changeMinigame')}</button></div>
-    : <button type="button" className="small-button" onClick={() => setPicking(true)}>{t('chooseMinigame')}</button>}
+    {!compact && (known && !inDraw ? <div className="configuration-game"><strong>{gameName(game)}</strong>{gameButton}</div> : gameButton)}
     {/* A new minigame starts from its own defaults and a fitting timer; a team minigame gets round-only teams of two, which the host can change. */}
     {picking && <ChoiceDialog title={t('chooseTitle')} intro={t('chooseIntro')} value={known ? game : undefined}
       choices={MINIGAME_KEYS.map(key => ({ value: key, label: gameName(key), description: gameDescription(key), icon: 'minigame' }))}
@@ -93,7 +93,7 @@ export function MinigameFields({ part, definition, node, index, onChange, inDraw
       onPick={next => { setPicking(false); if (next !== game) edit(current => withMinigame(current, next as MinigameKey, definition), 'game'); }} onClose={() => setPicking(false)} />}
     {known && !settings && <p className="hint warn" role="alert">{t('misfit')} <button type="button" className="small-button" onClick={() => edit(current => { const copy = { ...current }; delete copy['settings']; return copy; }, 'reset')}>{t('standardSettings')}</button></p>}
     {game === 'draw-the-graph' && settings && <GraphFields key={`${node.key}:${index}`} graph={(stage['settings'] as MinigameSettings<'draw-the-graph'> | undefined)?.graph}
-      onChange={graph => edit(current => ({ ...current, settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph } }), 'graph-data')} />}
+      compactControls={compact ? <>{graphSource}{gameButton}</> : undefined} onChange={graph => edit(current => ({ ...current, settings: { ...(current['settings'] as MinigameSettings<'draw-the-graph'> | undefined), graph } }), 'graph-data')} />}
     {(game === 'count-the-dots' || game === 'draw-the-graph') && settings && <label>{t('revealEasing')}
       <select value={(settings as MinigameSettings<'count-the-dots' | 'draw-the-graph'>).revealEasing ?? DEFAULT_REVEAL_EASING}
         onChange={event => setSettings({ ...settings, revealEasing: RevealEasingSchema.parse(event.currentTarget.value) }, 'reveal-easing')}>

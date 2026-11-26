@@ -1,4 +1,4 @@
-import { AutoRevealSecondsSchema, ColorSchema, GameRoomSettingsSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
+import { StoredGraphsSchema, AutoRevealSecondsSchema, ColorSchema, GameRoomSettingsSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { CARRYOVERS, MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
@@ -167,6 +167,7 @@ export const GameDefinitionSchema = z.object({
   ownReactions: z.array(OwnReactionSchema).max(MAX_OWN_REACTIONS).optional(), soundboard: z.array(SoundSchema).max(MAX_SOUNDS).optional(),
   // The background playlist (songs from the media library), from the lobby on. Left out: no music.
   music: GameMusicSchema.optional(),
+  graphLibrary: StoredGraphsSchema.optional(),
   nodes: z.array(z.object({ key: GameKeySchema, stages: z.array(stageSchema).min(1).max(20) }).strict()).min(1).max(100),
   // `option` names the route option an edge belongs to (format 2 choice nodes only).
   edges: z.array(z.object({ key: GameKeySchema, from: GameKeySchema, to: GameKeySchema, option: GameKeySchema.optional() }).strict()).max(300),

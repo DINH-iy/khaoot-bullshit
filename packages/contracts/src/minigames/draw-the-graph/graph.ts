@@ -13,6 +13,7 @@ export const GraphViewSchema = z.object({
 }).strict();
 export const GraphDataSchema = GraphViewSchema.extend({
   hidden: readings, source: z.string().trim().min(1).max(500).optional(),
+  sourceSeries: z.string().min(1).max(250).optional(),
   sourceNote: z.string().trim().min(1).max(500).optional(),
   sourceUrl: z.url({ protocol: /^https$/ }).max(500).optional(),
 }).strict();
@@ -46,6 +47,30 @@ export type GraphLibraryEntry = z.infer<typeof GraphLibraryEntrySchema>;
 export const GraphSettingsSchema = z.object({ graph: GraphDataSchema.optional(), revealEasing: RevealEasingSchema.optional() }).strict();
 export type GraphView = z.infer<typeof GraphViewSchema>;
 export type GraphData = z.infer<typeof GraphDataSchema>;
+
+export const MAX_STORED_GRAPHS = 50;
+export const StoredGraphSchema = z.object({
+  key: z.string().regex(/^graph-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i), question: z.string().trim().min(1).max(500), graph: GraphDataSchema,
+}).strict();
+export const StoredGraphsSchema = z.array(StoredGraphSchema).max(MAX_STORED_GRAPHS)
+  .refine(entries => new Set(entries.map(entry => entry.key)).size === entries.length, 'Duplicate graph key');
+export type StoredGraph = z.infer<typeof StoredGraphSchema>;
+
+export function graphReadingAt(graph: GraphData, position: number) {
+  const split = graph.splitAt ?? .5;
+  const points = position <= split ? graph.visible : [graph.visible.at(-1)!, ...graph.hidden];
+  const progress = position <= split ? position / split : (position - split) / (1 - split);
+  const index = Math.max(0, Math.min(points.length - 1, progress * (points.length - 1)));
+  const low = Math.floor(index);
+  return points[low]! + (points[Math.ceil(index)]! - points[low]!) * (index - low);
+}
+
+/** Compact comparison for equivalent chart readings, regardless of the chosen cutoff or axis scale. */
+export function graphDataKey(graph: GraphData): string {
+  const { min, max } = graph.scale ?? { min: 0, max: 100 };
+  const points = Array.from({ length: 17 }, (_, index) => Number((min + (max - min) * graphReadingAt(graph, index / 16) / 100).toPrecision(6)));
+  return JSON.stringify([graph.startLabel, graph.endLabel, points]);
+}
 
 export const GRAPH_REVEAL_MS = 2000;
 export const GraphPlaybackSchema = z.object({

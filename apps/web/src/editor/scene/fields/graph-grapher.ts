@@ -3,6 +3,7 @@ import { graphCutoffs, readGraphTable, splitGraphRows, type GraphTable } from '.
 
 export interface GrapherSeries {
   name: string;
+  key: string;
   table: GraphTable;
   title: string;
   entity: string;
@@ -17,12 +18,15 @@ export function grapherSeries({ csv, metadata, sourceUrl }: GrapherImportResult)
   if (!header) return [];
   const columns = header.map((name, index) => ({ name, index })).filter(({ name }) => Object.hasOwn(metadata.columns, name));
   const entityIndex = header.indexOf('entity');
+  const codeIndex = header.indexOf('code');
+  const selected = new URL(sourceUrl).searchParams.get('country')?.split('~').filter(Boolean);
   const yearIndex = header.findIndex(name => name === 'year' || name === 'day' || name === 'date');
   if (entityIndex < 0 || yearIndex < 0 || !columns.length) return [];
   const entities = new Map<string, string[][]>();
   for (const row of rows) {
     const entity = row[entityIndex];
     if (!entity || !row[yearIndex]) continue;
+    if (selected?.length && codeIndex >= 0 && !selected.includes(row[codeIndex]!) && !selected.includes(entity)) continue;
     if (!entities.has(entity)) entities.set(entity, []);
     entities.get(entity)!.push(row);
   }
@@ -37,7 +41,7 @@ export function grapherSeries({ csv, metadata, sourceUrl }: GrapherImportResult)
       const credit = column.citationLong || column.citationShort || metadata.chart.citation;
       const source = ('Our World in Data' + (credit ? ` · ${credit}` : '')).slice(0, 500);
       const sourceNote = column.descriptionShort?.trim().slice(0, 500);
-      series.push({ name: columns.length === 1 ? entity : `${entity} · ${title}`, table, title, entity, source, sourceUrl, ...(unit ? { unit } : {}), ...(sourceNote ? { sourceNote } : {}) });
+      series.push({ key: `${readings[0]?.[codeIndex] || entity} · ${name}`.slice(0, 250), name: columns.length === 1 ? entity : `${entity} · ${title}`, table, title, entity, source, sourceUrl, ...(unit ? { unit } : {}), ...(sourceNote ? { sourceNote } : {}) });
     }
   }
   return series;

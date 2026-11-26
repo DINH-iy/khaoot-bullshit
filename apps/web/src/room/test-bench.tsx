@@ -102,7 +102,7 @@ function BenchPhone({ seat, code, reloadKey, onReload }: { seat: number; code: s
     return () => observer.disconnect();
   }, [width]);
   const name = `Player ${seat}`;
-  return <figure className={`bench-phone${landscape ? ' bench-phone-landscape' : ''}`} style={{ '--phone-ratio': width / height } as React.CSSProperties} title={device.name}>
+  return <figure className={`bench-phone${landscape ? ' bench-phone-landscape' : ''}`} style={{ '--phone-ratio': width / height, '--bench-native-width': `${width}px` } as React.CSSProperties} title={device.name}>
     <figcaption><span>{name}</span><div className="bench-phone-actions">
       <button type="button" className="bench-icon bench-orientation" aria-label={`Landscape for ${name}`} aria-pressed={landscape} onClick={() => setLandscape(value => !value)}>Landscape</button>
       <button type="button" className="bench-icon" aria-label={`Reload ${name}`} title="Reload this phone" onClick={onReload}><FaIcon name="rotate" /></button>

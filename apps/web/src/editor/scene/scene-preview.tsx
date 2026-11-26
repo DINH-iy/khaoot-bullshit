@@ -191,7 +191,9 @@ function CanvasPrompt({ value, label, readOnly, onChange }: { value: string; lab
   </div>;
 }
 
-export function ScenePreviewDialog({ onClose, initialDevice, ...preview }: PreviewProps & { initialDevice: Device; onClose: () => void }) {
+export function ScenePreviewDialog({ onClose, initialDevice, compactIntro = false, ...preview }: PreviewProps & {
+  initialDevice: Device; onClose: () => void; compactIntro?: boolean;
+}) {
   const t = useTexts(FIELDS_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
   const practice = useTexts(PRACTICE_TEXTS);
@@ -207,7 +209,7 @@ export function ScenePreviewDialog({ onClose, initialDevice, ...preview }: Previ
     return () => { element?.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={`scene-preview-dialog${device === 'phone' ? ' phone-preview-dialog' : ''}`} aria-labelledby={title}
-    onCancel={event => { event.preventDefault(); onClose(); }}
+    onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="scene-preview-window">
       <header><h2 id={title}>{t('preview')}</h2>
@@ -222,7 +224,8 @@ export function ScenePreviewDialog({ onClose, initialDevice, ...preview }: Previ
         <span>{practice('part', { part: index + 1, total: preview.node.stages.length })}</span>
         <button type="button" disabled={index + 1 >= preview.node.stages.length} onClick={() => setPart(index + 1)}>{practice('next')}</button>
       </div>}
-      <ScenePreview key={`${preview.node.key}:${preview.node.stages[index]?.key}`} {...preview} index={index} device={device} interactive />
+      <ScenePreview key={`${preview.node.key}:${preview.node.stages[index]?.key}`} {...preview} index={index} device={device} interactive
+        compactIntro={compactIntro || (device === 'sharedScreen' && preview.node.stages[index]?.['game'] === 'draw-the-graph')} />
     </div>
   </dialog>;
 }

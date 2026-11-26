@@ -14,6 +14,7 @@ import { Icon, sceneIcon } from '../controls/icons.js';
 import { WheelOfScene } from '../shell/show-settings.js';
 import { PlacesFields } from './fields/places-fields.js';
 import { MinigameFields } from './fields/minigame-fields.js';
+import { addStoredGraphs } from '../graph-library/stored-graphs.js';
 import { MinigameConfiguration } from './minigame-configuration.js';
 import { PoolConfiguration } from './pool-configuration.js';
 import { DrawingFields } from './fields/drawing-fields.js';
@@ -153,7 +154,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
         <input type="number" min={0} max={15} value={Number(stage['countdownSeconds'] ?? 0)}
           onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 0 && value <= 15) edit(current => ({ ...current, countdownSeconds: value }), 'countdown'); }} /></label>}
       {stage.kind === 'scoreboard' && <Segmented label={t('show')} value={String(stage['show'] ?? 'players')} choices={scoreboardShows()} onChange={show => edit(current => ({ ...current, show }), 'show')} />}
-      {stage.kind === 'minigame' && <MinigameConfiguration key={stage.key} definition={definition} node={node} index={index} onApply={next => edit(() => next, 'minigame-configuration')} />}
+      {stage.kind === 'minigame' && <MinigameConfiguration key={stage.key} definition={definition} node={node} index={index} onApply={(next, graphs) => onChange(addStoredGraphs(updateStage(definition, node.key, index, () => next), graphs), `${node.key}:${index}:minigame-configuration`)} />}
       {poolStage ? <PoolConfiguration key={`${node.key}:${stage.key}`} stage={stage} onChange={(next, field) => edit(() => next, field)}
         addTeams={hasTeamSetup ? undefined : addTeams} />
         : stage.kind === 'duel' && <DuelFields part="settings" stage={stage} onChange={(next, field) => edit(() => next, field)} />}

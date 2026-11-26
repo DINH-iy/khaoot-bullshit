@@ -1,16 +1,17 @@
 import { z } from 'zod';
 import { GameIdSchema, GameKeySchema, RevisionSchema } from './game.js';
 import { ColorSchema } from './presentation.js';
-import { GraphDataSchema } from './minigames/draw-the-graph/graph.js';
+import { GraphDataSchema, StoredGraphSchema } from './minigames/draw-the-graph/graph.js';
 
 export const AuthoredGraphSchema = z.object({
   gameId: GameIdSchema, title: z.string().max(160), nodeKey: GameKeySchema, stageKey: GameKeySchema, inDraw: z.boolean(),
+  stored: z.boolean().optional(), dataKey: z.string().max(700), sourceUrl: GraphDataSchema.shape.sourceUrl, sourceSeries: GraphDataSchema.shape.sourceSeries,
   question: z.string().max(500), label: z.string().max(32).optional(), editable: z.boolean(),
 }).strict();
 export const AuthoredGraphsSchema = z.array(AuthoredGraphSchema);
 export type AuthoredGraph = z.infer<typeof AuthoredGraphSchema>;
 
-const graphDraftShape = z.object({ nodes: z.array(z.unknown()) });
+const graphDraftShape = z.object({ nodes: z.array(z.unknown()), graphLibrary: z.array(z.unknown()).optional() });
 const graphSceneShape = z.object({ key: GameKeySchema, stages: z.array(z.unknown()) });
 const graphStageShape = z.object({ kind: z.literal('minigame'), key: GameKeySchema, prompt: z.string().optional(), game: z.string(),
   settings: z.unknown().optional(), draw: z.array(z.unknown()).optional() });
@@ -21,7 +22,7 @@ const graphSettingsShape = z.object({ graph: GraphDataSchema });
 export function authoredGraphs(definition: unknown) {
   const draft = graphDraftShape.safeParse(definition);
   if (!draft.success) return [];
-  return draft.data.nodes.flatMap(value => {
+  const scenes = draft.data.nodes.flatMap(value => {
     const node = graphSceneShape.safeParse(value);
     if (!node.success) return [];
     return node.data.stages.flatMap(part => {
@@ -34,6 +35,13 @@ export function authoredGraphs(definition: unknown) {
       return [{ nodeKey: node.data.key, stageKey, inDraw: Boolean(draw), question: prompt?.trim().slice(0, 500) || '', graph: chart.data.graph }];
     });
   });
+  const stored = (draft.data.graphLibrary ?? []).flatMap(value => {
+    const entry = StoredGraphSchema.safeParse(value);
+    if (!entry.success) return [];
+    const { key, graph, question } = entry.data;
+    return [{ nodeKey: key, stageKey: 'main', inDraw: false, stored: true, graph, question }];
+  });
+  return [...scenes.map(scene => ({ ...scene, stored: undefined })), ...stored];
 }
 
 // Authoring: a game's editable draft and its published, playable versions.
