@@ -31,13 +31,13 @@ export function LogsPanel() {
     {error && <p role="alert" className="error">{error}</p>}
     {!items && !error && <p role="status">Loading logs…</p>}
     {items && <>
-      <div className="admin-filters">
+      <div className="admin-filters log-filters">
         <div role="group" aria-label="Show" className="admin-chips">
           {(['problems', 'game_over', 'all'] as const).map(key => <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}>
             {key === 'problems' ? 'Problems' : key === 'game_over' ? 'Finished games' : 'Everything'} <span>{count(key)}</span></button>)}
         </div>
         <label>Search<input type="search" placeholder="Room code, player, error code" value={search} onChange={event => setSearch(event.target.value)} /></label>
-        <button type="button" className="quiet" onClick={() => void load()}><FaIcon name="rotate" /> Refresh</button>
+        <button type="button" className="quiet log-action" onClick={() => void load()}><FaIcon name="rotate" /> Refresh</button>
       </div>
       {!shown.length && <p className="admin-empty">{items.length ? 'Nothing with these filters.' : 'Nothing yet. That is good news.'}</p>}
       <ol className="admin-list">{shown.map(item => <LogItem key={item.id} item={item} />)}</ol>
@@ -58,7 +58,7 @@ function LogItem({ item }: { item: LogSummary }) {
     <div className="admin-item-head">
       <span className="admin-kind">{REASONS[item.reason] ?? item.reason}</span>
       <h2>{item.summary || '(no summary)'}</h2>
-      <button type="button" className="quiet log-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="quiet log-action log-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
         <FaIcon name={open ? 'chevron-up' : 'chevron-down'} /> {open ? 'Hide' : 'Show'}</button>
     </div>
     <p className="admin-meta">{new Date(item.createdAt).toLocaleString()} · {item.who}{item.place && <> · {item.place}</>}{item.requestId && <> · request <code>{item.requestId.slice(0, 8)}</code></>}</p>
@@ -71,7 +71,7 @@ function LogItem({ item }: { item: LogSummary }) {
       </section>}
       {detail.events.length > 0 && <Timeline events={detail.events} />}
       <div className="admin-actions">
-        <button type="button" className="quiet" onClick={() => void copyAll()}><FaIcon name="copy" /> {copied || 'Copy as text'}</button>
+        <button type="button" className="quiet log-action" onClick={() => void copyAll()}><FaIcon name="copy" /> {copied || 'Copy as text'}</button>
       </div>
     </>)}
   </li>;

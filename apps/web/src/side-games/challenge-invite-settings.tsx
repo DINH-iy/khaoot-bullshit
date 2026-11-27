@@ -17,10 +17,13 @@ export function InviteSettings({ challenge }: { challenge: Challenge }) {
   const behavior = useTexts(POOL_BEHAVIOR_TEXTS);
 
   if (challenge.game === 'brick-rally') {
-    const { map } = challenge.view;
+    const { map, lives, timerSeconds } = challenge.view;
     const preset = BRICK_PRESETS.find(key => BRICK_MAPS[key].length === map.length
       && BRICK_MAPS[key].every((row, index) => row === map[index]));
-    return <SettingsRows rows={[[brick('map'), brick(preset ?? 'custom')]]} />;
+    const rows: [string, string][] = [[brick('map'), brick(preset ?? 'custom')]];
+    if (lives !== undefined) rows.push([brick('lives'), String(lives)]);
+    if (timerSeconds !== undefined) rows.push([brick('timer'), brick('seconds', { seconds: timerSeconds })]);
+    return <SettingsRows rows={rows} />;
   }
 
   const { board } = challenge.view;

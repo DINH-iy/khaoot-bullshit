@@ -459,10 +459,11 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     socket.on('disconnect', reason => { clearTimeout(expiry); stopMinigames(); io.to(`session:${id}`).emit('presence.changed'); app.log.info({ event: 'room_disconnected', reason }, 'Room disconnected'); });
   });
 
+  const connectedRoomIds = () => [...new Set([...io.sockets.sockets.values()].map(socket => (socket.data['principal'] as Principal).sessionId))];
   const publish = async () => {
     if (publishing || shuttingDown) return; publishing = true;
     try {
-      const sessions = [...new Set([...io.sockets.sockets.values()].map(socket => (socket.data['principal'] as Principal).sessionId))];
+      const sessions = connectedRoomIds();
       if (!sessions.length) return;
       const events = await client.outboxEvent.findMany({ where: { sessionId: { in: sessions }, publishedAt: null, attempts: { lt: 5 }, availableAt: { lte: new Date() } }, orderBy: [{ createdAt: 'asc' }, { revision: 'asc' }, { eventIndex: 'asc' }], take: 100 });
       for (const event of events) {
@@ -518,5 +519,5 @@ export function registerRoomNetworking(app: FastifyInstance, client: PrismaClien
     if (running.length) app.log.info({ event: 'rooms_recovered', count: running.length }, 'Recovered rooms paused for host review');
   });
   app.addHook('preClose', async () => { shuttingDown = true; clearInterval(ticker); clearInterval(timeoutTicker); clearInterval(idleTicker); minigames.close(); await publishTask; await closeTask; await idleTask; await io.close(); });
-  return { io, gateway, snapshot, service };
+  return { io, gateway, snapshot, service, connectedRoomIds };
 }

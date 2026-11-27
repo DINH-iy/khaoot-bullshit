@@ -1,4 +1,5 @@
 import { BrickMapFields } from '../minigames/brick-rally/map-fields.js';
+import { BrickLivesField } from '../minigames/brick-rally/rule-fields.js';
 import type { ReactNode } from 'react';
 import {
   ARCADE_SECONDS_MAX, ARCADE_SECONDS_MIN, BRICK_MAX_SECONDS, DOT_COUNT_MAX, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, POOL_FELTS, POOL_SHOT_SECONDS, ROULETTE_BET_FLOOR, arcadeSettings,
@@ -63,7 +64,8 @@ export function ArcadeGameSettingsFields({ game, chosen, disabled, onChange }: {
     onChange={value => onChange({ ...chosen, seconds: value })} />);
   switch (game) {
     case 'brick-rally':
-      add(<BrickMapFields key="map" settings={values as BrickSettings} disabled={disabled} onChange={next => onChange({ ...chosen, values: next.map ? { map: next.map } : next.preset ? { preset: next.preset } : {} })} />);
+      add(<BrickLivesField key="lives" value={(values as BrickSettings).lives} disabled={disabled} onChange={lives => setValues({ lives })} />);
+      add(<BrickMapFields key="map" settings={values as BrickSettings} disabled={disabled} onChange={setValues} />);
       break;
     case 'reaction': {
       const min = Number(values['minWaitMs']); const max = Number(values['maxWaitMs']);

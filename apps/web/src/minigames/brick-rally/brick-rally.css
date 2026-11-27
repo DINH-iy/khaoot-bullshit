@@ -14,6 +14,9 @@
 .brick-help { text-align: center; margin: 0; font-size: .9rem; }
 .brick-settings { display: grid; gap: 10px; min-inline-size: 0; }
 .brick-settings p { margin: 0; }
+.brick-rule-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+.brick-rule-fields label { flex: 1 1 7rem; }
+.brick-rule-fields select, .brick-settings select { min-height: 44px; }
 .brick-settings > .actions button[aria-pressed="true"] {
   border-color: var(--e-accent, var(--r-accent));
   background: var(--e-accent-soft, var(--r-card-strong));

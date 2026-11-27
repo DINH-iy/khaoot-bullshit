@@ -2,7 +2,7 @@ import { useTexts } from '../i18n/texts.js';
 import { CREATURE_TEXTS } from '../head-to-head/creature-board.js';
 import { Dropdown } from '../ui/dropdown.js';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BRICK_PRESETS, CHALLENGE_GAMES, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, type Challenge, type ChallengeGame, type HeadToHeadMove, type HeadToHeadSettings } from '@party/contracts';
+import { BRICK_PRESETS, CHALLENGE_GAMES, ChallengeSchema, HEAD_TO_HEAD_DEFAULTS, type BrickRaceSettings, type Challenge, type ChallengeGame, type HeadToHeadMove, type HeadToHeadSettings } from '@party/contracts';
 import { newId } from '../room/api.js';
 import { chips, sideApi, isMyTurn, st } from './side-api.js';
 import { rich } from '../i18n/rich.js';
@@ -10,6 +10,7 @@ import { gameHowToPlay, gameName } from '../presentation/catalog.text.js';
 import { challengeProblem, type useChallenges } from './use-challenges.js';
 import { ChallengeMapPicker, OpponentPicker, type ChallengePlayer, type ChallengePreset } from './challenge-pickers.js';
 import { BRICK_CHALLENGE_TEXTS } from './brick-challenge.text.js';
+import { BrickRaceRuleFields } from '../minigames/brick-rally/rule-fields.js';
 import { GameSymbol } from '../presentation/game-symbol.js';
 import { FaIcon } from '../presentation/icons.js';
 import { InviteSettings } from './challenge-invite-settings.js';
@@ -121,6 +122,7 @@ function NewChallenge({ initialGame, players, balance, busy, onSend, withChips }
   const c = useTexts(CREATURE_TEXTS);
   const race = useTexts(BRICK_CHALLENGE_TEXTS);
   const [preset, setPreset] = useState<ChallengePreset>(BRICK_PRESETS[0]);
+  const [brick, setBrick] = useState<BrickRaceSettings>({});
   const [size, setSize] = useState('1');
   const [pool, setPool] = useState<HeadToHeadSettings<'eight-ball'>>(HEAD_TO_HEAD_DEFAULTS['eight-ball']);
   const [selectedOpponent, setOpponent] = useState<string>(); const [game, setGame] = useState(initialGame);
@@ -130,7 +132,7 @@ function NewChallenge({ initialGame, players, balance, busy, onSend, withChips }
   const amount = withChips ? Math.max(0, Math.round(Number(stake) || 0)) : 0;
   if (!opponent) return <p className="hint">{st('nobodyElse')}</p>;
   const settings = ({
-    rps: { firstTo: Number(firstTo) }, 'creature-duel': { size: Number(size) }, 'brick-rally': { preset }, 'eight-ball': pool,
+    rps: { firstTo: Number(firstTo) }, 'creature-duel': { size: Number(size) }, 'brick-rally': { ...brick, preset }, 'eight-ball': pool,
   } as Partial<Record<ChallengeGame, object>>)[game];
   return <form className="challenge-form" onSubmit={event => { event.preventDefault(); onSend({ challengeId: newId(), opponentId: opponent.id, game, stake: amount, settings }); }}>
     <OpponentPicker players={players} value={opponent} onChange={setOpponent} />
@@ -142,7 +144,7 @@ function NewChallenge({ initialGame, players, balance, busy, onSend, withChips }
     {game === 'creature-duel' && <label>{c('teamSize')}<Dropdown value={size} onChange={setSize}
       options={[{ value: '1', label: c('solo') }, { value: '3', label: c('team') }]} /></label>}
     {game === 'eight-ball' && <PoolChallengeSettings value={pool} onChange={setPool} />}
-    {game === 'brick-rally' && <ChallengeMapPicker value={preset} onChange={setPreset} />}
+    {game === 'brick-rally' && <><ChallengeMapPicker value={preset} onChange={setPreset} /><BrickRaceRuleFields settings={brick} onChange={setBrick} /></>}
     {withChips && <label>{st('stake')}<input type="number" inputMode="numeric" min={0} max={balance} value={stake} onChange={event => setStake(event.target.value)} /></label>}
     {amount > 0 && <p className="hint">{st('eachPut', { amount: chips(amount), total: chips(amount * 2) })}</p>}
     <button type="submit" className="primary challenge-send" disabled={busy || amount > balance}>{st('send')}</button>

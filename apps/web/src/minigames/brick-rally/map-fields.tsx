@@ -15,12 +15,12 @@ export function BrickMapFields({ settings, disabled = false, onChange }: { setti
     <legend>{t('map')}</legend>
     <div className="actions">
       {BRICK_PRESETS.map(preset => <button type="button" key={preset} aria-pressed={!settings.map && (settings.preset ?? 'steps') === preset}
-        onClick={() => onChange({ preset })}>{t(preset)}</button>)}
+        onClick={() => onChange({ ...settings, preset, map: undefined })}>{t(preset)}</button>)}
       <button type="button" aria-haspopup="dialog" onClick={() => setEditing(true)}>{t('edit')}</button>
     </div>
     {settings.map && <p>{t('custom')}</p>}
     {editing && !disabled && <BrickMapEditor map={brickMap(settings)} onClose={() => setEditing(false)} onApply={map => {
-      onChange({ map });
+      onChange({ ...settings, preset: undefined, map });
       setEditing(false);
     }} />}
   </fieldset>;

@@ -163,6 +163,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
       const coinFlip = game === 'heads-or-tails' && text(raw['flip']) === 'host' ? { settings: { ...(isObject(raw['settings']) ? raw['settings'] : {}), flip: 'host' } } : {};
       // Galgje: `"words": ["fiets", "molen"]` (one drawn per round), `"lives": 7`, `"wordLanguage": "nl"` for the built-in list.
       const own = isObject(raw['settings']) ? raw['settings'] : {};
+      const brick = game === 'brick-rally' && raw['lives'] !== undefined ? { settings: { ...own, lives: raw['lives'] } } : {};
       const hangman = game === 'hangman' ? { settings: { ...own, lives: Math.round(Math.min(12, Math.max(3, Number(raw['lives'] ?? own['lives']) || 7))),
         ...(Array.isArray(raw['words']) ? { words: raw['words'].map(entry => text(entry)).filter(Boolean).slice(0, 200) } : {}),
         ...(['en', 'nl', 'de', 'ro'].includes(text(raw['wordLanguage'])) ? { wordLanguage: text(raw['wordLanguage']) } : {}) } } : {};
@@ -175,7 +176,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
         ...(['en', 'nl', 'de', 'ro'].includes(text(raw['wordLanguage'])) ? { wordLanguage: text(raw['wordLanguage']) } : {}) } } : {};
       const timer = durationMs ?? (known ? MINIGAMES[game].defaultSeconds * 1000 : null);
       return { key, kind: 'minigame', prompt, game: game.slice(0, 64), durationMs: game === 'brick-rally' && typeof timer === 'number' ? Math.min(timer, BRICK_MAX_SECONDS * 1000) : timer,
-        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...coinFlip, ...hangman, ...undercover, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
+        ...(isObject(raw['settings']) ? { settings: raw['settings'] } : {}), ...sips, ...coinFlip, ...brick, ...hangman, ...undercover, ...(raw['places'] !== undefined ? placesFrom(raw) : points.length ? { placementMilli: points } : {}), ...teamResult, ...tiebreak, ...closeness, ...decide, ...voteSeconds, ...play, ...draw };
     }
     case 'duel': {
       // `pick`: "random" or "host". `game`: a head-to-head game played on the two phones (by key or name), else the host names the winner.

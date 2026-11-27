@@ -282,8 +282,25 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .admin-item-head > .ed-dropdown, .admin-actions > .ed-dropdown { width: auto; max-width: 100%; }
 /* Device logs: problems in red, finished games in green, server errors in amber. */
 .log-item.log-problem { border-left-color: #d6336c; } .log-item.log-finished { border-left-color: #1f9d55; } .log-item.log-server { border-left-color: #f0a400; }
-.log-item .admin-item-head h2 { overflow-wrap: anywhere; font-size: 1rem; }
-.admin-page button.log-toggle { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; }
+.log-filters { gap: 8px; }
+.log-filters label { flex: 1 1 12rem; min-width: 0; max-width: 19rem; }
+.log-filters input { width: 100%; min-width: 0; }
+.log-filters .admin-chips { gap: 8px; }
+.log-filters .admin-chips button { min-height: 44px; padding-inline: 10px; }
+.log-item { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.log-item .admin-item-head { display: grid; grid-template: "kind title toggle" auto / auto minmax(0, 1fr) auto; gap: 8px 12px; }
+.log-item .admin-kind { grid-area: kind; justify-self: start; }
+.log-item .admin-item-head h2 { grid-area: title; min-width: 0; overflow-wrap: anywhere; font-size: 1rem; }
+.admin-page button.log-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: auto; min-height: 44px;
+  padding: 6px 12px; font-size: .9rem; font-weight: 600; line-height: 1.2; white-space: nowrap;
+}
+.admin-page button.log-action .fa-icon { flex: none; width: 1em; height: 1em; }
+.admin-page button.log-action:hover { border-color: light-dark(#6d3fd6, #b9a2ff); }
+.log-toggle { grid-area: toggle; justify-self: end; }
+@media (max-width: 540px) {
+  .log-item .admin-item-head { grid-template: "kind toggle" auto "title title" auto / minmax(0, 1fr) auto; }
+}
 .log-stats { margin: 0; }
 .log-agent { overflow-wrap: anywhere; font-size: .78rem; }
 .log-server { padding: 10px 12px; border-radius: 10px; background: light-dark(#fff6e0, #2f2817); display: grid; gap: 4px; }
@@ -322,12 +339,16 @@ a.person-name:hover .person-name-text { color: light-dark(#5b31bf, #c9b6ff); }
 .health-summary .admin-meta { display: inline; margin: 0 0 0 8px; }
 .level-ok { border-color: light-dark(#2e7d32, #66bb6a); } .level-check { border-color: light-dark(#b26a00, #ffb74d); } .level-problem { border-color: light-dark(#c62828, #ef5350); }
 .health-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; margin-bottom: 16px; }
-.health-part { padding: 12px 14px; border-radius: 12px; border-width: 2px; border-style: solid; background: light-dark(#fff, #1f1b30); }
+.health-part { margin: 0; padding: 12px 14px; border-radius: 12px; border-width: 2px; border-style: solid; background: light-dark(#fff, #1f1b30); }
 .health-part h2 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 8px; font-size: 1.05rem; }
 .health-level { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .health-part.level-ok .health-level { color: light-dark(#2e7d32, #81c784); } .health-part.level-check .health-level { color: light-dark(#8a5200, #ffcc80); } .health-part.level-problem .health-level { color: light-dark(#b71c1c, #ef9a9a); }
 .health-part dl { display: grid; gap: 4px; margin: 0; }
 .health-part dl div { display: flex; justify-content: space-between; gap: 12px; }
+.health-actions { margin-top: 12px; }
+.health-actions p { margin: 8px 0; }
+.health-actions :is(button, .link-button) { min-height: 44px; border-radius: 8px; padding: 6px 10px; font-size: .875rem; font-weight: 600; }
+.health-actions .link-button { display: inline-flex; align-items: center; color: inherit; }
 .health-part dt, .health-part dd { font-size: .92rem; } .health-part dt { color: light-dark(#5d5873, #b8b2cf); } .health-part dd { margin: 0; font-weight: 700; text-align: right; }
 /* Admin → Roles: one card per role, its permissions as rows with the switch on the left. */
 .role-add { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin: 0 0 24px; }

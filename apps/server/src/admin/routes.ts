@@ -1,6 +1,6 @@
 import { statfs } from 'node:fs/promises';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { AdminHealthSchema, GameIdSchema, AdminActionListSchema, AdminRoomsSchema, AdminStorageSchema } from '@party/contracts';
+import { AdminHealthRecoverySchema, AdminHealthSchema, GameIdSchema, AdminActionListSchema, AdminRoomsSchema, AdminStorageSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { createOwnerAccess } from '../hosting/owner-access.js';
@@ -12,6 +12,7 @@ import { defaultMediaDirectory } from '../assets/media.js';
 import { cleanUpMedia } from '../assets/cleanup.js';
 import { recordAction } from './actions.js';
 import { readHealth } from './health.js';
+import { recoverRoomUpdates, unreviewedProblems } from './health-recovery.js';
 import type { DatabaseHealth } from '../database/client.js';
 import type { RequestMetrics } from '../diagnostics/observability.js';
 
@@ -22,7 +23,7 @@ import type { RequestMetrics } from '../diagnostics/observability.js';
  * what the owner and editors changed.
  */
 export function registerAdminRoutes(app: FastifyInstance, client: PrismaClient, config: Config, owner: ReturnType<typeof createOwnerAccess>,
-  health?: { metrics: RequestMetrics; database: DatabaseHealth; connections: () => number }) {
+  health?: { metrics: RequestMetrics; database: DatabaseHealth; connections: () => number; connectedRoomIds: () => string[] }) {
   const directory = config.MEDIA_DIR ?? defaultMediaDirectory;
   const sessionParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { sessionId?: string }).sessionId); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
 
@@ -86,6 +87,20 @@ export function registerAdminRoutes(app: FastifyInstance, client: PrismaClient, 
     try {
       owner.requireOwner(request); roomAssert(health, 'AUTH_UNAVAILABLE');
       return { ok: true, data: AdminHealthSchema.parse(await readHealth(client, { ...health!, version: config.APP_VERSION, mediaDirectory: directory })) };
+    } catch (error) { return owner.fail(reply, error); }
+  });
+  app.post('/api/host/admin/health/recover', async (request, reply) => {
+    try {
+      owner.requireOwner(request); roomAssert(health, 'AUTH_UNAVAILABLE');
+      const parsed = AdminHealthRecoverySchema.safeParse(request.body); roomAssert(parsed.success, 'INVALID_COMMAND');
+      const { action } = parsed.data; const now = Date.now();
+      const affected = action === 'review-problems'
+        ? (await client.deviceLog.updateMany({
+          where: unreviewedProblems(now, Date.parse(parsed.data.checkedAt)), data: { reviewedAt: new Date(now) },
+        })).count
+        : await recoverRoomUpdates(client, action, health.connectedRoomIds(), now);
+      if (affected) await recordAction(client, { personId: null }, `health.${action}`, `${affected} affected`);
+      return { ok: true, data: { affected } };
     } catch (error) { return owner.fail(reply, error); }
   });
 

@@ -157,7 +157,8 @@ export function buildApp(config: Config, options: { verifyToken?: TokenVerifier;
     registerPackAdminRoutes(app, options.database.client, config, owner);
     registerSiteLook(app, options.database.client, owner);
     registerMediaLibrary(app, options.database.client, config, owner);
-    registerAdminRoutes(app, options.database.client, config, owner, { metrics, database: options.database, connections: () => rooms?.io.engine.clientsCount ?? 0 });
+    registerAdminRoutes(app, options.database.client, config, owner, { metrics, database: options.database,
+      connections: () => rooms?.io.engine.clientsCount ?? 0, connectedRoomIds: rooms?.connectedRoomIds ?? (() => []) });
     if (rooms) registerSideGames(app, options.database.client, config, rooms.gateway, rooms.io);
     if (rooms) { const lobbies = createLobbies(options.database.client); registerArcade(app, options.database.client, config, rooms.gateway, createRounds(options.database.client, config, rooms.service, lobbies), lobbies); }
   }

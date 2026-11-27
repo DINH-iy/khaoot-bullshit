@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BRICK_BALL_RADIUS, BRICK_COLUMNS, BRICK_HEIGHT, BRICK_HZ, BRICK_MAPS, BRICK_PADDLE_WIDTH, BRICK_ROWS, BrickMapSchema, brickPaddleWidth, brickRect, startBrickRun, tickBrickRun } from '@party/contracts';
+import { BRICK_BALL_RADIUS, BRICK_COLUMNS, BRICK_CONTROLS, BRICK_HEIGHT, BRICK_HZ, BRICK_MAPS, BRICK_PADDLE_WIDTH, BRICK_ROWS, BrickMapSchema, brickElapsed, brickPaddleWidth, brickRect, startBrickRun, tickBrickRun } from '@party/contracts';
+import { verifiedBrickClear } from '../../src/minigames/brick-rally/judge.js';
+import { brickRaceOutcome, newBrickRace, readyBrickRace } from '../../src/side-games/brick-race.js';
 
 describe('Brick Rally maps', () => {
   it('provides distinct playable layouts, including the oudje lettering', () => {
@@ -51,7 +53,7 @@ describe('Brick Rally maps', () => {
 
   it('adds a ball on impact and keeps playing when one of the pair is lost', () => {
     const map = ['#.......', '........', '........', '........', '......S.'];
-    const run = startBrickRun(map);
+    const run = startBrickRun(map, 2);
     for (let tick = 0; tick < BRICK_HZ && !run.hits; tick++) tickBrickRun(run, 32);
     expect(run.remaining).toBe(1);
     expect(run.balls).toHaveLength(2);
@@ -62,6 +64,48 @@ describe('Brick Rally maps', () => {
     expect(run.balls).toHaveLength(1);
     expect(run.relaunch).toBe(0);
     expect(run.misses).toBe(0);
+    expect(run.livesLeft).toBe(2);
+    for (const livesLeft of [1, 0]) {
+      run.relaunch = 0;
+      Object.assign(run.balls[0]!, { y: BRICK_HEIGHT + BRICK_BALL_RADIUS, vy: 2 });
+      tickBrickRun(run, 32);
+      expect(run.livesLeft).toBe(livesLeft);
+    }
+    expect(run.balls).toHaveLength(0);
+    const endedAt = run.ticks;
+    tickBrickRun(run, 32);
+    expect(run.ticks).toBe(endedAt);
+  });
+
+  it('rejects a clear that relied on relaunching after the final life', () => {
+    const map = ['........', '........', '........', '........', '......#.'];
+    const run = startBrickRun(map);
+    let trace = '';
+    while (run.remaining && run.ticks < BRICK_HZ * 10) {
+      const control = run.ticks < 18 ? 0 : 32;
+      trace += BRICK_CONTROLS[control];
+      tickBrickRun(run, control);
+    }
+    const elapsed = brickElapsed(run.ticks);
+    expect(run.remaining).toBe(0);
+    expect(run.misses).toBeGreaterThan(0);
+    expect(verifiedBrickClear(map, trace, elapsed)).toBe(elapsed);
+    expect(verifiedBrickClear(map, trace, elapsed, 1)).toBeNull();
+  });
+
+  it('uses the chosen race timer and preserves the default for older challenges', () => {
+    for (const timerSeconds of [undefined, 15]) {
+      const race = newBrickRace({ timerSeconds })!;
+      readyBrickRace(race, 0, 1000);
+      expect(race.deadlineAt).toBeNull();
+      readyBrickRace(race, 1, 2000);
+      const deadline = Date.parse(race.startsAt!) + (timerSeconds ?? 120) * 1000;
+      expect(Date.parse(race.deadlineAt!)).toBe(deadline);
+      expect(brickRaceOutcome(race, deadline - 1)).toBeNull();
+      expect(brickRaceOutcome(race, deadline)).toEqual({ kind: 'draw' });
+    }
+    expect(newBrickRace({ timerSeconds: 121 })).toBeNull();
+    expect(newBrickRace({ lives: 0 })).toBeNull();
   });
 
   it('widens the paddle for eight seconds when its power-up brick breaks', () => {

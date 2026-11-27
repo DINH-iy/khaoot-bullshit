@@ -121,7 +121,7 @@ export const MINIGAMES: { [K in MinigameKey]: MinigameInfo & { defaults: Minigam
     howToPlay: 'Use the arrows to go around the walls and reach the flag. Fastest finish wins.',
     better: 'lower', defaults: {}, defaultSeconds: 45 },
   'brick-rally': { name: 'Brick Rally', description: 'Bounce the ball and clear the map as fast as you can.',
-    howToPlay: 'Drag to move the paddle, or use the arrow keys. Clear every brick. Missed balls relaunch while the clock keeps running.',
+    howToPlay: 'Drag the paddle or use the arrow keys. Clear every brick before time runs out. If lives are limited, losing the last ball costs a life.',
     better: 'lower', defaults: {}, defaultSeconds: 90 },
   'stop-clock': { name: 'Stop the clock', description: 'Stop a vanishing clock at exactly the target.', howToPlay: 'A clock starts counting. It disappears after a while. Tap Stop when you think it reaches the target.',
     better: 'lower', closeness: { unit: 'ms', perUnit: 1, max: 60_000, within: 250, scale: 2000 }, defaults: { targetMs: 10_000, visibleMs: 3000 }, defaultSeconds: 30 },

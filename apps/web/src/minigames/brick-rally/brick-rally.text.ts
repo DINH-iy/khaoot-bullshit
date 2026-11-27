@@ -9,6 +9,7 @@ export const BRICK_TEXTS = defineTexts('brick rally', {
   cell: 'Row {row}, column {column}: {tile}', empty: 'Add at least one brick.', play: 'Start', restart: 'Restart', close: 'Close',
   board: 'Brick Rally board. Use Left and Right to move the paddle.', controls: 'Drag to move the paddle, or use the arrow keys.',
   remaining: 'Bricks left: {count}', cleared: 'Cleared in {time} s', expired: 'Time’s up', submit: 'Submit time',
+  lives: 'Lives', unlimited: 'Unlimited', timer: 'Timer', seconds: '{seconds} s', timeLeft: '{seconds} s left', livesLeft: 'Lives left: {count}', outOfLives: 'Out of lives',
 }, {
   nl: {
     solo: 'Speel Brick Rally alleen', map: 'Kaart', steps: 'Trappen', circuit: 'Circuit', cascade: 'Waterval', oudje: 'oudje', custom: 'Eigen kaart',
@@ -19,6 +20,7 @@ export const BRICK_TEXTS = defineTexts('brick rally', {
     cell: 'Rij {row}, kolom {column}: {tile}', empty: 'Plaats minstens één steen.', play: 'Start', restart: 'Opnieuw', close: 'Sluiten',
     board: 'Brick Rally-speelveld. Gebruik links en rechts om de balk te bewegen.', controls: 'Sleep om de balk te bewegen of gebruik de pijltjestoetsen.',
     remaining: 'Stenen over: {count}', cleared: 'Klaar in {time} s', expired: 'Tijd voorbij', submit: 'Tijd versturen',
+    lives: 'Levens', unlimited: 'Onbeperkt', timer: 'Timer', seconds: '{seconds} s', timeLeft: 'Nog {seconds} s', livesLeft: 'Levens over: {count}', outOfLives: 'Geen levens meer',
   },
   de: {
     solo: 'Brick Rally allein spielen', map: 'Karte', steps: 'Stufen', circuit: 'Rundkurs', cascade: 'Kaskade', oudje: 'oudje', custom: 'Eigene Karte',
@@ -29,6 +31,7 @@ export const BRICK_TEXTS = defineTexts('brick rally', {
     cell: 'Zeile {row}, Spalte {column}: {tile}', empty: 'Platziere mindestens einen Stein.', play: 'Start', restart: 'Neustart', close: 'Schließen',
     board: 'Brick Rally-Spielfeld. Bewege den Schläger mit Links und Rechts.', controls: 'Ziehe den Schläger oder benutze die Pfeiltasten.',
     remaining: 'Übrige Steine: {count}', cleared: 'Geschafft in {time} s', expired: 'Zeit abgelaufen', submit: 'Zeit senden',
+    lives: 'Leben', unlimited: 'Unbegrenzt', timer: 'Zeitlimit', seconds: '{seconds} s', timeLeft: 'Noch {seconds} s', livesLeft: 'Übrige Leben: {count}', outOfLives: 'Keine Leben mehr',
   },
   ro: {
     solo: 'Joacă Brick Rally singur', map: 'Hartă', steps: 'Trepte', circuit: 'Circuit', cascade: 'Cascadă', oudje: 'oudje', custom: 'Hartă proprie',
@@ -39,5 +42,6 @@ export const BRICK_TEXTS = defineTexts('brick rally', {
     cell: 'Rândul {row}, coloana {column}: {tile}', empty: 'Adaugă cel puțin o cărămidă.', play: 'Start', restart: 'Repornește', close: 'Închide',
     board: 'Terenul Brick Rally. Folosește săgețile stânga și dreapta pentru a muta paleta.', controls: 'Trage paleta sau folosește tastele cu săgeți.',
     remaining: 'Cărămizi rămase: {count}', cleared: 'Terminat în {time} s', expired: 'Timpul a expirat', submit: 'Trimite timpul',
+    lives: 'Vieți', unlimited: 'Nelimitat', timer: 'Cronometru', seconds: '{seconds} s', timeLeft: 'Mai sunt {seconds} s', livesLeft: 'Vieți rămase: {count}', outOfLives: 'Nu mai ai vieți',
   },
 });

@@ -15,8 +15,12 @@ test('Brick Rally solo plays and remembers a custom map on a narrow phone', asyn
   await open.click();
   const solo = page.getByRole('dialog', { name: 'Brick Rally' });
   await expect(solo.getByText('Custom map')).toBeVisible();
+  await solo.getByRole('combobox', { name: 'Lives' }).selectOption('3');
+  await solo.getByRole('combobox', { name: 'Timer' }).selectOption('5');
   await solo.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(solo.getByLabel(/Brick Rally board/)).toBeInViewport();
+  await expect(solo.getByText('Lives left: 3')).toBeVisible();
+  await expect(solo.getByText('5 s left')).toBeVisible();
   await expect(solo.getByRole('status')).toHaveText('Cleared in 0.93 s');
   await solo.getByRole('button', { name: 'Map', exact: true }).click();
   await solo.getByRole('button', { name: 'Cascade', exact: true }).click();
@@ -28,8 +32,13 @@ test('Brick Rally solo plays and remembers a custom map on a narrow phone', asyn
   await mapEditor.getByRole('button', { name: 'Apply map' }).click();
   await solo.getByRole('button', { name: 'Close', exact: true }).click();
   await open.click();
+  await expect(solo.getByRole('combobox', { name: 'Lives' })).toHaveValue('3');
+  await expect(solo.getByRole('combobox', { name: 'Timer' })).toHaveValue('5');
   await solo.getByRole('button', { name: 'Edit map' }).click();
   await expect(mapEditor.getByRole('button', { name: /^Row 1, column 1: Tough brick/ })).toBeVisible();
+  await mapEditor.getByRole('button', { name: 'Cancel' }).click();
+  await solo.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(solo.getByRole('status')).toHaveText('Time’s up');
 });
 
 test('Arcade players get the same custom Brick Rally map and verified times', async ({ page, browser, baseURL }) => {
@@ -42,12 +51,16 @@ test('Arcade players get the same custom Brick Rally map and verified times', as
   await page.getByRole('dialog', { name: 'Choose a game' }).getByRole('button', { name: 'Brick Rally', exact: true }).click();
   await page.getByRole('button', { name: /^Game settings .*Brick Rally$/ }).click();
   const settings = page.getByRole('dialog', { name: 'Brick Rally settings' });
+  await settings.getByRole('combobox', { name: 'Lives' }).selectOption('2');
+  await settings.getByRole('button', { name: 'Less round time' }).click();
   await settings.getByRole('button', { name: 'Edit map' }).click();
   const mapEditor = page.getByRole('dialog', { name: 'Edit map' });
   await mapEditor.getByRole('button', { name: 'Blank map' }).click();
   await expect(mapEditor.getByRole('button', { name: 'Apply map' })).toBeDisabled();
   await mapEditor.getByRole('button', { name: 'Row 24, column 21: Empty' }).click();
   await mapEditor.getByRole('button', { name: 'Apply map' }).click();
+  await expect(settings.getByRole('combobox', { name: 'Lives' })).toHaveValue('2');
+  await expect(settings.getByRole('group', { name: 'Round time' }).locator('output')).toHaveText('85 s');
   await settings.getByRole('button', { name: 'Close' }).click();
 
   const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 } });
@@ -111,6 +124,7 @@ test('a hosted Brick Rally scene saves its own painted map', async ({ page, base
   await expect(dialog.getByRole('button', { name: 'Start practice' })).toBeInViewport();
   if (captures) await page.screenshot({ path: join(captures, 'brick-rally-phone-preview.png'), animations: 'disabled' });
   const phone = dialog.locator('.phone-device');
+  await dialog.getByRole('combobox', { name: 'Lives' }).selectOption('3');
   const openedAt = await phone.boundingBox();
   await dialog.getByRole('button', { name: 'oudje', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'oudje', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -148,7 +162,7 @@ test('a hosted Brick Rally scene saves its own painted map', async ({ page, base
   await expect.poll(async () => {
     const saved = (await (await page.request.get(`${api}/${gameId}`, { headers })).json()).data;
     return saved.definition.nodes[0].stages[0].settings;
-  }).toEqual({ map: ['5S'.padEnd(BRICK_COLUMNS, '.'), ...Array<string>(BRICK_ROWS - 1).fill('.'.repeat(BRICK_COLUMNS))] });
+  }).toEqual({ lives: 3, map: ['5S'.padEnd(BRICK_COLUMNS, '.'), ...Array<string>(BRICK_ROWS - 1).fill('.'.repeat(BRICK_COLUMNS))] });
 });
 
 test('two phones can invite each other to Brick Rally and finish a shared race', async ({ browser, baseURL }) => {
@@ -217,6 +231,8 @@ test('two phones can invite each other to Brick Rally and finish a shared race',
       }
       await maps.getByRole('button', { name: 'Circuit', exact: true }).click();
       await expect(outgoing.getByRole('button', { name: 'Browse maps, Circuit' })).toBeFocused();
+      await outgoing.getByRole('combobox', { name: 'Lives' }).selectOption('3');
+      await outgoing.getByRole('combobox', { name: 'Timer' }).selectOption('30');
       expect((await outgoing.boundingBox())!.height).toBeLessThan(800);
       if (custom) {
         // Use a short fixture through the same endpoint so both browsers can clear it with real gameplay.
@@ -227,7 +243,7 @@ test('two phones can invite each other to Brick Rally and finish a shared race',
       } else await screenshot(ada, 'brick-rally-invite.png');
       await outgoing.getByRole('button', { name: 'Send challenge' }).click();
       await expect(incoming.getByText(/Ada challenges you to Brick Rally/)).toBeVisible();
-      await expect(incoming.locator('dl.challenge-invite-settings dd')).toHaveText(custom ? 'Custom map' : 'Circuit');
+      await expect(incoming.locator('dl.challenge-invite-settings dd')).toHaveText(custom ? ['Custom map'] : ['Circuit', '3', '30 s']);
       await incoming.getByRole('button', { name: 'Accept' }).click();
       await outgoing.getByRole('button', { name: 'Open', exact: true }).click();
       const canvas = (page: Page) => page.getByRole('img', { name: 'Map', exact: true });
@@ -248,6 +264,7 @@ test('two phones can invite each other to Brick Rally and finish a shared race',
     await send(false);
     await expect(outgoing.getByRole('button', { name: 'Give up', exact: true })).toBeInViewport({ ratio: 1 });
     await expect(outgoing.getByText(/Bricks left: [4-6][0-9][0-9]/)).toBeVisible();
+    await expect(outgoing.getByText(/Lives left: [1-3]/)).toBeVisible();
     await screenshot(ada, 'brick-rally-race.png');
     await ada.setViewportSize({ width: 360, height: 640 });
     await expect(board(ada)).toBeInViewport({ ratio: 1 });

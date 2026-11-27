@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { join } from 'node:path';
 
 const ownerToken = process.env['LOCAL_OWNER_TOKEN'];
 if (!ownerToken || process.env['NODE_ENV'] !== 'test') throw new Error('Dedicated E2E owner key required');
@@ -28,6 +29,7 @@ test('a phone sends its log by itself when the server fails, without what was ty
   const ownerContext = await browser.newContext(); const owner = await ownerContext.newPage();
   try {
     expect((await owner.request.post(`${baseURL}/api/host/claim`, { headers: { origin: baseURL!, 'x-party-request': '1' }, data: { token: ownerToken } })).ok()).toBe(true);
+    if (process.env['ADMIN_SCREENSHOTS']) await owner.emulateMedia({ colorScheme: 'dark' });
     await owner.goto(`${baseURL}/?admin=logs`);
     await expect(owner.getByRole('heading', { name: 'Device logs', level: 1 })).toBeVisible();
     await owner.getByRole('searchbox', { name: 'Search' }).fill('0f0f0f0f');
@@ -37,6 +39,17 @@ test('a phone sends its log by itself when the server fails, without what was ty
     const timeline = item.getByRole('table', { name: /What happened on the device/ });
     await expect(timeline.getByRole('row').filter({ hasText: 'POST /api/rooms/join' }).first()).toHaveClass(/log-bad/);
     await expect(timeline).not.toContainText('Secret Sam');
+    for (const width of [1320, 390]) {
+      await owner.setViewportSize({ width, height: 960 });
+      for (const name of ['Refresh', 'Hide', 'Copy as text']) {
+        const button = owner.getByRole('button', { name, exact: true }).first();
+        await expect(button).toBeVisible();
+        expect((await button.boundingBox())!.height).toBe(44);
+        expect((await button.locator('svg').boundingBox())!.width).toBeLessThanOrEqual(16);
+      }
+      expect(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (process.env['ADMIN_SCREENSHOTS']) await owner.screenshot({ path: join(process.env['ADMIN_SCREENSHOTS'], `device-logs-${width}.png`), fullPage: true });
+    }
     expect((await new AxeBuilder({ page: owner }).analyze()).violations).toEqual([]);
     expect(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   } finally { await ownerContext.close(); }

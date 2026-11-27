@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BrickChallengeView } from '@party/contracts';
+import { BRICK_MAX_SECONDS, type BrickChallengeView } from '@party/contracts';
 import { useTexts } from '../i18n/texts.js';
 import { H2H_TEXTS } from '../head-to-head/h2h.text.js';
 import { BrickMapPreview, BrickRallyBoard } from '../minigames/brick-rally/board.js';
@@ -41,7 +41,8 @@ export function BrickChallenge({ view, names, offset, busy, onReady, onClear, on
       <p><strong>{b('cleared', { time: (ownTime / 1000).toFixed(3) })}</strong></p>
       <p>{t('submitted')}</p>
     </div> : startsAt ? <Countdown startsAt={startsAt} offset={offset}>
-      <BrickRallyBoard map={map} raceStart={Date.parse(startsAt) - offset} disabled={busy || confirm} onClear={result => onClear(result.brickTrace)} />
+      <BrickRallyBoard map={map} lives={view.lives} raceStart={Date.parse(startsAt) - offset}
+        timeLimitMs={(view.timerSeconds ?? BRICK_MAX_SECONDS) * 1000} disabled={busy || confirm} onClear={result => onClear(result.brickTrace)} />
     </Countdown> : <>
       <p className="hint">{t('rules')}</p>
       <div className="brick-rally"><BrickMapPreview map={map} label={b('map')} /></div>

@@ -92,7 +92,7 @@ export function MinigameStage({ state, stage, offset, canPlay, disabled, onResul
     const score = Number(BigInt(state.view.standings.find(row => row.playerId === state.selfPlayerId)?.amountMilli ?? '0') / 1000n);
     const rouletteLimit = minigame.game === 'red-or-black-roulette' ? rouletteBetLimit(score, (settings as MinigameSettings<'red-or-black-roulette'>).betFloor ?? ROULETTE_BET_FLOOR) : undefined;
     return <>
-      <TimedMinigame key={stage.id} rouletteLimit={rouletteLimit} game={minigame.game} settings={settings} startsAt={minigame.startsAt} goAt={goAt} cutTarget={minigame.cutTarget} angleTarget={minigame.angleTarget}
+      <TimedMinigame key={stage.id} rouletteLimit={rouletteLimit} game={minigame.game} settings={settings} startsAt={minigame.startsAt} deadlineAt={stage.deadlineAt} goAt={goAt} cutTarget={minigame.cutTarget} angleTarget={minigame.angleTarget}
         graph={minigame.graph} dots={minigame.dots} offset={offset} disabled={disabled} onResult={send} onTaps={sendTaps} />
       {race && <div className="mg-phone-race"><RaceBars state={state} progress={live.progress!.counts} /></div>}
     </>;

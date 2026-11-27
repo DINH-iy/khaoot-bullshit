@@ -27,8 +27,15 @@ export type AdminActionList = z.infer<typeof AdminActionListSchema>;
 
 /** Admin → Health: how the server is doing now, each part with a verdict (ok, check, problem) and its numbers. */
 export const HEALTH_LEVELS = ['ok', 'check', 'problem'] as const;
+const HealthCount = z.number().int().nonnegative();
+export const AdminHealthRecoverySchema = z.discriminatedUnion('action', [
+  z.strictObject({ action: z.literal('retry-updates') }),
+  z.strictObject({ action: z.literal('clear-finished-updates') }),
+  z.strictObject({ action: z.literal('review-problems'), checkedAt: z.iso.datetime() }),
+]);
 export const AdminHealthSchema = z.object({
   checkedAt: z.string().datetime(), version: z.string(), level: z.enum(HEALTH_LEVELS),
   parts: z.array(z.object({ key: z.string(), level: z.enum(HEALTH_LEVELS), facts: z.array(z.object({ label: z.string(), value: z.string() }).strict()) }).strict()),
+  recovery: z.strictObject({ retryable: HealthCount, obsolete: HealthCount, unreviewed: HealthCount }).optional(),
 }).strict();
 export type AdminHealth = z.infer<typeof AdminHealthSchema>;

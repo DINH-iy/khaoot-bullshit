@@ -67,16 +67,20 @@ export function BrickMapPreview({ map, label }: { map: readonly string[]; label?
 
 export type BrickResult = { value: number; brickTrace: string };
 
-export function BrickRallyBoard({ map, disabled = false, onClear, raceStart }: { map: readonly string[]; disabled?: boolean; raceStart?: number; onClear?: (result: BrickResult) => void }) {
+export function BrickRallyBoard({ map, lives, timeLimitMs, disabled = false, onClear, raceStart }: {
+  map: readonly string[]; lives?: number | undefined; timeLimitMs?: number | undefined; disabled?: boolean; raceStart?: number; onClear?: (result: BrickResult) => void;
+}) {
   const t = useTexts(BRICK_TEXTS);
   const canvas = useRef<HTMLCanvasElement>(null);
   const target = useRef(BRICK_WIDTH / 2);
   const keys = useRef(new Set<string>());
   const pointer = useRef<number | null>(null);
-  const latest = useRef({ disabled, onClear });
-  latest.current = { disabled, onClear };
+  const maxTicks = Math.min(BRICK_MAX_TICKS, Math.max(0, Math.floor((timeLimitMs ?? Infinity) * BRICK_HZ / 1000)));
+  const latest = useRef({ disabled, onClear, maxTicks });
+  latest.current = { disabled, onClear, maxTicks };
   const [remaining, setRemaining] = useState(() => startBrickRun(map).remaining);
-  const [seconds, setSeconds] = useState(0);
+  const [elapsedTicks, setElapsedTicks] = useState(0);
+  const [livesLeft, setLivesLeft] = useState(lives);
   const [result, setResult] = useState<BrickResult>();
   const [expired, setExpired] = useState(false);
   const initialRaceStart = useRef(raceStart);
@@ -86,7 +90,7 @@ export function BrickRallyBoard({ map, disabled = false, onClear, raceStart }: {
     const context = canvas.current?.getContext('2d');
     if (!context) return;
     canvas.current?.focus({ preventScroll: true });
-    const run = startBrickRun(layout.split('|'));
+    const run = startBrickRun(layout.split('|'), lives);
     const field = document.createElement('canvas');
     field.width = BRICK_WIDTH;
     field.height = BRICK_HEIGHT;
@@ -106,11 +110,13 @@ export function BrickRallyBoard({ map, disabled = false, onClear, raceStart }: {
     let frame: number;
     let lastSeconds = 0;
     let lastRemaining = run.remaining;
+    let lastLives = run.livesLeft;
+    let timedOut = false;
     paint();
     const play = (now: number) => {
       // Use wall time for the tick budget, with bounded catch-up after a slow frame.
-      const ticks = Math.min(BRICK_MAX_TICKS, run.ticks + 120, Math.floor((now - start) * BRICK_HZ / 1000));
-      while (run.ticks < ticks && run.remaining > 0) {
+      const ticks = Math.min(latest.current.maxTicks, run.ticks + 120, Math.floor((now - start) * BRICK_HZ / 1000));
+      while (run.ticks < ticks && run.remaining > 0 && run.livesLeft !== 0) {
         if (!latest.current.disabled) {
           const direction = Number(keys.current.has('ArrowRight')) - Number(keys.current.has('ArrowLeft'));
           target.current = Math.max(0, Math.min(BRICK_WIDTH, target.current + direction * 7));
@@ -121,25 +127,32 @@ export function BrickRallyBoard({ map, disabled = false, onClear, raceStart }: {
       }
       paint();
       const elapsed = Math.floor(run.ticks / BRICK_HZ);
-      if (elapsed !== lastSeconds) { lastSeconds = elapsed; setSeconds(elapsed); }
+      const deadlineReached = run.ticks >= latest.current.maxTicks;
+      if (elapsed !== lastSeconds || deadlineReached !== timedOut) { lastSeconds = elapsed; setElapsedTicks(run.ticks); }
       if (run.remaining !== lastRemaining) { lastRemaining = run.remaining; setRemaining(run.remaining); }
+      if (run.livesLeft !== lastLives) { lastLives = run.livesLeft; setLivesLeft(run.livesLeft); }
       if (!run.remaining) {
         const clear = { value: brickElapsed(run.ticks), brickTrace: trace.join('') };
         setResult(clear);
         if (!latest.current.disabled) latest.current.onClear?.(clear);
-      } else if (run.ticks === BRICK_MAX_TICKS) setExpired(true);
-      else frame = requestAnimationFrame(play);
+      } else if (run.livesLeft !== 0) {
+        if (timedOut !== deadlineReached) { timedOut = deadlineReached; setExpired(timedOut); }
+        // The host can extend a live round's deadline.
+        if (run.ticks < BRICK_MAX_TICKS) frame = requestAnimationFrame(play);
+      }
     };
     frame = requestAnimationFrame(play);
     return () => cancelAnimationFrame(frame);
-  }, [layout]);
+  }, [layout, lives]);
 
   const aim = (clientX: number) => {
     const bounds = canvas.current?.getBoundingClientRect();
     if (bounds && !disabled) target.current = (clientX - bounds.left) / bounds.width * BRICK_WIDTH;
   };
   return <div className="brick-rally">
-    <div className="brick-hud"><span>{t('remaining', { count: remaining })}</span><span>{seconds} s</span></div>
+    <div className="brick-hud"><span>{t('remaining', { count: remaining })}</span>
+      {livesLeft !== undefined && <span>{t('livesLeft', { count: livesLeft })}</span>}
+      <span>{t('timeLeft', { seconds: Math.ceil(Math.max(0, maxTicks - elapsedTicks) / BRICK_HZ) })}</span></div>
     <canvas className="brick-board" ref={canvas} width={BRICK_WIDTH} height={BRICK_HEIGHT} tabIndex={0} aria-label={t('board')}
       onPointerDown={event => {
         if (disabled || event.button !== 0 || pointer.current !== null) return;
@@ -157,6 +170,6 @@ export function BrickRallyBoard({ map, disabled = false, onClear, raceStart }: {
     {result ? <div className="brick-status">
       <span role="status">{t('cleared', { time: (result.value / 1000).toFixed(2) })}</span>
       {onClear && <button type="button" disabled={disabled} onClick={() => onClear(result)}>{t('submit')}</button>}
-    </div> : <p className="brick-help" role={expired ? 'status' : undefined}>{t(expired ? 'expired' : 'controls')}</p>}
+    </div> : <p className="brick-help" role={expired || livesLeft === 0 ? 'status' : undefined}>{t(livesLeft === 0 ? 'outOfLives' : expired ? 'expired' : 'controls')}</p>}
   </div>;
 }

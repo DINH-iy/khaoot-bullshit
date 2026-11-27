@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BrickMapSchema, BrickTraceSchema } from './minigames/brick-rally/brick-rally.js';
+import { BrickLivesSchema, BrickMapSchema, BrickTimerSchema, BrickTraceSchema } from './minigames/brick-rally/brick-rally.js';
 import { POOL_MAX_SHOTS, PoolBallBehaviorSchema, PoolBoardSchema, PoolFrameSchema, PoolFeltSchema, PoolShotSchema, PoolShotSecondsSchema, PoolStartSchema, PoolTimeoutSchema } from './minigames/eight-ball/pool.js';
 
 /**
@@ -118,6 +118,7 @@ export const BrickChallengeClearSchema = z.strictObject({ brickTrace: BrickTrace
 const BrickChallengeTime = z.number().int().positive().nullable();
 export const BrickChallengeViewSchema = z.strictObject({
   seat: Seat, map: BrickMapSchema, ready: z.tuple([z.boolean(), z.boolean()]),
+  lives: BrickLivesSchema.optional(), timerSeconds: BrickTimerSchema.optional(),
   startsAt: z.iso.datetime().nullable(), deadlineAt: z.iso.datetime().nullable(),
   times: z.tuple([BrickChallengeTime, BrickChallengeTime]), outcome: HeadToHeadOutcomeSchema.nullable(),
 });

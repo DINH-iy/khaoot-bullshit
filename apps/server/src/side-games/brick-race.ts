@@ -1,4 +1,4 @@
-import { BRICK_MAX_SECONDS, BrickChallengeViewSchema, BrickSettingsSchema, MINIGAME_COUNTDOWN_MS, brickMap, type BrickChallengeView, type HeadToHeadOutcome } from '@party/contracts';
+import { BRICK_MAX_SECONDS, BrickChallengeViewSchema, BrickRaceSettingsSchema, MINIGAME_COUNTDOWN_MS, brickMap, type BrickChallengeView, type HeadToHeadOutcome } from '@party/contracts';
 import { roomAssert } from '../rooms/security.js';
 import { verifiedBrickClear } from '../minigames/brick-rally/judge.js';
 
@@ -7,8 +7,11 @@ type BrickRace = ReturnType<typeof BrickRaceSchema.parse>;
 type Racer = BrickChallengeView['seat'];
 
 export function newBrickRace(settings: unknown): BrickRace | null {
-  const parsed = BrickSettingsSchema.safeParse(settings ?? {});
-  return parsed.success ? { map: [...brickMap(parsed.data)], ready: [false, false], startsAt: null, deadlineAt: null, times: [null, null], outcome: null } : null;
+  const parsed = BrickRaceSettingsSchema.safeParse(settings ?? {});
+  if (!parsed.success) return null;
+  const { lives, timerSeconds } = parsed.data;
+  return { map: [...brickMap(parsed.data)], ...(lives === undefined ? {} : { lives }), ...(timerSeconds === undefined ? {} : { timerSeconds }),
+    ready: [false, false], startsAt: null, deadlineAt: null, times: [null, null], outcome: null };
 }
 
 export function readBrickRace(raw: unknown): BrickRace {
@@ -29,14 +32,14 @@ export function readyBrickRace(race: BrickRace, seat: Racer, now: number) {
   if (!race.startsAt && race.ready.every(Boolean)) {
     const start = now + MINIGAME_COUNTDOWN_MS;
     race.startsAt = new Date(start).toISOString();
-    race.deadlineAt = new Date(start + BRICK_MAX_SECONDS * 1000).toISOString();
+    race.deadlineAt = new Date(start + (race.timerSeconds ?? BRICK_MAX_SECONDS) * 1000).toISOString();
   }
 }
 
 export function submitBrickRaceClear(race: BrickRace, seat: Racer, brickTrace: string, now: number) {
   roomAssert(race.startsAt, 'INVALID_STATE');
   if (race.times[seat] !== null) return;
-  const elapsed = verifiedBrickClear(race.map, brickTrace, now - Date.parse(race.startsAt));
+  const elapsed = verifiedBrickClear(race.map, brickTrace, now - Date.parse(race.startsAt), race.lives);
   roomAssert(elapsed !== null, 'INVALID_SUBMISSION');
   race.times[seat] = elapsed;
 }

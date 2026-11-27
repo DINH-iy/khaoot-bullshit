@@ -147,7 +147,7 @@ function PracticeAttempt({ game, settings, stage, attempt, shared }: {
   if (STEP_RENDERERS[game]) return <Countdown startsAt={startsAt} offset={0}>
     <StepPractice game={game} settings={settings} starts={starts} expired={expired} />
   </Countdown>;
-  return <TimedMinigame game={game} settings={settings} startsAt={startsAt} goAt={goAt} cutTarget={cutTarget} angleTarget={angleTarget} graph={graph} offset={0} disabled={false} onResult={setResult} onTaps={ignoreTaps}
+  return <TimedMinigame game={game} settings={settings} startsAt={startsAt} deadlineAt={game === 'brick-rally' ? new Date(starts + duration).toISOString() : undefined} goAt={goAt} cutTarget={cutTarget} angleTarget={angleTarget} graph={graph} offset={0} disabled={false} onResult={setResult} onTaps={ignoreTaps}
     rouletteLimit={game === 'red-or-black-roulette' ? (settings as MinigameSettings<'red-or-black-roulette'>).betFloor ?? ROULETTE_BET_FLOOR : undefined} />;
 }
 

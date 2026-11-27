@@ -19,6 +19,7 @@ const CONTROLLERS = { reaction: ReactionPad, 'tap-race': TapRace, 'clap-beat': C
 interface Props {
   settings: MinigameSettings;
   startsAt: string;
+  deadlineAt?: string | null | undefined;
   goAt: string | null;
   cutTarget?: number | undefined;
   angleTarget?: number | undefined;
@@ -35,14 +36,17 @@ interface Props {
 
 export function TimedMinigame({ game, ...props }: Props & { game: MinigameKey }) {
   const Controller = CONTROLLERS[game as keyof typeof CONTROLLERS] as ComponentType<Props> | undefined;
-  const { cutTarget, angleTarget, graph, dots, startsAt, offset, disabled, onResult, rouletteLimit } = props;
+  const { cutTarget, angleTarget, graph, dots, startsAt, deadlineAt, offset, disabled, onResult, rouletteLimit } = props;
+  const brick = props.settings as BrickSettings;
   const targetController = game === 'cut-the-line' && cutTarget !== undefined ? <CutLine target={cutTarget} disabled={disabled} onResult={onResult} />
     : game === 'match-the-angle' && angleTarget !== undefined ? <MatchAngle target={angleTarget} disabled={disabled} onResult={onResult} />
     : graph ? <GraphPhone graph={graph} disabled={disabled} onResult={onResult} />
     : game === 'count-the-dots' ? <DotPhone pattern={dots?.pattern} guessAt={dots?.guessAt} offset={offset} disabled={disabled} onResult={onResult} />
     : game === 'heads-or-tails' ? <CoinPhone disabled={disabled} onResult={onResult} />
     : game === 'red-or-black-roulette' ? <RoulettePhone limit={rouletteLimit ?? 0} disabled={disabled} onResult={onResult} />
-    : game === 'brick-rally' ? <BrickRallyBoard map={brickMap(props.settings as BrickSettings)} disabled={disabled} onClear={onResult} />
+    : game === 'brick-rally' ? <BrickRallyBoard map={brickMap(brick)} lives={brick.lives}
+      raceStart={Date.parse(startsAt) - offset} timeLimitMs={deadlineAt ? Date.parse(deadlineAt) - Date.parse(startsAt) : undefined}
+      disabled={disabled} onClear={onResult} />
     : null;
   return Controller || targetController ? <div className={`mg-play mg-${game}`}>
     {Controller ? <Controller key={startsAt} {...props} /> : <Countdown key={startsAt} startsAt={startsAt} offset={offset}>

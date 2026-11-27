@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const BRICK_COLUMNS = 32;
 export const BRICK_ROWS = 24;
 export const BRICK_MAX_SECONDS = 120;
+export const BRICK_MAX_LIVES = 9;
+export const BrickLivesSchema = z.number().int().min(1).max(BRICK_MAX_LIVES);
+export const BrickTimerSchema = z.number().int().min(5).max(BRICK_MAX_SECONDS);
 export const BRICK_HZ = 60;
 export const BRICK_MAX_TICKS = BRICK_HZ * BRICK_MAX_SECONDS;
 export const BRICK_CONTROLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -80,9 +83,11 @@ export const BRICK_MAPS = {
   ],
 };
 export const BRICK_PRESETS = ['steps', 'circuit', 'cascade', 'oudje'] as const;
-export const BrickSettingsSchema = z.object({ preset: z.enum(BRICK_PRESETS).optional(), map: BrickMapSchema.optional() }).strict()
+export const BrickSettingsSchema = z.strictObject({ preset: z.enum(BRICK_PRESETS).optional(), map: BrickMapSchema.optional(), lives: BrickLivesSchema.optional() })
   .refine(settings => !settings.preset || !settings.map, 'Choose a preset or a custom map');
 export type BrickSettings = z.infer<typeof BrickSettingsSchema>;
+export const BrickRaceSettingsSchema = BrickSettingsSchema.safeExtend({ timerSeconds: BrickTimerSchema.optional() });
+export type BrickRaceSettings = z.infer<typeof BrickRaceSettingsSchema>;
 export const brickMap = (settings: BrickSettings = {}) => settings.map ?? BRICK_MAPS[settings.preset ?? 'steps'];
 
 export const BRICK_WIDTH = 320;
@@ -119,10 +124,11 @@ export interface BrickRun {
   wideUntil: number;
   relaunch: number;
   misses: number;
+  livesLeft: number | undefined;
   ticks: number;
 }
 
-export function startBrickRun(map: readonly string[]): BrickRun {
+export function startBrickRun(map: readonly string[], lives?: number): BrickRun {
   const powerTiles = [...map.join('')];
   const tiles = powerTiles.map(brickTileHits);
   const columns = map[0]!.length;
@@ -131,7 +137,7 @@ export function startBrickRun(map: readonly string[]): BrickRun {
   const speed = columns === LEGACY_COLUMNS ? BALL_SPEED : BALL_SPEED + Math.min(4, Math.max(0, remaining - 40) / 100);
   const paddle = BRICK_WIDTH / 2;
   return { tiles, powerTiles, columns, rows: map.length, layout: columns === LEGACY_COLUMNS ? LEGACY_LAYOUT : DENSE_LAYOUT, speed,
-    hits: 0, remaining, paddle, balls: [launchBall(paddle, speed, .38)], wideUntil: 0, relaunch: 18, misses: 0, ticks: 0 };
+    hits: 0, remaining, paddle, balls: [launchBall(paddle, speed, .38)], wideUntil: 0, relaunch: 18, misses: 0, livesLeft: lives, ticks: 0 };
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -145,7 +151,7 @@ export const brickPaddleWidth = (run: BrickRun) => run.ticks < run.wideUntil ? W
 
 /** One fixed tick, shared by the interactive board and the server's replay. */
 export function tickBrickRun(run: BrickRun, control: number) {
-  if (!run.remaining || run.ticks >= BRICK_MAX_TICKS) return;
+  if (!run.remaining || run.livesLeft === 0 || run.ticks >= BRICK_MAX_TICKS) return;
   run.ticks++;
   const halfPaddle = brickPaddleWidth(run) / 2;
   const target = HALF_PADDLE + control / LAST_CONTROL * (BRICK_WIDTH - BRICK_PADDLE_WIDTH);
@@ -165,8 +171,9 @@ export function tickBrickRun(run: BrickRun, control: number) {
   run.paddle = clamp(run.paddle, nextHalfPaddle, BRICK_WIDTH - nextHalfPaddle);
   run.balls = run.balls.filter(ball => ball.y <= BRICK_HEIGHT + RADIUS);
   run.balls.push(...splits.slice(0, MAX_BALLS - run.balls.length));
-  if (!run.balls.length) {
+  if (run.remaining && !run.balls.length) {
     run.misses++;
+    if (run.livesLeft !== undefined && --run.livesLeft === 0) return;
     run.relaunch = 34;
     run.balls = [launchBall(run.paddle, run.speed, run.misses % 2 === 0 ? .38 : -.38)];
   }

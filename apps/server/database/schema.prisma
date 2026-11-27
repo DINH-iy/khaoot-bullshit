@@ -1069,6 +1069,7 @@ model DeviceLog {
   /// Device: { device, stats, events }; server: ServerProblemSchema.
   details   Json      @db.JsonB
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  reviewedAt DateTime? @db.Timestamptz(3)
 
   @@index([createdAt])
   @@index([sessionId, createdAt])

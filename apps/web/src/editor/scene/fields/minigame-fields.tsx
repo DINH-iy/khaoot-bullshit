@@ -1,4 +1,5 @@
 import { BrickMapFields } from '../../../minigames/brick-rally/map-fields.js';
+import { BrickLivesField } from '../../../minigames/brick-rally/rule-fields.js';
 import { HangmanWordSchema, normalizeHangmanWord, UndercoverPairSchema, DEFAULT_REVEAL_EASING, RevealEasingSchema, DOT_COUNT_MAX, DOT_RANDOM_MIN, DOT_VIEW_MAX_SECONDS, DOT_VIEW_MIN_SECONDS, isMinigameKey, isSharedPrediction, isStepMinigame, MINIGAME_KEYS, MINIGAMES, minigameScoring, minigameTiebreak, parseMinigameSettings, placePoints, PlacesSchema, ROULETTE_BET_FLOOR, type MinigameKey, type MinigameSettings, type Places } from '@party/contracts';
 import { NumberChoiceFields, NUMBER_CHOICE_TEXTS } from './number-choice-fields.js';
 import { GraphFields } from './graph-fields.js';
@@ -126,7 +127,11 @@ export function MinigameFields({ part, definition, node, index, onChange, inDraw
     </div>; })()}
     {game === 'tap-race' && settings && <label>{t('raceLength')}<input type="number" min={3} max={60} value={(settings as MinigameSettings<'tap-race'>).seconds}
       onChange={event => setSettings({ seconds: Math.round(Math.min(60, Math.max(3, Number(event.target.value) || 3))) }, 'seconds')} /></label>}
-    {game === 'brick-rally' && settings && <BrickMapFields settings={settings as MinigameSettings<'brick-rally'>} onChange={value => setSettings(value, 'brick-map')} />}
+    {game === 'brick-rally' && settings && <>
+      <BrickLivesField value={(settings as MinigameSettings<'brick-rally'>).lives}
+        onChange={lives => setSettings({ ...settings, lives } as MinigameSettings<'brick-rally'>, 'brick-lives')} />
+      <BrickMapFields settings={settings as MinigameSettings<'brick-rally'>} onChange={value => setSettings(value, 'brick-map')} />
+    </>}
     {game === 'speed-run' && settings && <SpeedRunCourseFields key={`${node.key}:${index}`} course={(settings as MinigameSettings<'speed-run'>).course}
       onChange={course => setSettings(course ? { course } : {}, 'course')} />}
     {game === 'stop-clock' && settings && (() => { const value = settings as MinigameSettings<'stop-clock'>; return <div className="field-pair">
