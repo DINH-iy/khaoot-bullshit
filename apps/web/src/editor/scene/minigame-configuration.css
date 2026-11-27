@@ -37,7 +37,12 @@
 .configuration-preview > .preview { width: 100%; justify-content: center; }
 .configuration-preview .preview > figure { min-width: 0; }
 .configuration-preview .tv > figcaption { display: none; }
-.configuration-preview .phone { --phone-max-h: max(320px, calc(100dvh - 280px)); }
+.configuration-window:has(.configuration-columns[data-device="phone"]:not([hidden])) {
+  block-size: calc(100dvh - 26px);
+}
+.minigame-configuration[open]:has(.configuration-columns[data-device="phone"]:not([hidden])) { animation: none; }
+.configuration-columns[data-device="phone"] .configuration-preview { container-type: size; align-self: stretch; }
+.minigame-configuration .configuration-preview .phone { --phone-max-h: max(100px, calc(100cqh - 76px)); }
 .configuration-preview .tv-screen:has(.scene-practice) { min-height: min(17rem, 40dvh); aspect-ratio: auto; }
 .scene-preview-dialog .configuration-game-intro { background: transparent; border: 0; padding: 0 4px; }
 .configuration-preview .minigame-preview-copy p { margin: 0; }
@@ -166,11 +171,11 @@
   .minigame-configuration[data-game="draw-the-graph"] .configuration-actions { padding-block: 6px; }
   .minigame-configuration[data-game="draw-the-graph"] .configuration-preview { gap: 8px; padding: 8px; }
 }
+@media (max-width: 420px), (orientation: landscape) and (max-height: 480px) {
+  .minigame-configuration .configuration-preview .phone { --phone-max-h: max(100px, calc(100cqh - 96px)); }
+}
 
 /* Fit the prompt and chart within the framed phone at every editor window height. */
-.minigame-configuration[data-game="draw-the-graph"] .configuration-preview .phone {
-  --phone-max-h: max(390px, calc(100dvh - 300px));
-}
 .minigame-configuration[data-game="draw-the-graph"] .configuration-preview .compact-game-preview {
   grid-template-columns: minmax(0, 1fr);
   align-content: safe center;

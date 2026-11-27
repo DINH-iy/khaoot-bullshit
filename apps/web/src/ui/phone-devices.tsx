@@ -52,23 +52,29 @@ export function PhoneDevicePicker({ label, className }: { label: string; classNa
 export function PhoneFrame({ caption, pickerLabel, picker = true, className, children }: { caption: string; pickerLabel: string; picker?: boolean; className?: string; children: ReactNode }) {
   const [device] = usePhoneDevice();
   const body = useRef<HTMLDivElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
   const maxHeight = useFit(body);
-  const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
     const element = body.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setScale(entry.contentRect.width / device.width);
-    });
-    const bezel = parseFloat(getComputedStyle(element).borderInlineStartWidth) + parseFloat(getComputedStyle(element).borderInlineEndWidth);
-    setScale((element.getBoundingClientRect().width - bezel) / device.width);
+    const screen = viewport.current;
+    if (!element || !screen) return;
+    const scale = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return;
+      screen.style.transform = `scale(${Math.min(width / device.width, height / device.height)})`;
+      screen.style.visibility = 'visible';
+    };
+    if (element.offsetWidth) {
+      const style = getComputedStyle(element);
+      scale(parseFloat(style.width), parseFloat(style.height));
+    }
+    const observer = new ResizeObserver(([entry]) => { if (entry) scale(entry.contentRect.width, entry.contentRect.height); });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [device.width]);
+  }, [device.width, device.height]);
   return <figure className={`phone${className ? ` ${className}` : ''}`} style={{ ...phoneStyle(device), ...(maxHeight ? { '--phone-max-h': `${maxHeight}px` } : {}) } as CSSProperties}>
     <figcaption><span>{caption}</span>{picker && <PhoneDevicePicker label={pickerLabel} />}</figcaption>
     <div ref={body} className="phone-device" data-cutout={device.cutout} title={device.name}>
-      <div className="phone-viewport" style={{ transform: `scale(${scale})` }}>{children}</div>
+      <div ref={viewport} className="phone-viewport">{children}</div>
     </div>
   </figure>;
 }
@@ -81,22 +87,20 @@ export function PhoneFrame({ caption, pickerLabel, picker = true, className, chi
 function useFit(body: React.RefObject<HTMLDivElement | null>) {
   const [height, setHeight] = useState<number>();
   useLayoutEffect(() => {
-    const element = body.current; if (!element) return;
+    const element = body.current;
+    // Popup layouts reserve room in CSS. Measuring a centered dialog here feeds the phone's
+    // own size and the opening animation back into its height limit.
+    if (!element || element.closest('dialog, [role=dialog]')) return;
     let frame = 0;
     const measure = () => {
       const box = element.getBoundingClientRect(); let bottom = window.innerHeight;
-      const dialog = element.closest('dialog, [role=dialog]');
-      if (dialog) {
-        // A popup grows with the phone, so it is measured against the window: whatever is below the phone in the
-        // popup (buttons, notes) stays on screen too.
-        bottom -= 12 + Math.max(0, dialog.getBoundingClientRect().bottom - box.bottom);
-      } else for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
         // Inside the container's padding (a preview area keeps room at its bottom for the floating tabs).
         const style = getComputedStyle(parent);
         if (/(auto|scroll|hidden)/.test(style.overflowY)) { bottom = Math.min(bottom, parent.getBoundingClientRect().bottom - parseFloat(style.paddingBottom)); break; }
       }
       // The floating editor tabs sit over the bottom of the page (not over a popup, which is above them).
-      const tabs = dialog ? null : document.querySelector('.editor-tabs')?.getBoundingClientRect();
+      const tabs = document.querySelector('.editor-tabs')?.getBoundingClientRect();
       if (tabs && tabs.left < box.right && tabs.right > box.left && tabs.top < bottom) bottom = Math.min(bottom, tabs.top);
       const next = Math.max(160, Math.floor(bottom - box.top - 2 * 7 - 4));
       setHeight(current => current !== undefined && Math.abs(current - next) < 2 ? current : next);

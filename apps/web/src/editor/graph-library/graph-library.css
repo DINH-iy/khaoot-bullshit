@@ -56,6 +56,8 @@
 .graph-library-browser .result-page-actions { margin: 0; }
 .editor .graph-library-item {
   display: grid;
+  align-self: stretch;
+  align-content: center;
   gap: 3px;
   width: 100%;
   min-height: 44px;
@@ -63,6 +65,7 @@
   text-align: start;
   overflow-wrap: anywhere;
 }
+.graph-library-item::after { content: ''; position: absolute; inset: 0; }
 .graph-library-item small { color: var(--e-muted); }
 .graph-library-edit {
   min-height: 0;
@@ -109,6 +112,7 @@
 }
 
 .graph-library-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -123,6 +127,8 @@
 .editor .graph-library-dialog .graph-library-item:hover:not(:disabled),
 .editor .graph-library-row-actions button:not(.danger-icon):hover:not(:disabled) { background: var(--e-accent-soft); }
 .graph-library-row-actions {
+  position: relative;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -135,7 +141,7 @@
 }
 .editor .graph-library-dialog button.danger { color: light-dark(white, #28151b); background: var(--e-danger); border-color: var(--e-danger); }
 
-.editor .graph-library-row-actions button[aria-disabled="true"] { opacity: .55; cursor: default; }
+.editor .graph-library-row [aria-disabled="true"] { opacity: .55; cursor: default; }
 @media (max-width: 430px) {
   .graph-library-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .graph-library-row-actions { justify-content: flex-end; padding-inline-end: 0; }

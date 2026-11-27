@@ -97,7 +97,7 @@ export function GraphLibraryDialog({ d, onClose }: { d: DraftState; onClose: () 
     else d.change(next);
   }
 
-  async function open(entry: AuthoredGraph, mode: 'edit' | 'preview' = 'edit') {
+  async function open(entry: AuthoredGraph, mode: 'edit' | 'preview') {
     if (busy) return;
     setIssue(undefined); setNotice(undefined); setBusy(true);
     try {
@@ -219,22 +219,22 @@ export function GraphLibraryDialog({ d, onClose }: { d: DraftState; onClose: () 
             const name = entry.question || t('unnamed');
             const editable = entry.editable && !d.readOnly;
             return <li className="graph-library-row" key={`${entry.gameId}:${entry.nodeKey}:${entry.stageKey}:${Boolean(entry.stored)}`}>
-              <button type="button" disabled={busy} className="graph-library-item" onClick={() => void open(entry)}>
+              <button type="button" aria-disabled={busy} className="graph-library-item" aria-haspopup="dialog" onClick={() => void open(entry, 'preview')}>
                 <strong>{name}</strong>
                 <small>{[entry.title, entry.label, editable ? null : t('viewing')].filter(Boolean).join(' · ')}</small>
               </button>
               <div className="graph-library-row-actions">
                 <button type="button" className="small-button icon-only" aria-disabled={busy} aria-haspopup="dialog"
                   aria-label={t('previewNamed', { name })} title={t('previewGraph')} onClick={() => void open(entry, 'preview')}>
-                  <Icon name="eye" size={16} />
+                  <Icon name="eye" size={20} />
                 </button>
                 {editable && <>
-                  <button type="button" className="small-button icon-only" disabled={busy} aria-label={t('editNamed', { name })} title={t('edit')} onClick={() => void open(entry)}>
-                    <Icon name="edit" size={16} />
+                  <button type="button" className="small-button icon-only" disabled={busy} aria-label={t('editNamed', { name })} title={t('edit')} onClick={() => void open(entry, 'edit')}>
+                    <Icon name="edit" size={20} />
                   </button>
                   <button type="button" className="small-button icon-only danger-icon" disabled={busy} aria-label={t('deleteNamed', { name })} title={t('deleteTitle')}
                     onClick={() => { setNotice(undefined); setIssue(undefined); setDeleting(entry); }}>
-                    <Icon name="trash" size={16} />
+                    <Icon name="trash" size={20} />
                   </button>
                 </>}
               </div>

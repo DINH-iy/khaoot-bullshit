@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  BRICK_BALL_RADIUS, BRICK_CONTROLS, BRICK_HEIGHT, BRICK_HZ, BRICK_MAX_TICKS, BRICK_PADDLE_WIDTH, BRICK_PADDLE_Y, BRICK_WIDTH,
-  brickControl, brickElapsed, brickRect, startBrickRun, tickBrickRun, type BrickRun,
+  BRICK_BALL_RADIUS, BRICK_CONTROLS, BRICK_HEIGHT, BRICK_HZ, BRICK_MAX_TICKS, BRICK_PADDLE_WIDTH, BRICK_PADDLE_Y, BRICK_SPLIT_TILE, BRICK_WIDE_TILE, BRICK_WIDTH,
+  brickControl, brickElapsed, brickPaddleWidth, brickRect, startBrickRun, tickBrickRun, type BrickRun,
 } from '@party/contracts';
 import { useTexts } from '../../i18n/texts.js';
 import { BRICK_TEXTS } from './brick-rally.text.js';
@@ -20,9 +20,20 @@ function paintField(context: CanvasRenderingContext2D, run: BrickRun) {
     const { x, y, width, height } = brickRect(run, index);
     const row = Math.floor(index / run.columns);
     const gradient = Math.min(colors.length - 1, Math.floor(row * colors.length / run.rows));
-    context.fillStyle = health === 2 ? '#d49b85' : colors[gradient]!;
+    const power = run.powerTiles[index];
+    context.fillStyle = power === BRICK_SPLIT_TILE ? '#c1a2ff' : power === BRICK_WIDE_TILE ? '#ffcf66' : health > 2 ? '#f5ac77' : health === 2 ? '#d49b85' : colors[gradient]!;
     context.fillRect(x, y, width, height);
-    if (health === 2) {
+    if (power === BRICK_SPLIT_TILE || power === BRICK_WIDE_TILE) {
+      context.fillStyle = '#20203a';
+      context.fillRect(x + width / 2 - 2, y + height / 2 - .5, 4, 1);
+      if (power === BRICK_SPLIT_TILE) context.fillRect(x + width / 2 - .5, y + height / 2 - 2, 1, 4);
+    } else if (health > 2) {
+      context.fillStyle = '#412734';
+      context.font = 'bold 7px system-ui';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(String(health), x + width / 2, y + height / 2 + .5);
+    } else if (health === 2) {
       context.fillStyle = '#563947';
       context.fillRect(x + 2, y + 2, width - 4, 1);
     }
@@ -30,12 +41,15 @@ function paintField(context: CanvasRenderingContext2D, run: BrickRun) {
 }
 
 function paintPaddle(context: CanvasRenderingContext2D, run: BrickRun) {
-  context.fillStyle = '#ff826c';
-  context.fillRect(run.paddle - BRICK_PADDLE_WIDTH / 2, BRICK_PADDLE_Y, BRICK_PADDLE_WIDTH, 6);
+  const width = brickPaddleWidth(run);
+  context.fillStyle = width > BRICK_PADDLE_WIDTH ? '#ffcf66' : '#ff826c';
+  context.fillRect(run.paddle - width / 2, BRICK_PADDLE_Y, width, 6);
   context.fillStyle = '#fff7e9';
-  context.beginPath();
-  context.arc(run.x, run.y, BRICK_BALL_RADIUS - 1, 0, Math.PI * 2);
-  context.fill();
+  for (const ball of run.balls) {
+    context.beginPath();
+    context.arc(ball.x, ball.y, BRICK_BALL_RADIUS - 1, 0, Math.PI * 2);
+    context.fill();
+  }
 }
 
 export function BrickMapPreview({ map, label }: { map: readonly string[]; label?: string }) {

@@ -72,8 +72,9 @@ test('players finish the same graph in their own colors and the host reveals all
   expect((await previewTab.boundingBox())?.y).toBe((await settingsTab.boundingBox())?.y);
   await previewTab.click();
   await expect(configuration.getByRole('combobox', { name: 'Phone model' })).toBeInViewport({ ratio: 1 });
-  await expect(configuration.locator('.phone-screen.compact-game-preview')).toBeInViewport({ ratio: 1 });
-  await expect(configuration.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  await expect(configuration.locator('.phone-device')).toBeInViewport({ ratio: 1 });
+  // The button is inside a scaled viewport, so Chromium rounds its intersection by a fraction of a pixel.
+  await expect(configuration.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: .999 });
   await host.setViewportSize(desktop);
   await configuration.getByRole('button', { name: 'Text & timing' }).click();
   const question = configuration.getByRole('textbox', { name: 'Question', exact: true });
@@ -344,7 +345,7 @@ test('the graph library lists other drafts and edits an imported graph in its or
   const remove = page.getByRole('dialog', { name: 'Delete graph' });
   await expect(remove).toContainText('The scene will use the built-in sample graph.');
   await remove.getByRole('button', { name: 'Delete graph', exact: true }).click();
-  await expect(library.getByRole('status')).toHaveText('Graph deleted.');
+  await expect(library.getByRole('status').filter({ hasText: 'Graph deleted.' })).toBeVisible();
   const afterDelete = (await (await page.request.get(`${api}/${source.gameId}`, { headers })).json()).data.definition;
   expect(afterDelete.nodes).toHaveLength(1);
   expect(afterDelete.nodes[0].stages[0].settings).toEqual({ revealEasing: 'ease-out' });
@@ -432,7 +433,7 @@ test('a population link imports both countries and the cutoff and device preview
   await expect.poll(() => phoneFrame.evaluate(element => Math.abs(element.clientWidth / element.clientHeight - 375 / 667))).toBeLessThan(.005);
   await expect(phoneFrame).toBeInViewport({ ratio: 1 });
   if (screenshots) await page.screenshot({ path: `${screenshots}/graph-phone-model.png` });
-  await expect(graphPreview.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  await expect(graphPreview.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: .999 });
   await graphPreview.getByRole('button', { name: 'Start practice' }).click();
   await expect(graphPreview.locator('.phone-screen .graph-controller')).toBeVisible();
   if (screenshots) await page.screenshot({ path: `${screenshots}/graph-practice-mobile.png` });
@@ -459,6 +460,12 @@ test('a population link imports both countries and the cutoff and device preview
   if (screenshots) await page.screenshot({ path: `${screenshots}/graph-library-direct-preview.png` });
   await graphPreview.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(previewRomania).toBeFocused();
+  const romaniaRow = library.getByRole('button', { name: /^Population.*Romania/ });
+  await romaniaRow.click();
+  await expect(graphPreview.locator('.phone-screen')).toContainText('Romania?');
+  await expect(page.getByRole('dialog', { name: 'Edit graph' })).toHaveCount(0);
+  await graphPreview.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(romaniaRow).toBeFocused();
   const editRomania = library.getByRole('button', { name: /^Edit Population.*Romania/ });
   await expect(editRomania).toHaveText('');
   await editRomania.click();
@@ -497,7 +504,7 @@ test('a population link imports both countries and the cutoff and device preview
   await expect(removeRomania).toBeVisible();
   await removeRomania.click();
   await remove.getByRole('button', { name: 'Delete graph', exact: true }).click();
-  await expect(library.getByRole('status')).toHaveText('Graph deleted.');
+  await expect(library.getByRole('status').filter({ hasText: 'Graph deleted.' })).toBeVisible();
   await expect.poll(async () => (await readDraft()).graphLibrary.length).toBe(1);
   await library.getByRole('button', { name: 'Close' }).click();
 
@@ -508,7 +515,7 @@ test('a population link imports both countries and the cutoff and device preview
   const phone = config.locator('.phone-screen');
   await expect(config.getByRole('combobox', { name: 'Phone model' })).toContainText('iPhone SE');
   const fields = config.getByRole('region', { name: 'Settings' });
-  await expect(config.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: 1 });
+  await expect(config.getByRole('button', { name: 'Start practice' })).toBeInViewport({ ratio: .999 });
   expect((await phone.boundingBox())!.x).toBeGreaterThan((await fields.boundingBox())!.x + (await fields.boundingBox())!.width);
   expect(await phone.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   if (screenshots) await page.screenshot({ path: `${screenshots}/phone-preview.png` });

@@ -213,6 +213,7 @@
   display: flex;
   width: calc(var(--phone-w) * 1px);
   height: calc(var(--phone-h) * 1px);
+  visibility: hidden;
   transform-origin: top left;
 }
 .phone-device[data-cutout=none] { border-radius: 9% / 5%; }
@@ -948,7 +949,11 @@
 .scene-preview-window header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .scene-preview-window h2 { margin: 0; font-size: 1.25rem; }
 .scene-preview-window .preview { justify-content: center; }
-.scene-preview-window .phone { --phone-max-h: max(360px, calc(100dvh - 230px)); }
+.scene-preview-dialog .scene-preview-window .phone {
+  --preview-chrome: 270px;
+  --phone-max-h: max(100px, calc(100dvh - var(--preview-chrome) - var(--preview-parts, 0px)));
+}
+.scene-preview-window:has(.practice-parts) .phone { --preview-parts: 46px; }
 .scene-preview-window .tv-screen:has(.scene-practice) { min-height: min(32rem, 55dvh); }
 .scene-preview-window .practice-note { color: var(--e-muted); margin: 0; font-size: .85rem; }
 .practice-parts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .9rem; }
@@ -1143,7 +1148,7 @@
     align-items: center;
   }
   .scene-preview-dialog:has(.compact-game-preview) .scene-preview-window > :is(.preview, .practice-parts) { grid-column: 1 / -1; }
-  .scene-preview-dialog .phone:has(.compact-game-preview) { --phone-max-h: calc(100dvh - 6rem); }
+  .scene-preview-window .phone:has(.compact-game-preview) { --preview-chrome: 200px; }
   .compact-game-preview .practice-draw-the-graph:has(.graph-phone) {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;

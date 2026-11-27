@@ -21,14 +21,15 @@ test('Brick Rally solo plays and remembers a custom map on a narrow phone', asyn
   await solo.getByRole('button', { name: 'Map', exact: true }).click();
   await solo.getByRole('button', { name: 'Cascade', exact: true }).click();
   await solo.getByRole('button', { name: 'Edit map' }).click();
-  await solo.getByRole('button', { name: 'Tough brick', exact: true }).click();
-  await solo.getByRole('button', { name: 'Row 1, column 1: Empty' }).click();
-  await expect(solo.getByRole('button', { name: 'Row 1, column 1: Tough brick' })).toBeVisible();
-  await solo.getByRole('button', { name: 'Apply map' }).click();
+  const mapEditor = page.getByRole('dialog', { name: 'Edit map' });
+  await mapEditor.getByRole('button', { name: 'Tough brick', exact: true }).click();
+  await mapEditor.getByRole('button', { name: 'Row 1, column 1: Empty' }).click();
+  await expect(mapEditor.getByRole('button', { name: /^Row 1, column 1: Tough brick/ })).toBeVisible();
+  await mapEditor.getByRole('button', { name: 'Apply map' }).click();
   await solo.getByRole('button', { name: 'Close', exact: true }).click();
   await open.click();
   await solo.getByRole('button', { name: 'Edit map' }).click();
-  await expect(solo.getByRole('button', { name: 'Row 1, column 1: Tough brick' })).toBeVisible();
+  await expect(mapEditor.getByRole('button', { name: /^Row 1, column 1: Tough brick/ })).toBeVisible();
 });
 
 test('Arcade players get the same custom Brick Rally map and verified times', async ({ page, browser, baseURL }) => {
@@ -42,10 +43,11 @@ test('Arcade players get the same custom Brick Rally map and verified times', as
   await page.getByRole('button', { name: /^Game settings .*Brick Rally$/ }).click();
   const settings = page.getByRole('dialog', { name: 'Brick Rally settings' });
   await settings.getByRole('button', { name: 'Edit map' }).click();
-  await settings.getByRole('button', { name: 'Blank map' }).click();
-  await expect(settings.getByRole('button', { name: 'Apply map' })).toBeDisabled();
-  await settings.getByRole('button', { name: 'Row 24, column 21: Empty' }).click();
-  await settings.getByRole('button', { name: 'Apply map' }).click();
+  const mapEditor = page.getByRole('dialog', { name: 'Edit map' });
+  await mapEditor.getByRole('button', { name: 'Blank map' }).click();
+  await expect(mapEditor.getByRole('button', { name: 'Apply map' })).toBeDisabled();
+  await mapEditor.getByRole('button', { name: 'Row 24, column 21: Empty' }).click();
+  await mapEditor.getByRole('button', { name: 'Apply map' }).click();
   await settings.getByRole('button', { name: 'Close' }).click();
 
   const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 } });
@@ -80,19 +82,73 @@ test('a hosted Brick Rally scene saves its own painted map', async ({ page, base
   }) } });
   expect(imported.ok()).toBe(true);
   await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
-  await page.getByRole('button', { name: 'Configure minigame', exact: true }).click();
+  await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1280, height: 850 });
+  await expect(page.getByRole('button', { name: 'Configure minigame', exact: true })).toBeVisible();
+  // Sample every visible frame, including the configuration dialog's opening animation.
+  const phoneSizes = await page.evaluate(() => new Promise<{ width: number; height: number; x: number; y: number }[]>(resolve => {
+    const samples: { width: number; height: number; x: number; y: number }[] = [];
+    const started = performance.now();
+    const sample = () => {
+      const phone = document.querySelector<HTMLElement>('.minigame-configuration[open] .phone-device');
+      if (phone?.offsetWidth) {
+        const { x, y } = phone.getBoundingClientRect();
+        samples.push({ width: phone.clientWidth, height: phone.clientHeight, x, y });
+      }
+      if (performance.now() - started < 350) requestAnimationFrame(sample);
+      else resolve(samples);
+    };
+    Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === 'Configure minigame')!.click();
+    sample();
+  }));
+  expect(phoneSizes.length).toBeGreaterThan(1);
+  expect(phoneSizes.every(size => size.width === phoneSizes[0]!.width && size.height === phoneSizes[0]!.height && size.x === phoneSizes[0]!.x && size.y === phoneSizes[0]!.y)).toBe(true);
+  expect(phoneSizes[0]!.width / phoneSizes[0]!.height).toBeCloseTo(390 / 844, 2);
   const dialog = page.getByRole('dialog', { name: 'Configure minigame' });
+  const captures = process.env['BRICK_EDITOR_SCREENSHOTS'];
+  await expect(dialog.getByRole('combobox', { name: 'Phone model' })).toBeVisible();
+  await expect(dialog.locator('.phone-device')).toBeInViewport({ ratio: 1 });
+  await expect(dialog.getByRole('button', { name: 'Start practice' })).toBeInViewport();
+  if (captures) await page.screenshot({ path: join(captures, 'brick-rally-phone-preview.png'), animations: 'disabled' });
+  const phone = dialog.locator('.phone-device');
+  const openedAt = await phone.boundingBox();
+  await dialog.getByRole('button', { name: 'oudje', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'oudje', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.getByRole('button', { name: 'Start practice' })).toBeInViewport();
+  expect(await phone.boundingBox()).toEqual(openedAt);
+  if (captures) await page.screenshot({ path: join(captures, 'brick-rally-oudje.png'), animations: 'disabled' });
+  await dialog.getByRole('button', { name: 'Start practice' }).click();
+  await expect(dialog.getByLabel(/Brick Rally board/)).toBeVisible();
+  expect(await phone.boundingBox()).toEqual(openedAt);
   await dialog.getByRole('button', { name: 'Circuit', exact: true }).click();
   await dialog.getByRole('button', { name: 'Edit map' }).click();
-  await dialog.getByRole('button', { name: 'Blank map' }).click();
-  await dialog.getByRole('button', { name: 'Tough brick', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Row 1, column 1: Empty' }).click();
-  await dialog.getByRole('button', { name: 'Apply map' }).click();
+  const mapEditor = page.getByRole('dialog', { name: 'Edit map' });
+  await expect(mapEditor.getByRole('button', { name: /^Row 24, column 32:/ })).toBeInViewport();
+  if (captures) await page.screenshot({ path: join(captures, 'brick-rally-map-editor.png'), animations: 'disabled' });
+  await mapEditor.getByRole('button', { name: 'Blank map' }).click();
+  const from = await mapEditor.getByRole('button', { name: /^Row 1, column 1:/ }).boundingBox();
+  const to = await mapEditor.getByRole('button', { name: /^Row 1, column 8:/ }).boundingBox();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2);
+  await page.mouse.up();
+  await expect(mapEditor.getByRole('button', { name: /^Row 1, column [1-8]: Brick$/ })).toHaveCount(8);
+  await mapEditor.getByRole('button', { name: 'Blank map' }).click();
+  await mapEditor.getByRole('combobox', { name: 'Hits to break' }).selectOption('5');
+  await mapEditor.getByRole('button', { name: 'Row 1, column 1: Empty' }).click();
+  await expect(mapEditor.getByRole('button', { name: 'Row 1, column 1: Tough brick (5 hits)' })).toBeVisible();
+  await mapEditor.getByRole('button', { name: 'Split ball', exact: true }).click();
+  await mapEditor.getByRole('button', { name: /^Row 1, column 1: Tough brick/ }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Space');
+  await expect(mapEditor.getByRole('button', { name: 'Row 1, column 2: Split ball' })).toBeFocused();
+  await mapEditor.getByRole('button', { name: 'Apply map' }).click();
+  await expect(dialog.locator('.phone-device')).toHaveJSProperty('clientWidth', phoneSizes[0]!.width);
   await dialog.getByRole('button', { name: 'Apply changes' }).click();
   await expect.poll(async () => {
     const saved = (await (await page.request.get(`${api}/${gameId}`, { headers })).json()).data;
     return saved.definition.nodes[0].stages[0].settings;
-  }).toEqual({ map: ['+'.padEnd(BRICK_COLUMNS, '.'), ...Array<string>(BRICK_ROWS - 1).fill('.'.repeat(BRICK_COLUMNS))] });
+  }).toEqual({ map: ['5S'.padEnd(BRICK_COLUMNS, '.'), ...Array<string>(BRICK_ROWS - 1).fill('.'.repeat(BRICK_COLUMNS))] });
 });
 
 test('two phones can invite each other to Brick Rally and finish a shared race', async ({ browser, baseURL }) => {
@@ -150,7 +206,8 @@ test('two phones can invite each other to Brick Rally and finish a shared race',
       const browse = outgoing.getByRole('button', { name: 'Browse maps, Steps' });
       const maps = ada.getByRole('dialog', { name: 'Choose map' });
       await browse.click();
-      await expect(maps.locator('canvas')).toHaveCount(3);
+      await expect(maps.locator('canvas')).toHaveCount(4);
+      await expect(maps.getByRole('button', { name: 'oudje', exact: true })).toBeVisible();
       if (!custom) {
         await screenshot(ada, 'brick-rally-map-library.png');
         await ada.keyboard.press('Escape');
@@ -165,7 +222,7 @@ test('two phones can invite each other to Brick Rally and finish a shared race',
         // Use a short fixture through the same endpoint so both browsers can clear it with real gameplay.
         await ada.route('**/api/rooms/*/side/challenges', route => {
           const body = route.request().postDataJSON();
-          return route.continue({ postData: { ...body, settings: { map: ['........', '........', '........', '........', '......#.'] } } });
+          return route.continue({ postData: { ...body, settings: { map: ['........', '........', '........', '........', '......S.'] } } });
         }, { times: 1 });
       } else await screenshot(ada, 'brick-rally-invite.png');
       await outgoing.getByRole('button', { name: 'Send challenge' }).click();

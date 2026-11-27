@@ -104,6 +104,8 @@ Every phone preview must provide a visible **Phone model** picker whenever a pho
 
 Use the chosen model’s exact logical screen dimensions and aspect ratio at every viewport size. Use the native CSS screen size when space allows and scale the entire viewport uniformly when space is tight. Keep the frame and its safe areas. A narrow or short window still shows the selected phone in its correct proportions. The picker stays outside the scaled screen.
 
+Reserve space for the complete phone frame before showing the preview. The frame must stay the same size and in the same position as authoring controls change or practice starts. Refit it when the available viewport or the chosen model changes.
+
 ## Reference viewport sizes
 
 | Surface | CSS viewport sizes |
