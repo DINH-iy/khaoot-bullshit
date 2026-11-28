@@ -119,7 +119,13 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   const scenePart = `${current.key}:${index}`;
   const [textSelection, setTextSelection] = useState<{ part: string; target: SceneTextTarget }>();
   const selectedText = textSelection?.part === scenePart ? textSelection.target : 'promptStyle';
-  const selectText = (target: SceneTextTarget) => setTextSelection({ part: scenePart, target });
+  const [pictureSelection, setPictureSelection] = useState<{ part: string; key: string }>();
+  const selectedImage = pictureSelection?.part === scenePart ? pictureSelection.key : undefined;
+  const selectImage = (key?: string) => setPictureSelection(current => key ? { part: scenePart, key } : current?.part === scenePart ? undefined : current);
+  const selectText = (target: SceneTextTarget) => {
+    selectImage();
+    setTextSelection({ part: scenePart, target });
+  };
   const editMedia = () => { if (!readOnly) setMediaKey(scenePart); };
   const problemsFor = (key: string) => d.issues.filter(issue => issue.nodeKey === key).length;
   const onChange = (next: Definition, group?: string) => change(next, undefined, group);
@@ -259,7 +265,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       </div>
       <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice} phonePicker={false}
         canvas={canvasDevice === 'sharedScreen' ? {
-          readOnly, selectedText, selectText, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
+          readOnly, selectedText, selectText, selectedImage, selectImage, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
         } : undefined} />
       {previewDevice && <ScenePreviewDialog definition={definition} node={current} index={index} initialDevice={previewDevice} returnToEditor onClose={() => setPreviewDevice(undefined)} />}
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
@@ -288,7 +294,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         </Section>}
         {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
         <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange}
-          textTarget={selectedText} selectText={selectText} readOnly={readOnly}
+          textTarget={selectedText} selectText={selectText} selectedImage={selectedImage} selectImage={selectImage} readOnly={readOnly}
           addTeams={addTeamSetup} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
       </div>
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>

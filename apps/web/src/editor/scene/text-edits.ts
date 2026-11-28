@@ -29,14 +29,14 @@ export function updateTextFormat(stage: Stage, target: SceneTextTarget, patch: S
   }
   return setSceneTextBoxes(stage, sceneTextBoxes(stage).map(box => {
     if (target !== `box:${box.key}`) return box;
-    const { key, text, layout, ...style } = box;
-    return { key, text, ...(layout ? { layout } : {}), ...mergeStyle(style, patch) };
+    const { key, text, layout, source, ...style } = box;
+    return { key, text, ...(source ? { source } : {}), ...(layout ? { layout } : {}), ...mergeStyle(style, patch) };
   }));
 }
 
 export function updateBoxText(stage: Stage, key: string, text: string, caret: number): Stage {
   return setSceneTextBoxes(stage, sceneTextBoxes(stage).map(box => {
-    if (box.key !== key) return box;
+    if (box.key !== key || box.source === 'places') return box;
     const marks = box.marks && moveTextMarks(box.marks, box.text, text, caret);
     const { marks: _previous, ...rest } = box;
     return { ...rest, text, ...(marks?.length ? { marks } : {}) };

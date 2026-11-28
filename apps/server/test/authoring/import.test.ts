@@ -29,7 +29,7 @@ describe('importing a game from text', () => {
         { key: 'next', layout: { width: 6, startColumn: 7 } },
       ],
     });
-    expect(stage('warmup')).toMatchObject({ mediaLayout: { position: 'right', size: 'standard', imageWidth: 48, imageRotation: -12 }, translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
+    expect(stage('warmup')).toMatchObject({ textBoxes: [{ key: 'awards', text: '', source: 'places', size: 'small' }], mediaLayout: { position: 'right', size: 'standard', imageWidth: 48, imageRotation: -12 }, translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
     expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
     expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', voteMode: 'ranked', voteLimit: 3, resultCards: 'manual', durationMs: 40000 });
     expect(stage('finale')).toMatchObject({ input: { kind: 'order', items: [{ label: 'Walkman' }, { label: 'Discman' }, { label: 'iPod' }, { label: 'Smartphone' }] }, scoring: { kind: 'correct-order', correctOrder: ['walkman', 'discman', 'ipod', 'smartphone'], awardMilli: '15000' } });

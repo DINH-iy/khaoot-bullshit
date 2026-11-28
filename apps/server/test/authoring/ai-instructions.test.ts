@@ -38,7 +38,7 @@ describe('the instructions for an AI know every feature', () => {
     expect(missing(['phoneMenuIcons', ...PHONE_MENU_ACTIONS, ...PHONE_MENU_GLYPHS])).toEqual([]);
   });
   it('the game-wide extras: wheels, awards (every rule), side games, places and teams', () => {
-    expect(missing(quoted(['wheels', 'spin', 'wheelClear', 'awards', 'sideGames', 'chips', 'openInvites', 'quickTime', 'idleCloseMinutes', 'autoRevealSeconds', 'birthdayVote', 'voteMode', 'voteLimit', 'resultCards', 'countdownSeconds', 'matchSeconds', 'ballBehavior', 'rollingResistance', 'railBounce', 'stopSpeed', 'start', 'side', 'percent', 'felt', 'shotSeconds', 'explain', 'places', 'inTeams', 'look', 'media', 'music']))).toEqual([]);
+    expect(missing(quoted(['wheels', 'spin', 'wheelClear', 'awards', 'sideGames', 'chips', 'openInvites', 'quickTime', 'idleCloseMinutes', 'autoRevealSeconds', 'birthdayVote', 'voteMode', 'voteLimit', 'resultCards', 'countdownSeconds', 'matchSeconds', 'ballBehavior', 'rollingResistance', 'railBounce', 'stopSpeed', 'start', 'side', 'percent', 'felt', 'shotSeconds', 'explain', 'places', 'inTeams', 'look', 'media', 'music', 'slideImages']))).toEqual([]);
     expect(missing(quoted([...AWARD_RULES]))).toEqual([]);
   });
   it('every look: style presets, every theme setting and its choices, and every animation', () => {

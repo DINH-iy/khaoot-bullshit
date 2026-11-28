@@ -1,6 +1,6 @@
 import { ballotTally } from './scoring/ballot.js';
 import { introView, readExplain } from './explain.js';
-import { DEFAULT_SOUNDBOARD, isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
+import { scenePlaceAwards, DEFAULT_SOUNDBOARD, isStepMinigame, type MinigameSettings, type Presentation, mergePresentationTexts, GameIdSchema, sceneMediaUrl, SessionViewSchema, type PublicMusic, type YouTubeClip, type SceneMedia, type SceneMusic, SubmissionValueSchema, type SessionView } from '@party/contracts';
 import { stepView } from '../minigames/shared/steps/engine.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { createHash } from 'node:crypto';
@@ -183,6 +183,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           youtube: entry.stage.youtube,
           mediaLayout: entry.stage.mediaLayout,
           textBoxes: entry.stage.textBoxes,
+          ...(entry.stage.textBoxes?.some(box => box.source === 'places') && stageEntry ? { boxPlaceAwards: scenePlaceAwards(stageEntry) } : {}),
+          slideImages: entry.stage.slideImages,
           textBoxPhoneColumns: entry.stage.textBoxPhoneColumns,
           ...(actor.data.role === 'host' && entry.stage.hostNotes?.trim() ? { hostNotes: entry.stage.hostNotes } : {}),
           promptStyle: entry.stage.promptStyle,

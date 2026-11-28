@@ -21,8 +21,8 @@ export function rotationGesture(element: HTMLElement, start: CanvasPoint, rotati
   return { update: point => preview(value(point)), commit: point => { preview(); commit(value(point)); }, cancel: () => preview() };
 }
 
-export function CanvasObjectHandle({ action, label, description, select, start, arrow }: {
-  action: CanvasAction; label: string; description: string; select: () => void;
+export function CanvasObjectHandle({ action, label, description, select, start, arrow, surface }: {
+  action: CanvasAction; surface?: boolean; label: string; description: string; select: () => void;
   start: (point: CanvasPoint) => Gesture | undefined; arrow: (x: number, y: number, shift: boolean) => void;
 }) {
   const active = useRef<{ id: number; origin: CanvasPoint; gesture: Gesture }>(undefined);
@@ -35,7 +35,7 @@ export function CanvasObjectHandle({ action, label, description, select, start, 
     active.current = undefined;
     drag.gesture.cancel();
   };
-  return <button type="button" className={`canvas-box-handle ${action}`} aria-label={label} title={label}
+  return <button type="button" className={`canvas-box-handle ${action}${surface ? ' drag-surface' : ''}`} aria-label={label} title={label}
     aria-description={description} onFocus={select} onClick={select}
     onPointerDown={event => {
       if (event.button !== 0 || !event.isPrimary) return;

@@ -2,8 +2,8 @@ import { defineTexts } from '../../../i18n/texts.js';
 
 export const TEXT_BOX_TEXTS = defineTexts('scene-text-boxes', {
   add: 'Add text box', edit: 'Selected text box', box: 'Text box {number}',
-  blank: 'Blank', heading: 'Heading', body: 'Body', small: 'Small', instructions: 'Instructions', points: 'Points by place',
-  instructionsText: 'Write your instructions here.', pointsText: '1st: 3 points · 2nd: 2 points · 3rd: 1 point',
+  blank: 'Blank', heading: 'Heading', body: 'Body', small: 'Small', instructions: 'Instructions', points: 'Placement breakdown',
+  instructionsText: 'Write your instructions here.',
   size: 'Text role', align: 'Horizontal alignment', left: 'Left', center: 'Center', right: 'Right',
   up: 'Move up', down: 'Move down', remove: 'Remove text box', removeTitle: 'Remove this text box?',
   removeText: 'This will remove the box and its text from the scene.',
@@ -17,8 +17,8 @@ export const TEXT_BOX_TEXTS = defineTexts('scene-text-boxes', {
 }, {
   nl: {
     add: 'Tekstvak toevoegen', edit: 'Geselecteerd tekstvak', box: 'Tekstvak {number}',
-    blank: 'Leeg', heading: 'Kop', body: 'Normaal', small: 'Klein', instructions: 'Instructies', points: 'Punten per plek',
-    instructionsText: 'Schrijf hier je instructies.', pointsText: '1e plek: 3 punten · 2e plek: 2 punten · 3e plek: 1 punt',
+    blank: 'Leeg', heading: 'Kop', body: 'Normaal', small: 'Klein', instructions: 'Instructies', points: 'Puntenverdeling',
+    instructionsText: 'Schrijf hier je instructies.',
     size: 'Tekstrol', align: 'Horizontale uitlijning', left: 'Links', center: 'Midden', right: 'Rechts',
     up: 'Omhoog', down: 'Omlaag', remove: 'Tekstvak verwijderen', removeTitle: 'Dit tekstvak verwijderen?',
     removeText: 'Hiermee verwijder je het tekstvak en de tekst uit de scène.',
@@ -32,8 +32,8 @@ export const TEXT_BOX_TEXTS = defineTexts('scene-text-boxes', {
   },
   de: {
     add: 'Textfeld hinzufügen', edit: 'Ausgewähltes Textfeld', box: 'Textfeld {number}',
-    blank: 'Leer', heading: 'Überschrift', body: 'Normal', small: 'Klein', instructions: 'Anleitung', points: 'Punkte nach Platz',
-    instructionsText: 'Schreibe hier deine Anleitung.', pointsText: '1. Platz: 3 Punkte · 2. Platz: 2 Punkte · 3. Platz: 1 Punkt',
+    blank: 'Leer', heading: 'Überschrift', body: 'Normal', small: 'Klein', instructions: 'Anleitung', points: 'Punkteverteilung',
+    instructionsText: 'Schreibe hier deine Anleitung.',
     size: 'Textrolle', align: 'Horizontale Ausrichtung', left: 'Links', center: 'Mitte', right: 'Rechts',
     up: 'Nach oben', down: 'Nach unten', remove: 'Textfeld entfernen', removeTitle: 'Dieses Textfeld entfernen?',
     removeText: 'Dadurch werden das Textfeld und sein Text aus der Szene entfernt.',
@@ -47,8 +47,8 @@ export const TEXT_BOX_TEXTS = defineTexts('scene-text-boxes', {
   },
   ro: {
     add: 'Adaugă casetă de text', edit: 'Caseta selectată', box: 'Caseta de text {number}',
-    blank: 'Goală', heading: 'Titlu', body: 'Normal', small: 'Mic', instructions: 'Instrucțiuni', points: 'Puncte pe loc',
-    instructionsText: 'Scrie aici instrucțiunile.', pointsText: 'Locul 1: 3 puncte · Locul 2: 2 puncte · Locul 3: 1 punct',
+    blank: 'Goală', heading: 'Titlu', body: 'Normal', small: 'Mic', instructions: 'Instrucțiuni', points: 'Punctaj pe loc',
+    instructionsText: 'Scrie aici instrucțiunile.',
     size: 'Rolul textului', align: 'Aliniere orizontală', left: 'Stânga', center: 'Centru', right: 'Dreapta',
     up: 'Mută în sus', down: 'Mută în jos', remove: 'Elimină caseta', removeTitle: 'Elimini această casetă?',
     removeText: 'Caseta și textul acesteia vor fi eliminate din scenă.',

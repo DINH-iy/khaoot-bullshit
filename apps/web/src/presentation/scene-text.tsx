@@ -69,13 +69,15 @@ export function withoutMarks(format: SceneTextStyle | undefined): SceneTextStyle
   return rest;
 }
 
-export function SceneTextBoxes({ boxes, phoneColumns, renderBox }: {
+export function SceneTextBoxes({ boxes, phoneColumns, renderBox, placeText = '' }: {
   boxes: readonly SceneTextBox[] | undefined;
+  placeText?: string;
   phoneColumns?: boolean | undefined;
   renderBox?: (box: SceneTextBox, index: number, position: TextBoxPosition, lastRow: number) => ReactNode;
 }) {
-  const explicitLayout = boxes?.some(box => box.layout !== undefined);
-  const displayed = renderBox || explicitLayout ? boxes : boxes?.filter(box => box.text.trim());
+  const resolved = boxes?.map(box => box.source === 'places' ? { ...box, text: placeText, marks: undefined } : box);
+  const explicitLayout = resolved?.some(box => box.layout !== undefined);
+  const displayed = renderBox || explicitLayout ? resolved : resolved?.filter(box => box.text.trim());
   if (!displayed?.length) return null;
   const placed = placeTextBoxes(displayed);
   return <div className="scene-text-grid" data-phone-columns={phoneColumns || undefined}

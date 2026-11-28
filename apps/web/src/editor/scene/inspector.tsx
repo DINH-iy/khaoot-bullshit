@@ -23,6 +23,7 @@ import { translate, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import type { SceneTextTarget } from './text-edits.js';
 import { SceneTextSettings } from './fields/text-boxes.js';
+import { SlideImageSettings } from './fields/slide-image-settings.js';
 import { MediaField } from './fields/media-field.js';
 import { musicSummary, SceneMusicFields } from './fields/music-fields.js';
 import { DEFAULT_TEAM_NAMES, MINIGAME_KEYS, TEAM_MINIGAMES, type MinigameKey } from '@party/contracts';
@@ -69,7 +70,7 @@ const scoreboardShows = () => [{ value: 'players', label: t('showPlayers') }, { 
  * (open), the points, and who plays. The kind of scene (which minigame, how a
  * duel is won) is chosen when adding it, so it is shown here, not asked again.
  */
-export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia, textTarget, selectText, readOnly }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void; textTarget: SceneTextTarget; selectText: (target: SceneTextTarget) => void; readOnly: boolean }) {
+export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia, textTarget, selectText, selectedImage, selectImage, readOnly }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void; textTarget: SceneTextTarget; selectText: (target: SceneTextTarget) => void; selectedImage: string | undefined; selectImage: (key?: string) => void; readOnly: boolean }) {
   const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
@@ -105,6 +106,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
           onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
       </details>}
       {!readOnly && <SceneTextSettings key={group} stage={stage} selectedTarget={textTarget} onSelect={selectText} edit={edit} />}
+      {!readOnly && <SlideImageSettings key={`pictures-${group}`} stage={stage} selected={selectedImage} select={selectImage} edit={edit} />}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
       {timed && stage.kind !== 'minigame' && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : isDrawScene(stage) ? 'drawTimer' : 'timer')}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600}

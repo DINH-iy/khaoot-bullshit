@@ -1,5 +1,7 @@
 import { AwardMilliSchema, PlacesSchema, placePoints, type StakePoints } from './game.js';
 
+import { isMinigameKey, isSharedPrediction, minigameScoring } from './minigames/shared/catalog.js';
+
 /** A minigame's points for 1st, 2nd, 3rd… when the scene leaves them out. */
 export const STANDARD_PLACEMENT_MILLI = ['10000', '6000', '3000'] as const;
 
@@ -37,4 +39,43 @@ export function pointsAtStake(stage: Record<string, unknown>): StakePoints | nul
     return perVote > 0n || bonus > 0n ? { kind: 'vote', perVoteMilli: String(perVote), bonusMilli: bonus > 0n ? String(bonus) : null } : null;
   }
   return null;
+}
+
+/** The same list used by timed quiz awards, vote bonuses and the host's place buttons. */
+export function configuredPlacePoints(stage: Record<string, unknown>): string[] | null {
+  const scoring = stage['scoring'] as Record<string, unknown> | undefined;
+  const places = stage['kind'] === 'collect' && scoring?.['kind'] !== 'none' ? scoring?.['places']
+    : stage['kind'] === 'vote' || stage['kind'] === 'challenge' ? stage['places'] : undefined;
+  const parsed = PlacesSchema.safeParse(places);
+  return parsed.success ? placePoints(parsed.data) : null;
+}
+
+export function minigamePlacePoints(stage: Record<string, unknown>): string[] {
+  const places = PlacesSchema.safeParse(stage['places']);
+  if (places.success) return placePoints(places.data);
+  const list = stage['placementMilli'];
+  return Array.isArray(list) && list.length > 0 && list.length <= 12 && list.every(amount => AwardMilliSchema.safeParse(amount).success)
+    ? list : [...STANDARD_PLACEMENT_MILLI];
+}
+
+export interface ScenePlaceAwards { amounts: string[]; bonus: boolean }
+
+/** The placement schedule a slide can show before anybody has played. */
+export function scenePlaceAwards(stage: Record<string, unknown>): ScenePlaceAwards | undefined {
+  const kind = stage['kind'];
+  const scoring = stage['scoring'] as Record<string, unknown> | undefined;
+  const game = stage['game'];
+  let amounts = configuredPlacePoints(stage);
+  if (kind === 'minigame' && typeof game === 'string' && isMinigameKey(game) && game !== 'lucky-doors' && game !== 'red-or-black-roulette' && !minigameScoring(game, stage['scoring'])) {
+    const winnersOnly = game === 'undercover' || game === 'majority' || isSharedPrediction(game);
+    const list = minigamePlacePoints(stage);
+    amounts = winnersOnly ? list.slice(0, 1) : list;
+  }
+  if (kind === 'duel') {
+    const places = PlacesSchema.safeParse(stage['places']);
+    const contest = stage['contest'] as { kind?: string; game?: string } | undefined;
+    amounts = (places.success ? placePoints(places.data) : ['10000']).slice(0, contest?.kind === 'game' && contest.game === 'eight-ball' ? 1 : 2);
+  }
+  return amounts?.some(amount => amount !== '0')
+    ? { amounts, bonus: kind === 'vote' || (kind === 'collect' && scoring?.['kind'] !== 'judged') } : undefined;
 }

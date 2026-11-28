@@ -225,7 +225,7 @@ export function MediaLibraryDialog({ current, only, title, onPick, scene, onClos
       : edit ? <AudioEditForm edit={edit} busy={busy} save={saveAudio} back={back} /> : <>
       <div className="actions media-upload">
         {!readOnly && <>
-        <input ref={input} type="file" accept={only === 'audio' ? 'audio/*,.mp3,.m4a,.ogg,.wav,.flac' : LIBRARY_ACCEPT} hidden onChange={event => upload(event.target.files)} />
+        <input ref={input} type="file" accept={only === 'audio' ? 'audio/*,.mp3,.m4a,.ogg,.wav,.flac' : only === 'image' ? 'image/png,image/jpeg,image/webp,image/gif' : LIBRARY_ACCEPT} hidden onChange={event => upload(event.target.files)} />
         <button type="button" className="primary with-icon" disabled={busy} onClick={() => input.current?.click()}><Icon name="upload" size={16} />{t(busy ? 'uploading' : 'upload')}</button>
         {scene && <button type="button" disabled={busy} onClick={() => setYouTube(true)}>{yt('add')}</button>}
         {(!only || only === 'audio') && <button type="button" disabled={busy} onClick={() => openAudio({ kind: 'youtube' })}>{audioText('fromYouTube')}</button>}

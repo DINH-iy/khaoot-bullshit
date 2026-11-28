@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pointsAtStake } from '../src/index.js';
+import { pointsAtStake, scenePlaceAwards } from '../src/index.js';
 
 const quiz = (scoring: Record<string, unknown>) => ({ kind: 'collect', scoring });
 
@@ -35,5 +35,21 @@ describe('the points a round puts at stake', () => {
     expect(pointsAtStake({ kind: 'vote', awardPerVoteMilli: '0' })).toBeNull();
     expect(pointsAtStake({ kind: 'challenge', maxAwardMilli: 'lots' })).toBeNull();
     for (const kind of ['info', 'scoreboard', 'route', 'teams', 'duel']) expect(pointsAtStake({ kind })).toBeNull();
+  });
+});
+
+describe('placement breakdown on the slide', () => {
+  it('uses the actual split including its remainder and identifies a quiz placement bonus', () => {
+    const places = { kind: 'split', totalMilli: '10000', places: 3, curve: 'even' };
+    expect(scenePlaceAwards({ kind: 'challenge', places })).toEqual({ amounts: ['6000', '3000', '1000'], bonus: false });
+    expect(scenePlaceAwards({ kind: 'collect', scoring: { kind: 'correct-choice', awardMilli: '5000', places } }))
+      .toEqual({ amounts: ['6000', '3000', '1000'], bonus: true });
+  });
+
+  it('only advertises placements a game can award', () => {
+    expect(scenePlaceAwards({ kind: 'minigame', game: 'heads-or-tails' })).toEqual({ amounts: ['10000'], bonus: false });
+    expect(scenePlaceAwards({ kind: 'minigame', game: 'red-or-black-roulette' })).toBeUndefined();
+    expect(scenePlaceAwards({ kind: 'minigame', game: 'cut-the-line', scoring: { kind: 'within', distance: 5, pointsMilli: '6000' } })).toBeUndefined();
+    expect(scenePlaceAwards({ kind: 'challenge', maxAwardMilli: '20000' })).toBeUndefined();
   });
 });

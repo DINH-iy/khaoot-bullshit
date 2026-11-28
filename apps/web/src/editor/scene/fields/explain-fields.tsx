@@ -44,7 +44,7 @@ export function ExplainFields({ definition, stage, onChange }: { definition: Def
       {t('explainFirst')}</label>
     {intro && <>
       <label className="choice"><input type="checkbox" checked={Boolean(intro.points)} disabled={!stake && !intro.points} onChange={event => set({ points: event.target.checked }, 'explain-points')} />
-        {t('showPoints')}{stake ? <span className="hint-inline"> · {stakeSummary(stake)}</span> : null}</label>
+        {t('showPoints')}</label>
       {!stake && <p className="hint">{t('noStake')}</p>}
       <label>{t('explanation')}
         <textarea rows={4} maxLength={1000} value={intro.text ?? ''} placeholder={standard ?? t('explainPlaceholder')}

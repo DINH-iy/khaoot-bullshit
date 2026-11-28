@@ -57,6 +57,7 @@ export type SceneTextBoxLayout = z.infer<typeof SceneTextBoxLayoutSchema>;
 export const SceneTextBoxesSchema = z.array(z.object({
   key: GameKeySchema,
   text: z.string().max(MAX_SCENE_TEXT_LENGTH),
+  source: z.literal('places').optional(),
   layout: SceneTextBoxLayoutSchema.optional(),
   ...SceneTextStyleSchema.shape,
 }).strict()).max(MAX_SCENE_TEXT_BOXES)

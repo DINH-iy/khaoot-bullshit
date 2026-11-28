@@ -52,6 +52,8 @@ import { LookContext, themeClass, useThemeStyle, useBuiltLook, useLook, useMomen
 import { useSiteThemeState } from '../presentation/site-look.js';
 import { LeaveRoom } from '../room-extras/leave-room.js';
 import { SceneTextBoxes, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../presentation/scene-text.js';
+import { useScenePlaceAwards } from '../presentation/scene-place-awards.js';
+import { SlideImages } from '../presentation/slide-images.js';
 import { SceneComposition } from '../presentation/scene-composition.js';
 import { MediaHostControls, StageMedia, StageYouTube } from './stage-media.js';
 import { MusicPlayer } from './music-player.js';
@@ -308,6 +310,7 @@ export function RoomScreen() {
   const finaleRef = useRef<HTMLDivElement>(null);
   const choosingTeams = Boolean(stage?.teams?.forming);
   const explainingScene = !choosingTeams && Boolean(stage?.explain);
+  const placeText = useScenePlaceAwards(stage?.boxPlaceAwards);
   const showingScene = !choosingTeams && !explainingScene;
   useMoment(mediaRef, 'mediaEnter', showingScene && (stage?.media || stage?.youtube) ? stage.id : null, {}, look);
   useMoment(teamMomentRef, 'teamsEnter', stage?.teams ? `${stage.id}:${choosingTeams}` : null, {}, look);
@@ -462,6 +465,7 @@ export function RoomScreen() {
               </div></>}
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}${stage.minigame?.graph ? ' round-graph' : stage.minigame?.dots ? ' round-dots' : ''}`} aria-labelledby="stage-heading">
+          {showingScene && <SlideImages images={stage.slideImages} />}
           <SceneComposition layout={stage.mediaLayout} media={showingScene && (stage.youtube || stage.media) ? <div ref={mediaRef}>
             {stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'}
                 control={room.mediaControl?.stageRunId === stage.id ? room.mediaControl : null} />
@@ -480,7 +484,7 @@ export function RoomScreen() {
               <SceneTextContent text={stageHeading ?? ''} format={headingStyle} />
             </h2><div ref={setActionSlot} className="stage-action-slot" /></div>
             {stage.info && <p {...sceneTextProps(stage.promptStyle)}><SceneTextContent text={stage.prompt} format={stage.promptStyle} /></p>}
-            {showingScene && <SceneTextBoxes boxes={stage.textBoxes} phoneColumns={stage.textBoxPhoneColumns} />}
+            {showingScene && <SceneTextBoxes boxes={stage.textBoxes} placeText={placeText} phoneColumns={stage.textBoxPhoneColumns} />}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           {stage.teams && <div ref={teamMomentRef}>

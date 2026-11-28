@@ -63,3 +63,4 @@ export const IdentitySchema = z.object({
   scopes: z.array(z.string()),
 }).strict();
 export type Identity = z.infer<typeof IdentitySchema>;
+export * from './slide-images.js';

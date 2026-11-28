@@ -9,6 +9,7 @@ import { GraphPlaybackActionSchema, GraphPlaybackSchema } from './minigames/draw
 import { PoolBallBehaviorSchema, PoolMatchSecondsSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
+import { SlideImagesSchema } from './slide-images.js';
 import { GameKeySchema } from './game-key.js';
 import { ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema } from './scene-text.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
@@ -308,6 +309,8 @@ export const PublicStageSchema = z.object({
   kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel', 'teams']), prompt: z.string().min(1).max(2000),
   translations: SceneTranslationsSchema.optional(),
   textBoxes: SceneTextBoxesSchema.optional(),
+  slideImages: SlideImagesSchema.optional(),
+  boxPlaceAwards: z.object({ amounts: z.array(AwardMilliSchema).max(12), bonus: z.boolean() }).strict().optional(),
   textBoxPhoneColumns: z.boolean().optional(),
   promptStyle: SceneTextStyleSchema.optional(),
   titleStyle: SceneTextStyleSchema.optional(),

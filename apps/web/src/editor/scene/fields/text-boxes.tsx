@@ -1,3 +1,5 @@
+import { scenePlaceAwards } from '@party/contracts';
+import { useScenePlaceAwards } from '../../../presentation/scene-place-awards.js';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TEXT_LINES, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
@@ -28,6 +30,7 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
   const t = useTexts(TEXT_BOX_TEXTS);
   const fields = useTexts(INSPECTOR_TEXTS);
   const boxes = sceneTextBoxes(stage);
+  const pointsText = useScenePlaceAwards(scenePlaceAwards(stage), true);
   const selected = boxes.find(box => selectedTarget === `box:${box.key}`);
   const target = selected ? `box:${selected.key}` as const : selectedTarget === 'titleStyle' && stage.kind === 'info' ? 'titleStyle' : 'promptStyle';
   const format = selected ?? sceneTextStyle(stage, target === 'titleStyle' ? 'titleStyle' : 'promptStyle') ?? {};
@@ -64,10 +67,10 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
   const typography = { font: undefined, scale: undefined, color: undefined, bold: undefined, italic: undefined, underline: undefined, strike: undefined };
   const hasTypography = Object.keys(typography).some(key => format[key as keyof typeof typography] !== undefined);
   const add = (preset: Preset) => {
-    const text = { blank: '', heading: t('heading'), instructions: t('instructionsText'), points: t('pointsText') };
+    const text = { blank: '', heading: t('heading'), instructions: t('instructionsText'), points: '' };
     const sizes = { blank: 'body', heading: 'heading', instructions: 'body', points: 'small' } as const;
     const key = uniqueKey('text', boxes.map(box => box.key));
-    edit(current => setSceneTextBoxes(current, [...boxes, { key, text: text[preset], size: sizes[preset] }]), 'textBoxes');
+    edit(current => setSceneTextBoxes(current, [...boxes, { key, text: text[preset], size: sizes[preset], ...(preset === 'points' ? { source: 'places' as const } : {}) }]), 'textBoxes');
     onSelect(`box:${key}`);
   };
   return <div className="canvas-text-controls">
@@ -78,7 +81,7 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
     </div>
     {(boxes.length > 0 || formatting) && <label>{t('edit')}<Dropdown value={target} onChange={value => onSelect(value as SceneTextTarget)} options={targets} /></label>}
     {selected && <>
-      <label>{t('box', { number: index + 1 })}<textarea rows={2} maxLength={MAX_SCENE_TEXT_LENGTH} value={selected.text}
+      <label>{t('box', { number: index + 1 })}<textarea rows={2} maxLength={MAX_SCENE_TEXT_LENGTH} value={selected.source === 'places' ? pointsText : selected.text} readOnly={selected.source === 'places'}
         onChange={event => {
           const { value, selectionEnd } = event.currentTarget;
           edit(current => updateBoxText(current, selected.key, value, selectionEnd), `textBox-${selected.key}-text`);

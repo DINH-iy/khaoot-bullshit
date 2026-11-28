@@ -34,10 +34,9 @@ test('slide text, blank lines and selected letters survive editing, publishing a
   const caption = await canvas.locator('figcaption').boundingBox();
   expect(slideTop!.y - caption!.y - caption!.height).toBeLessThan(16);
   await field.fill(prompt);
-  await chooseOption(addBox, 'points');
+  await chooseOption(addBox, 'blank');
   const points = '1e plek: 3 punten · 2e plek: 2 punten · 3e plek: 1 punt';
   const box = canvas.getByRole('textbox', { name: 'Text box 1', exact: true });
-  await expect(box).toHaveValue('1st: 3 points · 2nd: 2 points · 3rd: 1 point');
   await box.fill(points);
 
   await box.press('Home');
@@ -69,6 +68,7 @@ test('slide text, blank lines and selected letters survive editing, publishing a
   await sidebar.getByRole('button', { name: 'Box layout', exact: true }).click();
   const format = sidebar.getByRole('group', { name: 'Box layout', exact: true });
   await expect(format.getByRole('combobox', { name: 'Font', exact: true })).toHaveCount(0);
+  await chooseOption(format.getByLabel('Text role'), 'small');
   await chooseOption(format.getByLabel('Horizontal alignment'), 'right');
   await expect(box).toHaveCSS('text-align', 'right');
   await chooseOption(format.getByLabel('Horizontal alignment'), 'left');
