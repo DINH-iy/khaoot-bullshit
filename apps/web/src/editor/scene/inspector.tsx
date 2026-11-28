@@ -1,8 +1,8 @@
 import { AnswerPlacementSettings } from './fields/answer-placement-settings.js';
-import { setAnswerPlacement } from './answer-placement.js';
+import { setAnswerLabel, setAnswerPlacement } from './answer-edits.js';
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
-import { isSharedPrediction, MAX_HOST_NOTES_LENGTH, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent, type SceneTextBoxPlacement, type AnswerOption, type AnswerPlacement } from '@party/contracts';
+import { isSharedPrediction, MAX_HOST_NOTES_LENGTH, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent, type SceneTextBoxPlacement, MAX_ANSWER_LABEL_LENGTH, type AnswerOption, type AnswerPlacement } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields, stakeSummary } from './fields/explain-fields.js';
@@ -120,7 +120,10 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
       {stage.kind === 'collect' && input?.kind === 'choice' && <fieldset><legend>{t('answers')}{scoring?.kind === 'correct-choice' ? t('tickCorrect') : ''}</legend>
         {(input.options ?? []).map((option, position) => <div key={option.key} className="option-row">
           {scoring?.kind === 'correct-choice' && <input type="radio" name={id('correct')} aria-label={t('isCorrect', { label: option.label })} checked={scoring.correctChoiceKey === option.key} onChange={() => edit(current => ({ ...current, scoring: { ...scoring, correctChoiceKey: option.key } }))} />}
-          <input aria-label={t('answerOption', { number: position + 1 })} onFocus={() => selectAnswer(option.key)} value={option.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, options: input.options!.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
+          <input aria-label={t('answerOption', { number: position + 1 })} onFocus={() => selectAnswer(option.key)} value={option.label} maxLength={MAX_ANSWER_LABEL_LENGTH} onChange={event => {
+            const { value, selectionEnd } = event.currentTarget;
+            edit(current => setAnswerLabel(current, option.key, value, selectionEnd), `option-${option.key}`);
+          }} />
           <button className="icon-button danger-icon" disabled={(input.options ?? []).length <= 2} aria-label={t('removeAnswer', { number: position + 1 })} onClick={() => edit(current => {
             const options = input.options!.filter(entry => entry.key !== option.key);
             return { ...current, input: { ...input, options }, ...(scoring?.kind === 'correct-choice' && scoring.correctChoiceKey === option.key ? { scoring: { ...scoring, correctChoiceKey: options[0]!.key } } : {}) };

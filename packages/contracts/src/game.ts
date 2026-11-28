@@ -11,7 +11,7 @@ import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
 import { SlideImagesSchema } from './slide-images.js';
 import { GameKeySchema } from './game-key.js';
-import { ScenePrimaryTextPlacementSchema, SceneTextBoxPlacementSchema, ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema } from './scene-text.js';
+import { ScenePrimaryTextPlacementSchema, SceneTextBoxPlacementSchema, SceneTextMarksSchema, ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema } from './scene-text.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
 
 /** How team captains are picked: assigned (by the host, else at random) or elected by their teammates. */
@@ -64,7 +64,8 @@ export const StakePointsSchema = z.discriminatedUnion('kind', [
 export type StakePoints = z.infer<typeof StakePointsSchema>;
 export const MediaKindSchema = z.enum(['image', 'gif', 'video']);
 export type MediaKind = z.infer<typeof MediaKindSchema>;
-export const ChoiceOptionSchema = z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(240) }).strict();
+export const MAX_ANSWER_LABEL_LENGTH = 240;
+export const ChoiceOptionSchema = z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(MAX_ANSWER_LABEL_LENGTH) }).strict();
 export const MIN_ANSWER_WIDTH_PERCENT = 8;
 export const MIN_ANSWER_HEIGHT_PERCENT = 5;
 export const AnswerPlacementSchema = SceneTextBoxPlacementSchema.extend({
@@ -73,7 +74,24 @@ export const AnswerPlacementSchema = SceneTextBoxPlacementSchema.extend({
   rotation: z.number().int().min(-180).max(180).optional(),
 });
 export type AnswerPlacement = z.infer<typeof AnswerPlacementSchema>;
-export const AnswerOptionSchema = ChoiceOptionSchema.extend({ placement: AnswerPlacementSchema.optional() });
+export const AnswerOptionSchema = ChoiceOptionSchema.extend({
+  // Keep offsets relative to the submitted text until its outer whitespace is removed.
+  label: z.string().refine(label => ChoiceOptionSchema.shape.label.safeParse(label).success, 'Invalid answer label'),
+  placement: AnswerPlacementSchema.optional(),
+  marks: SceneTextMarksSchema.optional(),
+}).refine(option => !option.marks || option.marks.length <= MAX_ANSWER_LABEL_LENGTH && option.marks.every(mark => mark.end <= option.label.length),
+  { path: ['marks'], message: 'Answer formatting ranges must fit inside the answer.' })
+  .transform(({ label, marks, ...option }) => {
+    const trimmed = label.trim();
+    if (!marks?.length) return { ...option, label: trimmed };
+    const offset = label.length - label.trimStart().length;
+    const visible = marks.flatMap(mark => {
+      const start = Math.max(0, mark.start - offset);
+      const end = Math.min(trimmed.length, mark.end - offset);
+      return start < end ? [{ ...mark, start, end }] : [];
+    });
+    return { ...option, label: trimmed, ...(visible.length ? { marks: visible } : {}) };
+  });
 export type AnswerOption = z.infer<typeof AnswerOptionSchema>;
 
 export const InputSchema = z.discriminatedUnion('kind', [

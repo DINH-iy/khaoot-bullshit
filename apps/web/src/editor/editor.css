@@ -192,7 +192,7 @@
 .tv-options { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tv-options.order { grid-template-columns: 1fr; }
 .tv-options li { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgb(255 255 255 / .1); font-weight: 600; }
-.tv-options span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #b8a2ff; color: #1d1730; font-weight: 800; flex: none; }
+.tv-options li > .answer-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #b8a2ff; color: #1d1730; font-weight: 800; flex: none; }
 .tv-scores { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 1.1rem; } .tv-scores b { float: right; }
 /* A phone preview: the chosen model (ui/phone-devices.tsx) in its own proportions, at its real width where there is
    room and smaller (never stretched) where there is not. `--phone-max-h` caps its height per place. */
@@ -229,9 +229,9 @@
   padding: calc(var(--phone-top, 0px) + 10px) 12px calc(var(--phone-bottom, 0px) + 12px); display: grid; gap: 12px; align-content: start; overflow: auto; }
 .phone-screen .stage-media.image img { max-height: 170px; }
 .phone-prompt { margin: 0; font-weight: 700; font-size: .95rem; overflow-wrap: anywhere; }
-.phone-tiles span, .phone-list span { overflow-wrap: anywhere; hyphens: auto; }
+.phone-tiles span, .phone-list > span { overflow-wrap: anywhere; hyphens: auto; }
 .phone-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .phone-list { display: grid; gap: 6px; }
-.phone-tiles span, .phone-list span { padding: 10px; border-radius: 10px; border: 1.5px solid var(--e-border); font-size: .85rem; font-weight: 600; }
+.phone-tiles span, .phone-list > span { padding: 10px; border-radius: 10px; border: 1.5px solid var(--e-border); font-size: .85rem; font-weight: 600; }
 .phone-tiles span { min-height: 48px; display: grid; place-items: center; text-align: center; }
 .phone-hint { margin: 0; color: var(--r-muted); font-size: .85rem; }
 .part-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
@@ -263,7 +263,7 @@
 .tv { container-type: inline-size; }
 .tv-screen { align-content: start; }
 .tv-banner { font-size: 6.5cqw; } .tv-prompt { font-size: 3.6cqw; } .tv-options li { font-size: 2.6cqw; padding: 1.2cqw 2cqw; }
-.tv-options span { width: 4cqw; height: 4cqw; font-size: 2.2cqw; } .tv-scores { font-size: 3cqw; } .tv-screen > * { min-height: 0; }
+.tv-options li > .answer-mark { width: 4cqw; height: 4cqw; font-size: 2.2cqw; } .tv-scores { font-size: 3cqw; } .tv-screen > * { min-height: 0; }
 
 .minimap { position: absolute; right: 16px; bottom: 16px; border-radius: 10px; border: 1px solid var(--e-border); background: color-mix(in srgb, var(--e-panel) 92%, transparent); cursor: pointer; touch-action: none; }
 .mini-card { fill: var(--e-line); opacity: .55; } .mini-card.on { fill: var(--e-accent); opacity: 1; }
@@ -920,10 +920,18 @@
 .canvas-text-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .canvas-text-tools label { display: grid; gap: 4px; color: var(--e-text); font-size: .85rem; }
 
-.scene-canvas .canvas-answer input[type=text] {
-  width: 100%; min-width: 0; color: inherit; background: color-mix(in srgb, var(--r-surface) 80%, transparent);
-  border: 1px solid var(--r-line); padding: 8px 10px; font-family: inherit;
+.scene-canvas .canvas-answer-text {
+  min-width: 0; flex: 1 1 auto; --slide-text-weight: 700;
+  border: 1px solid var(--r-line); border-radius: 10px;
+  background: color-mix(in srgb, var(--r-surface) 80%, transparent);
 }
+.scene-canvas .canvas-answer-text :is(.canvas-text-anchor, .canvas-text-reading, textarea),
+.scene-canvas .canvas-answer-text::after {
+  box-sizing: border-box; margin: 0; padding: 8px 10px; min-height: 42px; line-height: 1.3;
+  font: inherit; color: inherit; text-align: start; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.scene-canvas .canvas-answer-text > textarea { width: 100%; border: 0; background: transparent; }
+.scene-canvas .canvas-answer-text > .canvas-text-reading { min-width: 0; }
 .scene-canvas :is(.scene-composition, .scene-slide-text-layer) :is(.canvas-title, .canvas-prompt, .canvas-extra-text) {
   min-height: 0; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent;
   outline: 1px solid var(--r-line); outline-offset: 2px;
@@ -944,7 +952,7 @@
 .scene-canvas .canvas-text-box[data-sized] > .canvas-prompt { max-height: 75dvh; }
 .scene-canvas .canvas-add-answer { min-height: 44px; font-size: .85rem; justify-self: center; padding: 6px 12px; }
 .scene-canvas .canvas-answer { background: var(--r-card); border-left: 4px solid var(--option-accent); padding: 8px; }
-.scene-canvas .canvas-answer > span { color: var(--r-text); background: var(--r-card-strong); }
+.scene-canvas .canvas-answer > .answer-mark { color: var(--r-text); background: var(--r-card-strong); }
 .scene-canvas .canvas-answer input[type=radio] { flex: none; width: 19px; height: 19px; accent-color: var(--r-accent); }
 @container (max-width: 480px) { .scene-canvas .tv-options { grid-template-columns: 1fr; } }
 .scene-canvas .tv-screen { container-type: inline-size; }
@@ -1306,7 +1314,6 @@
 
 .scene-canvas .scene-positioned-answer { position: absolute; pointer-events: auto; }
 .scene-canvas .tv-options .answer-slot-placeholder { min-height: 50px; }
-.scene-canvas .canvas-answer > input[type=text] { flex: 1 1 auto; }
 .room .scene-positioned-answer .canvas-box-handle.move { left: -23px; }
 .room .scene-positioned-answer .canvas-box-handle.resize { right: -23px; }
 

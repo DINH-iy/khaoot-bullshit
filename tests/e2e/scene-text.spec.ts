@@ -399,7 +399,7 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   const headers = { 'x-party-request': '1', origin: baseURL! };
   expect((await page.request.post(`${baseURL}/api/host/games/import`, { headers, data: {
     gameId, text: JSON.stringify({ title: 'Planet quiz', scenes: [
-      { type: 'quiz', question: 'Which planet has rings?', answers: ['Saturn', 'Mercury', 'Venus'], correct: 'Saturn', seconds: 60 },
+      { type: 'quiz', question: 'Which planet has rings?', answers: [{ key: 'saturn', label: 'Planet Saturn' }, 'Mercury', 'Venus'], correct: 'saturn', seconds: 60 },
     ] }),
   } })).ok()).toBe(true);
   await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
@@ -486,6 +486,25 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   await set(rotation, '-9');
   await expect(neighbor).toHaveCSS('rotate', '-9deg');
 
+  const answer = first.getByRole('textbox');
+  await answer.press('End');
+  for (const _ of 'Saturn') await answer.press('Shift+ArrowLeft');
+  const toolbar = page.getByRole('group', { name: 'Format selected text' });
+  await expect(toolbar).toBeVisible();
+  await toolbar.getByRole('button', { name: 'Italic', exact: true }).click();
+  await toolbar.getByRole('button', { name: 'Underline', exact: true }).click();
+  await toolbar.getByRole('combobox', { name: 'Font', exact: true }).selectOption('serif');
+  await set(toolbar.getByRole('spinbutton', { name: 'Size (%)' }), '145');
+  await toolbar.getByRole('button', { name: 'Text color', exact: true }).click();
+  const hex = page.getByRole('dialog', { name: 'Text color' }).locator('.color-code input');
+  await hex.fill('#f0c45c');
+  await hex.press('Enter');
+  await hex.press('Escape');
+  await expect(toolbar).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('answer-word-formatting.png') });
+  await page.locator('.scene-props').getByRole('textbox', { name: 'Answer option 1', exact: true }).fill('Bright Planet Saturn');
+  await expect(first.locator('.canvas-text-reading').getByText('Saturn', { exact: true })).toHaveCSS('font-style', 'italic');
+
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   await settings.evaluate(element => element.scrollIntoView({ block: 'center' }));
   await page.screenshot({ path: testInfo.outputPath('freely-positioned-answers.png') });
@@ -505,6 +524,11 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   const placed = host.locator('.scene-positioned-answer').filter({ hasText: 'Saturn' });
   await expect(placed).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
   await expect(placed).toHaveCSS('rotate', '7deg');
+  const selectedWord = placed.locator('.answer-label').getByText('Saturn', { exact: true });
+  await expect(selectedWord).toHaveCSS('font-style', 'italic');
+  await expect(selectedWord).toHaveCSS('text-decoration-line', 'underline');
+  await expect(selectedWord).toHaveCSS('color', 'rgb(240, 196, 92)');
+  await expect(selectedWord).toHaveAttribute('style', /font-size: 145%/);
   await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveCSS('rotate', '-9deg');
   await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveAttribute('style', /left: 77.4%; top: 49.3%; width: 31.2%; height: 12.6%/);
   await expect(host.locator('.canvas-box-handle')).toHaveCount(0);
@@ -514,6 +538,7 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   expect(automaticBounds.y + automaticBounds.height).toBeLessThan(positionedBounds.y);
   await host.locator('.stage-card').screenshot({ path: testInfo.outputPath('live-answer-layout.png') });
   await expect(phone.locator('.answer-form label')).toHaveCount(3);
+  await expect(phone.locator('.answer-form .answer-label').getByText('Saturn', { exact: true })).toHaveCSS('font-style', 'italic');
   await phone.locator('.answer-form label').filter({ hasText: 'Saturn' }).click();
   await phone.getByRole('button', { name: 'Save answer', exact: true }).click();
   await expect(phone.getByRole('status').filter({ hasText: 'Your answer is in!' })).toBeVisible();

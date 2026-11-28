@@ -1,6 +1,6 @@
 import { Children, Fragment, type CSSProperties, type ReactNode } from 'react';
 import { placeTextBoxes } from './scene-text-layout.js';
-import { FONTS, SCENE_TEXT_GRID_COLUMNS, type SceneCharacterStyle, type SceneTextBoxPlacement, type SceneTextBox, type SceneTextStyle } from '@party/contracts';
+import { FONTS, SCENE_TEXT_GRID_COLUMNS, type SceneCharacterStyle, type AnswerOption, type SceneTextBoxPlacement, type SceneTextBox, type SceneTextStyle } from '@party/contracts';
 
 import { slideObjectStyle } from './slide-object.js';
 
@@ -63,6 +63,17 @@ export function SceneTextContent({ text, format, selection }: {
     })}
     {cursor < text.length && <span style={{ textDecorationLine: baseDecoration }}>{slice(cursor, text.length)}</span>}
   </>;
+}
+
+export function AnswerOptionLabel({ option }: { option: Pick<AnswerOption, 'label' | 'marks'> }) {
+  if (!option.marks?.length) return <>{option.label}</>;
+  return <span className="answer-label"><SceneTextContent text={option.label} format={option} /></span>;
+}
+
+export function withAnswerTranslation<T extends Pick<AnswerOption, 'label' | 'marks'>>(option: T, label: string): T {
+  if (label === option.label) return option;
+  const { marks: _marks, ...other } = option;
+  return { ...other, label } as T;
 }
 
 export function withoutMarks(format: SceneTextStyle | undefined): SceneTextStyle | undefined {

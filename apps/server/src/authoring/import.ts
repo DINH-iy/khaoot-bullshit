@@ -33,13 +33,14 @@ const seconds = (stage: Json) => {
   return Number.isFinite(value) && value > 0 ? Math.round(value) * 1000 : null;
 };
 /** Plain words or {key,label} objects become options with keys. */
-function options(value: unknown, prefix: string, placement = false): { key: string; label: string; placement?: unknown }[] {
+function options(value: unknown, prefix: string, answerFields = false): { key: string; label: string; placement?: unknown; marks?: unknown }[] {
   const taken = new Set<string>();
   return (Array.isArray(value) ? value : []).map((entry, index) => {
     const label = isObject(entry) ? text(entry['label'] ?? entry['text'] ?? entry['name']) : text(entry);
     const key = isObject(entry) && typeof entry['key'] === 'string' ? entry['key'] : slug(label, `${prefix}${index + 1}`);
     return { key: unique(key, taken), label: label || `Option ${index + 1}`,
-      ...(placement && isObject(entry) && entry['placement'] !== undefined ? { placement: entry['placement'] } : {}) };
+      ...(answerFields && isObject(entry) && entry['placement'] !== undefined ? { placement: entry['placement'] } : {}),
+      ...(answerFields && isObject(entry) && entry['marks'] !== undefined ? { marks: entry['marks'] } : {}) };
   });
 }
 const findKey = (list: { key: string; label: string }[], wanted: unknown) => {

@@ -2,7 +2,7 @@ import { scenePlaceAwards } from '@party/contracts';
 import { useScenePlaceAwards } from '../../../presentation/scene-place-awards.js';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TEXT_LINES, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextBoxPlacement, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
+import { MAX_ANSWER_LABEL_LENGTH, MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TEXT_LINES, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextBoxPlacement, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
 import { useTexts } from '../../../i18n/texts.js';
 import { slidePercent } from '../../../presentation/slide-object.js';
 import { lastTextBoxRow, placeTextBoxes } from '../../../presentation/scene-text-layout.js';
@@ -208,10 +208,10 @@ function withinSelectionTools(tools: HTMLElement | null, target: Node | null) {
 
 interface TextSelection { start: number; end: number; x: number; top: number; bottom: number }
 
-export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly, format, main, title }: {
+export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly, format, main, title, answer }: {
   value: string; label: string; onChange: (value: string, caret: number) => void;
   onMarks?: ((marks: SceneTextMark[]) => void) | undefined; onFocus?: () => void;
-  readOnly: boolean; format?: SceneTextStyle | undefined; main?: boolean; title?: boolean;
+  readOnly: boolean; format?: SceneTextStyle | undefined; main?: boolean; title?: boolean; answer?: boolean;
 }) {
   const t = useTexts(TEXT_BOX_TEXTS);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -293,6 +293,7 @@ export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly,
     setSelection({ start, end, x, top: Math.max(rect.top, (line?.top ?? rect.top) + dy), bottom: Math.min(rect.bottom, (line?.bottom ?? rect.bottom) + dy) });
   };
   const shortcut = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (answer && event.key === 'Enter') { event.preventDefault(); return; }
     if (!selection) return;
     const command = event.key.toLowerCase();
     if (event.key === 'Escape') { event.stopPropagation(); setSelection(undefined); setMore(false); }
@@ -316,14 +317,14 @@ export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly,
   const formatSelected = (patch: SceneCharacterStyle | null) => {
     if (selection) onMarks?.(formatSelection(marks, selection, patch));
   };
-  return <div className={`canvas-text-box scene-text-mirror ${typography}`} data-text={value || label} data-sized={sized && !useFixedHeight || undefined}
+  return <div className={`canvas-text-box scene-text-mirror ${typography}${answer ? ' canvas-answer-text' : ''}`} data-text={value || label} data-sized={sized && !useFixedHeight || undefined}
     data-fixed={useFixedHeight || undefined} data-reading={showReading && (!focused || readOnly) || undefined} style={style}>
     <div ref={mirror} className={`${typography} canvas-text-anchor`} aria-hidden="true">{value}<span>{'\u200b'}</span></div>
     {showReading && <div className={`${typography} canvas-text-reading`} aria-hidden="true">
       <SceneTextContent text={value} format={format} selection={selection} />
     </div>}
     <textarea ref={field} className={`${typography} ${main ? 'canvas-prompt' : title ? 'tv-banner canvas-title' : 'canvas-extra-text'}`} rows={1}
-      aria-label={label} placeholder={label} value={value} readOnly={readOnly} maxLength={title ? MAX_SCENE_TITLE_LENGTH : MAX_SCENE_TEXT_LENGTH}
+      aria-label={label} placeholder={label} value={value} readOnly={readOnly} maxLength={answer ? MAX_ANSWER_LABEL_LENGTH : title ? MAX_SCENE_TITLE_LENGTH : MAX_SCENE_TEXT_LENGTH}
       wrap={format?.wrap === 'none' ? 'off' : 'soft'} style={offset ? { paddingBlockStart: offset } : undefined}
       onFocus={() => { setFocused(true); onFocus?.(); }} onBlur={() => setFocused(false)}
       onKeyDown={shortcut} onSelect={event => captureSelection(event.currentTarget)}
@@ -334,7 +335,7 @@ export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly,
         captureSelection(event.currentTarget);
         tools.current?.querySelector('select')?.focus();
       }}
-      onChange={event => { setSelection(undefined); setMore(false); onChange(event.target.value, event.target.selectionEnd); }} />
+      onChange={event => { setSelection(undefined); setMore(false); onChange(answer ? event.target.value.replace(/[\r\n]/g, ' ') : event.target.value, event.target.selectionEnd); }} />
     {selection && portal && createPortal(<div ref={tools} className="canvas-selection-tools" role="group"
       aria-label={t('selection')} style={{ width, left, ...toolbarPosition }}
       onKeyDown={event => {

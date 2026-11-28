@@ -1,6 +1,6 @@
 import { SlideAnswers, answerAccent } from '../../presentation/slide-answers.js';
 import { AnswerOptionHandles } from './fields/answer-option-handles.js';
-import { setAnswerPlacement } from './answer-placement.js';
+import { setAnswerLabel, setAnswerPlacement, setAnswerMarks } from './answer-edits.js';
 import { scenePlaceAwards, type SceneTextBox, type AnswerOption } from '@party/contracts';
 import { useScenePlaceAwards } from '../../presentation/scene-place-awards.js';
 import { BrickMapPreview } from '../../minigames/brick-rally/board.js';
@@ -21,7 +21,7 @@ import { buildLook, LookContext, themeClass, useThemeStyle } from '../../present
 import { GameSymbol } from '../../presentation/game-symbol.js';
 import { gameDescription, gameName } from '../../presentation/catalog.text.js';
 import { Mark } from '../../presentation/mark-icons.js';
-import { PositionedSlideText, SceneTextBoxes, SlideTextLayer, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../../presentation/scene-text.js';
+import { AnswerOptionLabel, withAnswerTranslation, PositionedSlideText, SceneTextBoxes, SlideTextLayer, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../../presentation/scene-text.js';
 import { SlideImages } from '../../presentation/slide-images.js';
 import { SlideImageHandles } from './fields/slide-image-handles.js';
 import { sceneSlideImages, updateSlideImage } from './slide-image-edits.js';
@@ -98,9 +98,8 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const promptLabel = fields(stage.kind === 'info' ? 'lInfo' : 'lQuestion');
   const timer = typeof stage.durationMs === 'number' && !(stage.kind === 'minigame' && stage['game'] === 'stop-clock') ? look.text('timer.left', { time: formatRemaining(stage.durationMs) }) : null;
   const input = stage['input'] as { kind?: string; options?: AnswerOption[]; items?: { key: string; label: string }[]; layout?: string } | undefined;
-  const options = (stage.kind === 'route' ? optionsOf(node) : input?.options ?? input?.items ?? []).map(option => ({
-    ...option, label: Object.hasOwn(translations?.labels ?? {}, option.key) ? translations!.labels![option.key]! : option.label,
-  }));
+  const options = (stage.kind === 'route' ? optionsOf(node) : input?.options ?? input?.items ?? []).map(option =>
+    withAnswerTranslation(option, translations?.labels?.[option.key] ?? option.label));
   const media = SceneMediaSchema.safeParse(stage['media']).data;
   const clip = YouTubeClipSchema.safeParse(stage['youtube']).data;
   const layout = MediaLayoutSchema.safeParse(stage['mediaLayout']).data ?? DEFAULT_MEDIA_LAYOUT;
@@ -177,17 +176,18 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
     size="heading" rotation={titlePlacement.rotation ?? 0} />;
   const positionedPrompt = (text: string) => promptPlacement && <PositionedSlideText position={promptPlacement} text={text}
     format={text === prompt ? visiblePromptStyle : withoutMarks(visiblePromptStyle)} rotation={promptPlacement.rotation ?? 0} />;
-  const renderAnswer = (option: { key: string; label: string }, position: number) => {
+  const renderAnswer = (option: AnswerOption, position: number) => {
     const mark = ordered ? String(position + 1) : answerMark(theme, position, options.length, stage.kind === 'route');
     const accent = answerAccent(position);
     const content = <>
-      {mark && <span className={canvas ? undefined : 'answer-mark'} aria-hidden="true"><Mark text={mark} /></span>}
+      {mark && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}
       {canvas && choices ? <>
-        <input type="text" aria-label={fields('answerOption', { number: position + 1 })} maxLength={240} readOnly={canvas.readOnly} value={option.label}
-          onChange={event => canvas.edit(current => ({ ...current, input: { ...input, options: choices.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
+        <CanvasText answer label={fields('answerOption', { number: position + 1 })} value={option.label} format={option} readOnly={canvas.readOnly}
+          onChange={(label, caret) => canvas.edit(current => setAnswerLabel(current, option.key, label, caret), `option-${option.key}`)}
+          onMarks={canvas.readOnly ? undefined : marks => canvas.edit(current => setAnswerMarks(current, option.key, marks), `option-${option.key}-marks`)} />
         {scoring?.kind === 'correct-choice' && <input type="radio" name={radioGroup} aria-label={fields('isCorrect', { label: option.label })} checked={scoring.correctChoiceKey === option.key}
           disabled={canvas.readOnly} onChange={() => canvas.edit(current => ({ ...current, scoring: { ...scoring, correctChoiceKey: option.key } }), 'correct')} />}
-      </> : option.label}
+      </> : <AnswerOptionLabel option={option} />}
     </>;
     const answer = choices?.[position];
     if (canvas && !canvas.readOnly && answer) return <AnswerOptionHandles key={option.key} option={answer}
@@ -236,7 +236,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
         </ul>}
         {canPlaceAnswers ? <ul className="scene-slide-layer scene-slide-answers tv-options" data-editable>
           {options.map((option, position) => choices?.[position]?.placement ? renderAnswer(option, position) : null)}
-        </ul> : !interactive && choices && <SlideAnswers options={choices.map((choice, index) => ({ ...choice, label: options[index]?.label ?? choice.label }))}
+        </ul> : !interactive && choices && <SlideAnswers options={choices.map((choice, index) => withAnswerTranslation(choice, options[index]?.label ?? choice.label))}
           theme={theme} label={fields('answers')} />}
         {canvas && choices && input && !placedAnswerCount && quizKind(input) !== 'true-false' && choices.length < 12 && <button className="canvas-add-answer" type="button" disabled={canvas.readOnly}
           onClick={() => canvas.edit(current => ({ ...current, input: { ...input, options: [...choices, { key: uniqueKey('answer', choices.map(option => option.key)), label: fields('newAnswer') }] } }), 'answers')}>{fields('addAnswer')}</button>}
@@ -263,9 +263,9 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
             <legend>{look.text('answer.legend')}</legend>
             {options.map((option, index) => {
               const mark = answerMark(theme, index, options.length, stage.kind === 'route');
-              return <div key={option.key} className="tile">{mark !== null && <span className="answer-mark tile-mark" aria-hidden="true"><Mark text={mark} /></span>}{option.label}</div>;
+              return <div key={option.key} className="tile">{mark !== null && <span className="answer-mark tile-mark" aria-hidden="true"><Mark text={mark} /></span>}<AnswerOptionLabel option={option} /></div>;
             })}
-          </fieldset> : <div className="phone-list">{options.map(option => <span key={option.key}>{option.label}</span>)}</div>
+          </fieldset> : <div className="phone-list">{options.map(option => <span key={option.key}><AnswerOptionLabel option={option} /></span>)}</div>
           : <p className="phone-hint">{phoneHint}</p>)}
       </div></PhoneFrame>}
   </div>;

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { answerMark, type AnswerOption, type AnswerPlacement, type FullTheme } from '@party/contracts';
+import { AnswerOptionLabel } from './scene-text.js';
 import { Mark } from './mark-icons.js';
 import { slideObjectStyle } from './slide-object.js';
 
@@ -18,7 +19,7 @@ export function SlideAnswers({ options, theme, label }: { options: readonly Answ
       return <li key={option.key} className="scene-positioned-answer" style={{
         ...answerPlacementStyle(option.placement), '--positioned-answer-color': answerAccent(index),
       } as CSSProperties}>
-        {mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}{option.label}
+        {mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}<AnswerOptionLabel option={option} />
       </li>;
     })}
   </ol>;

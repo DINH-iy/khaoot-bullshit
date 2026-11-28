@@ -29,7 +29,7 @@ const mark = z.object({
   end: z.number().int().min(1).max(MAX_SCENE_TEXT_LENGTH),
   ...characterStyle,
 }).strict();
-const marks = z.array(mark).max(MAX_SCENE_TEXT_LENGTH)
+export const SceneTextMarksSchema = z.array(mark).max(MAX_SCENE_TEXT_LENGTH)
   .refine(ranges => ranges.every((range, index) => range.start < range.end && (index === 0 || ranges[index - 1]!.end <= range.start)),
     'Text formatting ranges must be ordered and non-overlapping.');
 export type SceneTextMark = z.infer<typeof mark>;
@@ -40,7 +40,7 @@ export const SceneTextStyleSchema = z.object({
   align: z.enum(SCENE_TEXT_ALIGNMENTS).optional(),
   verticalAlign: z.enum(SCENE_TEXT_VERTICAL_ALIGNMENTS).optional(),
   ...characterStyle,
-  marks: marks.optional(),
+  marks: SceneTextMarksSchema.optional(),
   wrap: z.enum(SCENE_TEXT_WRAPS).optional(),
   overflow: z.enum(SCENE_TEXT_OVERFLOWS).optional(),
   lines: z.number().int().min(1).max(MAX_SCENE_TEXT_LINES).optional(),
