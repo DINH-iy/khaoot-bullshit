@@ -480,7 +480,7 @@ export function RoomScreen() {
               <SceneTextContent text={stageHeading ?? ''} format={headingStyle} />
             </h2><div ref={setActionSlot} className="stage-action-slot" /></div>
             {stage.info && <p {...sceneTextProps(stage.promptStyle)}><SceneTextContent text={stage.prompt} format={stage.promptStyle} /></p>}
-            {showingScene && <SceneTextBoxes boxes={stage.textBoxes} />}
+            {showingScene && <SceneTextBoxes boxes={stage.textBoxes} phoneColumns={stage.textBoxPhoneColumns} />}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           {stage.teams && <div ref={teamMomentRef}>

@@ -161,6 +161,8 @@ model GameDraft {
   definitionFormat Int      @default(1)
   definition       Json     @db.JsonB
   updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  lastEditorName   String?  @db.VarChar(80)
+  lastEditorIsOwner Boolean @default(false)
 
   game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
 

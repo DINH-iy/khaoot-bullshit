@@ -209,7 +209,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
       const access = await requireEditor(request);
       const games = await authoring.activity((await ownerCreator()).id, access);
       reply.header('cache-control', 'no-store');
-      return { ok: true, data: GameActivitySchema.parse(games.map(game => ({ ...game, editorOpen: live?.hasEditor(game.gameId) ?? false }))) };
+      return { ok: true, data: GameActivitySchema.parse(games.map(game => ({ ...game, openEditors: live?.openEditors(game.gameId) ?? [] }))) };
     } catch (error) { return fail(reply, error); }
   });
   app.get('/api/host/graphs', async (request, reply) => {
@@ -229,7 +229,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
     try {
       const access = await requireEditor(request, 'edit'); roomAssert(live, 'AUTH_UNAVAILABLE');
       const creator = await ownerCreator(); const { gameId } = await authoring.get(creator.id, gameParam(request), access);
-      return { ok: true, data: { ticket: await live.ticket(creator.id, gameId, access.personId) } };
+      return { ok: true, data: { ticket: await live.ticket(creator.id, gameId, { personId: access.personId, editor: access.role === 'owner' ? { kind: 'owner' } : { kind: 'person', name: access.name } }) } };
     } catch (error) { return fail(reply, error); }
   });
   // A whole game is larger than ordinary requests, so this route alone accepts up to the draft limit.

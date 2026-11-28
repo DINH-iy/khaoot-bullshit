@@ -24,7 +24,10 @@ describe('importing a game from text', () => {
     expect(inspectDefinition(definition).definition?.nodes.find(node => node.key === 'welcome')?.stages[0]).toMatchObject({
       hostNotes: 'Welcome everyone.\n\nWait until everyone has joined before continuing.',
       prompt: 'Grab your phone.\n\nClosest cuts and best guesses earn points.',
-      textBoxes: [{ key: 'reminder', size: 'small', verticalAlign: 'bottom', lines: 2, marks: [{ start: 7, end: 15, italic: true, color: '#ffcc55' }] }],
+      textBoxes: [
+        { key: 'reminder', size: 'small', verticalAlign: 'bottom', lines: 2, layout: { width: 6 }, marks: [{ start: 7, end: 15, italic: true, color: '#ffcc55' }] },
+        { key: 'next', layout: { width: 6, startColumn: 7 } },
+      ],
     });
     expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
     expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });

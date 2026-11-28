@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_EDITORS } from './live-editing.js';
 import { GameIdSchema, GameKeySchema, RevisionSchema } from './game.js';
 import { ColorSchema } from './presentation.js';
 import { GraphDataSchema, StoredGraphSchema } from './minigames/draw-the-graph/graph.js';
@@ -57,8 +58,14 @@ export const DefinitionIssueSchema = z.object({
 }).strict();
 export type DefinitionIssue = z.infer<typeof DefinitionIssueSchema>;
 const Published = z.object({ number: z.number().int().min(1), publishedAt: z.string().datetime(), matchesDraft: z.boolean() }).strict().nullable();
+export const GameEditorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('owner') }).strict(),
+  z.object({ kind: z.literal('person'), name: z.string().min(1).max(80) }).strict(),
+]);
+export type GameEditor = z.infer<typeof GameEditorSchema>;
 export const GameSummarySchema = z.object({
   gameId: GameIdSchema, title: z.string().min(1).max(160), revision: RevisionSchema, updatedAt: z.string().datetime(),
+  lastEditor: GameEditorSchema.optional(),
   issueCount: z.number().int().min(0), published: Published,
   // Who made the game: an editor's name (`you`: the one looking), or null when the owner made it. `shared`: shared with the one looking.
   author: z.object({ name: z.string(), you: z.boolean() }).strict().nullable().optional(), shared: z.boolean().optional(),
@@ -67,8 +74,9 @@ export const GameSummarySchema = z.object({
 }).strict();
 export type GameSummary = z.infer<typeof GameSummarySchema>;
 export const GameActivitySchema = z.array(z.object({
-  gameId: GameIdSchema, updatedAt: z.string().datetime(), editorOpen: z.boolean(),
+  gameId: GameIdSchema, updatedAt: z.string().datetime(), lastEditor: GameEditorSchema.optional(), openEditors: z.array(GameEditorSchema).max(MAX_EDITORS),
 }).strict()).max(100);
+export type GameActivity = z.infer<typeof GameActivitySchema>[number];
 /**
  * Who may see and edit a game: the owner always; an editor when they made it or it is shared with them.
  * The game's author and the owner choose whom to share it with; only the owner changes who made it

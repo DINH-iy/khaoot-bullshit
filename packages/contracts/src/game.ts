@@ -308,6 +308,7 @@ export const PublicStageSchema = z.object({
   kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel', 'teams']), prompt: z.string().min(1).max(2000),
   translations: SceneTranslationsSchema.optional(),
   textBoxes: SceneTextBoxesSchema.optional(),
+  textBoxPhoneColumns: z.boolean().optional(),
   promptStyle: SceneTextStyleSchema.optional(),
   titleStyle: SceneTextStyleSchema.optional(),
   hostNotes: HostNotesSchema.optional(),

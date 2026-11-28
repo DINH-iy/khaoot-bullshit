@@ -1,5 +1,5 @@
-import { Fragment, type CSSProperties } from 'react';
-import { FONTS, type SceneCharacterStyle, type SceneTextBox, type SceneTextStyle } from '@party/contracts';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
+import { FONTS, SCENE_TEXT_GRID_COLUMNS, type SceneCharacterStyle, type SceneTextBox, type SceneTextStyle } from '@party/contracts';
 
 export const usesSlideTypography = (kind: string) => ['info', 'challenge', 'collect'].includes(kind);
 
@@ -68,6 +68,31 @@ export function withoutMarks(format: SceneTextStyle | undefined): SceneTextStyle
   return rest;
 }
 
-export function SceneTextBoxes({ boxes }: { boxes: readonly SceneTextBox[] | undefined }) {
-  return boxes?.filter(box => box.text.trim()).map(box => <p key={box.key} {...sceneTextProps(box)}><SceneTextContent text={box.text} format={box} /></p>);
+export function SceneTextBoxes({ boxes, phoneColumns, renderBox }: {
+  boxes: readonly SceneTextBox[] | undefined;
+  phoneColumns?: boolean | undefined;
+  renderBox?: (box: SceneTextBox, index: number) => ReactNode;
+}) {
+  const explicitLayout = boxes?.some(box => box.layout !== undefined);
+  const displayed = renderBox || explicitLayout ? boxes : boxes?.filter(box => box.text.trim());
+  if (!displayed?.length) return null;
+  let row = 1;
+  let nextColumn = 1;
+  return <div className="scene-text-grid" data-phone-columns={phoneColumns || undefined}
+    style={{ '--text-grid-columns': SCENE_TEXT_GRID_COLUMNS } as CSSProperties}>
+    {displayed.map((box, index) => {
+      const width = box.layout?.width ?? SCENE_TEXT_GRID_COLUMNS;
+      const start = box.layout?.startColumn;
+      let column = start ?? nextColumn;
+      if (index > 0 && (box.layout?.newRow || column < nextColumn || column + width - 1 > SCENE_TEXT_GRID_COLUMNS)) {
+        row++;
+        column = start ?? 1;
+      }
+      nextColumn = column + width;
+      const empty = !renderBox && !box.text.trim();
+      return <div key={box.key} className="scene-text-cell" data-empty={empty || undefined} aria-hidden={empty || undefined} style={{ gridColumn: `${column} / span ${width}`, gridRow: row }}>
+        {renderBox ? renderBox(box, index) : !empty && <p {...sceneTextProps(box)}><SceneTextContent text={box.text} format={box} /></p>}
+      </div>;
+    })}
+  </div>;
 }

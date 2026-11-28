@@ -24,7 +24,8 @@ test('game cards show draft activity and an authored phone preview returns to ed
   const timestamp = card.locator('time');
   await expect(timestamp).toContainText('Last edited');
   const initial = await timestamp.getAttribute('datetime');
-  await expect(card.getByText('Open in editor', { exact: true })).toHaveCount(0);
+  await expect(timestamp.locator('..')).toContainText('by Owner');
+  await expect(card.getByText(/^Open in editor/)).toHaveCount(0);
 
   const editor = await context.newPage();
   await editor.setViewportSize({ width: 1440, height: 900 });
@@ -38,7 +39,7 @@ test('game cards show draft activity and an authored phone preview returns to ed
   await page.bringToFront();
   await expect(async () => {
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await expect(card.getByText('Open in editor', { exact: true })).toBeVisible({ timeout: 1200 });
+    await expect(card.getByText('Open in editor · Owner', { exact: true })).toBeVisible({ timeout: 1200 });
     await expect(timestamp).not.toHaveAttribute('datetime', initial ?? '', { timeout: 1200 });
   }).toPass();
   await page.screenshot({ path: testInfo.outputPath('game-activity.png') });

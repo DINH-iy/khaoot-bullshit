@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { jwtVerify, SignJWT } from 'jose';
 import type { Server, Socket } from 'socket.io';
 import type { FastifyBaseLogger } from 'fastify';
-import { EDITOR_NAMESPACE, EditorJoinSchema, EditorPointSchema, EditorPresenceSchema, GameIdSchema, MAX_EDITORS, type Draft, type EditorPeer, type EditorPresence } from '@party/contracts';
+import { EDITOR_NAMESPACE, EditorJoinSchema, EditorPointSchema, EditorPresenceSchema, GameEditorSchema, GameIdSchema, MAX_EDITORS, type Draft, type EditorPeer, type EditorPresence, type GameEditor } from '@party/contracts';
 import { RateLimiter } from '../rooms/security.js';
 import { clientAddress } from '../http/client-address.js';
 
@@ -18,7 +18,7 @@ const AUDIENCE = 'party-editor-live';
 const TICKET_SECONDS = 120;
 const MAX_CONNECTED_MS = 12 * 60 * 60 * 1000;
 // personId: the editor (a person with editor rights) this connection belongs to; null for the owner.
-interface Seat { gameId: string; color: number; presence: EditorPresence; personId: string | null }
+interface Seat { gameId: string; color: number; presence: EditorPresence; personId: string | null; editor: GameEditor }
 
 export function createEditorLive(io: Server, roomSecret: string, log: FastifyBaseLogger, trustCloudflareLocal = false) {
   // Its own key, so a ticket can never stand in for another kind of room credential.
@@ -39,10 +39,11 @@ export function createEditorLive(io: Server, roomSecret: string, log: FastifyBas
       const { payload } = await jwtVerify(join.ticket, key, { audience: AUDIENCE, algorithms: ['HS256'], requiredClaims: ['sub', 'exp', 'game'] });
       const gameId = GameIdSchema.parse(payload['game']);
       const personId = payload['person'] === undefined ? null : GameIdSchema.parse(payload['person']);
+      const editor = GameEditorSchema.parse(payload['editor']);
       const taken = new Set(present(gameId).map(peer => seat(peer).color));
       const color = Array.from({ length: MAX_EDITORS }, (_, index) => index).find(index => !taken.has(index));
       if (color === undefined) throw new Error('Game is full');
-      socket.data['seat'] = { gameId, color, presence: { name: join.name, view: 'flow', selected: [] }, personId } satisfies Seat;
+      socket.data['seat'] = { gameId, color, presence: { name: join.name, view: 'flow', selected: [] }, personId, editor } satisfies Seat;
     })().then(() => next(), () => { log.warn({ event: 'editor_live_rejected' }, 'Editor connection rejected'); next(new Error('Editor access denied')); });
   });
   editors.on('connection', socket => {
@@ -65,8 +66,13 @@ export function createEditorLive(io: Server, roomSecret: string, log: FastifyBas
 
   return {
     /** A ticket to join one game's editors. Only call this for someone already allowed to edit that game. */
-    ticket: (creatorId: string, gameId: string, personId: string | null = null) => new SignJWT(personId ? { game: gameId, person: personId } : { game: gameId }).setProtectedHeader({ alg: 'HS256' }).setSubject(creatorId).setAudience(AUDIENCE).setIssuedAt().setExpirationTime(`${TICKET_SECONDS}s`).sign(key),
-    hasEditor: (gameId: string) => (editors.adapter.rooms.get(room(gameId))?.size ?? 0) > 0,
+    ticket: (creatorId: string, gameId: string, identity: { personId: string | null; editor: GameEditor }) =>
+      new SignJWT({ game: gameId, editor: identity.editor, ...(identity.personId ? { person: identity.personId } : {}) })
+        .setProtectedHeader({ alg: 'HS256' }).setSubject(creatorId).setAudience(AUDIENCE).setIssuedAt().setExpirationTime(`${TICKET_SECONDS}s`).sign(key),
+    openEditors: (gameId: string) => [...new Map(present(gameId).map(socket => {
+      const { personId, editor } = seat(socket);
+      return [personId, editor] as const;
+    })).values()],
     /** Hands a newly saved draft to everyone who has the game open. */
     saved: (draft: Draft) => { editors.to(room(draft.gameId)).emit('editor.draft', draft); },
     /** Closes an editor's open editors at once: their rights were taken away, or their phones signed out. */

@@ -40,6 +40,21 @@ test('editors see only their own games and games shared with them; the owner see
     await expect(theirs.locator('.my-game').filter({ hasText: ownerGame })).toHaveCount(0);
     expect(await activityIds()).toContain(editorGameId);
     expect(await activityIds()).not.toContain(ownerGameId);
+    const editOne = await editorContext.newPage();
+    const editTwo = await editorContext.newPage();
+    try {
+      for (const tab of [editOne, editTwo]) {
+        await tab.goto(`${baseURL}/?edit=${editorGameId}`);
+        await expect(tab.getByRole('tab', { name: 'Flow editor' })).toBeVisible();
+      }
+      await expect(async () => {
+        const response = await page.request.get(`${baseURL}/api/host/games/activity`, { headers });
+        const games = (await response.json()).data;
+        expect(games.find((game: { gameId: string }) => game.gameId === editorGameId)).toMatchObject({
+          lastEditor: { kind: 'person', name: editorName }, openEditors: [{ kind: 'person', name: editorName }],
+        });
+      }).toPass();
+    } finally { await editOne.close(); await editTwo.close(); }
 
     // The owner shares their game with the editor from the editor's Invite people panel.
     await mine.getByRole('link', { name: `Edit ${ownerGame}` }).click();

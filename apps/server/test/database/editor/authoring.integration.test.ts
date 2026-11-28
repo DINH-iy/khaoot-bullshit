@@ -70,7 +70,11 @@ describe('authoring drafts and publishing', () => {
     await expect(authoring.share(author.id, anns.gameId, { ...editing(bo), authorPersonId: bo.id }, as(ann))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(await authoring.share(author.id, anns.gameId, editing(bo), as(ann))).toMatchObject({ authorPersonId: ann.id, shares: [{ personId: bo.id, roleId: EDITOR_ROLE_ID }], canChangeAuthor: false });
     expect((await authoring.list(author.id, as(bo))).map(game => [game.title, game.author?.name, game.shared])).toEqual([['Ann quiz', ann.name, true]]);
-    expect((await authoring.save(author.id, anns.gameId, { expectedRevision: 0, definition: anns.definition }, as(bo))).revision).toBe(1);
+    expect(await authoring.save(author.id, anns.gameId, { expectedRevision: 0, definition: anns.definition }, as(bo))).toMatchObject({
+      revision: 1, lastEditor: { kind: 'person', name: bo.name }, author: { name: ann.name },
+    });
+    await expect(authoring.save(author.id, anns.gameId, { expectedRevision: 0, definition: anns.definition }, as(ann))).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+    expect(await authoring.activity(author.id, as(ann))).toMatchObject([{ gameId: anns.gameId, lastEditor: { kind: 'person', name: bo.name } }]);
     await expect(authoring.archive(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(authoring.sharing(author.id, anns.gameId, as(bo))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     // The owner gives the old game to Bo (who made it before authors were kept): Bo sees it, Ann does not.

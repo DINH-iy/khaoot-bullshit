@@ -1221,11 +1221,11 @@
   padding: 8px; border: 1px solid var(--e-border); border-radius: 10px;
 }
 .canvas-text-format > label { min-width: 0; }
-.canvas-text-format > :is(.canvas-character-choices, .canvas-text-order) { grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid var(--e-border); }
+.canvas-text-format > .canvas-layout-wide { grid-column: 1 / -1; }
+.canvas-text-format > label.choice { display: flex; align-items: center; min-height: 44px; }
+.canvas-text-format > label.choice input { margin: 0; }
 .canvas-text-order { display: flex; flex-wrap: wrap; gap: 8px; }
-.canvas-text-tools input:is([type=color], [type=number]) { width: 82px; min-height: 44px; padding: 4px 6px; }
-.canvas-character-choices { display: flex; flex-wrap: wrap; gap: 8px; }
-.canvas-character-choices button[aria-pressed] { width: 44px; padding-inline: 0; }
+.canvas-text-tools input[type=number] { width: 82px; min-height: 44px; padding: 4px 6px; }
 .scene-canvas .canvas-text-box[data-fixed]::after { display: none; }
 .scene-canvas .canvas-text-box[data-fixed] > textarea { block-size: var(--box-height); max-height: none; resize: none; }
 
@@ -1250,10 +1250,9 @@
 .editor .canvas-selection-tools :is(button, select, .canvas-selection-color):hover,
 .editor .canvas-selection-tools button[aria-pressed="true"],
 .editor .canvas-selection-tools button[aria-expanded="true"] { background: var(--e-accent-soft); }
-.canvas-selection-color { position: relative; display: grid; place-items: center; cursor: pointer; }
-.canvas-selection-color > span { border-bottom: 2px solid; line-height: 1.15; font-size: 1rem; font-weight: 750; }
-.canvas-selection-color > input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; opacity: 0; cursor: pointer; }
-.canvas-selection-color:has(:focus-visible) { outline: 2px solid var(--e-accent); outline-offset: -2px; }
+.editor .canvas-selection-row .canvas-selection-color { justify-content: center; }
+.canvas-selection-color .color-chip { display: none; }
+.canvas-color-letter { border-bottom: 2px solid; line-height: 1.15; font-size: 1rem; font-weight: 750; }
 .canvas-selection-more { flex-wrap: wrap; border-top: 1px solid var(--e-border); padding: 6px 4px 0; }
 .editor .canvas-selection-size input { width: 58px; min-height: 44px; padding: 4px 6px; color: var(--e-text); background: var(--e-bg); border-color: var(--e-border); }
 .editor .canvas-selection-more button { padding: 4px 10px; }

@@ -183,6 +183,7 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           youtube: entry.stage.youtube,
           mediaLayout: entry.stage.mediaLayout,
           textBoxes: entry.stage.textBoxes,
+          textBoxPhoneColumns: entry.stage.textBoxPhoneColumns,
           ...(actor.data.role === 'host' && entry.stage.hostNotes?.trim() ? { hostNotes: entry.stage.hostNotes } : {}),
           promptStyle: entry.stage.promptStyle,
           titleStyle: entry.stage.kind === 'info' ? entry.stage.titleStyle : undefined,

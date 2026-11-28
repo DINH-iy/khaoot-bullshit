@@ -54,12 +54,21 @@ test('slide text, blank lines and selected letters survive editing, publishing a
   await mini.getByRole('button', { name: 'Italic', exact: true }).click();
   await mini.getByRole('button', { name: 'Underline', exact: true }).click();
   await mini.getByRole('combobox', { name: 'Font', exact: true }).selectOption('mono');
-  await mini.getByLabel('Text color', { exact: true }).fill('#e19a30');
+  await mini.getByRole('button', { name: 'Text color', exact: true }).click();
+  const colorPicker = page.getByRole('dialog', { name: 'Text color' });
+  const hex = colorPicker.locator('.color-code input');
+  await expect(colorPicker.getByRole('slider').first()).toBeVisible();
+  await hex.fill('#e19a30');
+  await hex.press('Enter');
+  await page.screenshot({ path: testInfo.outputPath('built-in-color-picker.png') });
+  await hex.press('Escape');
+  await expect(colorPicker).toHaveCount(0);
   await expect(canvas.locator('.canvas-text-reading').getByText('1e', { exact: true })).toHaveCSS('font-style', 'italic');
 
   await page.screenshot({ path: testInfo.outputPath('editor-selection.png') });
-  await sidebar.getByRole('button', { name: 'Format text', exact: true }).click();
-  const format = sidebar.getByRole('group', { name: 'Format text', exact: true });
+  await sidebar.getByRole('button', { name: 'Box layout', exact: true }).click();
+  const format = sidebar.getByRole('group', { name: 'Box layout', exact: true });
+  await expect(format.getByRole('combobox', { name: 'Font', exact: true })).toHaveCount(0);
   await chooseOption(format.getByLabel('Horizontal alignment'), 'right');
   await expect(box).toHaveCSS('text-align', 'right');
   await chooseOption(format.getByLabel('Horizontal alignment'), 'left');
@@ -81,9 +90,9 @@ test('slide text, blank lines and selected letters survive editing, publishing a
 
   await chooseOption(addBox, 'blank');
   await sidebar.getByRole('textbox', { name: 'Text box 2', exact: true }).fill('Houd één hand achter je rug.');
-  await format.getByRole('button', { name: 'Move up', exact: true }).click();
+  await sidebar.getByRole('button', { name: 'Move up', exact: true }).click();
   await expect(canvas.getByRole('textbox', { name: 'Text box 1', exact: true })).toHaveValue('Houd één hand achter je rug.');
-  await sidebar.getByRole('button', { name: 'Format text', exact: true }).click();
+  await sidebar.getByRole('button', { name: 'Box layout', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('editor-slide.png') });
   const editorPromptStyle = await field.evaluate(element => {
@@ -119,7 +128,7 @@ test('slide text, blank lines and selected letters survive editing, publishing a
       await expect(livePrompt).toHaveCSS('font-weight', editorPromptStyle.weight);
       await expect(livePrompt).toHaveCSS('text-align', editorPromptStyle.alignment);
       await expect(livePrompt).toHaveCSS('white-space', editorPromptStyle.wrapping);
-      const boxes = surface.locator('.composition-copy > p');
+      const boxes = surface.locator('.scene-text-grid p');
       await expect(boxes).toHaveText(['Houd één hand achter je rug.', points]);
       const livePoints = boxes.last();
       await expect(livePoints).toHaveCSS('text-align', 'center');
@@ -146,4 +155,83 @@ test('slide text, blank lines and selected letters survive editing, publishing a
   } finally {
     await phoneContext.close();
   }
+});
+
+test('authors can place two or three text boxes in a row and delete a selected box', async ({ page, baseURL }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+  const gameId = randomUUID();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  expect((await page.request.post(`${baseURL}/api/host/games/import`, { headers, data: {
+    gameId, text: JSON.stringify({ title: 'Three columns', scenes: [{
+      type: 'cutscene', title: 'Showtime', text: 'Choose your station.',
+      textBoxes: [{ key: 'one', text: 'Warm up' }, { key: 'two', text: 'Get ready' }, { key: 'three', text: 'Start playing' }],
+    }] }),
+  } })).ok()).toBe(true);
+  await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  const settings = page.locator('.scene-props');
+  const layoutButton = settings.getByRole('button', { name: 'Box layout', exact: true });
+  await layoutButton.click();
+  const grid = page.locator('.scene-text-grid');
+  const getPositions = () => grid.locator('.scene-text-cell').evaluateAll(divs => divs.map(div => {
+    const { x, y, width } = div.getBoundingClientRect();
+    return { x, y, width };
+  }));
+  const arrange = settings.getByRole('combobox', { name: 'Arrange all boxes' });
+  await chooseOption(arrange, '2');
+  let [first, second, third] = await getPositions();
+  expect(second!.y).toBeCloseTo(first!.y);
+  expect(second!.x).toBeGreaterThan(first!.x);
+  expect(third!.y).toBeGreaterThan(first!.y);
+
+  await chooseOption(arrange, '3');
+  [first, second, third] = await getPositions();
+  expect(third!.y).toBeCloseTo(second!.y);
+  expect(third!.x).toBeGreaterThan(second!.x);
+  expect(Math.abs(third!.width - first!.width)).toBeLessThan(1);
+  await testInfo.attach('three-text-boxes', { body: await page.screenshot({ path: testInfo.outputPath('three-text-boxes.png') }), contentType: 'image/png' });
+
+  await chooseOption(settings.getByLabel('Selected text box'), 'box:three');
+  await settings.getByLabel('Start a new row').check();
+  await chooseOption(settings.getByLabel('Start column'), '7');
+  [first, second, third] = await getPositions();
+  expect(third!.y).toBeGreaterThan(first!.y);
+  expect(third!.x).toBeGreaterThan(second!.x);
+  await chooseOption(arrange, '3');
+
+  const devices = page.getByRole('group', { name: 'Preview device' });
+  await devices.getByRole('button', { name: 'Phone', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Phone model' })).toBeVisible();
+  [first, second] = await getPositions();
+  expect(second!.y).toBeGreaterThan(first!.y);
+  await settings.getByLabel('Keep columns on phones').check();
+  [first, second] = await getPositions();
+  expect(second!.y).toBeCloseTo(first!.y);
+  await devices.getByRole('button', { name: 'Shared screen', exact: true }).click();
+
+  await layoutButton.click();
+  await settings.getByRole('button', { name: 'Remove text box', exact: true }).click();
+  const confirm = page.getByRole('alertdialog');
+  await confirm.getByRole('button', { name: 'Remove text box', exact: true }).click();
+  await expect(grid.locator('.scene-text-cell')).toHaveCount(2);
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.reload();
+  await expect(grid.locator('.scene-text-cell')).toHaveCount(2);
+  [first, second] = await getPositions();
+  expect(second!.y).toBeCloseTo(first!.y);
+
+  const pop = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Play & publish' }).click();
+  await page.getByRole('menuitem', { name: /Test bench: play it with virtual phones/ }).click();
+  const bench = await pop;
+  const host = bench.frameLocator('.bench-host');
+  await expect(host.getByText(/Player 1 · connected/)).toBeVisible();
+  await host.getByRole('button', { name: 'Start the game' }).click();
+  for (const frame of [host, bench.frameLocator('iframe[title="Phone of Player 1"]')]) {
+    const live = frame.locator('.scene-text-cell');
+    await expect(live).toHaveText(['Warm up', 'Get ready']);
+    expect(Math.abs((await live.nth(0).boundingBox())!.y - (await live.nth(1).boundingBox())!.y)).toBeLessThan(1);
+  }
+
 });

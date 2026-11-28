@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
+import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
 import { useTexts } from '../../../i18n/texts.js';
 import { SceneTextContent, sceneTextProps } from '../../../presentation/scene-text.js';
+import { ColorPicker } from '../../../ui/color-picker.js';
 import { Dropdown } from '../../../ui/dropdown.js';
 import { ConfirmDialog } from '../../controls/confirm-dialog.js';
 import { LOOK_TEXTS } from '../../look/look.text.js';
@@ -45,6 +46,20 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
     next.splice(index + direction, 0, selected);
     edit(current => setSceneTextBoxes(current, next), 'textBoxes');
   };
+  const width = selected?.layout?.width ?? SCENE_TEXT_GRID_COLUMNS;
+  const layoutOptions = Array.from({ length: SCENE_TEXT_GRID_COLUMNS }, (_, index) => SCENE_TEXT_GRID_COLUMNS - index);
+  const setLayout = (patch: SceneTextBoxLayout) => {
+    if (!selected) return;
+    edit(current => setSceneTextBoxes(current, sceneTextBoxes(current).map(box =>
+      box.key === selected.key ? { ...box, layout: { ...box.layout, ...patch } } : box)), `layout-${selected.key}`);
+  };
+  const arrange = (count: number) => edit(current => setSceneTextBoxes(current, sceneTextBoxes(current).map((box, index) => {
+    const slot = index % count;
+    const width = Math.floor((slot + 1) * SCENE_TEXT_GRID_COLUMNS / count) - Math.floor(slot * SCENE_TEXT_GRID_COLUMNS / count);
+    return { ...box, layout: { width, ...(slot === 0 && index > 0 ? { newRow: true } : {}) } };
+  })), 'text-box-columns');
+  const typography = { font: undefined, scale: undefined, color: undefined, bold: undefined, italic: undefined, underline: undefined, strike: undefined };
+  const hasTypography = Object.keys(typography).some(key => format[key as keyof typeof typography] !== undefined);
   const add = (preset: Preset) => {
     const text = { blank: '', heading: t('heading'), instructions: t('instructionsText'), points: t('pointsText') };
     const sizes = { blank: 'body', heading: 'heading', instructions: 'body', points: 'small' } as const;
@@ -59,12 +74,49 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
       <button type="button" className="small-button" aria-expanded={formatting} onClick={() => setFormatting(!formatting)}>{t('format')}</button>
     </div>
     {(boxes.length > 0 || formatting) && <label>{t('edit')}<Dropdown value={target} onChange={value => onSelect(value as SceneTextTarget)} options={targets} /></label>}
-    {selected && <label>{t('box', { number: index + 1 })}<textarea rows={2} maxLength={MAX_SCENE_TEXT_LENGTH} value={selected.text}
-      onChange={event => {
-        const { value, selectionEnd } = event.currentTarget;
-        edit(current => updateBoxText(current, selected.key, value, selectionEnd), `textBox-${selected.key}-text`);
-      }} /></label>}
+    {selected && <>
+      <label>{t('box', { number: index + 1 })}<textarea rows={2} maxLength={MAX_SCENE_TEXT_LENGTH} value={selected.text}
+        onChange={event => {
+          const { value, selectionEnd } = event.currentTarget;
+          edit(current => updateBoxText(current, selected.key, value, selectionEnd), `textBox-${selected.key}-text`);
+        }} /></label>
+      <div className="canvas-text-tools canvas-text-order">
+        <button type="button" className="small-button" disabled={index <= 0} onClick={() => move(-1)}>{t('up')}</button>
+        <button type="button" className="small-button" disabled={index >= boxes.length - 1} onClick={() => move(1)}>{t('down')}</button>
+        <button type="button" className="small-button danger-outline" onClick={() => setRemoving(selected.key)}>{t('remove')}</button>
+      </div>
+      {removing === selected.key && <ConfirmDialog title={t('removeTitle')} text={t('removeText')} confirm={t('remove')}
+        onConfirm={() => {
+          setRemoving(undefined);
+          edit(current => setSceneTextBoxes(current, sceneTextBoxes(current).filter(box => box.key !== selected.key)), 'textBoxes');
+          onSelect('promptStyle');
+        }} onCancel={() => setRemoving(undefined)} />}
+    </>}
     {formatting && <div className="canvas-text-tools canvas-text-format" role="group" aria-label={t('format')}>
+      {boxes.length > 1 && <Dropdown className="canvas-layout-wide" label={t('arrange')} placeholder={t('arrange')} value="" onChange={value => arrange(Number(value))}
+        options={Array.from({ length: MAX_SCENE_TEXT_BOXES }, (_, index) => ({ value: String(index + 1), label: t('columns', { count: index + 1 }) }))} />}
+      {selected && <>
+        <label>{t('width')}<Dropdown value={String(width)} onChange={value => {
+          const next = Number(value);
+          const start = selected.layout?.startColumn;
+          setLayout({ width: next, startColumn: start && start + next - 1 <= SCENE_TEXT_GRID_COLUMNS ? start : undefined });
+        }} options={layoutOptions.map(count => ({ value: String(count), label: count === 12 ? t('full') : count === 6 ? t('half')
+          : count === 4 ? t('third') : count === 3 ? t('quarter') : t('units', { count }) }))} /></label>
+        <label>{t('startColumn')}<Dropdown value={String(selected.layout?.startColumn ?? '')} onChange={value => setLayout({ startColumn: value ? Number(value) : undefined })}
+          options={[{ value: '', label: t('auto') }, ...Array.from({ length: SCENE_TEXT_GRID_COLUMNS - width + 1 }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))]} /></label>
+        <label className="canvas-layout-wide choice"><input type="checkbox" checked={selected.layout?.newRow ?? false}
+          onChange={event => setLayout({ newRow: event.currentTarget.checked })} />{t('newRow')}</label>
+      </>}
+      {boxes.length > 1 && <label className="canvas-layout-wide choice"><input type="checkbox" checked={stage['textBoxPhoneColumns'] === true}
+        onChange={event => {
+          const checked = event.currentTarget.checked;
+          edit(current => {
+            const next = { ...current };
+            if (checked) next['textBoxPhoneColumns'] = true;
+            else delete next['textBoxPhoneColumns'];
+            return next;
+          }, 'text-box-phone-layout');
+        }} />{t('phoneColumns')}</label>}
       <label>{t('align')}<Dropdown value={format.align ?? 'center'} onChange={value => onFormat({ align: value as SceneTextStyle['align'] })}
         options={SCENE_TEXT_ALIGNMENTS.map(value => ({ value, label: t(value) }))} /></label>
       <label>{t('vertical')}<Dropdown value={format.verticalAlign ?? 'top'} onChange={value => onFormat({ verticalAlign: value as SceneTextStyle['verticalAlign'] })}
@@ -76,18 +128,7 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
         options={SCENE_TEXT_WRAPS.map(value => ({ value, label: t(value) }))} /></label>
       <label>{t('overflow')}<Dropdown value={format.overflow ?? 'visible'} onChange={value => onFormat({ overflow: value as SceneTextStyle['overflow'] })}
         options={SCENE_TEXT_OVERFLOWS.map(value => ({ value, label: t(value) }))} /></label>
-      <CharacterTools key={target} format={format} onFormat={onFormat} />
-      {selected && <div className="canvas-text-order">
-        <button type="button" className="small-button" disabled={index <= 0} onClick={() => move(-1)}>{t('up')}</button>
-        <button type="button" className="small-button" disabled={index >= boxes.length - 1} onClick={() => move(1)}>{t('down')}</button>
-        <button type="button" className="small-button danger-outline" onClick={() => setRemoving(selected.key)}>{t('remove')}</button>
-        {removing === selected.key && <ConfirmDialog title={t('removeTitle')} text={t('removeText')} confirm={t('remove')}
-          onConfirm={() => {
-            setRemoving(undefined);
-            edit(current => setSceneTextBoxes(current, boxes.filter(box => box.key !== selected.key)), 'textBoxes');
-            onSelect('promptStyle');
-          }} onCancel={() => setRemoving(undefined)} />}
-      </div>}
+      {hasTypography && <button type="button" className="small-button canvas-layout-wide" onClick={() => onFormat(typography)}>{t('resetBoxType')}</button>}
     </div>}
   </div>;
 }
@@ -107,23 +148,6 @@ function CharacterFlags({ format, onFormat, compact, keys = characterToggles }: 
   });
 }
 
-function CharacterTools({ format, onFormat }: {
-  format: SceneCharacterStyle; onFormat: (format: SceneCharacterStyle | null) => void;
-}) {
-  const t = useTexts(TEXT_BOX_TEXTS);
-  const fonts = useTexts(LOOK_TEXTS);
-  return <>
-    <label>{t('font')}<Dropdown value={format.font ?? ''} onChange={value => onFormat({ font: (value || undefined) as SceneCharacterStyle['font'] })}
-      options={[{ value: '', label: t('followTheme') }, ...SCENE_TEXT_FONTS.map(value => ({ value, label: fonts(fontNames[value]) }))]} /></label>
-    <label>{t('scale')}<NumberSetting value={format.scale} min={50} max={200} placeholder="100" onChange={scale => onFormat({ scale })} /></label>
-    <label>{t('color')}<input type="color" value={format.color ?? '#ffffff'} onChange={event => onFormat({ color: event.currentTarget.value })} /></label>
-    {format.color && <button type="button" className="small-button" onClick={() => onFormat({ color: undefined })}>{t('themeColor')}</button>}
-    <div className="canvas-character-choices"><CharacterFlags compact format={format} onFormat={onFormat} />
-      <button type="button" className="small-button" onClick={() => onFormat(null)}>{t('reset')}</button>
-    </div>
-  </>;
-}
-
 function NumberSetting({ value, min, max, placeholder, label, onChange }: {
   value: number | undefined; min: number; max: number; placeholder: string; label?: string; onChange: (value: number | undefined) => void;
 }) {
@@ -135,6 +159,13 @@ function NumberSetting({ value, min, max, placeholder, label, onChange }: {
       else if (field.value) onChange(field.valueAsNumber);
       else onChange(undefined);
     }} />;
+}
+
+function withinSelectionTools(tools: HTMLElement | null, target: Node | null) {
+  if (!tools || !target) return false;
+  if (tools.contains(target)) return true;
+  const popover = tools.querySelector('.color-trigger')?.getAttribute('aria-controls');
+  return Boolean(popover && document.getElementById(popover)?.contains(target));
 }
 
 interface TextSelection { start: number; end: number; x: number; top: number; bottom: number }
@@ -166,7 +197,7 @@ export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly,
     if (!showingTools) return;
     const outside = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (target !== field.current && !tools.current?.contains(target)) dismiss();
+      if (target !== field.current && !withinSelectionTools(tools.current, target)) dismiss();
     };
     const dismiss = () => { setSelection(undefined); setMore(false); };
     document.addEventListener('pointerdown', outside, true);
@@ -273,7 +304,7 @@ export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly,
         event.stopPropagation(); field.current?.focus(); setSelection(undefined); setMore(false);
       }}
       onBlur={event => {
-        if (!event.relatedTarget || event.relatedTarget === field.current || event.currentTarget.contains(event.relatedTarget)) return;
+        if (!event.relatedTarget || event.relatedTarget === field.current || withinSelectionTools(event.currentTarget, event.relatedTarget)) return;
         setSelection(undefined); setMore(false);
       }}>
       <div className="canvas-selection-row">
@@ -288,11 +319,12 @@ export function CanvasText({ value, label, onChange, onMarks, onFocus, readOnly,
         <div className="canvas-selection-flags">
           <CharacterFlags compact keys={['bold', 'italic', 'underline']} format={selectedStyle} onFormat={formatSelected} />
         </div>
-        <label className="canvas-selection-color" title={t('color')}>
-          <span aria-hidden="true" style={{ borderColor: selectedStyle.color ?? 'currentColor' }}>A</span>
-          <input type="color" aria-label={t('color')} value={selectedStyle.color ?? '#ffffff'}
-            onChange={event => formatSelected({ color: event.currentTarget.value })} />
-        </label>
+        <ColorPicker className="canvas-selection-color" opaque label={t('color')} title={t('color')}
+          value={selectedStyle.color ?? (field.current && getComputedStyle(field.current).getPropertyValue('--r-text').trim().slice(0, 7) || '#ffffff')}
+          onChange={color => formatSelected({ color })}>
+          <span className="visually-hidden">{t('color')}</span>
+          <span className="canvas-color-letter" aria-hidden="true" style={{ borderColor: selectedStyle.color ?? 'currentColor' }}>A</span>
+        </ColorPicker>
         <button type="button" aria-label={t('more')} title={t('more')} aria-expanded={more} onClick={() => setMore(!more)}>⋯</button>
       </div>
       {more && <div className="canvas-selection-more">

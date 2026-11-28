@@ -1,7 +1,7 @@
 import { SHARE_TEXTS } from '../editor/shell/share.text.js';
 import { Dropdown } from '../ui/dropdown.js';
 import { useEffect, useState, type ReactNode } from 'react';
-import { DraftSchema, GameActivitySchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
+import { DraftSchema, GameActivitySchema, type DefinitionIssue, type GameActivity, type GameEditor, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
 import { useLanguage } from '../i18n/language.js';
 import { translate, useTexts } from '../i18n/texts.js';
@@ -26,7 +26,7 @@ function Badges({ game }: { game: Game }) {
 }
 
 function useGameActivity(enabled: boolean) {
-  const [activity, setActivity] = useState<Map<string, { updatedAt: string; editorOpen: boolean }>>(() => new Map());
+  const [activity, setActivity] = useState<Map<string, GameActivity>>(() => new Map());
   useEffect(() => {
     if (!enabled) return;
     let canceled = false;
@@ -38,7 +38,7 @@ function useGameActivity(enabled: boolean) {
         const data = GameActivitySchema.parse(await roomApi('/api/host/games/activity'));
         if (!canceled) setActivity(new Map(data.map(game => [game.gameId, game])));
       } catch {
-        if (!canceled) setActivity(current => new Map([...current].map(([id, game]) => [id, { ...game, editorOpen: false }])));
+        if (!canceled) setActivity(current => new Map([...current].map(([id, game]) => [id, { ...game, openEditors: [] }])));
       } finally { pending = false; }
     };
     void refresh();
@@ -62,6 +62,8 @@ export function MyGames({ menu, reload, openRoom, builtIn = null }: { menu: Host
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS); const s = useTexts(SHARE_TEXTS);
   const activity = useGameActivity(menu.myGames.length > 0);
   const language = useLanguage();
+  const editorName = (editor: GameEditor) => editor.kind === 'owner' ? t('ownerEditor') : editor.name;
+  const list = new Intl.ListFormat(language);
   const editedDate = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
   // Making a game and importing one open in a dialog, so the list stays the page.
@@ -83,14 +85,17 @@ export function MyGames({ menu, reload, openRoom, builtIn = null }: { menu: Host
     {error && <p role="alert" className="error">{error}</p>}
     {menu.myGames.length === 0 ? <p className="my-games-empty">{t('noGamesYet')}</p> : <ul className="plain-list my-games">{menu.myGames.map(game => {
       const status = activity.get(game.gameId);
-      const updatedAt = status && status.updatedAt > game.updatedAt ? status.updatedAt : game.updatedAt;
+      const latest = status && status.updatedAt >= game.updatedAt ? status : game;
+      const { updatedAt, lastEditor } = latest;
+      const open = status?.openEditors ?? [];
       return <li key={game.gameId} className="my-game">
       <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} />
         {/* Who made it: the owner sees each editor's games by name; an editor sees who shared a game with them. */}
         <div className="my-game-meta">
           {(game.author || game.shared) && <span className="my-game-author">{game.author?.you ? s('byYou') : game.author ? s('byAuthor', { name: game.author.name }) : s('byOwner')}{game.shared ? ` · ${s('shared')}` : ''}</span>}
-          <time dateTime={updatedAt}>{t('lastEdited', { date: editedDate.format(new Date(updatedAt)) })}</time>
-          {status?.editorOpen && <span className="game-editor-open">{t('editorOpen')}</span>}
+          <span><time dateTime={updatedAt}>{t('lastEdited', { date: editedDate.format(new Date(updatedAt)) })}</time>
+            {lastEditor && <> {s('byAuthor', { name: editorName(lastEditor) })}</>}</span>
+          {open.length > 0 && <span className="game-editor-open">{t('editorOpen', { names: list.format(open.map(editorName)) })}</span>}
         </div></div>
       <div className="my-game-actions">
         <a className="button-link primary" href={`/?edit=${game.gameId}`} aria-label={t('editLabel', { title: game.title })}>{t('edit')}</a>

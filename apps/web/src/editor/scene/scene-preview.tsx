@@ -129,10 +129,11 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
             onMarks={canvas.readOnly ? undefined : marks => canvas.edit(current => updateTextFormat(current, 'promptStyle', { marks: marks.length ? marks : undefined }), 'prompt-marks')}
             onChange={(value, caret) => editMainText('prompt', value, caret)} />
             : slideTypography ? <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={prompt} format={visiblePromptStyle} /></p> : <p className="tv-prompt">{prompt}</p>}
-          {canvas && !canvas.readOnly ? boxes.map((box, position) => <CanvasText key={box.key} value={box.text} label={boxText('box', { number: position + 1 })}
-            format={box} readOnly={false} onFocus={() => canvas.selectText(`box:${box.key}`)}
-            onMarks={marks => canvas.edit(current => updateTextFormat(current, `box:${box.key}`, { marks: marks.length ? marks : undefined }), `textBox-${box.key}-marks`)}
-            onChange={(value, caret) => canvas.edit(current => updateBoxText(current, box.key, value, caret), `textBox-${box.key}-text`)} />) : <SceneTextBoxes boxes={boxes} />}
+          <SceneTextBoxes boxes={boxes} phoneColumns={stage['textBoxPhoneColumns'] === true}
+            {...(canvas && !canvas.readOnly ? { renderBox: (box, position) => <CanvasText value={box.text} label={boxText('box', { number: position + 1 })}
+              format={box} readOnly={false} onFocus={() => canvas.selectText(`box:${box.key}`)}
+              onMarks={marks => canvas.edit(current => updateTextFormat(current, `box:${box.key}`, { marks: marks.length ? marks : undefined }), `textBox-${box.key}-marks`)}
+              onChange={(value, caret) => canvas.edit(current => updateBoxText(current, box.key, value, caret), `textBox-${box.key}-text`)} /> } : {})} />
         </SceneComposition>
         {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}
@@ -163,7 +164,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
             <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={prompt} format={visiblePromptStyle} /></p>
           </> : slideTypography ? <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={phoneLabel}
             format={phoneLabel === prompt ? visiblePromptStyle : withoutMarks(visiblePromptStyle)} /></p> : <p className="phone-prompt">{phoneLabel}</p>}
-          <SceneTextBoxes boxes={boxes} />
+          <SceneTextBoxes boxes={boxes} phoneColumns={stage['textBoxPhoneColumns'] === true} />
         </SceneComposition>
         {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}

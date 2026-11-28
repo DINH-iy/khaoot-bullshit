@@ -1,4 +1,4 @@
-import { GAME_PERMISSIONS, type GamePermission, UpdateGameSharingSchema, type GameSharing, CreateGameSchema, ImportGameSchema, MAX_DRAFT_BYTES, PublishSchema, RehearseSchema, SaveDraftSchema, type DefinitionIssue, type Draft, type GameSummary } from '@party/contracts';
+import { GAME_PERMISSIONS, type GamePermission, UpdateGameSharingSchema, type GameSharing, CreateGameSchema, ImportGameSchema, MAX_DRAFT_BYTES, PublishSchema, RehearseSchema, SaveDraftSchema, type DefinitionIssue, type Draft, type GameEditor, type GameSummary } from '@party/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash, GameDefinitionSchema, unplayable, type GameDefinition } from '../game/definition.js';
 import { requireGame } from '../game/errors.js';
@@ -60,7 +60,7 @@ const sizeOf = (raw: unknown) => Buffer.byteLength(JSON.stringify(raw) ?? '', 'u
  * Who is working on games: the owner (personId null, may do everything), or a person with a role. `permissions`:
  * the person's own role's (app) permissions; only `games.all` matters here (see and do everything with every game).
  */
-export interface EditorAccess { personId: string | null; permissions?: ReadonlySet<string> | undefined }
+export interface EditorAccess { personId: string | null; name?: string; permissions?: ReadonlySet<string> | undefined }
 export const OWNER_ACCESS: EditorAccess = { personId: null };
 const ALL_GAME = new Set<GamePermission>(GAME_PERMISSIONS);
 const seesAll = (access: EditorAccess) => access.personId === null || Boolean(access.permissions?.has('games.all'));
@@ -75,7 +75,18 @@ export async function gamePermissions(client: PrismaClient, game: { id: string; 
   return new Set((share?.role.permissions ?? []).filter((permission): permission is GamePermission => (GAME_PERMISSIONS as readonly string[]).includes(permission)));
 }
 
+type DraftActivity = { updatedAt: Date; lastEditorName: string | null; lastEditorIsOwner: boolean };
+function draftActivity(draft: DraftActivity): { updatedAt: string; lastEditor?: GameEditor } {
+  const lastEditor: GameEditor | undefined = draft.lastEditorIsOwner ? { kind: 'owner' }
+    : draft.lastEditorName ? { kind: 'person', name: draft.lastEditorName } : undefined;
+  return { updatedAt: draft.updatedAt.toISOString(), ...(lastEditor ? { lastEditor } : {}) };
+}
+
 export function createAuthoring(client: PrismaClient) {
+  const editorColumns = async (access: EditorAccess) => ({
+    lastEditorIsOwner: access.personId === null,
+    lastEditorName: access.personId ? access.name ?? (await client.person.findUnique({ where: { id: access.personId }, select: { name: true } }))?.name ?? null : null,
+  });
   // `need`: the game permission this asks for. A game one may not see is NOT_FOUND; one may see but not do this with, FORBIDDEN.
   async function owned(creatorId: string, gameId: string, access: EditorAccess, need: GamePermission = 'game.view') {
     const game = await client.game.findFirst({ where: { id: gameId, creatorId, archivedAt: null, ...visibleTo(access) }, include: { draft: true, versions: { orderBy: { number: 'desc' }, take: 1 } } });
@@ -89,13 +100,13 @@ export function createAuthoring(client: PrismaClient) {
     const person = await client.person.findUnique({ where: { id: game.authorPersonId }, select: { name: true } });
     return { name: person?.name ?? 'Former editor', you: game.authorPersonId === access.personId };
   }
-  function summary(game: { id: string; title: string }, draft: { revision: number; updatedAt: Date; definition: unknown }, latest: { number: number; createdAt: Date; contentHash: string } | null, inspected = inspectDefinition(draft.definition),
+  function summary(game: { id: string; title: string }, draft: DraftActivity & { revision: number; definition: unknown }, latest: { number: number; createdAt: Date; contentHash: string } | null, inspected = inspectDefinition(draft.definition),
     who: { author?: GameSummary['author']; shared?: boolean; can?: ReadonlySet<GamePermission> } = {}): GameSummary {
-    return { gameId: game.id, title: game.title, revision: draft.revision, updatedAt: draft.updatedAt.toISOString(), issueCount: inspected.issues.length,
+    return { gameId: game.id, title: game.title, revision: draft.revision, ...draftActivity(draft), issueCount: inspected.issues.length,
       published: latest ? { number: latest.number, publishedAt: latest.createdAt.toISOString(), matchesDraft: inspected.definition !== null && contentHash(inspected.definition) === latest.contentHash } : null,
       ...(who.author !== undefined ? { author: who.author } : {}), ...(who.shared ? { shared: true } : {}), ...(who.can ? { can: [...who.can] } : {}) };
   }
-  const draftView = (game: { id: string; title: string; builtInKey?: string | null }, draft: { revision: number; updatedAt: Date; definition: unknown }, latest: Parameters<typeof summary>[2]): Draft => {
+  const draftView = (game: { id: string; title: string; builtInKey?: string | null }, draft: DraftActivity & { revision: number; definition: unknown }, latest: Parameters<typeof summary>[2]): Draft => {
     const inspected = inspectDefinition(draft.definition);
     // The owner's own version of a built-in game says which one, so the editor can show it.
     const original = game.builtInKey ? builtInGames.find(entry => entry.key === game.builtInKey) : undefined;
@@ -118,8 +129,8 @@ export function createAuthoring(client: PrismaClient) {
     },
     async activity(creatorId: string, access: EditorAccess) {
       const games = await client.game.findMany({ where: listedGames(creatorId, access),
-        select: { id: true, draft: { select: { updatedAt: true } } }, orderBy: { updatedAt: 'desc' }, take: 100 });
-      return games.flatMap(game => game.draft ? [{ gameId: game.id, updatedAt: game.draft.updatedAt.toISOString() }] : []);
+        select: { id: true, draft: { select: { updatedAt: true, lastEditorName: true, lastEditorIsOwner: true } } }, orderBy: { updatedAt: 'desc' }, take: 100 });
+      return games.flatMap(game => game.draft ? [{ gameId: game.id, ...draftActivity(game.draft) }] : []);
     },
     /** Creates a game with its first draft. Repeating the request returns the same game. */
     async create(creatorId: string, input: unknown, access: EditorAccess = OWNER_ACCESS): Promise<Draft> {
@@ -134,7 +145,7 @@ export function createAuthoring(client: PrismaClient) {
       // A copy of one of your games starts from its draft as it is now, card positions and all; the original stays as it was.
       const source = copyOf ? (await owned(creatorId, copyOf, access, 'game.copy')).draft.definition as Record<string, unknown> : undefined;
       const definition = source ? { ...structuredClone(source), title } : template ? { ...structuredClone(own?.definition ?? template.definition), title } : blankDefinition(title);
-      const game = await client.game.create({ data: { id: gameId, creatorId, title, authorPersonId: access.personId, draft: { create: { definition, definitionFormat: formatOf(definition) } } }, include: { draft: true } });
+      const game = await client.game.create({ data: { id: gameId, creatorId, title, authorPersonId: access.personId, draft: { create: { definition, definitionFormat: formatOf(definition), ...await editorColumns(access) } } }, include: { draft: true } });
       return draftView(game, game.draft!, null);
     },
     /**
@@ -151,7 +162,7 @@ export function createAuthoring(client: PrismaClient) {
       const exported = (parseText(parsed.data.text) ?? {}) as { editor?: unknown };
       const layout = EditorLayoutSchema.safeParse(exported.editor).success ? { editor: exported.editor } : {};
       const title = titleOf(definition) ?? 'Imported game';
-      const game = await client.game.create({ data: { id: parsed.data.gameId, creatorId, title, authorPersonId: access.personId, draft: { create: { definition: { ...definition, ...layout } as object, definitionFormat: formatOf(definition) } } } });
+      const game = await client.game.create({ data: { id: parsed.data.gameId, creatorId, title, authorPersonId: access.personId, draft: { create: { definition: { ...definition, ...layout } as object, definitionFormat: formatOf(definition), ...await editorColumns(access) } } } });
       return api.get(creatorId, game.id, access);
     },
     async get(creatorId: string, gameId: string, access: EditorAccess = OWNER_ACCESS): Promise<Draft> {
@@ -170,7 +181,7 @@ export function createAuthoring(client: PrismaClient) {
       const layout = (definition as { editor?: unknown }).editor;
       requireGame(layout === undefined || EditorLayoutSchema.safeParse(layout).success, 'INVALID_COMMAND');
       const { game } = await owned(creatorId, gameId, access, 'game.edit');
-      const updated = await client.gameDraft.updateMany({ where: { gameId, revision: expectedRevision }, data: { definition: definition as object, definitionFormat: formatOf(definition), revision: { increment: 1 } } });
+      const updated = await client.gameDraft.updateMany({ where: { gameId, revision: expectedRevision }, data: { definition: definition as object, definitionFormat: formatOf(definition), revision: { increment: 1 }, ...await editorColumns(access) } });
       requireGame(updated.count === 1, 'REVISION_CONFLICT');
       const title = titleOf(definition);
       if (title && title !== game.title) await client.game.update({ where: { id: gameId }, data: { title } });
@@ -282,7 +293,7 @@ export function createAuthoring(client: PrismaClient) {
       const existing = await find(); if (existing) return existing.id;
       const definition = structuredClone(template.definition);
       try {
-        return (await client.game.create({ data: { creatorId, title: definition.title, builtInKey: key, draft: { create: { definition, definitionFormat: formatOf(definition) } } }, select: { id: true } })).id;
+        return (await client.game.create({ data: { creatorId, title: definition.title, builtInKey: key, draft: { create: { definition, definitionFormat: formatOf(definition), lastEditorIsOwner: true } } }, select: { id: true } })).id;
       } catch (error) {
         // Two clicks at once: the other one made it.
         const made = await find(); if (made) return made.id; throw error;

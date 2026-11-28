@@ -28,8 +28,8 @@ export function updateTextFormat(stage: Stage, target: SceneTextTarget, patch: S
   }
   return setSceneTextBoxes(stage, sceneTextBoxes(stage).map(box => {
     if (target !== `box:${box.key}`) return box;
-    const { key, text, ...style } = box;
-    return { key, text, ...mergeStyle(style, patch) };
+    const { key, text, layout, ...style } = box;
+    return { key, text, ...(layout ? { layout } : {}), ...mergeStyle(style, patch) };
   }));
 }
 

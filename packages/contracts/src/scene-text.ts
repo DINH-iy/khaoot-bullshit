@@ -3,13 +3,14 @@ import { GameKeySchema } from './game-key.js';
 import { FONTS, type FontName } from './presentation.js';
 
 export const MAX_SCENE_TEXT_BOXES = 8;
+export const SCENE_TEXT_GRID_COLUMNS = 12;
 export const MAX_SCENE_TEXT_LENGTH = 2000;
 export const SCENE_TEXT_SIZES = ['heading', 'body', 'small'] as const;
 export const SCENE_TEXT_ALIGNMENTS = ['left', 'center', 'right'] as const;
 export const SCENE_TEXT_VERTICAL_ALIGNMENTS = ['top', 'middle', 'bottom'] as const;
 export const MAX_SCENE_TITLE_LENGTH = 120;
-export const SceneTitleSchema = z.string().max(MAX_SCENE_TITLE_LENGTH).refine(value => value.trim().length > 0, 'Enter a scene title.');
-export const ScenePromptSchema = z.string().max(MAX_SCENE_TEXT_LENGTH).refine(value => value.trim().length > 0, 'Enter scene text.');
+export const SceneTitleSchema = z.string().max(MAX_SCENE_TITLE_LENGTH).regex(/\S/);
+export const ScenePromptSchema = z.string().max(MAX_SCENE_TEXT_LENGTH).regex(/\S/);
 export const SCENE_TEXT_OVERFLOWS = ['visible', 'clip', 'scroll'] as const;
 export const SCENE_TEXT_WRAPS = ['break-word', 'word', 'none'] as const;
 export const SCENE_TEXT_FONTS = Object.keys(FONTS) as FontName[];
@@ -44,9 +45,17 @@ export const SceneTextStyleSchema = z.object({
   lines: z.number().int().min(1).max(32).optional(),
 }).strict();
 export type SceneTextStyle = z.infer<typeof SceneTextStyleSchema>;
+const SceneTextBoxLayoutSchema = z.object({
+  width: z.number().int().min(1).max(SCENE_TEXT_GRID_COLUMNS).optional(),
+  startColumn: z.number().int().min(1).max(SCENE_TEXT_GRID_COLUMNS).optional(),
+  newRow: z.boolean().optional(),
+}).strict().refine(layout => (layout.startColumn ?? 1) + (layout.width ?? SCENE_TEXT_GRID_COLUMNS) - 1 <= SCENE_TEXT_GRID_COLUMNS,
+  'This text box extends beyond its row.');
+export type SceneTextBoxLayout = z.infer<typeof SceneTextBoxLayoutSchema>;
 export const SceneTextBoxesSchema = z.array(z.object({
   key: GameKeySchema,
   text: z.string().max(MAX_SCENE_TEXT_LENGTH),
+  layout: SceneTextBoxLayoutSchema.optional(),
   ...SceneTextStyleSchema.shape,
 }).strict()).max(MAX_SCENE_TEXT_BOXES)
   .refine(boxes => new Set(boxes.map(box => box.key)).size === boxes.length, 'Text box keys must be unique.');

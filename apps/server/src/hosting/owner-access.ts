@@ -80,7 +80,7 @@ export function createOwnerAccess(app: FastifyInstance, config: Config, client: 
     const found = await personFromCookie(client, request.headers.cookie);
     if (!found?.person.roleId) return null;
     const role = await client.accessRole.findUnique({ where: { id: found.person.roleId }, select: { permissions: true } });
-    return role ? { role: 'editor' as const, personId: found.person.id, permissions: new Set(role.permissions) as ReadonlySet<string> } : null;
+    return role ? { role: 'editor' as const, personId: found.person.id, name: found.person.name, permissions: new Set(role.permissions) as ReadonlySet<string> } : null;
   };
   const navigationAccess = async (request: FastifyRequest) => {
     checkRequest(request, 'access');

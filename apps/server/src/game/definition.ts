@@ -67,7 +67,7 @@ export const WheelSchema = z.object({
 // All optional, so earlier definitions keep their hash.
 // `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
 // `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
-const look = { hostNotes: HostNotesSchema.optional(), textBoxes: SceneTextBoxesSchema.optional(), promptStyle: SceneTextStyleSchema.optional(), mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+const look = { hostNotes: HostNotesSchema.optional(), textBoxes: SceneTextBoxesSchema.optional(), textBoxPhoneColumns: z.boolean().optional(), promptStyle: SceneTextStyleSchema.optional(), mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An intro shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   // `points`: also show the points at stake (worked out from the scene's scoring). `picture`: a picture from the
   // media library. `screenOnly`: only the shared screen shows it; phones wait without “Got it”.
