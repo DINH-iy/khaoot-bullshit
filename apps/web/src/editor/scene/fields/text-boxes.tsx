@@ -2,8 +2,9 @@ import { scenePlaceAwards } from '@party/contracts';
 import { useScenePlaceAwards } from '../../../presentation/scene-place-awards.js';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TEXT_LINES, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
+import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TEXT_LINES, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextBoxPlacement, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
 import { useTexts } from '../../../i18n/texts.js';
+import { slidePercent } from '../../../presentation/slide-object.js';
 import { lastTextBoxRow, placeTextBoxes } from '../../../presentation/scene-text-layout.js';
 import { SceneTextContent, sceneTextProps } from '../../../presentation/scene-text.js';
 import { ColorPicker } from '../../../ui/color-picker.js';
@@ -15,16 +16,17 @@ import { formatSelection } from '../text-marks.js';
 import { TEXT_BOX_TEXTS } from './text-boxes.text.js';
 import { INSPECTOR_TEXTS } from '../inspector.text.js';
 import { uniqueKey, type Stage } from '../../model.js';
-import { positionTextBox, sceneTextBoxes, sceneTextStyle, setSceneTextBoxes, updateBoxText, updateTextFormat, updateBoxLayout, type SceneTextTarget } from '../text-edits.js';
+import { placePrimaryText, primaryTextPlacement, placeSlideTextBox, positionTextBox, sceneTextBoxes, sceneTextStyle, setSceneTextBoxes, updateBoxText, updateTextFormat, updateBoxLayout, type SceneTextTarget } from '../text-edits.js';
 
 const presets = ['blank', 'heading', 'instructions', 'points'] as const;
 type Preset = typeof presets[number];
 const fontNames = { system: 'fSystem', rounded: 'fRounded', serif: 'fSerif', slab: 'fSlab', mono: 'fMono', condensed: 'fCondensed', playful: 'fPlayful', elegant: 'fElegant' } as const;
 
-export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
+export function SceneTextSettings({ stage, selectedTarget, onSelect, edit, measurePlacement }: {
   stage: Stage;
   selectedTarget: SceneTextTarget;
   onSelect: (target: SceneTextTarget) => void;
+  measurePlacement: (key: string) => SceneTextBoxPlacement | undefined;
   edit: (change: (stage: Stage) => Stage, field: string) => void;
 }) {
   const t = useTexts(TEXT_BOX_TEXTS);
@@ -32,7 +34,10 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
   const boxes = sceneTextBoxes(stage);
   const pointsText = useScenePlaceAwards(scenePlaceAwards(stage), true);
   const selected = boxes.find(box => selectedTarget === `box:${box.key}`);
-  const target = selected ? `box:${selected.key}` as const : selectedTarget === 'titleStyle' && stage.kind === 'info' ? 'titleStyle' : 'promptStyle';
+  const primaryTarget = selectedTarget === 'titleStyle' && stage.kind === 'info' ? 'titleStyle' : 'promptStyle';
+  const target = selected ? `box:${selected.key}` as const : primaryTarget;
+  const primaryPlacement = selected ? undefined : primaryTextPlacement(stage, primaryTarget);
+  const placement = selected?.placement ?? primaryPlacement;
   const format = selected ?? sceneTextStyle(stage, target === 'titleStyle' ? 'titleStyle' : 'promptStyle') ?? {};
   const defaultSize = target === 'titleStyle' ? 'heading' : 'body';
   const targets = [
@@ -59,11 +64,37 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
     if (!selected) return;
     edit(current => updateBoxLayout(current, selected.key, patch), `layout-${selected.key}`);
   };
-  const arrange = (count: number) => edit(current => setSceneTextBoxes(current, sceneTextBoxes(current).map((box, index) => {
-    const slot = index % count;
-    const width = Math.floor((slot + 1) * SCENE_TEXT_GRID_COLUMNS / count) - Math.floor(slot * SCENE_TEXT_GRID_COLUMNS / count);
-    return { ...box, layout: { width, rotation: box.layout?.rotation, ...(slot === 0 && index > 0 ? { newRow: true } : {}) } };
-  })), 'text-box-columns');
+  const setPlacement = (key: keyof SceneTextBoxPlacement | 'rotation', value: number | undefined) => {
+    if (value === undefined) {
+      if (key === 'rotation' && selected) setLayout({ rotation: undefined });
+      else if (key === 'rotation' && primaryPlacement) edit(current => placePrimaryText(current, primaryTarget,
+        { ...primaryPlacement, rotation: undefined }), `${primaryTarget}-placement`);
+      return;
+    }
+    if (key === 'rotation' && selected) { setLayout({ rotation: value }); return; }
+    const measured = placement ?? measurePlacement(target) ?? {
+      x: slidePercent(100 * ((position?.column ?? 1) - 1 + width / 2) / SCENE_TEXT_GRID_COLUMNS),
+      y: selected ? slidePercent(45 + ((position?.row ?? 1) - 1) * 7) : primaryTarget === 'titleStyle' ? 15 : 30,
+      width: slidePercent(100 * width / SCENE_TEXT_GRID_COLUMNS, 2),
+    };
+    const next = { ...measured, [key]: value };
+    if (selected) edit(current => placeSlideTextBox(current, selected.key, next), `layout-${selected.key}`);
+    else edit(current => placePrimaryText(current, primaryTarget, next), `${primaryTarget}-placement`);
+  };
+  const restoreAutomatic = () => {
+    if (selected) edit(current => placeSlideTextBox(current, selected.key, undefined), `layout-${selected.key}`);
+    else edit(current => placePrimaryText(current, primaryTarget), `${primaryTarget}-placement`);
+  };
+  const arrange = (count: number) => edit(current => {
+    let index = 0;
+    return setSceneTextBoxes(current, sceneTextBoxes(current).map(box => {
+      if (box.placement) return box;
+      const at = index++;
+      const slot = at % count;
+      const width = Math.floor((slot + 1) * SCENE_TEXT_GRID_COLUMNS / count) - Math.floor(slot * SCENE_TEXT_GRID_COLUMNS / count);
+      return { ...box, layout: { width, rotation: box.layout?.rotation, ...(slot === 0 && at > 0 ? { newRow: true } : {}) } };
+    }));
+  }, 'text-box-columns');
   const typography = { font: undefined, scale: undefined, color: undefined, bold: undefined, italic: undefined, underline: undefined, strike: undefined };
   const hasTypography = Object.keys(typography).some(key => format[key as keyof typeof typography] !== undefined);
   const add = (preset: Preset) => {
@@ -79,7 +110,7 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
         options={presets.map(value => ({ value, label: t(value) }))} disabled={boxes.length >= MAX_SCENE_TEXT_BOXES} />
       <button type="button" className="small-button" aria-expanded={formatting} onClick={() => setFormatting(!formatting)}>{t('format')}</button>
     </div>
-    {(boxes.length > 0 || formatting) && <label>{t('edit')}<Dropdown value={target} onChange={value => onSelect(value as SceneTextTarget)} options={targets} /></label>}
+    {(stage.kind === 'info' || boxes.length > 0 || formatting) && <label>{t('edit')}<Dropdown value={target} onChange={value => onSelect(value as SceneTextTarget)} options={targets} /></label>}
     {selected && <>
       <label>{t('box', { number: index + 1 })}<textarea rows={2} maxLength={MAX_SCENE_TEXT_LENGTH} value={selected.source === 'places' ? pointsText : selected.text} readOnly={selected.source === 'places'}
         onChange={event => {
@@ -98,8 +129,19 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
           onSelect('promptStyle');
         }} onCancel={() => setRemoving(undefined)} />}
     </>}
+      <div className="slide-position-values">
+        <label>{t('horizontalPosition')}<NumberSetting key={target} value={placement?.x} min={0} max={100} step={0.1}
+          placeholder={t('auto')} onChange={value => setPlacement('x', value)} /></label>
+        <label>{t('verticalPosition')}<NumberSetting key={target} value={placement?.y} min={0} max={100} step={0.1}
+          placeholder={t('auto')} onChange={value => setPlacement('y', value)} /></label>
+        <label>{t('preciseWidth')}<NumberSetting key={target} value={placement?.width} min={2} max={100} step={0.1}
+          placeholder={t('auto')} onChange={value => setPlacement('width', value)} /></label>
+        <label>{t('rotation')}<NumberSetting key={target} value={selected?.layout?.rotation ?? primaryPlacement?.rotation} min={-180} max={180} placeholder="0"
+          onChange={value => setPlacement('rotation', value)} /></label>
+      </div>
+      {placement && <button type="button" className="small-button" onClick={restoreAutomatic}>{t('automaticLayout')}</button>}
     {formatting && <div className="canvas-text-tools canvas-text-format" role="group" aria-label={t('format')}>
-      {boxes.length > 1 && <Dropdown className="canvas-layout-wide" label={t('arrange')} placeholder={t('arrange')} value="" onChange={value => arrange(Number(value))}
+      {placed.length > 1 && <Dropdown className="canvas-layout-wide" label={t(placed.length === boxes.length ? 'arrange' : 'arrangeAutomatic')} placeholder={t(placed.length === boxes.length ? 'arrange' : 'arrangeAutomatic')} value="" onChange={value => arrange(Number(value))}
         options={Array.from({ length: MAX_SCENE_TEXT_BOXES }, (_, index) => ({ value: String(index + 1), label: t('columns', { count: index + 1 }) }))} />}
       {selected && position && <>
         <label>{t('row')}<Dropdown value={String(position.row)} onChange={value =>
@@ -113,12 +155,10 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
           : count === 4 ? t('third') : count === 3 ? t('quarter') : t('units', { count }) }))} /></label>
         <label>{t('startColumn')}<Dropdown value={String(selected.layout?.startColumn ?? '')} onChange={value => setLayout({ startColumn: value ? Number(value) : undefined })}
           options={[{ value: '', label: t('auto') }, ...Array.from({ length: SCENE_TEXT_GRID_COLUMNS - width + 1 }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))]} /></label>
-        <label>{t('rotation')}<NumberSetting key={target} value={selected.layout?.rotation} min={-180} max={180} placeholder="0"
-          onChange={rotation => setLayout({ rotation })} /></label>
         <label className="canvas-layout-wide choice"><input type="checkbox" checked={selected.layout?.newRow ?? false}
           onChange={event => setLayout({ newRow: event.currentTarget.checked })} />{t('newRow')}</label>
       </>}
-      {boxes.length > 1 && <label className="canvas-layout-wide choice"><input type="checkbox" checked={stage['textBoxPhoneColumns'] === true}
+      {placed.length > 1 && <label className="canvas-layout-wide choice"><input type="checkbox" checked={stage['textBoxPhoneColumns'] === true}
         onChange={event => {
           const checked = event.currentTarget.checked;
           edit(current => {

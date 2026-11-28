@@ -11,7 +11,7 @@ import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
 import { SlideImagesSchema } from './slide-images.js';
 import { GameKeySchema } from './game-key.js';
-import { ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema } from './scene-text.js';
+import { ScenePrimaryTextPlacementSchema, SceneTextBoxPlacementSchema, ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema } from './scene-text.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
 
 /** How team captains are picked: assigned (by the host, else at random) or elected by their teammates. */
@@ -65,10 +65,20 @@ export type StakePoints = z.infer<typeof StakePointsSchema>;
 export const MediaKindSchema = z.enum(['image', 'gif', 'video']);
 export type MediaKind = z.infer<typeof MediaKindSchema>;
 export const ChoiceOptionSchema = z.object({ key: GameKeySchema, label: z.string().trim().min(1).max(240) }).strict();
+export const MIN_ANSWER_WIDTH_PERCENT = 8;
+export const MIN_ANSWER_HEIGHT_PERCENT = 5;
+export const AnswerPlacementSchema = SceneTextBoxPlacementSchema.extend({
+  width: z.number().min(MIN_ANSWER_WIDTH_PERCENT).max(100),
+  height: z.number().min(MIN_ANSWER_HEIGHT_PERCENT).max(100),
+});
+export type AnswerPlacement = z.infer<typeof AnswerPlacementSchema>;
+export const AnswerOptionSchema = ChoiceOptionSchema.extend({ placement: AnswerPlacementSchema.optional() });
+export type AnswerOption = z.infer<typeof AnswerOptionSchema>;
+
 export const InputSchema = z.discriminatedUnion('kind', [
   // `layout` is how the phone presents the options: a compact list or large
   // pressable tiles. Optional so existing saved definitions keep their hash.
-  z.object({ kind: z.literal('choice'), options: z.array(ChoiceOptionSchema).min(2).max(12), layout: z.enum(['list', 'tiles']).optional() }).strict().refine(
+  z.object({ kind: z.literal('choice'), options: z.array(AnswerOptionSchema).min(2).max(12), layout: z.enum(['list', 'tiles']).optional() }).strict().refine(
     input => new Set(input.options.map(option => option.key)).size === input.options.length, 'Choice keys must be unique',
   ),
   // The player arranges every item into an order.
@@ -314,6 +324,8 @@ export const PublicStageSchema = z.object({
   textBoxPhoneColumns: z.boolean().optional(),
   promptStyle: SceneTextStyleSchema.optional(),
   titleStyle: SceneTextStyleSchema.optional(),
+  promptPlacement: ScenePrimaryTextPlacementSchema.optional(),
+  titlePlacement: ScenePrimaryTextPlacementSchema.optional(),
   hostNotes: HostNotesSchema.optional(),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the

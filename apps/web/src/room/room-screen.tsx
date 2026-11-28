@@ -1,3 +1,4 @@
+import { SlideAnswers, answerAccent } from '../presentation/slide-answers.js';
 import { Countdown } from '../minigames/shared/countdown.js';
 import { Loader } from '../ui/loader.js';
 import { PoolAimContext } from '../head-to-head/eight-ball/live-aim.js';
@@ -51,7 +52,7 @@ import './room.css';
 import { LookContext, themeClass, useThemeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 import { useSiteThemeState } from '../presentation/site-look.js';
 import { LeaveRoom } from '../room-extras/leave-room.js';
-import { SceneTextBoxes, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../presentation/scene-text.js';
+import { PositionedSlideText, SceneTextBoxes, SlideTextLayer, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../presentation/scene-text.js';
 import { useScenePlaceAwards } from '../presentation/scene-place-awards.js';
 import { SlideImages } from '../presentation/slide-images.js';
 import { SceneComposition } from '../presentation/scene-composition.js';
@@ -380,6 +381,9 @@ export function RoomScreen() {
       ? graphText(state.tryout || stage.minigame.graph.chart.yLabel === 'Books lent (thousands)' ? 'sampleQuestion' : 'trendQuestion')
       : stage.prompt));
   const headingStyle = stageHeading === stage?.prompt ? stage?.promptStyle : withoutMarks(stage?.promptStyle);
+  const titlePlacement = showingScene && stage?.info ? stage.titlePlacement : undefined;
+  const promptPlacement = showingScene ? stage?.promptPlacement : undefined;
+  const positionedHeading = Boolean(titlePlacement || (!stage?.info && promptPlacement));
   // Teams are made first; then the explanation; then the round itself.
   const explaining = !forming && Boolean(stage?.explain);
   const phase = !stage || showOnly ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams') : explaining ? t('explain.title')
@@ -466,6 +470,15 @@ export function RoomScreen() {
         </section>}
         {stage && <section ref={stageRef} className={`stage-card kind-${stage.kind}${stage.minigame?.graph ? ' round-graph' : stage.minigame?.dots ? ' round-dots' : ''}`} aria-labelledby="stage-heading">
           {showingScene && <SlideImages images={stage.slideImages} />}
+          {showingScene && <SlideTextLayer boxes={stage.textBoxes} placeText={placeText}>
+            {titlePlacement && stage.info && <PositionedSlideText position={titlePlacement} text={stage.info.title} format={stage.titleStyle}
+              size="heading" rotation={titlePlacement.rotation ?? 0} as="h2" id="stage-heading" />}
+            {promptPlacement && <PositionedSlideText position={promptPlacement} text={stage.info ? stage.prompt : stageHeading ?? ''}
+              format={stage.info ? stage.promptStyle : headingStyle} rotation={promptPlacement.rotation ?? 0}
+              {...(stage.info ? {} : { as: 'h2' as const, id: 'stage-heading' })} />}
+          </SlideTextLayer>}
+          {showingScene && role !== 'player' && !stage.revealed && stage.input?.kind === 'choice' &&
+            <SlideAnswers options={stage.input.options} theme={look.theme} label={r('answers')} />}
           <SceneComposition layout={stage.mediaLayout} media={showingScene && (stage.youtube || stage.media) ? <div ref={mediaRef}>
             {stage.youtube ? <StageYouTube key={stage.id} clip={stage.youtube} role={role} displayConnected={Boolean(state.displayConnected)} label={stage.info?.title ?? stage.prompt} paused={state.view.status === 'PAUSED' || state.view.status === 'FINISHED'}
                 control={room.mediaControl?.stageRunId === stage.id ? room.mediaControl : null} />
@@ -476,14 +489,14 @@ export function RoomScreen() {
               && <MediaHostControls onControl={action => room.sendMediaControl(stage.id, action)} />
             }
           </div> : null}>
-            {stage.info && <p {...sceneTextProps(stage.titleStyle, 'heading')}><SceneTextContent text={stage.info.title} format={stage.titleStyle} /></p>}
+            {stage.info && !titlePlacement && <p {...sceneTextProps(stage.titleStyle, 'heading')}><SceneTextContent text={stage.info.title} format={stage.titleStyle} /></p>}
             {/* While teams are picked, the round's question waits: one thing at a time. */}
             {/* The title, with the round's main action (such as Send) next to it when the round puts one there. */}
-            <div className="stage-heading-row"><h2 id="stage-heading" {...(stage.info ? { className: 'visually-hidden' }
+            <div className="stage-heading-row">{!positionedHeading && <h2 id="stage-heading" {...(stage.info ? { className: 'visually-hidden' }
               : !forming && (headingStyle || usesSlideTypography(stage.kind)) ? sceneTextProps(headingStyle) : {})}>
               <SceneTextContent text={stageHeading ?? ''} format={headingStyle} />
-            </h2><div ref={setActionSlot} className="stage-action-slot" /></div>
-            {stage.info && <p {...sceneTextProps(stage.promptStyle)}><SceneTextContent text={stage.prompt} format={stage.promptStyle} /></p>}
+            </h2>}<div ref={setActionSlot} className="stage-action-slot" /></div>
+            {stage.info && !promptPlacement && <p {...sceneTextProps(stage.promptStyle)}><SceneTextContent text={stage.prompt} format={stage.promptStyle} /></p>}
             {showingScene && <SceneTextBoxes boxes={stage.textBoxes} placeText={placeText} phoneColumns={stage.textBoxPhoneColumns} />}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
@@ -638,9 +651,18 @@ type StageInput = NonNullable<NonNullable<ReturnType<typeof useRoom>['snapshot']
 function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>; route?: boolean }) {
   const { theme } = useLook();
   const entries = input.kind === 'choice' ? input.options : input.kind === 'order' ? input.items : [];
-  if (!entries.length) return null;
-  return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}`} style={answerFit(entries.map(entry => entry.label))} aria-label={r(input.kind === 'order' ? 'itemsOrder' : 'answers')}>
-    {entries.map((entry, index) => { const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route); return <li key={entry.key}>{mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}{entry.label}</li>; })}</ol>;
+  const hasPlacement = input.kind === 'choice' && input.options.some(option => option.placement);
+  if (!entries.length || (input.kind === 'choice' && input.options.every(option => option.placement))) return null;
+  return <ol className={`options-board${input.kind === 'order' ? ' order' : ''}${route ? ' route' : ''}${hasPlacement ? ' with-positioned-answers' : ''}`}
+    data-list={input.kind === 'choice' && input.layout === 'list' || undefined} style={answerFit(entries.map(entry => entry.label))} aria-label={r(input.kind === 'order' ? 'itemsOrder' : 'answers')}>
+    {entries.map((entry, index) => {
+      const placed = input.kind === 'choice' && Boolean(input.options[index]?.placement);
+      const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route);
+      return <li key={entry.key} aria-hidden={placed || undefined} className={placed ? 'answer-slot-placeholder' : undefined} data-authored-answer={hasPlacement || undefined}
+        style={hasPlacement ? { '--positioned-answer-color': answerAccent(index) } as React.CSSProperties : undefined}>
+        {mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}{entry.label}
+      </li>;
+    })}</ol>;
 }
 
 /** The host screen inside the test bench (its frame is opened with `&bench=1`). */

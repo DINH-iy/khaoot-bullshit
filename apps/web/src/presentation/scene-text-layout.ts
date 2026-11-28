@@ -6,7 +6,7 @@ export interface PlacedTextBox extends TextBoxPosition { box: SceneTextBox }
 export function placeTextBoxes(boxes: readonly SceneTextBox[]): PlacedTextBox[] {
   let row = 1;
   let nextColumn = 1;
-  return boxes.map((box, index) => {
+  return boxes.filter(box => !box.placement).map((box, index) => {
     const width = box.layout?.width ?? SCENE_TEXT_GRID_COLUMNS;
     const start = box.layout?.startColumn;
     let column = start ?? nextColumn;

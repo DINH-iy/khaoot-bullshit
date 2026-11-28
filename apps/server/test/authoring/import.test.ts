@@ -22,15 +22,17 @@ describe('importing a game from text', () => {
     const stage = (key: string) => game.nodes.find(node => node.key === key)!.stages[0]!;
     expect(stage('welcome')).toMatchObject({ youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 5, endSeconds: 15 }, mediaLayout: { position: 'left', size: 'wide' } });
     expect(inspectDefinition(definition).definition?.nodes.find(node => node.key === 'welcome')?.stages[0]).toMatchObject({
+      titlePlacement: { x: 25.5, y: 18, width: 40, rotation: -5 },
+      promptPlacement: { x: 65, y: 44.5, width: 48 },
       hostNotes: 'Welcome everyone.\n\nWait until everyone has joined before continuing.',
       prompt: 'Grab your phone.\n\nClosest cuts and best guesses earn points.',
       textBoxes: [
         { key: 'reminder', size: 'small', verticalAlign: 'bottom', lines: 2, layout: { width: 5, startColumn: 1, rotation: -8 }, marks: [{ start: 7, end: 15, italic: true, color: '#ffcc55' }] },
-        { key: 'next', layout: { width: 6, startColumn: 7 } },
+        { key: 'next', placement: { x: 72.5, y: 64, width: 36 } },
       ],
     });
     expect(stage('warmup')).toMatchObject({ textBoxes: [{ key: 'awards', text: '', source: 'places', size: 'small' }], mediaLayout: { position: 'right', size: 'standard', imageWidth: 48, imageRotation: -12 }, translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
-    expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
+    expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday', placement: { x: 26.5, y: 61, width: 32, height: 14 } }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
     expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', voteMode: 'ranked', voteLimit: 3, resultCards: 'manual', durationMs: 40000 });
     expect(stage('finale')).toMatchObject({ input: { kind: 'order', items: [{ label: 'Walkman' }, { label: 'Discman' }, { label: 'iPod' }, { label: 'Smartphone' }] }, scoring: { kind: 'correct-order', correctOrder: ['walkman', 'discman', 'ipod', 'smartphone'], awardMilli: '15000' } });
     expect(game.edges.filter(edge => edge.from === 'choose')).toEqual([expect.objectContaining({ to: 'music', option: 'music' }), expect.objectContaining({ to: 'sculpture', option: 'physical' })]);

@@ -48,6 +48,10 @@ test('two pictures can be positioned freely and the points box follows the scene
   const rotation = settings.getByRole('spinbutton', { name: 'Rotation (degrees)' });
 
   const set = async (field: typeof horizontal, value: string) => { await field.fill(value); await field.press('Enter'); };
+  const textSettings = side.locator('.canvas-text-controls');
+  await set(textSettings.getByRole('spinbutton', { name: 'Horizontal position (%)' }), '50');
+  await set(textSettings.getByRole('spinbutton', { name: 'Vertical position (%)' }), '36');
+  await expect(pointsLine).toHaveValue(awards);
   for (const { name, background, paper } of [
     { name: 'Gold gift', background: '#f1c56b', paper: '#c14e39' },
     { name: 'Pink gift', background: '#ebb0aa', paper: '#764663' },
@@ -122,7 +126,7 @@ test('two pictures can be positioned freely and the points box follows the scene
     await expect(actual.first().locator('img')).toHaveAttribute('alt', 'Pink gift');
     await expect(actual.first()).toHaveAttribute('style', /left: 76.5%; top: 72.5%; width: 24.2%/);
     await expect(actual.first().locator('div')).toHaveCSS('rotate', '9deg');
-    await expect(screen.locator('.scene-text-grid p')).toHaveText(awards);
+    await expect(screen.locator('.scene-positioned-text-box p')).toHaveText(awards);
     await expect(screen.locator('.canvas-box-handle')).toHaveCount(0);
   }
   await host.locator('.stage-card').screenshot({ path: testInfo.outputPath('live-slide.png') });

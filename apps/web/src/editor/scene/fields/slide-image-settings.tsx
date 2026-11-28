@@ -41,7 +41,7 @@ export function SlideImageSettings({ stage, selected, select, edit }: {
     {images.length > 0 && <label>{t('select')}<Dropdown value={picture?.key ?? ''} placeholder={t('select')} onChange={select}
       options={images.map((image, index) => ({ value: image.key, label: image.alt?.trim() || t('picture', { number: index + 1 }) }))} /></label>}
     {picture && <>
-      <div className="slide-image-values">
+      <div className="slide-position-values">
         {fields.map(({ name, min, max, step }) => <label key={name}>{t(name)}
           <NumberSetting key={picture.key} value={picture[name]} min={min} max={max} step={step} placeholder={String(picture[name])}
             onChange={value => { if (value !== undefined) change(picture, { [name]: value }); }} />

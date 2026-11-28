@@ -85,7 +85,7 @@
 .lobby-join { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
 .lobby-join .join-qr img { width: 220px; border-radius: 16px; background: #fff; padding: 10px; }
 .big-code { margin: 8px 0 0; font-size: clamp(2.6rem, 9vw, 5rem); font-weight: 900; letter-spacing: .12em; color: var(--r-accent); }
-.stage-card { display: grid; gap: 16px; }
+.stage-card { --slide-copy-inset: 24px; display: grid; gap: 16px; }
 .stage-card h2 { margin: 0; font-size: clamp(1.4rem, 3.6vw, 2.4rem); line-height: 1.2; }
 .progress-line, .wait-note { margin: 0; color: var(--r-muted); }
 .answer-in { margin: 0; padding: 18px; border-radius: 16px; text-align: center; font-size: 1.3rem; font-weight: 800; background: rgb(94 230 168 / .15); color: var(--r-ok); }
@@ -638,7 +638,7 @@
 .room .result-page-actions span { color: var(--r-muted); }
 /* The round's title with its main action (Send…) beside it; the slot takes no room when empty. */
 .stage-heading-row { display: flex; align-items: center; gap: 12px; }
-.stage-heading-row:has(> .visually-hidden) { display: contents; }
+.stage-heading-row:not(:has(> h2)), .stage-heading-row:has(> .visually-hidden) { display: contents; }
 .stage-heading-row > h2 { flex: 1; min-width: 0; }
 .stage-action-slot { flex: none; display: flex; }
 .stage-action-slot:empty { display: none; }

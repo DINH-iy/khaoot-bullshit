@@ -1,6 +1,8 @@
-import { Fragment, type CSSProperties, type ReactNode } from 'react';
-import { lastTextBoxRow, placeTextBoxes, type TextBoxPosition } from './scene-text-layout.js';
-import { FONTS, SCENE_TEXT_GRID_COLUMNS, type SceneCharacterStyle, type SceneTextBox, type SceneTextStyle } from '@party/contracts';
+import { Children, Fragment, type CSSProperties, type ReactNode } from 'react';
+import { placeTextBoxes } from './scene-text-layout.js';
+import { FONTS, SCENE_TEXT_GRID_COLUMNS, type SceneCharacterStyle, type SceneTextBoxPlacement, type SceneTextBox, type SceneTextStyle } from '@party/contracts';
+
+import { slideObjectStyle } from './slide-object.js';
 
 export const usesSlideTypography = (kind: string) => ['info', 'challenge', 'collect'].includes(kind);
 
@@ -69,24 +71,67 @@ export function withoutMarks(format: SceneTextStyle | undefined): SceneTextStyle
   return rest;
 }
 
-export function SceneTextBoxes({ boxes, phoneColumns, renderBox, placeText = '' }: {
+type EditableBox = (box: SceneTextBox, index: number) => ReactNode;
+type TextBoxContentProps = {
   boxes: readonly SceneTextBox[] | undefined;
   placeText?: string;
+  renderBox?: EditableBox;
+};
+
+function boxContent(box: SceneTextBox, placeText: string) {
+  return box.source === 'places' ? { ...box, text: placeText, marks: undefined } : box;
+}
+
+export function SceneTextBoxes({ boxes, phoneColumns, renderBox, placeText = '' }: TextBoxContentProps & {
   phoneColumns?: boolean | undefined;
-  renderBox?: (box: SceneTextBox, index: number, position: TextBoxPosition, lastRow: number) => ReactNode;
 }) {
-  const resolved = boxes?.map(box => box.source === 'places' ? { ...box, text: placeText, marks: undefined } : box);
-  const explicitLayout = resolved?.some(box => box.layout !== undefined);
-  const displayed = renderBox || explicitLayout ? resolved : resolved?.filter(box => box.text.trim());
-  if (!displayed?.length) return null;
-  const placed = placeTextBoxes(displayed);
+  if (!boxes?.length) return null;
+  const flow = boxes.filter(box => !box.placement).map(box => boxContent(box, placeText));
+  const explicitLayout = flow.some(box => box.layout !== undefined);
+  const displayed = renderBox || explicitLayout ? flow : flow.filter(box => box.text.trim());
+  if (!displayed.length) return null;
   return <div className="scene-text-grid" data-phone-columns={phoneColumns || undefined}
     style={{ '--text-grid-columns': SCENE_TEXT_GRID_COLUMNS } as CSSProperties}>
-    {placed.map(({ box, row, column, width }, index) => {
+    {placeTextBoxes(displayed).map(({ box, row, column, width }) => {
       const empty = !renderBox && !box.text.trim();
-      return <div key={box.key} className="scene-text-cell" data-empty={empty || undefined} aria-hidden={empty || undefined} style={{ gridColumn: `${column} / span ${width}`, gridRow: row, rotate: !renderBox && box.layout?.rotation ? `${box.layout.rotation}deg` : undefined }}>
-        {renderBox ? renderBox(box, index, { row, column, width }, lastTextBoxRow(placed, box.key)) : !empty && <p {...sceneTextProps(box)}><SceneTextContent text={box.text} format={box} /></p>}
+      return <div key={box.key} className="scene-text-cell" data-empty={empty || undefined} aria-hidden={empty || undefined}
+        style={{ gridColumn: `${column} / span ${width}`, gridRow: row, rotate: !renderBox && box.layout?.rotation ? `${box.layout.rotation}deg` : undefined }}>
+        {renderBox ? renderBox(box, boxes.findIndex(entry => entry.key === box.key))
+          : !empty && <p {...sceneTextProps(box)}><SceneTextContent text={box.text} format={box} /></p>}
       </div>;
+    })}
+  </div>;
+}
+
+export function PositionedSlideText({ position, text, format, size, rotation = 0, as: Tag = 'p', id }: {
+  position: SceneTextBoxPlacement;
+  text: string;
+  format: SceneTextStyle | undefined;
+  size?: SceneTextStyle['size'];
+  rotation?: number;
+  as?: 'h2' | 'p';
+  id?: string;
+}) {
+  const props = sceneTextProps(format, size);
+  return <div className="scene-positioned-text-box" style={slideObjectStyle(position)}>
+    <Tag {...props} id={id} style={{ ...props.style, rotate: `${rotation}deg` }}>
+      <SceneTextContent text={text} format={format} />
+    </Tag>
+  </div>;
+}
+
+export function SlideTextLayer({ boxes, renderBox, placeText = '', children }: TextBoxContentProps & { children?: ReactNode }) {
+  const positioned = boxes?.flatMap((box, index) => box.placement ? [{ box: boxContent(box, placeText), position: box.placement, index }] : []);
+  const visible = renderBox ? positioned : positioned?.filter(({ box }) => box.text.trim());
+  // The editor also needs the board when the first automatic box is moved.
+  const primary = Children.toArray(children);
+  if (!primary.length && !visible?.length && !renderBox) return null;
+  return <div className="scene-slide-layer scene-slide-text-layer" data-editable={Boolean(renderBox) || undefined}>
+    {primary}
+    {visible?.map(({ box, position, index }) => {
+      if (renderBox) return renderBox(box, index);
+      return <PositionedSlideText key={box.key} position={position} text={box.text} format={box}
+        {...(box.layout?.rotation === undefined ? {} : { rotation: box.layout.rotation })} />;
     })}
   </div>;
 }

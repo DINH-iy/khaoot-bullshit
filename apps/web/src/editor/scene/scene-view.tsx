@@ -1,3 +1,5 @@
+import { measureAnswerPlacement } from './fields/answer-option-handles.js';
+import { measureTextPlacement } from './fields/text-box-handles.js';
 import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { DefinitionIssue, EditorPeer } from '@party/contracts';
@@ -117,13 +119,24 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
   };
   const [mediaKey, setMediaKey] = useState<string>();
   const scenePart = `${current.key}:${index}`;
+  const preview = useRef<HTMLElement>(null);
   const [textSelection, setTextSelection] = useState<{ part: string; target: SceneTextTarget }>();
   const selectedText = textSelection?.part === scenePart ? textSelection.target : 'promptStyle';
   const [pictureSelection, setPictureSelection] = useState<{ part: string; key: string }>();
+  const [answerSelection, setAnswerSelection] = useState<{ part: string; key: string }>();
+  const selectedAnswer = answerSelection?.part === scenePart ? answerSelection.key : undefined;
+  const selectAnswer = (key: string) => {
+    selectImage();
+    setAnswerSelection({ part: scenePart, key });
+  };
   const selectedImage = pictureSelection?.part === scenePart ? pictureSelection.key : undefined;
-  const selectImage = (key?: string) => setPictureSelection(current => key ? { part: scenePart, key } : current?.part === scenePart ? undefined : current);
+  const selectImage = (key?: string) => {
+    if (key) setAnswerSelection(undefined);
+    setPictureSelection(current => key ? { part: scenePart, key } : current?.part === scenePart ? undefined : current);
+  };
   const selectText = (target: SceneTextTarget) => {
     selectImage();
+    setAnswerSelection(undefined);
     setTextSelection({ part: scenePart, target });
   };
   const editMedia = () => { if (!readOnly) setMediaKey(scenePart); };
@@ -252,7 +265,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       returnFocus={rowMenu.button} onClose={closeRowMenu} />}
     {/* Floating over the preview, next to the list (on top of everything, so nothing covers it). */}
     {adding === 'scene' && <FloatingMenu anchor={addButton.current} onClose={() => setAdding(null)}><ScenePalette label={t('addAfterLabel')} onPick={insertAfter} onCancel={() => setAdding(null)} /></FloatingMenu>}
-    <section className="scene-stage" aria-label={t('preview')}>
+    <section ref={preview} className="scene-stage" aria-label={t('preview')}>
       {current.stages.length > 1 && <div className="part-tabs" role="tablist" aria-label={t('partsOf')}>{current.stages.map((stage, position) =>
         <button key={stage.key} role="tab" aria-selected={position === index} onClick={() => setPart(position)}>Part {position + 1} · {partLabel(definition, stage)}</button>)}</div>}
       <div className="scene-canvas-tools">
@@ -265,7 +278,7 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
       </div>
       <ScenePreview key={`${scenePart}:${canvasDevice}`} definition={definition} node={current} index={index} device={canvasDevice} phonePicker={false}
         canvas={canvasDevice === 'sharedScreen' ? {
-          readOnly, selectedText, selectText, selectedImage, selectImage, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
+          readOnly, selectedText, selectText, selectedImage, selectImage, selectedAnswer, selectAnswer, editMedia, edit: (update, field) => onChange(updateStage(definition, current.key, index, update), `${current.key}:${index}:${field}`),
         } : undefined} />
       {previewDevice && <ScenePreviewDialog definition={definition} node={current} index={index} initialDevice={previewDevice} returnToEditor onClose={() => setPreviewDevice(undefined)} />}
       {d.notice && <p role="status" className="flow-notice">{d.notice}</p>}
@@ -294,7 +307,8 @@ export function SceneView({ d, selected, setSelected, peers, onOpenFlow }: { d: 
         </Section>}
         {current.stages.length > 1 && <h3>Part {index + 1}</h3>}
         <fieldset className="view-lock" disabled={readOnly}><StageFields definition={definition} node={current} index={index} onChange={onChange}
-          textTarget={selectedText} selectText={selectText} selectedImage={selectedImage} selectImage={selectImage} readOnly={readOnly}
+          textTarget={selectedText} selectText={selectText} measureTextPlacement={key => measureTextPlacement(preview.current, key)} selectedImage={selectedImage} selectImage={selectImage} readOnly={readOnly}
+          selectedAnswer={selectedAnswer} selectAnswer={selectAnswer} measureAnswer={key => measureAnswerPlacement(preview.current, key)}
           addTeams={addTeamSetup} mediaOpen={!readOnly && mediaKey === scenePart} openMedia={editMedia} closeMedia={() => setMediaKey(undefined)} /></fieldset>
       </div>
       <fieldset className="view-lock" disabled={readOnly}>{!isWheelScene(current.stages[index]) && (definition['wheels'] as unknown[] | undefined)?.length ? <Section key={'spin-' + current.key} title={t('wheel')} memory="Wheel of fortune" summary={t((current.stages[index]?.['spin'] as { wheel?: string } | undefined)?.wheel ? 'spunHere' : 'notHere')}><SpinFields definition={definition} node={current} index={index} onChange={onChange} /></Section> : null}</fieldset>

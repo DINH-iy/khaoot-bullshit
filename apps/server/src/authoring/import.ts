@@ -33,12 +33,13 @@ const seconds = (stage: Json) => {
   return Number.isFinite(value) && value > 0 ? Math.round(value) * 1000 : null;
 };
 /** Plain words or {key,label} objects become options with keys. */
-function options(value: unknown, prefix: string): { key: string; label: string }[] {
+function options(value: unknown, prefix: string, placement = false): { key: string; label: string; placement?: unknown }[] {
   const taken = new Set<string>();
   return (Array.isArray(value) ? value : []).map((entry, index) => {
     const label = isObject(entry) ? text(entry['label'] ?? entry['text'] ?? entry['name']) : text(entry);
     const key = isObject(entry) && typeof entry['key'] === 'string' ? entry['key'] : slug(label, `${prefix}${index + 1}`);
-    return { key: unique(key, taken), label: label || `Option ${index + 1}` };
+    return { key: unique(key, taken), label: label || `Option ${index + 1}`,
+      ...(placement && isObject(entry) && entry['placement'] !== undefined ? { placement: entry['placement'] } : {}) };
   });
 }
 const findKey = (list: { key: string; label: string }[], wanted: unknown) => {
@@ -87,7 +88,7 @@ function stageFrom(raw: Json, key: string): Json {
   const media = SceneMediaSchema.safeParse(raw['media']);
   // `music`: what the scene does with the game's music; "keep", "quiet" and "stop" can be written as text, a song of its own only from the library.
   const music = SceneMusicSchema.safeParse(typeof raw['music'] === 'string' ? { mode: raw['music'] } : raw['music']);
-  const extras = { ...spun, ...explain, ...Object.fromEntries(['resultCards', 'countdownSeconds', 'voteMode', 'voteLimit', 'textBoxes', 'textBoxPhoneColumns', 'slideImages', 'promptStyle', 'titleStyle', 'hostNotes'].filter(field => raw[field] !== undefined).map(field => [field, raw[field]])), ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
+  const extras = { ...spun, ...explain, ...Object.fromEntries(['resultCards', 'countdownSeconds', 'voteMode', 'voteLimit', 'textBoxes', 'textBoxPhoneColumns', 'slideImages', 'promptStyle', 'titleStyle', 'promptPlacement', 'titlePlacement', 'hostNotes'].filter(field => raw[field] !== undefined).map(field => [field, raw[field]])), ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
   return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
 }
 /**
@@ -212,7 +213,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
         decide: method === 'host' ? { method } : { method, tie: text(raw['onTie']) === 'host' ? 'host' : 'random', noVotes: text(raw['whenNobodyVotes']) === 'host' ? 'host' : 'random', counts: ['live', 'reveal', 'never'].includes(text(raw['showCounts'])) ? text(raw['showCounts']) : 'reveal' } };
     }
     default: { // quiz or poll
-      const answers = options(raw['answers'] ?? raw['options'], 'answer');
+      const answers = options(raw['answers'] ?? raw['options'], 'answer', true);
       const correct = findKey(answers, raw['correct'] ?? raw['answer']);
       return { key, kind: 'collect', prompt, durationMs: durationMs ?? 20_000, input: { kind: 'choice', layout: text(raw['layout']) === 'list' ? 'list' : 'tiles', options: answers },
         scoring: correct && type !== 'poll' ? { kind: 'correct-choice', correctChoiceKey: correct, awardMilli: milli(raw['points'] ?? 10) ?? '10000', ...placesFrom(raw) } : { kind: 'none' }, ...play };

@@ -54,11 +54,20 @@ const SceneTextBoxLayoutSchema = z.object({
 }).strict().refine(layout => (layout.startColumn ?? 1) + (layout.width ?? SCENE_TEXT_GRID_COLUMNS) - 1 <= SCENE_TEXT_GRID_COLUMNS,
   'This text box extends beyond its row.');
 export type SceneTextBoxLayout = z.infer<typeof SceneTextBoxLayoutSchema>;
+export const SceneTextBoxPlacementSchema = z.object({
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  width: z.number().min(2).max(100),
+}).strict();
+export type SceneTextBoxPlacement = z.infer<typeof SceneTextBoxPlacementSchema>;
+export const ScenePrimaryTextPlacementSchema = SceneTextBoxPlacementSchema.extend({ rotation: z.number().int().min(-180).max(180).optional() });
+export type ScenePrimaryTextPlacement = z.infer<typeof ScenePrimaryTextPlacementSchema>;
 export const SceneTextBoxesSchema = z.array(z.object({
   key: GameKeySchema,
   text: z.string().max(MAX_SCENE_TEXT_LENGTH),
   source: z.literal('places').optional(),
   layout: SceneTextBoxLayoutSchema.optional(),
+  placement: SceneTextBoxPlacementSchema.optional(),
   ...SceneTextStyleSchema.shape,
 }).strict()).max(MAX_SCENE_TEXT_BOXES)
   .refine(boxes => new Set(boxes.map(box => box.key)).size === boxes.length, 'Text box keys must be unique.');

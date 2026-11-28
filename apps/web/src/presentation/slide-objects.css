@@ -1,0 +1,27 @@
+:is(.tv-screen, .phone-screen, .stage-card):has(> .scene-slide-layer) { position: relative; }
+.room .scene-slide-layer {
+  position: absolute; inset: 0; z-index: 1; isolation: isolate;
+  border-radius: inherit; overflow: clip; pointer-events: none;
+}
+.room .scene-slide-layer[data-editable] { overflow: visible; }
+.scene-slide-image, .scene-positioned-text-box { position: absolute; translate: -50% -50%; }
+.slide-picture { display: block; width: 100%; height: auto; user-select: none; }
+/* Leave space for low placements, including on short cutscenes. The phone frame keeps its own dimensions. */
+.preview .tv-screen:has(> .scene-slide-layer),
+.stage-card:has(> .scene-slide-layer) { aspect-ratio: 16 / 9; align-content: start; }
+.phone-screen > .scene-slide-layer {
+  top: calc(var(--phone-top, 0px) + 10px); bottom: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.room .scene-slide-answers { margin: 0; padding: 0; list-style: none; }
+.scene-positioned-answer { position: absolute; translate: -50% -50%; box-sizing: border-box; }
+.room .options-board li:is(.scene-positioned-answer, [data-authored-answer]) { background-color: var(--positioned-answer-color); }
+.room.tiles-outline .options-board li:is(.scene-positioned-answer, [data-authored-answer]) { border-color: var(--positioned-answer-color); }
+.room .options-board li.scene-positioned-answer { overflow: hidden; padding: clamp(4px, 1.5vw, 18px); }
+
+.answer-slot-placeholder { visibility: hidden; }
+
+/* Match the editor's automatic slots when they share the board with positioned cards. */
+.room .options-board.with-positioned-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.room .options-board.with-positioned-answers[data-list] { grid-template-columns: minmax(0, 1fr); }

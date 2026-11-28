@@ -201,9 +201,15 @@ test('authors can place two or three text boxes in a row and delete a selected b
 
   const selectedBox = page.locator('.canvas-box-frame[data-selected]');
   const moveHandle = selectedBox.getByRole('button', { name: /^Move Text box/ });
-  const resizeHandle = selectedBox.getByRole('button', { name: /^Resize Text box/ });
-  const step = await grid.evaluate(element => (element.getBoundingClientRect().width + parseFloat(getComputedStyle(element).columnGap)) / 12);
-  const lineHeight = await selectedBox.locator('textarea').evaluate(element => parseFloat(getComputedStyle(element).lineHeight));
+  const textSettings = settings.locator('.canvas-text-controls');
+  const horizontal = textSettings.getByRole('spinbutton', { name: 'Horizontal position (%)' });
+  const vertical = textSettings.getByRole('spinbutton', { name: 'Vertical position (%)' });
+  const width = textSettings.getByRole('spinbutton', { name: 'Text box width (%)' });
+  const rotation = textSettings.getByRole('spinbutton', { name: 'Rotation (degrees)' });
+  const set = async (field: typeof horizontal, value: string) => { await field.fill(value); await field.press('Enter'); };
+  const layer = page.locator('.scene-slide-text-layer');
+  const board = (await layer.boundingBox())!;
+  const frame = (await selectedBox.boundingBox())!;
   const dragHandle = async (handle: typeof moveHandle, dx: number, dy: number) => {
     await expect(handle).toBeVisible();
     const button = (await handle.boundingBox())!;
@@ -212,48 +218,37 @@ test('authors can place two or three text boxes in a row and delete a selected b
     await page.mouse.move(x, y);
     await page.mouse.down();
     await page.mouse.move(x + dx, y + dy, { steps: 8 });
-    await expect(page.locator('.canvas-box-preview')).toBeVisible();
     await page.mouse.up();
-    await expect(page.locator('.canvas-box-preview')).toHaveCount(0);
   };
-  await dragHandle(moveHandle, step, 0);
-  await expect(settings.getByRole('combobox', { name: 'Start column', exact: true })).toHaveText('8');
-  await expect(settings.getByRole('combobox', { name: 'Row', exact: true })).toHaveText('2');
+  const dx = 27;
+  const dy = 49;
+  await dragHandle(moveHandle, dx, dy);
+  const positioned = layer.locator('.scene-positioned-text-box');
+  await expect(positioned.getByRole('textbox')).toHaveValue('Start playing');
+  expect(Number(await horizontal.inputValue())).toBeCloseTo((frame.x + frame.width / 2 + dx - board.x) * 100 / board.width, 0);
+  expect(Number(await vertical.inputValue())).toBeCloseTo((frame.y + frame.height / 2 + dy - board.y) * 100 / board.height, 0);
+  await expect(grid.locator('.scene-text-cell')).toHaveCount(2);
+  expect((await getPositions())[1]!.x).toBeCloseTo(second!.x);
 
-  await dragHandle(resizeHandle, -step, 2 * lineHeight);
-  await expect(settings.getByRole('combobox', { name: 'Box width' })).toHaveText('One quarter');
-  await expect(settings.getByLabel('Height in lines')).toHaveValue('3');
-  await moveHandle.press('ArrowLeft');
-  await expect(settings.getByRole('combobox', { name: 'Start column', exact: true })).toHaveText('7');
-
-  [first, second, third] = await getPositions();
-  await dragHandle(moveHandle, 0, first!.y - third!.y);
-  await expect(settings.getByRole('combobox', { name: 'Row', exact: true })).toHaveText('1');
-  await expect(grid.locator('.scene-text-cell').first().locator('textarea')).toHaveValue('Start playing');
-  const rotateHandle = selectedBox.getByRole('button', { name: /^Rotate Text box/ });
-  const rotation = settings.getByRole('spinbutton', { name: 'Rotation (degrees)' });
-  const handle = (await rotateHandle.boundingBox())!;
-  const frame = (await selectedBox.boundingBox())!;
-  const x = frame.x + frame.width / 2;
-  const y = frame.y + frame.height / 2;
-  const radius = y - handle.y - handle.height / 2;
-  await page.mouse.move(handle.x + handle.width / 2, y - radius);
-  await page.mouse.down();
-  await page.mouse.move(x + radius / 2, y - radius * Math.sqrt(3) / 2, { steps: 8 });
-  await expect(selectedBox).toHaveCSS('rotate', '30deg');
-  await page.mouse.up();
-  await expect(rotation).toHaveValue('30');
-  await rotateHandle.press('ArrowLeft');
-  await expect(rotation).toHaveValue('29');
-  await chooseOption(settings.getByRole('combobox', { name: 'Row', exact: true }), '2');
-  await expect(settings.getByRole('combobox', { name: 'Row', exact: true })).toHaveText('2');
-  await expect(rotation).toHaveValue('29');
-  await rotation.fill('12');
-  await rotation.press('Enter');
+  const previousWidth = Number(await width.inputValue());
+  await dragHandle(selectedBox.getByRole('button', { name: /^Resize Text box/ }), -19, 0);
+  expect(Number(await width.inputValue())).toBeCloseTo(previousWidth - 19 * 200 / board.width, 0);
+  await set(horizontal, '68.2');
+  await set(vertical, '72.6');
+  await set(width, '32.5');
+  await selectedBox.getByRole('button', { name: /^Rotate Text box/ }).press('Shift+ArrowRight');
+  await expect(rotation).toHaveValue('15');
+  await expect(positioned).toHaveAttribute('style', /left: 68.2%; top: 72.6%; width: 32.5%/);
+  await expect(settings.getByRole('combobox', { name: 'Start column', exact: true })).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('text-box-handles.png') });
+  await textSettings.locator('.slide-position-values').evaluate(element => element.scrollIntoView({ block: 'center' }));
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.screenshot({ path: testInfo.outputPath('freely-positioned-text.png') });
+
+  await textSettings.getByRole('button', { name: 'Return to automatic layout' }).click();
+  await expect(grid.locator('.scene-text-cell')).toHaveCount(3);
+  await expect(settings.getByRole('combobox', { name: 'Start column', exact: true })).toHaveText('7');
   await chooseOption(arrange, '3');
-  await expect(rotation).toHaveValue('12');
 
   const devices = page.getByRole('group', { name: 'Preview device' });
   await devices.getByRole('button', { name: 'Phone', exact: true }).click();
@@ -279,6 +274,11 @@ test('authors can place two or three text boxes in a row and delete a selected b
   await firstBox.locator('textarea').click();
   await firstBox.getByRole('button', { name: /^Rotate Text box/ }).press('Shift+ArrowRight');
   await expect(firstBox).toHaveCSS('rotate', '15deg');
+  // Entering an exact position also detaches a box from the automatic layout.
+  await set(horizontal, '28.4');
+  await set(vertical, '70.3');
+  await set(width, '38.5');
+  await expect(layer.locator('.scene-positioned-text-box')).toHaveAttribute('style', /left: 28.4%; top: 70.3%; width: 38.5%/);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 
   const pop = page.waitForEvent('popup');
@@ -290,11 +290,196 @@ test('authors can place two or three text boxes in a row and delete a selected b
   await host.getByRole('button', { name: 'Start the game' }).click();
   for (const frame of [host, bench.frameLocator('iframe[title="Phone of Player 1"]')]) {
     const live = frame.locator('.scene-text-cell');
-    await expect(live).toHaveText(['Warm up', 'Get ready']);
+    await expect(live).toHaveText('Get ready');
+    const free = frame.locator('.scene-positioned-text-box');
+    await expect(free).toHaveText('Warm up');
+    await expect(free).toHaveAttribute('style', /left: 28.4%; top: 70.3%; width: 38.5%/);
+    await expect(free.locator('p')).toHaveCSS('rotate', '15deg');
     await expect(frame.locator('.canvas-box-handle')).toHaveCount(0);
-    await expect(live.first()).toHaveCSS('rotate', '15deg');
-    const rowTops = await live.evaluateAll(cells => cells.map(cell => (cell as HTMLElement).offsetTop));
-    expect(rowTops[0]).toBe(rowTops[1]);
   }
 
+});
+
+test('the title and question can be positioned independently and keep their roles in play', async ({ page, baseURL }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+  const gameId = randomUUID();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  expect((await page.request.post(`${baseURL}/api/host/games/import`, { headers, data: {
+    gameId, text: JSON.stringify({ title: 'Welcome and quiz', scenes: [
+      { id: 'welcome', type: 'cutscene', title: 'Welcome!', text: 'Grab your phone.\n\nGet ready to play.', titleStyle: { color: '#ffcc55' } },
+      { id: 'first-question', type: 'quiz', question: 'What day is it?', answers: ['Friday', 'Saturday'], correct: 'Friday', seconds: 30 },
+    ] }),
+  } })).ok()).toBe(true);
+  await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  const canvas = page.locator('.scene-canvas');
+  const settings = page.locator('.canvas-text-controls');
+  const selected = settings.getByLabel('Selected text box');
+  const setNumber = async (name: string, value: string) => {
+    const input = settings.getByRole('spinbutton', { name, exact: true });
+    await input.fill(value);
+    await input.press('Enter');
+  };
+  const place = async (x: string, y: string, width: string) => {
+    await setNumber('Horizontal position (%)', x);
+    await setNumber('Vertical position (%)', y);
+    await setNumber('Text box width (%)', width);
+  };
+  const drag = async (name: string, dx: number, dy: number) => {
+    const handle = canvas.getByRole('button', { name, exact: true });
+    await expect(handle).toBeVisible();
+    const { x, y, width, height } = (await handle.boundingBox())!;
+    await page.mouse.move(x + width / 2, y + height / 2);
+    await page.mouse.down();
+    await page.mouse.move(x + width / 2 + dx, y + height / 2 + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+
+  await chooseOption(selected, 'titleStyle');
+  await drag('Move Title', -43, 36);
+  const title = canvas.locator('.scene-positioned-text-box').filter({ has: page.getByRole('textbox', { name: 'Title', exact: true }) });
+  await expect(title.getByRole('textbox')).toHaveValue('Welcome!');
+  await expect(settings.getByRole('spinbutton', { name: 'Horizontal position (%)' })).toHaveValue(/\d/);
+  await place('28.5', '25.2', '45');
+  await expect(title).toHaveAttribute('style', /left: 28.5%; top: 25.2%; width: 45%/);
+
+  await chooseOption(selected, 'promptStyle');
+  await drag('Move Text on every screen', 53, 88);
+  const instruction = canvas.locator('.scene-positioned-text-box').filter({ has: page.getByRole('textbox', { name: 'Text on every screen', exact: true }) });
+  await expect(instruction.getByRole('textbox')).toHaveValue('Grab your phone.\n\nGet ready to play.');
+  await place('65.4', '59.8', '55');
+  await expect(instruction).toHaveAttribute('style', /left: 65.4%; top: 59.8%; width: 55%/);
+  await chooseOption(selected, 'titleStyle');
+  await expect(settings.getByRole('spinbutton', { name: 'Horizontal position (%)' })).toHaveValue('28.5');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('movable-title-and-instruction.png') });
+
+  await page.getByRole('navigation', { name: 'Scenes in play order' }).getByRole('button', { name: /What day is it/ }).click();
+  await place('59.2', '44.7', '70.5');
+  const question = canvas.locator('.scene-positioned-text-box').getByRole('textbox', { name: 'Question or instruction' });
+  await expect(question).toHaveValue('What day is it?');
+  await settings.getByRole('button', { name: 'Return to automatic layout' }).click();
+  await expect(question).toHaveCount(0);
+  await place('59.2', '44.7', '70.5');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Play & publish' }).click();
+  await page.getByRole('menuitem', { name: /Test bench: play it with virtual phones/ }).click();
+  const bench = await popup;
+  const host = bench.frameLocator('.bench-host');
+  const phone = bench.frameLocator('iframe[title="Phone of Player 1"]');
+  await expect(host.getByText(/Player 1 · connected/)).toBeVisible();
+  await host.getByRole('button', { name: 'Start the game' }).click();
+  for (const screen of [host, phone]) {
+    const heading = screen.locator('#stage-heading');
+    await expect(heading).toHaveText('Welcome!');
+    await expect(heading).toHaveCSS('color', 'rgb(255, 204, 85)');
+    await expect(screen.locator('.scene-positioned-text-box')).toHaveCount(2);
+    await expect(screen.locator('.scene-positioned-text-box').filter({ hasText: 'Get ready to play.' })).toHaveAttribute('style', /left: 65.4%; top: 59.8%; width: 55%/);
+  }
+  await host.getByRole('button', { name: 'Next', exact: true }).click();
+  for (const screen of [host, phone]) {
+    const heading = screen.locator('.scene-positioned-text-box #stage-heading');
+    await expect(heading).toHaveText('What day is it?');
+    await expect(screen.locator('#stage-heading')).toHaveCount(1);
+    await expect(screen.locator('.scene-positioned-text-box')).toHaveAttribute('style', /left: 59.2%; top: 44.7%; width: 70.5%/);
+  }
+  await phone.locator('.answer-form label').filter({ hasText: 'Friday' }).click();
+  await phone.getByRole('button', { name: 'Save answer', exact: true }).click();
+  await expect(phone.getByRole('status').filter({ hasText: 'Your answer is in!' })).toBeVisible();
+});
+
+test('quiz answers move and resize independently on the slide while phones can submit', async ({ page, baseURL }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
+  await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
+  const gameId = randomUUID();
+  const headers = { 'x-party-request': '1', origin: baseURL! };
+  expect((await page.request.post(`${baseURL}/api/host/games/import`, { headers, data: {
+    gameId, text: JSON.stringify({ title: 'Planet quiz', scenes: [
+      { type: 'quiz', question: 'Which planet has rings?', answers: ['Saturn', 'Mercury', 'Venus'], correct: 'Saturn', seconds: 60 },
+    ] }),
+  } })).ok()).toBe(true);
+  await page.goto(`${baseURL}/?edit=${gameId}&view=scene`);
+  const canvas = page.locator('.scene-canvas');
+  const settings = page.locator('.scene-props .answer-placement-settings');
+  const picker = settings.getByRole('combobox', { name: 'Answer to position' });
+  const x = settings.getByRole('spinbutton', { name: 'Horizontal position (%)' });
+  const y = settings.getByRole('spinbutton', { name: 'Vertical position (%)' });
+  const width = settings.getByRole('spinbutton', { name: 'Answer width (%)' });
+  const height = settings.getByRole('spinbutton', { name: 'Answer height (%)' });
+  const set = async (field: typeof x, value: string) => { await field.fill(value); await field.press('Enter'); };
+  const drag = async (name: string, dx: number, dy: number) => {
+    const handle = canvas.getByRole('button', { name, exact: true });
+    await expect(handle).toBeVisible();
+    const { x, y, width, height } = (await handle.boundingBox())!;
+    await page.mouse.move(x + width / 2, y + height / 2);
+    await page.mouse.down();
+    await page.mouse.move(x + width / 2 + dx, y + height / 2 + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+
+  const first = canvas.locator('[data-canvas-answer-key="saturn"]');
+  const neighbor = canvas.locator('[data-canvas-answer-key="mercury"]');
+  const before = (await neighbor.boundingBox())!;
+  await chooseOption(picker, 'saturn');
+  await drag('Move answer 1', 31, 74);
+  await expect(first).toHaveClass(/scene-positioned-answer/);
+  const after = (await neighbor.boundingBox())!;
+  expect(after.x).toBeCloseTo(before.x);
+  expect(after.y).toBeCloseTo(before.y);
+  const oldWidth = Number(await width.inputValue());
+  const oldHeight = Number(await height.inputValue());
+  await drag('Resize answer 1', -23, 15);
+  expect(Number(await width.inputValue())).toBeLessThan(oldWidth);
+  expect(Number(await height.inputValue())).toBeGreaterThan(oldHeight);
+  await set(x, '48.5');
+  await set(y, '72.2');
+  await set(width, '36.4');
+  await set(height, '16.3');
+  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 72.2%; width: 36.4%; height: 16.3%/);
+
+  await chooseOption(picker, 'mercury');
+  await set(x, '77.4');
+  await set(y, '47.3');
+  await set(width, '31.2');
+  await set(height, '12.6');
+  await expect(neighbor).toHaveAttribute('style', /left: 77.4%; top: 47.3%; width: 31.2%; height: 12.6%/);
+  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 72.2%; width: 36.4%; height: 16.3%/);
+  await settings.getByRole('button', { name: 'Return answer to automatic layout' }).click();
+  await expect(neighbor).not.toHaveClass(/scene-positioned-answer/);
+  await set(x, '77.4');
+  await set(y, '49.3');
+  await set(width, '31.2');
+  await set(height, '12.6');
+
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await settings.evaluate(element => element.scrollIntoView({ block: 'center' }));
+  await page.screenshot({ path: testInfo.outputPath('freely-positioned-answers.png') });
+  await page.reload();
+  await expect(canvas.locator('.scene-positioned-answer')).toHaveCount(2);
+
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Play & publish' }).click();
+  await page.getByRole('menuitem', { name: /Test bench: play it with virtual phones/ }).click();
+  const bench = await popup;
+  const host = bench.frameLocator('.bench-host');
+  const phone = bench.frameLocator('iframe[title="Phone of Player 1"]');
+  await expect(host.getByText(/Player 1 · connected/)).toBeVisible();
+  await host.getByRole('button', { name: 'Start the game' }).click();
+  const placed = host.locator('.scene-positioned-answer').filter({ hasText: 'Saturn' });
+  await expect(placed).toHaveAttribute('style', /left: 48.5%; top: 72.2%; width: 36.4%; height: 16.3%/);
+  await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveAttribute('style', /left: 77.4%; top: 49.3%; width: 31.2%; height: 12.6%/);
+  await expect(host.locator('.canvas-box-handle')).toHaveCount(0);
+  const automatic = host.locator('.with-positioned-answers li:visible').filter({ hasText: 'Venus' });
+  const automaticBounds = (await automatic.boundingBox())!;
+  const positionedBounds = (await placed.boundingBox())!;
+  expect(automaticBounds.y + automaticBounds.height).toBeLessThan(positionedBounds.y);
+  await host.locator('.stage-card').screenshot({ path: testInfo.outputPath('live-answer-layout.png') });
+  await expect(phone.locator('.answer-form label')).toHaveCount(3);
+  await phone.locator('.answer-form label').filter({ hasText: 'Saturn' }).click();
+  await phone.getByRole('button', { name: 'Save answer', exact: true }).click();
+  await expect(phone.getByRole('status').filter({ hasText: 'Your answer is in!' })).toBeVisible();
 });

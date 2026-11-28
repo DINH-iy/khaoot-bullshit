@@ -1,6 +1,8 @@
+import { AnswerPlacementSettings } from './fields/answer-placement-settings.js';
+import { setAnswerPlacement } from './answer-placement.js';
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
-import { isSharedPrediction, MAX_HOST_NOTES_LENGTH, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
+import { isSharedPrediction, MAX_HOST_NOTES_LENGTH, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent, type SceneTextBoxPlacement, type AnswerOption, type AnswerPlacement } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields, stakeSummary } from './fields/explain-fields.js';
@@ -70,11 +72,11 @@ const scoreboardShows = () => [{ value: 'players', label: t('showPlayers') }, { 
  * (open), the points, and who plays. The kind of scene (which minigame, how a
  * duel is won) is chosen when adding it, so it is shown here, not asked again.
  */
-export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia, textTarget, selectText, selectedImage, selectImage, readOnly }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void; textTarget: SceneTextTarget; selectText: (target: SceneTextTarget) => void; selectedImage: string | undefined; selectImage: (key?: string) => void; readOnly: boolean }) {
+export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia, textTarget, selectText, measureTextPlacement, selectedImage, selectImage, selectedAnswer, selectAnswer, measureAnswer, readOnly }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void; textTarget: SceneTextTarget; selectText: (target: SceneTextTarget) => void; measureTextPlacement: (key: string) => SceneTextBoxPlacement | undefined; selectedImage: string | undefined; selectImage: (key?: string) => void; selectedAnswer: string | undefined; selectAnswer: (key: string) => void; measureAnswer: (key: string) => AnswerPlacement | undefined; readOnly: boolean }) {
   const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
-  const input = stage['input'] as { kind?: string; options?: Option[]; items?: Option[]; layout?: string; maxLength?: number; accept?: string[] } | undefined;
+  const input = stage['input'] as { kind?: string; options?: AnswerOption[]; items?: Option[]; layout?: string; maxLength?: number; accept?: string[] } | undefined;
   const scoring = stage['scoring'] as { kind?: string; correctChoiceKey?: string; correctOrder?: string[]; awardMilli?: string; places?: Places } | undefined;
   // Optional points by place on a stage (or its scoring): left out entirely when switched off.
   const withPlaces = <T extends Record<string, unknown>>(base: T, places: Places | undefined): T => { const copy: Record<string, unknown> = { ...base }; if (places) copy['places'] = places; else delete copy['places']; return copy as T; };
@@ -105,7 +107,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
         <div>{WRITING_STARTERS.map(starter => <button key={starter.key} type="button" className="small-button" title={starter.prompt}
           onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
       </details>}
-      {!readOnly && <SceneTextSettings key={group} stage={stage} selectedTarget={textTarget} onSelect={selectText} edit={edit} />}
+      {!readOnly && <SceneTextSettings key={group} stage={stage} selectedTarget={textTarget} onSelect={selectText} measurePlacement={measureTextPlacement} edit={edit} />}
       {!readOnly && <SlideImageSettings key={`pictures-${group}`} stage={stage} selected={selectedImage} select={selectImage} edit={edit} />}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
       {timed && stage.kind !== 'minigame' && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : isDrawScene(stage) ? 'drawTimer' : 'timer')}
@@ -118,12 +120,14 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
       {stage.kind === 'collect' && input?.kind === 'choice' && <fieldset><legend>{t('answers')}{scoring?.kind === 'correct-choice' ? t('tickCorrect') : ''}</legend>
         {(input.options ?? []).map((option, position) => <div key={option.key} className="option-row">
           {scoring?.kind === 'correct-choice' && <input type="radio" name={id('correct')} aria-label={t('isCorrect', { label: option.label })} checked={scoring.correctChoiceKey === option.key} onChange={() => edit(current => ({ ...current, scoring: { ...scoring, correctChoiceKey: option.key } }))} />}
-          <input aria-label={t('answerOption', { number: position + 1 })} value={option.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, options: input.options!.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
+          <input aria-label={t('answerOption', { number: position + 1 })} onFocus={() => selectAnswer(option.key)} value={option.label} maxLength={240} onChange={event => edit(current => ({ ...current, input: { ...input, options: input.options!.map(entry => entry.key === option.key ? { ...entry, label: event.target.value } : entry) } }), `option-${option.key}`)} />
           <button className="icon-button danger-icon" disabled={(input.options ?? []).length <= 2} aria-label={t('removeAnswer', { number: position + 1 })} onClick={() => edit(current => {
             const options = input.options!.filter(entry => entry.key !== option.key);
             return { ...current, input: { ...input, options }, ...(scoring?.kind === 'correct-choice' && scoring.correctChoiceKey === option.key ? { scoring: { ...scoring, correctChoiceKey: options[0]!.key } } : {}) };
           })}>×</button></div>)}
         {quizKind(input) !== 'true-false' && <button className="small-button" disabled={(input.options ?? []).length >= 12} onClick={() => edit(current => ({ ...current, input: { ...input, options: [...input.options!, { key: uniqueKey('answer', input.options!.map(entry => entry.key)), label: t('newAnswer') }] } }))}>{t('addAnswer')}</button>}
+        {!readOnly && <AnswerPlacementSettings options={input.options ?? []} selected={selectedAnswer} select={selectAnswer} measure={measureAnswer}
+          change={(key, placement) => edit(current => setAnswerPlacement(current, key, placement), `answer-placement-${key}`)} />}
       </fieldset>}
       {stage.kind === 'collect' && input?.kind === 'order' && <fieldset><legend>{t('itemsOrder')}</legend>
         {(input.items ?? []).map((item, position) => <div key={item.key} className="option-row">

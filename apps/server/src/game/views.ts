@@ -189,6 +189,8 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           ...(actor.data.role === 'host' && entry.stage.hostNotes?.trim() ? { hostNotes: entry.stage.hostNotes } : {}),
           promptStyle: entry.stage.promptStyle,
           titleStyle: entry.stage.kind === 'info' ? entry.stage.titleStyle : undefined,
+          promptPlacement: entry.stage.promptPlacement,
+          titlePlacement: entry.stage.kind === 'info' ? entry.stage.titlePlacement : undefined,
           media: entry.stage.media ? { ...entry.stage.media, url: sceneMediaUrl(entry.stage.media.id) } : null,
           info: entry.stage.kind === 'info' ? { title: entry.stage.title } : null, scoreboard: entry.stage.kind === 'scoreboard' ? { show: entry.stage.show } : null,
           ...(current.status === 'ACTIVE' && session.status === 'RUNNING' && typeof (current.presentation as { drawingStartsAt?: unknown }).drawingStartsAt === 'string'

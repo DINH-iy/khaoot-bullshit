@@ -185,7 +185,7 @@
 .preview > figure { margin: 0; display: grid; gap: 8px; } .preview > figure > figcaption { color: var(--e-muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; }
 .tv { flex: 1 1 420px; max-width: 760px; }
 .preview .tv-screen { min-height: 0; min-width: 0; aspect-ratio: 16 / 9; border-radius: 14px; border: 4px solid var(--e-border);
-  padding: clamp(12px, 3vw, 28px); display: grid; align-content: start; gap: 14px; overflow: auto; box-sizing: border-box; }
+  --slide-copy-inset: clamp(12px, 3vw, 28px); padding: var(--slide-copy-inset); display: grid; align-content: start; gap: 14px; overflow: auto; box-sizing: border-box; }
 .tv-screen .stage-media :is(img, video) { max-height: min(38vh, 360px); }
 .tv-banner { margin: 0; font-size: clamp(1.4rem, 3.4vw, 2.6rem); font-weight: 900; letter-spacing: .02em; text-align: center; }
 .tv-prompt { margin: 0; font-size: clamp(1rem, 2vw, 1.6rem); font-weight: 700; text-align: center; }
@@ -924,11 +924,11 @@
   width: 100%; min-width: 0; color: inherit; background: color-mix(in srgb, var(--r-surface) 80%, transparent);
   border: 1px solid var(--r-line); padding: 8px 10px; font-family: inherit;
 }
-.scene-canvas .scene-composition :is(.canvas-title, .canvas-prompt, .canvas-extra-text) {
+.scene-canvas :is(.scene-composition, .scene-slide-text-layer) :is(.canvas-title, .canvas-prompt, .canvas-extra-text) {
   min-height: 0; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent;
   outline: 1px solid var(--r-line); outline-offset: 2px;
 }
-.scene-canvas .scene-composition :is(.canvas-title, textarea):focus-visible { outline: 2px solid var(--r-text); }
+.scene-canvas :is(.scene-composition, .scene-slide-text-layer) :is(.canvas-title, textarea):focus-visible { outline: 2px solid var(--r-text); }
 .canvas-text-box { position: relative; display: grid; min-width: 0; }
 .scene-canvas .canvas-text-box::after, .scene-canvas .canvas-text-box > textarea {
   grid-area: 1 / 1;
@@ -1289,7 +1289,7 @@
 
 .slide-image-settings { display: grid; gap: 8px; min-width: 0; }
 .slide-image-settings > button { justify-self: start; }
-.slide-image-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.slide-position-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .free-picture-frame { pointer-events: auto; }
 .room .free-picture-frame > .drag-surface {
   inset: 0; width: 100%; height: 100%; min-height: 0; z-index: 0; opacity: 1; pointer-events: auto;
@@ -1299,3 +1299,15 @@
 .free-picture-frame:is(:hover, :focus-within, [data-selected]) > .drag-surface > span { opacity: 1; }
 .room .free-picture-frame > .canvas-box-handle.resize { right: -16px; }
 .room .free-picture-frame > .canvas-box-handle.rotate { top: -39px; }
+
+.scene-slide-text-layer .canvas-box-frame { pointer-events: auto; }
+.room .scene-positioned-text-box .canvas-box-handle.move { left: -24px; }
+.room .scene-positioned-text-box .canvas-box-handle.resize { right: -24px; }
+
+.scene-canvas .scene-positioned-answer { position: absolute; pointer-events: auto; }
+.scene-canvas .tv-options .answer-slot-placeholder { min-height: 50px; }
+.scene-canvas .canvas-answer > input[type=text] { flex: 1 1 auto; }
+.room .scene-positioned-answer .canvas-box-handle.move { left: -23px; }
+.room .scene-positioned-answer .canvas-box-handle.resize { right: -23px; }
+
+.answer-placement-settings { display: grid; gap: 8px; }

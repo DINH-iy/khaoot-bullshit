@@ -2,7 +2,7 @@ import { StoredGraphsSchema, HostNotesSchema, AutoRevealSecondsSchema, ColorSche
 import { configuredPlacePoints, minigamePlacePoints, SlideImagesSchema } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { CARRYOVERS, MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
+import { CARRYOVERS, MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, ScenePrimaryTextPlacementSchema, ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -68,7 +68,7 @@ export const WheelSchema = z.object({
 // All optional, so earlier definitions keep their hash.
 // `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
 // `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
-const look = { slideImages: SlideImagesSchema.optional(), hostNotes: HostNotesSchema.optional(), textBoxes: SceneTextBoxesSchema.optional(), textBoxPhoneColumns: z.boolean().optional(), promptStyle: SceneTextStyleSchema.optional(), mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+const look = { slideImages: SlideImagesSchema.optional(), hostNotes: HostNotesSchema.optional(), textBoxes: SceneTextBoxesSchema.optional(), textBoxPhoneColumns: z.boolean().optional(), promptStyle: SceneTextStyleSchema.optional(), promptPlacement: ScenePrimaryTextPlacementSchema.optional(), mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An intro shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   // `points`: also show the points at stake (worked out from the scene's scoring). `picture`: a picture from the
   // media library. `screenOnly`: only the shared screen shows it; phones wait without “Got it”.
@@ -82,7 +82,7 @@ const stageSchema = z.discriminatedUnion('kind', [
   // Show-only scenes: no answers, no points, no team play. The host continues
   // whenever they like; an optional countdown only informs the room.
   // An info scene (cutscene, rules, announcement): a title and text on every screen.
-  z.object({ ...look, titleStyle: SceneTextStyleSchema.optional(), key: GameKeySchema, kind: z.literal('info'), title: SceneTitleSchema, prompt: ScenePromptSchema, durationMs: StageDurationSchema.nullable() }).strict(),
+  z.object({ ...look, titleStyle: SceneTextStyleSchema.optional(), titlePlacement: ScenePrimaryTextPlacementSchema.optional(), key: GameKeySchema, kind: z.literal('info'), title: SceneTitleSchema, prompt: ScenePromptSchema, durationMs: StageDurationSchema.nullable() }).strict(),
   // A scoreboard scene: the standings of players, the game's teams, or both.
   z.object({ ...look, key: GameKeySchema, kind: z.literal('scoreboard'), prompt: ScenePromptSchema, show: z.enum(['players', 'teams', 'both']), durationMs: StageDurationSchema.nullable() }).strict(),
   // A minigame from the catalog. `game` may still be a placeholder name, which

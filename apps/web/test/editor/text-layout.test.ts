@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { positionTextBox, sceneTextBoxes } from '../../src/editor/scene/text-edits.js';
+import { placeSlideTextBox, positionTextBox, sceneTextBoxes, updateTextFormat } from '../../src/editor/scene/text-edits.js';
 import { placeTextBoxes } from '../../src/presentation/scene-text-layout.js';
 
 const original = {
@@ -30,4 +30,16 @@ describe('moving and resizing boxes on a slide', () => {
     ]);
     expect(positionTextBox(next, 'c', { row: 1, column: 1, width: 6 })).toBe(next);
   });
+});
+
+it('keeps neighboring columns and text style when a box is moved to an exact slide position', () => {
+  const lateral = { ...original, textBoxes: original.textBoxes.map(box => ({
+    ...box, layout: { ...box.layout, newRow: undefined, startColumn: undefined },
+  })) };
+  const placement = { x: 63.4, y: 77.8, width: 28.6 };
+  const moved = placeSlideTextBox(lateral, 'b', placement);
+  expect(placeTextBoxes(sceneTextBoxes(moved)).map(({ box, column }) => [box.key, column])).toEqual([['a', 1], ['c', 9]]);
+  const formatted = updateTextFormat(moved, 'box:b', { underline: true });
+  expect(sceneTextBoxes(formatted)[1]).toMatchObject({ placement, text: 'Second\n\nLine', italic: true, underline: true, layout: { rotation: -12 } });
+  expect(sceneTextBoxes(placeSlideTextBox(formatted, 'b', undefined))[1]?.placement).toBeUndefined();
 });
