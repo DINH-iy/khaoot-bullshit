@@ -4,6 +4,7 @@ import { FONTS, type FontName } from './presentation.js';
 
 export const MAX_SCENE_TEXT_BOXES = 8;
 export const SCENE_TEXT_GRID_COLUMNS = 12;
+export const MAX_SCENE_TEXT_LINES = 32;
 export const MAX_SCENE_TEXT_LENGTH = 2000;
 export const SCENE_TEXT_SIZES = ['heading', 'body', 'small'] as const;
 export const SCENE_TEXT_ALIGNMENTS = ['left', 'center', 'right'] as const;
@@ -42,13 +43,14 @@ export const SceneTextStyleSchema = z.object({
   marks: marks.optional(),
   wrap: z.enum(SCENE_TEXT_WRAPS).optional(),
   overflow: z.enum(SCENE_TEXT_OVERFLOWS).optional(),
-  lines: z.number().int().min(1).max(32).optional(),
+  lines: z.number().int().min(1).max(MAX_SCENE_TEXT_LINES).optional(),
 }).strict();
 export type SceneTextStyle = z.infer<typeof SceneTextStyleSchema>;
 const SceneTextBoxLayoutSchema = z.object({
   width: z.number().int().min(1).max(SCENE_TEXT_GRID_COLUMNS).optional(),
   startColumn: z.number().int().min(1).max(SCENE_TEXT_GRID_COLUMNS).optional(),
   newRow: z.boolean().optional(),
+  rotation: z.number().int().min(-180).max(180).optional(),
 }).strict().refine(layout => (layout.startColumn ?? 1) + (layout.width ?? SCENE_TEXT_GRID_COLUMNS) - 1 <= SCENE_TEXT_GRID_COLUMNS,
   'This text box extends beyond its row.');
 export type SceneTextBoxLayout = z.infer<typeof SceneTextBoxLayoutSchema>;

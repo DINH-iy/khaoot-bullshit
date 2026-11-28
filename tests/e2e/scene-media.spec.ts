@@ -119,7 +119,7 @@ test('scene translations, background motion and a YouTube clip work from editor 
   } finally { await phoneContext.close(); }
 });
 
-test('an author puts a picture in a quiz question, and the room shows it with the question', async ({ browser, page, baseURL }) => {
+test('an author puts a picture in a quiz question, and the room shows it with the question', async ({ browser, page, baseURL }, testInfo) => {
   test.skip(test.info().project.name === 'android-chrome', 'The editor is desktop first; the phone view is checked below.');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
@@ -192,6 +192,44 @@ test('an author puts a picture in a quiz question, and the room shows it with th
   await crop.getByRole('button', { name: 'Use this', exact: true }).click();
   await expect(canvas.locator('.stage-media.cropped')).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  const object = canvas.locator('.canvas-image-frame');
+  await object.locator('img').click();
+  const move = object.getByRole('button', { name: 'Move picture' });
+  const resize = object.getByRole('button', { name: 'Resize picture' });
+  const rotate = object.getByRole('button', { name: 'Rotate picture' });
+  const drag = async (handle: typeof move, to: (x: number, y: number) => [number, number]) => {
+    await expect(handle).toBeVisible();
+    const bounds = (await handle.boundingBox())!;
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(...to(x, y), { steps: 8 });
+    await page.mouse.up();
+  };
+  const copy = (await canvas.locator('.composition-copy').boundingBox())!;
+  const frame = (await object.boundingBox())!;
+  await drag(move, (x, y) => [x, y + copy.y + copy.height - frame.y + frame.height]);
+  await expect(field.getByRole('button', { name: 'Below the text' })).toHaveAttribute('aria-pressed', 'true');
+  await move.press('ArrowUp');
+  await expect(field.getByRole('button', { name: 'Above the text' })).toHaveAttribute('aria-pressed', 'true');
+  await object.locator('img').click();
+  await drag(resize, (x, y) => [x - 105, y - 60]);
+  const width = field.getByRole('spinbutton', { name: 'Image width (%)' });
+  await expect(width).toHaveValue(/^\d+$/);
+  await width.fill('56');
+  await width.press('Enter');
+  await expect(canvas.locator('.scene-composition')).toHaveCSS('--image-width', '56%');
+  await object.locator('img').click();
+  const box = (await object.boundingBox())!;
+  await drag(rotate, (x, y) => {
+    const radius = box.y + box.height / 2 - y;
+    return [x + radius * Math.sin(Math.PI / 12), box.y + box.height / 2 - radius * Math.cos(Math.PI / 12)];
+  });
+  const rotation = field.getByRole('spinbutton', { name: 'Rotation (degrees)' });
+  await expect(rotation).toHaveValue('15');
+  await expect(object).toHaveCSS('rotate', '15deg');
+  await page.screenshot({ path: testInfo.outputPath('picture-handles.png') });
   // Words with the picture: what it shows (for screen readers) and a caption under it on every screen.
   await page.getByLabel('Describe the picture (for screen readers)').fill('The Eiffel tower at night');
   await page.getByLabel('Caption (shown under it on every screen)').fill('Paris, 1889');
@@ -226,6 +264,9 @@ test('an author puts a picture in a quiz question, and the room shows it with th
     for (const screen of [page, phone]) {
       const picture = screen.locator('.media-above.media-wide .stage-media.image.cropped img');
       await expect(picture).toBeVisible();
+      await expect(screen.locator('.stage-media.image.cropped')).toHaveCSS('rotate', '15deg');
+      await expect(screen.locator('.scene-composition')).toHaveCSS('--image-width', '56%');
+      await expect(screen.locator('.canvas-box-handle')).toHaveCount(0);
       expect(await picture.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1);
       await expect(picture).toHaveAttribute('alt', 'The Eiffel tower at night');
       await expect(screen.locator('.stage-media-caption')).toHaveText('Paris, 1889');

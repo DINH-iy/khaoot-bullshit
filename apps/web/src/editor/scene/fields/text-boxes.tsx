@@ -1,17 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
+import { MAX_SCENE_TEXT_BOXES, MAX_SCENE_TEXT_LENGTH, MAX_SCENE_TEXT_LINES, MAX_SCENE_TITLE_LENGTH, SCENE_TEXT_GRID_COLUMNS, SCENE_TEXT_ALIGNMENTS, SCENE_TEXT_VERTICAL_ALIGNMENTS, SCENE_TEXT_SIZES, SCENE_TEXT_FONTS, SCENE_TEXT_OVERFLOWS, SCENE_TEXT_WRAPS, type SceneCharacterStyle, type SceneTextBoxLayout, type SceneTextMark, type SceneTextStyle } from '@party/contracts';
 import { useTexts } from '../../../i18n/texts.js';
+import { lastTextBoxRow, placeTextBoxes } from '../../../presentation/scene-text-layout.js';
 import { SceneTextContent, sceneTextProps } from '../../../presentation/scene-text.js';
 import { ColorPicker } from '../../../ui/color-picker.js';
 import { Dropdown } from '../../../ui/dropdown.js';
+import { NumberSetting } from '../../controls/number-setting.js';
 import { ConfirmDialog } from '../../controls/confirm-dialog.js';
 import { LOOK_TEXTS } from '../../look/look.text.js';
 import { formatSelection } from '../text-marks.js';
 import { TEXT_BOX_TEXTS } from './text-boxes.text.js';
 import { INSPECTOR_TEXTS } from '../inspector.text.js';
 import { uniqueKey, type Stage } from '../../model.js';
-import { sceneTextBoxes, sceneTextStyle, setSceneTextBoxes, updateBoxText, updateTextFormat, type SceneTextTarget } from '../text-edits.js';
+import { positionTextBox, sceneTextBoxes, sceneTextStyle, setSceneTextBoxes, updateBoxText, updateTextFormat, updateBoxLayout, type SceneTextTarget } from '../text-edits.js';
 
 const presets = ['blank', 'heading', 'instructions', 'points'] as const;
 type Preset = typeof presets[number];
@@ -46,17 +48,18 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
     next.splice(index + direction, 0, selected);
     edit(current => setSceneTextBoxes(current, next), 'textBoxes');
   };
-  const width = selected?.layout?.width ?? SCENE_TEXT_GRID_COLUMNS;
+  const placed = placeTextBoxes(boxes);
+  const position = placed.find(entry => entry.box.key === selected?.key);
+  const width = position?.width ?? SCENE_TEXT_GRID_COLUMNS;
   const layoutOptions = Array.from({ length: SCENE_TEXT_GRID_COLUMNS }, (_, index) => SCENE_TEXT_GRID_COLUMNS - index);
   const setLayout = (patch: SceneTextBoxLayout) => {
     if (!selected) return;
-    edit(current => setSceneTextBoxes(current, sceneTextBoxes(current).map(box =>
-      box.key === selected.key ? { ...box, layout: { ...box.layout, ...patch } } : box)), `layout-${selected.key}`);
+    edit(current => updateBoxLayout(current, selected.key, patch), `layout-${selected.key}`);
   };
   const arrange = (count: number) => edit(current => setSceneTextBoxes(current, sceneTextBoxes(current).map((box, index) => {
     const slot = index % count;
     const width = Math.floor((slot + 1) * SCENE_TEXT_GRID_COLUMNS / count) - Math.floor(slot * SCENE_TEXT_GRID_COLUMNS / count);
-    return { ...box, layout: { width, ...(slot === 0 && index > 0 ? { newRow: true } : {}) } };
+    return { ...box, layout: { width, rotation: box.layout?.rotation, ...(slot === 0 && index > 0 ? { newRow: true } : {}) } };
   })), 'text-box-columns');
   const typography = { font: undefined, scale: undefined, color: undefined, bold: undefined, italic: undefined, underline: undefined, strike: undefined };
   const hasTypography = Object.keys(typography).some(key => format[key as keyof typeof typography] !== undefined);
@@ -95,7 +98,10 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
     {formatting && <div className="canvas-text-tools canvas-text-format" role="group" aria-label={t('format')}>
       {boxes.length > 1 && <Dropdown className="canvas-layout-wide" label={t('arrange')} placeholder={t('arrange')} value="" onChange={value => arrange(Number(value))}
         options={Array.from({ length: MAX_SCENE_TEXT_BOXES }, (_, index) => ({ value: String(index + 1), label: t('columns', { count: index + 1 }) }))} />}
-      {selected && <>
+      {selected && position && <>
+        <label>{t('row')}<Dropdown value={String(position.row)} onChange={value =>
+          edit(current => positionTextBox(current, selected.key, { width, column: position.column, row: Number(value) }), `layout-${selected.key}`)
+        } options={Array.from({ length: lastTextBoxRow(placed, selected.key) }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))} /></label>
         <label>{t('width')}<Dropdown value={String(width)} onChange={value => {
           const next = Number(value);
           const start = selected.layout?.startColumn;
@@ -104,6 +110,8 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
           : count === 4 ? t('third') : count === 3 ? t('quarter') : t('units', { count }) }))} /></label>
         <label>{t('startColumn')}<Dropdown value={String(selected.layout?.startColumn ?? '')} onChange={value => setLayout({ startColumn: value ? Number(value) : undefined })}
           options={[{ value: '', label: t('auto') }, ...Array.from({ length: SCENE_TEXT_GRID_COLUMNS - width + 1 }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))]} /></label>
+        <label>{t('rotation')}<NumberSetting key={target} value={selected.layout?.rotation} min={-180} max={180} placeholder="0"
+          onChange={rotation => setLayout({ rotation })} /></label>
         <label className="canvas-layout-wide choice"><input type="checkbox" checked={selected.layout?.newRow ?? false}
           onChange={event => setLayout({ newRow: event.currentTarget.checked })} />{t('newRow')}</label>
       </>}
@@ -123,7 +131,7 @@ export function SceneTextSettings({ stage, selectedTarget, onSelect, edit }: {
         options={SCENE_TEXT_VERTICAL_ALIGNMENTS.map(value => ({ value, label: t(value) }))} /></label>
       <label>{t('size')}<Dropdown value={format.size ?? defaultSize} onChange={value => onFormat({ size: value as SceneTextStyle['size'] })}
         options={SCENE_TEXT_SIZES.map(value => ({ value, label: t(value) }))} /></label>
-      <label>{t('lines')}<NumberSetting key={target} value={format.lines} min={1} max={32} placeholder={t('auto')} onChange={lines => onFormat({ lines })} /></label>
+      <label>{t('lines')}<NumberSetting key={target} value={format.lines} min={1} max={MAX_SCENE_TEXT_LINES} placeholder={t('auto')} onChange={lines => onFormat({ lines })} /></label>
       <label>{t('wrap')}<Dropdown value={format.wrap ?? 'break-word'} onChange={value => onFormat({ wrap: value as SceneTextStyle['wrap'] })}
         options={SCENE_TEXT_WRAPS.map(value => ({ value, label: t(value) }))} /></label>
       <label>{t('overflow')}<Dropdown value={format.overflow ?? 'visible'} onChange={value => onFormat({ overflow: value as SceneTextStyle['overflow'] })}
@@ -146,19 +154,6 @@ function CharacterFlags({ format, onFormat, compact, keys = characterToggles }: 
       {compact ? <span aria-hidden="true" className={`character-icon character-${key}`}>{({ bold: 'B', italic: 'I', underline: 'U', strike: 'S' })[key]}</span> : t(key)}
     </button>;
   });
-}
-
-function NumberSetting({ value, min, max, placeholder, label, onChange }: {
-  value: number | undefined; min: number; max: number; placeholder: string; label?: string; onChange: (value: number | undefined) => void;
-}) {
-  return <input key={value} type="number" min={min} max={max} step={1} defaultValue={value} placeholder={placeholder} aria-label={label}
-    onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-    onBlur={event => {
-      const field = event.currentTarget;
-      if (!field.validity.valid) field.value = value === undefined ? '' : String(value);
-      else if (field.value) onChange(field.valueAsNumber);
-      else onChange(undefined);
-    }} />;
 }
 
 function withinSelectionTools(tools: HTMLElement | null, target: Node | null) {

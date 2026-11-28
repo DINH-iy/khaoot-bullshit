@@ -30,8 +30,10 @@ import { MinigamePractice } from './minigame-practice.js';
 import { ScenePractice } from './scene-practice.js';
 import { PhoneFrame } from '../../ui/phone-devices.js';
 import { PRACTICE_TEXTS } from './scene-practice.text.js';
+import { ImageHandles } from './fields/image-handles.js';
+import { TextBoxHandles } from './fields/text-box-handles.js';
 import { CanvasText } from './fields/text-boxes.js';
-import { sceneTextBoxes, sceneTextStyle, updateBoxText, updateTextFormat, type SceneTextTarget } from './text-edits.js';
+import { positionTextBox, updateBoxLayout, sceneTextBoxes, sceneTextStyle, updateBoxText, updateTextFormat, type SceneTextTarget } from './text-edits.js';
 import { TEXT_BOX_TEXTS } from './fields/text-boxes.text.js';
 
 // `both`: the shared screen and the phone side by side (Look & feel's “This scene”).
@@ -41,6 +43,7 @@ interface CanvasControls {
   readOnly: boolean;
   edit: (change: (stage: Stage) => Stage, field: string) => void;
   selectText: (target: SceneTextTarget) => void;
+  selectedText: SceneTextTarget;
   editMedia: () => void;
 }
 
@@ -84,7 +87,11 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const layout = MediaLayoutSchema.safeParse(stage['mediaLayout']).data ?? DEFAULT_MEDIA_LAYOUT;
   const contentMedia = (role: 'display' | 'player') => clip
     ? <StageYouTube key={clip.videoId} clip={clip} label={label} role={role} displayConnected preview />
-    : media && <StageMedia key={media.id} media={{ ...media, url: sceneMediaUrl(media.id) }} label={label} role={role} displayConnected preview />;
+    : media && <StageMedia key={media.id} media={{ ...media, url: sceneMediaUrl(media.id) }} label={label} role={role} displayConnected preview
+      renderPicture={role === 'display' && canvas && !canvas.readOnly ? picture =>
+        <ImageHandles layout={layout} onChange={patch => canvas.edit(current => ({
+          ...current, mediaLayout: { ...(MediaLayoutSchema.safeParse(current['mediaLayout']).data ?? DEFAULT_MEDIA_LAYOUT), ...patch },
+        }), 'media-layout')}>{picture}</ImageHandles> : undefined} />;
   const classes = themeClass(theme);
   const style = useThemeStyle(theme);
   const phoneHint = t(stage.kind === 'info' || stage.kind === 'scoreboard' ? 'pWatch'
@@ -130,10 +137,19 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
             onChange={(value, caret) => editMainText('prompt', value, caret)} />
             : slideTypography ? <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={prompt} format={visiblePromptStyle} /></p> : <p className="tv-prompt">{prompt}</p>}
           <SceneTextBoxes boxes={boxes} phoneColumns={stage['textBoxPhoneColumns'] === true}
-            {...(canvas && !canvas.readOnly ? { renderBox: (box, position) => <CanvasText value={box.text} label={boxText('box', { number: position + 1 })}
-              format={box} readOnly={false} onFocus={() => canvas.selectText(`box:${box.key}`)}
-              onMarks={marks => canvas.edit(current => updateTextFormat(current, `box:${box.key}`, { marks: marks.length ? marks : undefined }), `textBox-${box.key}-marks`)}
-              onChange={(value, caret) => canvas.edit(current => updateBoxText(current, box.key, value, caret), `textBox-${box.key}-text`)} /> } : {})} />
+            {...(canvas && !canvas.readOnly ? { renderBox: (box, index, position, lastRow) => {
+              const target = `box:${box.key}` as const;
+              const label = boxText('box', { number: index + 1 });
+              const select = () => canvas.selectText(target);
+              return <TextBoxHandles label={label} position={position} lastRow={lastRow} lines={box.lines} rotation={box.layout?.rotation}
+                selected={canvas.selectedText === target} onSelect={select}
+                onRotate={rotation => canvas.edit(current => updateBoxLayout(current, box.key, { rotation }), `layout-${box.key}`)}
+                onPlace={(next, lines) => canvas.edit(current => positionTextBox(current, box.key, next, lines), `layout-${box.key}`)}>
+                <CanvasText value={box.text} label={label} format={box} readOnly={false} onFocus={select}
+                  onMarks={marks => canvas.edit(current => updateTextFormat(current, target, { marks: marks.length ? marks : undefined }), `textBox-${box.key}-marks`)}
+                  onChange={(value, caret) => canvas.edit(current => updateBoxText(current, box.key, value, caret), `textBox-${box.key}-text`)} />
+              </TextBoxHandles>;
+            } } : {})} />
         </SceneComposition>
         {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}

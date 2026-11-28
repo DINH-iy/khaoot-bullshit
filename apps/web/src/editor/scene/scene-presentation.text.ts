@@ -3,6 +3,7 @@ import { defineTexts } from '../../i18n/texts.js';
 export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
     position: "Media placement",
     size: "Media size",
+    imageWidth: "Image width (%)", rotation: "Rotation (degrees)", moveImage: "Move picture", resizeImage: "Resize picture", rotateImage: "Rotate picture", imageKeys: "Use the arrow keys to adjust the picture.",
     below: "Below the text",
     above: "Above the text",
     left: "Left of the text",
@@ -19,6 +20,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
   nl: {
     position: "Positie van media",
     size: "Mediaformaat",
+    imageWidth: "Afbeeldingsbreedte (%)", rotation: "Rotatie (graden)", moveImage: "Verplaats afbeelding", resizeImage: "Wijzig afbeeldingsgrootte", rotateImage: "Draai afbeelding", imageKeys: "Gebruik de pijltjestoetsen om de afbeelding aan te passen.",
     below: "Onder de tekst",
     above: "Boven de tekst",
     left: "Links van de tekst",
@@ -35,6 +37,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
   de: {
     position: "Medienposition",
     size: "Mediengröße",
+    imageWidth: "Bildbreite (%)", rotation: "Drehung (Grad)", moveImage: "Bild verschieben", resizeImage: "Bildgröße ändern", rotateImage: "Bild drehen", imageKeys: "Mit den Pfeiltasten das Bild anpassen.",
     below: "Unter dem Text",
     above: "Über dem Text",
     left: "Links vom Text",
@@ -51,6 +54,7 @@ export const SCENE_PRESENTATION_TEXTS = defineTexts('scene-presentation', {
   ro: {
     position: "Poziția conținutului media",
     size: "Dimensiunea conținutului media",
+    imageWidth: "Lățimea imaginii (%)", rotation: "Rotație (grade)", moveImage: "Mută imaginea", resizeImage: "Redimensionează imaginea", rotateImage: "Rotește imaginea", imageKeys: "Folosește tastele săgeată pentru a ajusta imaginea.",
     below: "Sub text",
     above: "Deasupra textului",
     left: "La stânga textului",

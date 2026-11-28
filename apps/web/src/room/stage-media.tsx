@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { CROP_RATIOS, youtubeWatchUrl, type MediaControl, type PublicSceneMedia, type YouTubeClip } from '@party/contracts';
 import { MEDIA_CONTROL_TEXTS } from './media-control.text.js';
 import { useTexts } from '../i18n/texts.js';
@@ -94,14 +94,15 @@ function YouTubeFrame({ clip, title, paused, autoPlay, preview, control }: {
 }
 
 /** Only the shared display (or the host alone) plays sound. The room pause also pauses that screen's media. */
-export function StageMedia({ media, role, displayConnected, label, paused = false, preview = false, control = null }: {
-  media: PublicSceneMedia; role: Role; displayConnected: boolean; label: string; paused?: boolean; preview?: boolean; control?: MediaCommand;
+export function StageMedia({ media, role, displayConnected, label, paused = false, preview = false, control = null, renderPicture }: {
+  media: PublicSceneMedia; role: Role; displayConnected: boolean; label: string; paused?: boolean; preview?: boolean; control?: MediaCommand; renderPicture?: ((picture: ReactNode) => ReactNode) | undefined;
 }) {
   const t = useTexts(EXTRAS_TEXTS);
   if (media.kind === 'image') {
     const crop = media.crop;
     const style = crop ? { '--media-crop-ratio': CROP_RATIOS[crop.ratio], '--media-crop-position': `${crop.x}% ${crop.y}%` } as CSSProperties : undefined;
-    return <><figure className={`stage-media image${crop ? ' cropped' : ''}`} style={style}><img src={media.url} alt={media.alt ?? t('picture', { label })} /></figure>
+    const picture = <figure className={`stage-media image${crop ? ' cropped' : ''}`} style={style}><img src={media.url} alt={media.alt ?? t('picture', { label })} draggable={renderPicture ? false : undefined} /></figure>;
+    return <>{renderPicture ? renderPicture(picture) : picture}
       {media.caption && <p className="stage-media-caption">{media.caption}</p>}</>;
   }
   // The caption shows on every screen, also on phones where the video or song plays on the shared screen.

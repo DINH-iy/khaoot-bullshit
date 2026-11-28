@@ -1237,6 +1237,32 @@
 .scene-canvas .canvas-text-box[data-reading] > textarea { opacity: 0; }
 .scene-canvas .canvas-text-box[data-fixed] > .canvas-text-reading { block-size: var(--box-height); }
 
+.canvas-box-frame { position: relative; min-width: 0; border-radius: 4px; }
+.canvas-box-frame[data-selected] { outline: 2px solid var(--e-accent); outline-offset: 3px; }
+.room .canvas-box-handle {
+  position: absolute; z-index: 1; display: grid; place-items: center; width: 44px; min-height: 44px;
+  margin: 0; padding: 0; border: 0; background: transparent; color: var(--e-text);
+  opacity: 0; pointer-events: none; touch-action: none;
+}
+.room .canvas-box-handle.move { inset: -19px auto auto -44px; justify-items: end; cursor: grab; }
+.room .canvas-box-handle.move:active { cursor: grabbing; }
+.room .canvas-box-handle.resize { inset: auto -44px -19px auto; justify-items: start; cursor: nwse-resize; }
+.room .canvas-box-handle.rotate { inset: -44px auto auto calc(50% - 22px); align-items: end; cursor: grab; }
+.room .canvas-box-handle.rotate:active { cursor: grabbing; }
+.canvas-image-frame { width: 100%; }
+.room .canvas-image-frame > .canvas-box-handle.move { left: -17px; }
+.room .canvas-image-frame > .canvas-box-handle.resize { right: -17px; }
+.canvas-box-handle > span {
+  display: grid; place-items: center; width: 23px; height: 23px;
+  border-radius: 6px; border: 1px solid var(--e-accent); background: var(--e-panel);
+}
+.canvas-box-frame:is(:hover, :focus-within, [data-selected]) .canvas-box-handle, .canvas-box-handle:focus-visible { opacity: 1; pointer-events: auto; }
+.canvas-box-frame[data-dragging] { z-index: 2; }
+.canvas-box-preview {
+  position: fixed; z-index: 145; pointer-events: none; border: 2px dashed var(--e-accent); border-radius: 4px;
+  background: color-mix(in srgb, var(--e-accent) 16%, transparent);
+}
+
 .canvas-selection-tools { position: fixed; z-index: 150; padding: 4px; color: var(--e-text); background: var(--e-panel);
   overflow: auto; border: 1px solid var(--e-border); border-radius: 10px; box-shadow: 0 6px 20px rgb(0 0 0 / .24); }
 .canvas-selection-row, .canvas-selection-flags, .canvas-selection-more { display: flex; align-items: center; gap: 8px; }

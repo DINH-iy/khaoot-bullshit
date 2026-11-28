@@ -25,11 +25,11 @@ describe('importing a game from text', () => {
       hostNotes: 'Welcome everyone.\n\nWait until everyone has joined before continuing.',
       prompt: 'Grab your phone.\n\nClosest cuts and best guesses earn points.',
       textBoxes: [
-        { key: 'reminder', size: 'small', verticalAlign: 'bottom', lines: 2, layout: { width: 6 }, marks: [{ start: 7, end: 15, italic: true, color: '#ffcc55' }] },
+        { key: 'reminder', size: 'small', verticalAlign: 'bottom', lines: 2, layout: { width: 5, startColumn: 1, rotation: -8 }, marks: [{ start: 7, end: 15, italic: true, color: '#ffcc55' }] },
         { key: 'next', layout: { width: 6, startColumn: 7 } },
       ],
     });
-    expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
+    expect(stage('warmup')).toMatchObject({ mediaLayout: { position: 'right', size: 'standard', imageWidth: 48, imageRotation: -12 }, translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
     expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
     expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', voteMode: 'ranked', voteLimit: 3, resultCards: 'manual', durationMs: 40000 });
     expect(stage('finale')).toMatchObject({ input: { kind: 'order', items: [{ label: 'Walkman' }, { label: 'Discman' }, { label: 'iPod' }, { label: 'Smartphone' }] }, scoring: { kind: 'correct-order', correctOrder: ['walkman', 'discman', 'ipod', 'smartphone'], awardMilli: '15000' } });

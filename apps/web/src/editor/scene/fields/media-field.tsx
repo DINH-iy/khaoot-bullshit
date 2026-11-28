@@ -6,6 +6,7 @@ import { DEFAULT_MEDIA_LAYOUT, LIBRARY_ACCEPT, LIBRARY_LIMITS, LibraryItemSchema
 import { roomApi } from '../../../room/api.js';
 import { StageMedia } from '../../../room/stage-media.js';
 import { Icon } from '../../controls/icons.js';
+import { NumberSetting } from '../../controls/number-setting.js';
 import { ConfirmDialog } from '../../controls/confirm-dialog.js';
 import { translate, useTexts } from '../../../i18n/texts.js';
 import { AudioEditForm, type AudioEdit } from './audio-edit.js';
@@ -74,7 +75,7 @@ export function MediaField({ stage, open, onOpen, onClose, onChange }: { stage: 
   };
   const setLayout = (next: MediaLayout) => {
     const copy = { ...stage };
-    if (next.position === DEFAULT_MEDIA_LAYOUT.position && next.size === DEFAULT_MEDIA_LAYOUT.size) delete copy['mediaLayout'];
+    if (next.position === DEFAULT_MEDIA_LAYOUT.position && next.size === DEFAULT_MEDIA_LAYOUT.size && next.imageWidth === undefined && next.imageRotation === undefined) delete copy['mediaLayout'];
     else copy['mediaLayout'] = next;
     onChange(copy);
   };
@@ -99,8 +100,14 @@ export function MediaField({ stage, open, onOpen, onClose, onChange }: { stage: 
           <span className={`layout-thumbnail layout-${position}`} aria-hidden="true"><i /><b /></span><span>{layoutText(`short-${position}`)}</span>
         </button>)}</div>
       </div>
-      <label>{layoutText('size')}<Dropdown value={layout.size} onChange={value => setLayout({ ...layout, size: value as MediaLayout['size'] })}
+      <label>{layoutText('size')}<Dropdown value={layout.size} onChange={value => setLayout({ ...layout, size: value as MediaLayout['size'], imageWidth: undefined })}
         options={MEDIA_SIZES.map(value => ({ value, label: layoutText(value) }))} /></label>
+      {media?.kind === 'image' && <>
+        <label>{layoutText('imageWidth')}<NumberSetting value={layout.imageWidth} min={10} max={80} placeholder={layoutText('size')}
+          onChange={imageWidth => setLayout({ ...layout, imageWidth })} /></label>
+        <label>{layoutText('rotation')}<NumberSetting value={layout.imageRotation} min={-180} max={180} placeholder="0"
+          onChange={imageRotation => setLayout({ ...layout, imageRotation })} /></label>
+      </>}
       {media?.kind === 'audio' && <label className="choice"><input type="checkbox" checked={media.waveform !== false} onChange={event => {
         const { waveform: _waveform, ...source } = media;
         onChange({ ...stage, media: event.target.checked ? source : { ...source, waveform: false } });

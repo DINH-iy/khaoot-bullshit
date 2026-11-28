@@ -1,16 +1,22 @@
 .scene-composition { container-type: inline-size; min-width: 0; }
 .scene-composition-body, .composition-copy { display: grid; gap: 12px; min-width: 0; align-content: start; }
-.composition-media { width: min(100%, max(var(--media-min, 0px), var(--composition-width, 100%))); min-width: 0; justify-self: center; }
+.composition-media { width: min(100%, max(var(--media-min, 0px), var(--composition-width, var(--preset-width, 100%)))); min-width: 0; justify-self: center; }
+.composition-media:has(.stage-media.image) { --composition-width: var(--image-width, var(--preset-width, 100%)); }
+.scene-composition .stage-media.image { rotate: var(--image-rotation, none); }
+.scene-composition .canvas-image-frame > .stage-media.image { rotate: none; }
+.scene-composition[data-image-width] .stage-media.image { max-width: none; }
+.scene-composition[data-image-width] .stage-media.image:not(.cropped) img { max-height: none; }
 .composition-media:has(.stage-media.audio), .has-media:has(.stage-media.audio) { --media-min: 140px; }
 .composition-media:has(.stage-media.youtube), .has-media:has(.stage-media.youtube) { --media-min: 200px; }
 .composition-media .stage-media:is(.image, .video) :is(img, video) { width: 100%; }
 .composition-media .stage-media:not(.cropped) :is(img, video) { max-height: var(--composition-height); }
 .composition-media .stage-media.cropped { max-width: calc(var(--composition-height) * var(--media-crop-ratio)); }
-.media-compact { --composition-width: min(48%, 320px); --composition-share: 29%; --composition-height: min(26dvh, 300px); }
-.media-standard { --composition-width: min(74%, 640px); --composition-share: 40%; --composition-height: min(38dvh, 460px); }
-.media-wide { --composition-width: 100%; --composition-share: 55%; --composition-height: min(52dvh, 640px); }
+.media-compact { --preset-width: min(48%, 320px); --composition-share: 29%; --composition-height: min(26dvh, 300px); }
+.media-standard { --preset-width: min(74%, 640px); --composition-share: 40%; --composition-height: min(38dvh, 460px); }
+.media-wide { --preset-width: 100%; --composition-share: 55%; --composition-height: min(52dvh, 640px); }
 @container (min-width: 340px) {
   .media-left .has-media, .media-right .has-media { --media-track: max(var(--media-min, 0px), var(--composition-share)); }
+  :is(.media-left, .media-right) .has-media:has(.stage-media.image) { --media-track: var(--image-width, var(--composition-share)); }
   .media-left .has-media:not(.room-player *), .media-right .has-media:not(.room-player *) { align-items: center; gap: clamp(10px, 3cqw, 32px); }
   :is(.media-left, .media-right) .has-media:not(.room-player *) > .composition-media { width: 100%; }
   .media-left .has-media:not(.room-player *) { grid-template-columns: minmax(0, var(--media-track)) minmax(0, 1fr); }

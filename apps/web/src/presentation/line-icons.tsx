@@ -19,6 +19,8 @@ const paths: Record<string, string> = {
   eraser: 'M14.5 4.5l5 5L11 18H6.5L3 14.5z M9 10l5 5 M6.5 18H21',
   // Start over: a circular arrow back to the beginning.
   restart: 'M4 12a8 8 0 1 0 2.4-5.7 M4 4v4h4',
+  move: 'M12 3v18 M3 12h18 M9 6l3-3 3 3 M9 18l3 3 3-3 M6 9l-3 3 3 3 M18 9l3 3-3 3',
+  'resize-corner': 'M7 17L17 7 M7 11v6h6 M11 7h6v6',
   redo: 'M15 14l5-5-5-5 M20 9H9a5 5 0 0 0 0 10h3',
   plus: 'M12 5v14 M5 12h14',
   // A minigame draw: a card held in front of a second one, with a question mark.

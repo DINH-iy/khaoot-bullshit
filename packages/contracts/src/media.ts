@@ -31,6 +31,8 @@ export const MEDIA_SIZES = ['compact', 'standard', 'wide'] as const;
 export const MediaLayoutSchema = z.object({
   position: z.enum(MEDIA_POSITIONS),
   size: z.enum(MEDIA_SIZES),
+  imageWidth: z.number().int().min(10).max(80).optional(),
+  imageRotation: z.number().int().min(-180).max(180).optional(),
 }).strict();
 export type MediaLayout = z.infer<typeof MediaLayoutSchema>;
 export const DEFAULT_MEDIA_LAYOUT: MediaLayout = { position: 'below', size: 'standard' };

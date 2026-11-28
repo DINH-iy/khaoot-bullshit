@@ -198,7 +198,62 @@ test('authors can place two or three text boxes in a row and delete a selected b
   [first, second, third] = await getPositions();
   expect(third!.y).toBeGreaterThan(first!.y);
   expect(third!.x).toBeGreaterThan(second!.x);
+
+  const selectedBox = page.locator('.canvas-box-frame[data-selected]');
+  const moveHandle = selectedBox.getByRole('button', { name: /^Move Text box/ });
+  const resizeHandle = selectedBox.getByRole('button', { name: /^Resize Text box/ });
+  const step = await grid.evaluate(element => (element.getBoundingClientRect().width + parseFloat(getComputedStyle(element).columnGap)) / 12);
+  const lineHeight = await selectedBox.locator('textarea').evaluate(element => parseFloat(getComputedStyle(element).lineHeight));
+  const dragHandle = async (handle: typeof moveHandle, dx: number, dy: number) => {
+    await expect(handle).toBeVisible();
+    const button = (await handle.boundingBox())!;
+    const x = button.x + button.width / 2;
+    const y = button.y + button.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 8 });
+    await expect(page.locator('.canvas-box-preview')).toBeVisible();
+    await page.mouse.up();
+    await expect(page.locator('.canvas-box-preview')).toHaveCount(0);
+  };
+  await dragHandle(moveHandle, step, 0);
+  await expect(settings.getByRole('combobox', { name: 'Start column', exact: true })).toHaveText('8');
+  await expect(settings.getByRole('combobox', { name: 'Row', exact: true })).toHaveText('2');
+
+  await dragHandle(resizeHandle, -step, 2 * lineHeight);
+  await expect(settings.getByRole('combobox', { name: 'Box width' })).toHaveText('One quarter');
+  await expect(settings.getByLabel('Height in lines')).toHaveValue('3');
+  await moveHandle.press('ArrowLeft');
+  await expect(settings.getByRole('combobox', { name: 'Start column', exact: true })).toHaveText('7');
+
+  [first, second, third] = await getPositions();
+  await dragHandle(moveHandle, 0, first!.y - third!.y);
+  await expect(settings.getByRole('combobox', { name: 'Row', exact: true })).toHaveText('1');
+  await expect(grid.locator('.scene-text-cell').first().locator('textarea')).toHaveValue('Start playing');
+  const rotateHandle = selectedBox.getByRole('button', { name: /^Rotate Text box/ });
+  const rotation = settings.getByRole('spinbutton', { name: 'Rotation (degrees)' });
+  const handle = (await rotateHandle.boundingBox())!;
+  const frame = (await selectedBox.boundingBox())!;
+  const x = frame.x + frame.width / 2;
+  const y = frame.y + frame.height / 2;
+  const radius = y - handle.y - handle.height / 2;
+  await page.mouse.move(handle.x + handle.width / 2, y - radius);
+  await page.mouse.down();
+  await page.mouse.move(x + radius / 2, y - radius * Math.sqrt(3) / 2, { steps: 8 });
+  await expect(selectedBox).toHaveCSS('rotate', '30deg');
+  await page.mouse.up();
+  await expect(rotation).toHaveValue('30');
+  await rotateHandle.press('ArrowLeft');
+  await expect(rotation).toHaveValue('29');
+  await chooseOption(settings.getByRole('combobox', { name: 'Row', exact: true }), '2');
+  await expect(settings.getByRole('combobox', { name: 'Row', exact: true })).toHaveText('2');
+  await expect(rotation).toHaveValue('29');
+  await rotation.fill('12');
+  await rotation.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('text-box-handles.png') });
   await chooseOption(arrange, '3');
+  await expect(rotation).toHaveValue('12');
 
   const devices = page.getByRole('group', { name: 'Preview device' });
   await devices.getByRole('button', { name: 'Phone', exact: true }).click();
@@ -220,6 +275,11 @@ test('authors can place two or three text boxes in a row and delete a selected b
   await expect(grid.locator('.scene-text-cell')).toHaveCount(2);
   [first, second] = await getPositions();
   expect(second!.y).toBeCloseTo(first!.y);
+  const firstBox = grid.locator('.canvas-box-frame').first();
+  await firstBox.locator('textarea').click();
+  await firstBox.getByRole('button', { name: /^Rotate Text box/ }).press('Shift+ArrowRight');
+  await expect(firstBox).toHaveCSS('rotate', '15deg');
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 
   const pop = page.waitForEvent('popup');
   await page.getByRole('button', { name: 'Play & publish' }).click();
@@ -231,7 +291,10 @@ test('authors can place two or three text boxes in a row and delete a selected b
   for (const frame of [host, bench.frameLocator('iframe[title="Phone of Player 1"]')]) {
     const live = frame.locator('.scene-text-cell');
     await expect(live).toHaveText(['Warm up', 'Get ready']);
-    expect(Math.abs((await live.nth(0).boundingBox())!.y - (await live.nth(1).boundingBox())!.y)).toBeLessThan(1);
+    await expect(frame.locator('.canvas-box-handle')).toHaveCount(0);
+    await expect(live.first()).toHaveCSS('rotate', '15deg');
+    const rowTops = await live.evaluateAll(cells => cells.map(cell => (cell as HTMLElement).offsetTop));
+    expect(rowTops[0]).toBe(rowTops[1]);
   }
 
 });
