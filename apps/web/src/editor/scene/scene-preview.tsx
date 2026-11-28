@@ -231,7 +231,7 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
         {!interactive && !draw && options.length > placedAnswerCount && <ul className={`${canvas ? 'tv-options' : 'options-board'}${ordered || (canvas && input?.layout === 'list') ? ' order' : ''}`}
           style={canvas ? undefined : answerFit(options.map(option => option.label))}>
           {options.map((option, position) => choices?.[position]?.placement
-            ? <li key={option.key} className="answer-slot-placeholder" aria-hidden="true">{option.label}</li>
+            ? <li key={option.key} className="answer-slot-placeholder" aria-hidden="true">{'\u00a0'}</li>
             : renderAnswer(option, position))}
         </ul>}
         {canPlaceAnswers ? <ul className="scene-slide-layer scene-slide-answers tv-options" data-editable>

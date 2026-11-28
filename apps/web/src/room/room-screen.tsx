@@ -660,7 +660,8 @@ function OptionsBoard({ input, route = false }: { input: NonNullable<StageInput>
       const mark = input.kind === 'order' ? '•' : answerMark(theme, index, entries.length, route);
       return <li key={entry.key} aria-hidden={placed || undefined} className={placed ? 'answer-slot-placeholder' : undefined} data-authored-answer={hasPlacement || undefined}
         style={hasPlacement ? { '--positioned-answer-color': answerAccent(index) } as React.CSSProperties : undefined}>
-        {mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}<AnswerOptionLabel option={entry} />
+        {mark !== null && <span className="answer-mark" aria-hidden="true"><Mark text={mark} /></span>}
+        {placed ? (mark === null ? '\u00a0' : null) : <AnswerOptionLabel option={entry} />}
       </li>;
     })}</ol>;
 }

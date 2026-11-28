@@ -18,7 +18,7 @@
 .scene-positioned-answer { position: absolute; translate: -50% -50%; box-sizing: border-box; }
 .room .options-board li:is(.scene-positioned-answer, [data-authored-answer]) { background-color: var(--positioned-answer-color); }
 .room.tiles-outline .options-board li:is(.scene-positioned-answer, [data-authored-answer]) { border-color: var(--positioned-answer-color); }
-.room .options-board li.scene-positioned-answer { overflow: hidden; padding: clamp(4px, 1.5vw, 18px); }
+.room .options-board li.scene-positioned-answer { overflow-wrap: anywhere; padding: clamp(4px, 1.5vw, 18px); }
 
 .answer-slot-placeholder { visibility: hidden; }
 

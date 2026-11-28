@@ -409,7 +409,7 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   const x = settings.getByRole('spinbutton', { name: 'Horizontal position (%)' });
   const y = settings.getByRole('spinbutton', { name: 'Vertical position (%)' });
   const width = settings.getByRole('spinbutton', { name: 'Answer width (%)' });
-  const height = settings.getByRole('spinbutton', { name: 'Answer height (%)' });
+  const height = settings.getByRole('spinbutton', { name: 'Minimum answer height (%)' });
   const rotation = settings.getByRole('spinbutton', { name: 'Rotation (degrees)' });
   const set = async (field: typeof x, value: string) => { await field.fill(value); await field.press('Enter'); };
   const drag = async (name: string, dx: number, dy: number) => {
@@ -440,7 +440,7 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   await set(y, '76.2');
   await set(width, '36.4');
   await set(height, '16.3');
-  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
+  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; min-height: 16.3%/);
 
   const rotateFirst = canvas.getByRole('button', { name: 'Rotate answer 1' });
   const handle = (await rotateFirst.boundingBox())!;
@@ -475,8 +475,8 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   await set(y, '47.3');
   await set(width, '31.2');
   await set(height, '12.6');
-  await expect(neighbor).toHaveAttribute('style', /left: 77.4%; top: 47.3%; width: 31.2%; height: 12.6%/);
-  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
+  await expect(neighbor).toHaveAttribute('style', /left: 77.4%; top: 47.3%; width: 31.2%; min-height: 12.6%/);
+  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; min-height: 16.3%/);
   await settings.getByRole('button', { name: 'Return answer to automatic layout' }).click();
   await expect(neighbor).not.toHaveClass(/scene-positioned-answer/);
   await set(x, '77.4');
@@ -499,10 +499,18 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   const hex = page.getByRole('dialog', { name: 'Text color' }).locator('.color-code input');
   await hex.fill('#f0c45c');
   await hex.press('Enter');
+  await page.screenshot({ path: testInfo.outputPath('answer-color-picker.png') });
   await hex.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Text color' })).toHaveCount(0);
   await expect(toolbar).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('answer-word-formatting.png') });
-  await page.locator('.scene-props').getByRole('textbox', { name: 'Answer option 1', exact: true }).fill('Bright Planet Saturn');
+  const shortHeight = await first.evaluate(element => element.offsetHeight);
+  const sidebarAnswer = page.locator('.scene-props').getByRole('textbox', { name: 'Answer option 1', exact: true });
+  await sidebarAnswer.click();
+  await sidebarAnswer.evaluate(input => (input as HTMLInputElement).setSelectionRange(0, 0));
+  await page.keyboard.insertText('Surrounded by rings of ice and rock, this is ');
+  await expect(sidebarAnswer).toHaveValue('Surrounded by rings of ice and rock, this is Planet Saturn');
+  await expect.poll(() => first.evaluate(element => element.offsetHeight)).toBeGreaterThan(shortHeight);
   await expect(first.locator('.canvas-text-reading').getByText('Saturn', { exact: true })).toHaveCSS('font-style', 'italic');
 
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
@@ -522,20 +530,27 @@ test('quiz answers move, resize and rotate independently on the slide while phon
   await expect(host.getByText(/Player 1 · connected/)).toBeVisible();
   await host.getByRole('button', { name: 'Start the game' }).click();
   const placed = host.locator('.scene-positioned-answer').filter({ hasText: 'Saturn' });
-  await expect(placed).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
+  await expect(placed).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; min-height: 16.3%/);
   await expect(placed).toHaveCSS('rotate', '7deg');
   const selectedWord = placed.locator('.answer-label').getByText('Saturn', { exact: true });
   await expect(selectedWord).toHaveCSS('font-style', 'italic');
   await expect(selectedWord).toHaveCSS('text-decoration-line', 'underline');
   await expect(selectedWord).toHaveCSS('color', 'rgb(240, 196, 92)');
   await expect(selectedWord).toHaveAttribute('style', /font-size: 145%/);
+  const cardFit = await placed.evaluate(element => ({
+    height: element.offsetHeight,
+    minimum: element.parentElement!.clientHeight * 0.163,
+    textHeight: element.querySelector<HTMLElement>('.answer-label')!.offsetHeight,
+  }));
+  expect(cardFit.height).toBeGreaterThan(cardFit.minimum);
+  expect(cardFit.textHeight).toBeLessThan(cardFit.height);
   await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveCSS('rotate', '-9deg');
-  await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveAttribute('style', /left: 77.4%; top: 49.3%; width: 31.2%; height: 12.6%/);
+  await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveAttribute('style', /left: 77.4%; top: 49.3%; width: 31.2%; min-height: 12.6%/);
   await expect(host.locator('.canvas-box-handle')).toHaveCount(0);
   const automatic = host.locator('.with-positioned-answers li:visible').filter({ hasText: 'Venus' });
   const automaticBounds = (await automatic.boundingBox())!;
-  const positionedBounds = (await placed.boundingBox())!;
-  expect(automaticBounds.y + automaticBounds.height).toBeLessThan(positionedBounds.y);
+  const boardBounds = (await host.locator('.scene-slide-answers').boundingBox())!;
+  expect(automaticBounds.y + automaticBounds.height).toBeLessThan(boardBounds.y + boardBounds.height * 0.762);
   await host.locator('.stage-card').screenshot({ path: testInfo.outputPath('live-answer-layout.png') });
   await expect(phone.locator('.answer-form label')).toHaveCount(3);
   await expect(phone.locator('.answer-form .answer-label').getByText('Saturn', { exact: true })).toHaveCSS('font-style', 'italic');

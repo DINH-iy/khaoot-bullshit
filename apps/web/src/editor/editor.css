@@ -943,6 +943,7 @@
   max-height: clamp(8rem, 34dvh, 18rem);
 }
 .scene-canvas .canvas-text-box::after { content: attr(data-text) '\200b'; visibility: hidden; overflow: hidden; pointer-events: none; }
+.scene-canvas .canvas-answer-text::after, .scene-canvas .canvas-answer-text > textarea { max-height: none; }
 .scene-canvas .canvas-text-box[data-sized]::after { display: none; }
 .scene-canvas .canvas-text-box > textarea {
   resize: none; overflow: auto;
