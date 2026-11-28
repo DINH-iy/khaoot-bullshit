@@ -70,6 +70,7 @@ export const MIN_ANSWER_HEIGHT_PERCENT = 5;
 export const AnswerPlacementSchema = SceneTextBoxPlacementSchema.extend({
   width: z.number().min(MIN_ANSWER_WIDTH_PERCENT).max(100),
   height: z.number().min(MIN_ANSWER_HEIGHT_PERCENT).max(100),
+  rotation: z.number().int().min(-180).max(180).optional(),
 });
 export type AnswerPlacement = z.infer<typeof AnswerPlacementSchema>;
 export const AnswerOptionSchema = ChoiceOptionSchema.extend({ placement: AnswerPlacementSchema.optional() });

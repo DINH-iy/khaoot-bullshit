@@ -4,7 +4,7 @@ import { Mark } from './mark-icons.js';
 import { slideObjectStyle } from './slide-object.js';
 
 export function answerPlacementStyle(placement: AnswerPlacement): CSSProperties {
-  return { ...slideObjectStyle(placement), height: `${placement.height}%` };
+  return { ...slideObjectStyle(placement), height: `${placement.height}%`, rotate: placement.rotation ? `${placement.rotation}deg` : undefined };
 }
 
 export const answerAccent = (index: number) => `var(--a${index % 8 + 1})`;

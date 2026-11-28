@@ -391,7 +391,7 @@ test('the title and question can be positioned independently and keep their role
   await expect(phone.getByRole('status').filter({ hasText: 'Your answer is in!' })).toBeVisible();
 });
 
-test('quiz answers move and resize independently on the slide while phones can submit', async ({ page, baseURL }, testInfo) => {
+test('quiz answers move, resize and rotate independently on the slide while phones can submit', async ({ page, baseURL }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseURL}/?host=1#owner=${ownerToken}`);
   await expect(page.getByRole('heading', { name: 'Built-in games' })).toBeVisible();
@@ -410,6 +410,7 @@ test('quiz answers move and resize independently on the slide while phones can s
   const y = settings.getByRole('spinbutton', { name: 'Vertical position (%)' });
   const width = settings.getByRole('spinbutton', { name: 'Answer width (%)' });
   const height = settings.getByRole('spinbutton', { name: 'Answer height (%)' });
+  const rotation = settings.getByRole('spinbutton', { name: 'Rotation (degrees)' });
   const set = async (field: typeof x, value: string) => { await field.fill(value); await field.press('Enter'); };
   const drag = async (name: string, dx: number, dy: number) => {
     const handle = canvas.getByRole('button', { name, exact: true });
@@ -436,30 +437,62 @@ test('quiz answers move and resize independently on the slide while phones can s
   expect(Number(await width.inputValue())).toBeLessThan(oldWidth);
   expect(Number(await height.inputValue())).toBeGreaterThan(oldHeight);
   await set(x, '48.5');
-  await set(y, '72.2');
+  await set(y, '76.2');
   await set(width, '36.4');
   await set(height, '16.3');
-  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 72.2%; width: 36.4%; height: 16.3%/);
+  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
+
+  const rotateFirst = canvas.getByRole('button', { name: 'Rotate answer 1' });
+  const handle = (await rotateFirst.boundingBox())!;
+  const card = (await first.boundingBox())!;
+  const center = { x: card.x + card.width / 2, y: card.y + card.height / 2 };
+  const radius = center.y - (handle.y + handle.height / 2);
+  const radians = 22 * Math.PI / 180;
+  await page.mouse.move(handle.x + handle.width / 2, center.y - radius);
+  await page.mouse.down();
+  await page.keyboard.down('Shift');
+  await page.mouse.move(center.x + Math.sin(radians) * radius, center.y - Math.cos(radians) * radius, { steps: 8 });
+  await expect(first).toHaveCSS('rotate', '15deg');
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  await expect(rotation).toHaveValue('15');
+  await rotateFirst.press('ArrowRight');
+  await expect(rotation).toHaveValue('16');
+  await set(rotation, '7');
+  await expect(first).toHaveCSS('rotate', '7deg');
+  await drag('Resize answer 1', 16, 2);
+  expect(Number(await width.inputValue())).toBeGreaterThan(36.4);
+  expect(Number(await height.inputValue())).toBeCloseTo(16.3, 0);
+  await set(width, '36.4');
+  await set(height, '16.3');
 
   await chooseOption(picker, 'mercury');
+  await canvas.getByRole('button', { name: 'Rotate answer 2' }).press('ArrowLeft');
+  await expect(rotation).toHaveValue('-1');
+  await set(rotation, '');
+  await expect(neighbor).toHaveCSS('rotate', 'none');
   await set(x, '77.4');
   await set(y, '47.3');
   await set(width, '31.2');
   await set(height, '12.6');
   await expect(neighbor).toHaveAttribute('style', /left: 77.4%; top: 47.3%; width: 31.2%; height: 12.6%/);
-  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 72.2%; width: 36.4%; height: 16.3%/);
+  await expect(first).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
   await settings.getByRole('button', { name: 'Return answer to automatic layout' }).click();
   await expect(neighbor).not.toHaveClass(/scene-positioned-answer/);
   await set(x, '77.4');
   await set(y, '49.3');
   await set(width, '31.2');
   await set(height, '12.6');
+  await set(rotation, '-9');
+  await expect(neighbor).toHaveCSS('rotate', '-9deg');
 
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   await settings.evaluate(element => element.scrollIntoView({ block: 'center' }));
   await page.screenshot({ path: testInfo.outputPath('freely-positioned-answers.png') });
   await page.reload();
   await expect(canvas.locator('.scene-positioned-answer')).toHaveCount(2);
+  await expect(first).toHaveCSS('rotate', '7deg');
+  await expect(neighbor).toHaveCSS('rotate', '-9deg');
 
   const popup = page.waitForEvent('popup');
   await page.getByRole('button', { name: 'Play & publish' }).click();
@@ -470,7 +503,9 @@ test('quiz answers move and resize independently on the slide while phones can s
   await expect(host.getByText(/Player 1 · connected/)).toBeVisible();
   await host.getByRole('button', { name: 'Start the game' }).click();
   const placed = host.locator('.scene-positioned-answer').filter({ hasText: 'Saturn' });
-  await expect(placed).toHaveAttribute('style', /left: 48.5%; top: 72.2%; width: 36.4%; height: 16.3%/);
+  await expect(placed).toHaveAttribute('style', /left: 48.5%; top: 76.2%; width: 36.4%; height: 16.3%/);
+  await expect(placed).toHaveCSS('rotate', '7deg');
+  await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveCSS('rotate', '-9deg');
   await expect(host.locator('.scene-positioned-answer').filter({ hasText: 'Mercury' })).toHaveAttribute('style', /left: 77.4%; top: 49.3%; width: 31.2%; height: 12.6%/);
   await expect(host.locator('.canvas-box-handle')).toHaveCount(0);
   const automatic = host.locator('.with-positioned-answers li:visible').filter({ hasText: 'Venus' });

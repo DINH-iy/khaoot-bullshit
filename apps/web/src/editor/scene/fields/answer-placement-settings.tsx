@@ -7,6 +7,7 @@ import { ANSWER_PLACEMENT_TEXTS } from './answer-placement.text.js';
 const controls = [
   { key: 'x', min: 0 }, { key: 'y', min: 0 },
   { key: 'width', min: MIN_ANSWER_WIDTH_PERCENT }, { key: 'height', min: MIN_ANSWER_HEIGHT_PERCENT },
+  { key: 'rotation', min: -180 },
 ] as const;
 
 export function AnswerPlacementSettings({ options, selected, select, measure, change }: {
@@ -22,7 +23,11 @@ export function AnswerPlacementSettings({ options, selected, select, measure, ch
     {active && <>
       <div className="slide-position-values">
         {controls.map(({ key, min }) => <label key={key}>{t(key)}<NumberSetting key={active.key} value={position?.[key]}
-          min={min} max={100} step={0.1} placeholder={t('auto')} onChange={value => {
+          min={min} max={key === 'rotation' ? 180 : 100} step={key === 'rotation' ? 1 : 0.1}
+          placeholder={key === 'rotation' ? '0' : t('auto')} onChange={value => {
+            if (key === 'rotation' && value === undefined && position?.rotation !== undefined) {
+              change(active.key, { ...position, rotation: undefined });
+            }
             if (value !== undefined) change(active.key, { ...(position ?? measure(active.key) ?? { x: 50, y: 65, width: 40, height: 12 }), [key]: value });
           }} /></label>)}
       </div>
