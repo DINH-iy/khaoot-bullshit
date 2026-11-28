@@ -1,9 +1,10 @@
 import { HOSTED_POOL_TEXTS } from '../head-to-head/eight-ball/hosted.text.js';
-import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type EditorLayout, type MinigameKey, type PrefabContent } from '@party/contracts';
+import { HEAD_TO_HEAD_KEYS, isHeadToHeadKey, isMinigameKey, MINIGAME_KEYS, MINIGAMES, TEAM_MINIGAMES, type SceneTextStyle, type EditorLayout, type MinigameKey, type PrefabContent } from '@party/contracts';
 import { translate } from '../i18n/texts.js';
 import { LANGUAGES, type Language } from '../i18n/language.js';
 import { isDefaultGraphQuestion } from '../minigames/draw-the-graph/graph-question.js';
 import { GRAPH_TEXTS } from '../minigames/draw-the-graph/graph.text.js';
+import { moveTextMarks } from './scene/text-marks.js';
 import { MODEL_TEXTS } from './model.text.js';
 import { CATALOG_TEXTS } from '../presentation/catalog.text.js';
 import { gameDescription, gameName } from '../presentation/catalog.text.js';
@@ -455,8 +456,22 @@ export function deleteScene(definition: Definition, key: string): Definition {
   const start = definition.startNodeKey !== key ? definition.startNodeKey : nodes.find(node => !edges.some(edge => edge.to === node.key))?.key ?? nodes[0]?.key ?? key;
   return { ...definition, nodes, edges, startNodeKey: start };
 }
+export function withRemappedText(previous: Stage, next: Stage, field: 'prompt' | 'title', caret?: number): Stage {
+  const key = field === 'prompt' ? 'promptStyle' : 'titleStyle';
+  if (previous[field] === next[field] || previous[key] !== next[key]) return next;
+  const style = next[key] as SceneTextStyle | undefined;
+  if (!style?.marks?.length) return next;
+  const { marks, ...rest } = style;
+  const moved = moveTextMarks(marks, previous[field] ?? '', next[field] ?? '', caret);
+  if (moved.length) return { ...next, [key]: { ...rest, marks: moved } };
+  const result = { ...next };
+  if (Object.keys(rest).length) result[key] = rest;
+  else delete result[key];
+  return result;
+}
+
 export function updateStage(definition: Definition, nodeKey: string, index: number, change: (stage: Stage) => Stage): Definition {
-  return { ...definition, nodes: definition.nodes.map(node => node.key !== nodeKey ? node : { ...node, stages: node.stages.map((stage, position) => position === index ? change(stage) : stage) }) };
+  return { ...definition, nodes: definition.nodes.map(node => node.key !== nodeKey ? node : { ...node, stages: node.stages.map((stage, position) => position === index ? withRemappedText(stage, withRemappedText(stage, change(stage), 'prompt'), 'title') : stage) }) };
 }
 /** Removing a route option also removes its connection. */
 export function setRouteOptions(definition: Definition, nodeKey: string, options: Option[]): Definition {

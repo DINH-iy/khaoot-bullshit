@@ -1,5 +1,6 @@
 import { z } from 'zod';
 export * from './game.js';
+export * from './scene-text.js';
 export * from './rooms.js';
 export * from './chat.js';
 export * from './authoring.js';

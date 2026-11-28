@@ -1,7 +1,7 @@
-import { StoredGraphsSchema, AutoRevealSecondsSchema, ColorSchema, GameRoomSettingsSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
+import { StoredGraphsSchema, HostNotesSchema, AutoRevealSecondsSchema, ColorSchema, GameRoomSettingsSchema, pointsAtStake, STANDARD_PLACEMENT_MILLI, IdleCloseMinutesSchema, PoolMatchSecondsSchema, ResultCardsSchema, VotingModeSchema, MAX_BALLOT_SELECTIONS } from '@party/contracts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { CARRYOVERS, MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
+import { CARRYOVERS, MAX_OWN_REACTIONS, MAX_SOUNDS, OwnReactionSchema, SoundSchema, CAPTAIN_PICKS, SOLO_MINIGAMES, HeadToHeadKeySchema, parseHeadToHeadSettings, AwardMilliSchema, ChoiceOptionSchema, FINALE_STATS, GameKeySchema, InputSchema, isMinigameKey, MINIGAMES, parseMinigameSettings, PlacesSchema, placePoints, PresentationSchema, MediaLayoutSchema, YouTubeClipSchema, SceneMediaSchema, SceneTranslationsSchema, ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema, SceneMusicSchema, GameMusicSchema, StageDurationSchema, TEAM_MINIGAMES, type MinigameKey, type MinigameSettings, AWARD_RULES, CLAP_END_MS, TEAM_DECIDES, type TeamDecides, MAX_OPEN_INVITES, MINIGAME_TIEBREAKS, minigameTiebreak, type MinigameTiebreak, MinigameScoringSchema, minigameScoring, type MinigameScoring } from '@party/contracts';
 import { allStages, graphIssues } from './graph.js';
 import { GameError } from './errors.js';
 
@@ -67,12 +67,12 @@ export const WheelSchema = z.object({
 // All optional, so earlier definitions keep their hash.
 // `media`: a picture, video or song from the media library shown with the scene's text (optional; earlier definitions keep their hash).
 // `music`: what the scene does with the game's music (keep it, its own song, quieter, silent).
-const look = { mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
+const look = { hostNotes: HostNotesSchema.optional(), textBoxes: SceneTextBoxesSchema.optional(), promptStyle: SceneTextStyleSchema.optional(), mediaLayout: MediaLayoutSchema.optional(), youtube: YouTubeClipSchema.optional(), translations: SceneTranslationsSchema.optional(), media: SceneMediaSchema.optional(), music: SceneMusicSchema.optional(), presentation: PresentationSchema.omit({ phoneMenuIcons: true }).optional(), spin: z.object({ wheel: GameKeySchema }).strict().optional(), wheelClear: z.boolean().optional(),
   // An intro shown before the scene starts, until the host continues. No `text`: a minigame's “how to play”.
   // `points`: also show the points at stake (worked out from the scene's scoring). `picture`: a picture from the
   // media library. `screenOnly`: only the shared screen shows it; phones wait without “Got it”.
   explain: z.object({ text: z.string().trim().min(1).max(1000).optional(), points: z.boolean().optional(), picture: SceneMediaSchema.optional(), screenOnly: z.boolean().optional() }).strict().optional() };
-const common = { key: GameKeySchema, prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), resultCards: ResultCardsSchema.optional(), countdownSeconds: z.number().int().min(0).max(15).optional(), ...look };
+const common = { key: GameKeySchema, prompt: ScenePromptSchema, durationMs: StageDurationSchema.nullable(), play: PlaySchema.optional(), resultCards: ResultCardsSchema.optional(), countdownSeconds: z.number().int().min(0).max(15).optional(), ...look };
 const stageSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('collect'), input: InputSchema, scoring }).strict(),
   z.object({ ...common, kind: z.literal('challenge'), maxAwardMilli: AwardMilliSchema, places: PlacesSchema.optional() }).strict(),
@@ -81,9 +81,9 @@ const stageSchema = z.discriminatedUnion('kind', [
   // Show-only scenes: no answers, no points, no team play. The host continues
   // whenever they like; an optional countdown only informs the room.
   // An info scene (cutscene, rules, announcement): a title and text on every screen.
-  z.object({ ...look, key: GameKeySchema, kind: z.literal('info'), title: z.string().trim().min(1).max(120), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable() }).strict(),
+  z.object({ ...look, titleStyle: SceneTextStyleSchema.optional(), key: GameKeySchema, kind: z.literal('info'), title: SceneTitleSchema, prompt: ScenePromptSchema, durationMs: StageDurationSchema.nullable() }).strict(),
   // A scoreboard scene: the standings of players, the game's teams, or both.
-  z.object({ ...look, key: GameKeySchema, kind: z.literal('scoreboard'), prompt: z.string().trim().min(1).max(2000), show: z.enum(['players', 'teams', 'both']), durationMs: StageDurationSchema.nullable() }).strict(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('scoreboard'), prompt: ScenePromptSchema, show: z.enum(['players', 'teams', 'both']), durationMs: StageDurationSchema.nullable() }).strict(),
   // A minigame from the catalog. `game` may still be a placeholder name, which
   // keeps the game a draft until a minigame is chosen. `settings` must fit the
   // minigame (checked below); left out, the minigame's defaults apply.
@@ -105,7 +105,7 @@ const stageSchema = z.discriminatedUnion('kind', [
   // else bets on the winner; the host taps the winner. `places`: 1st for the winner, 2nd for the
   // loser (left out: 10 points for the winner). `betMilli`: for every right bet. The timer is the
   // voting time. Pool can use representatives from two existing teams and skip voting.
-  z.object({ ...look, key: GameKeySchema, kind: z.literal('duel'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('duel'), prompt: ScenePromptSchema, durationMs: StageDurationSchema.nullable(),
     pick: z.enum(['random', 'host', 'teams']), places: PlacesSchema.optional(), betMilli: AwardMilliSchema, matchSeconds: PoolMatchSecondsSchema.optional(),
     // How it is won (left out: the host names the winner). `game`: a head-to-head game on the two phones, with its settings.
     contest: z.discriminatedUnion('kind', [
@@ -115,12 +115,12 @@ const stageSchema = z.discriminatedUnion('kind', [
   // Pick teams: the teams are made here (`form`) and the rounds after it play in them (a round's `play` of the game's
   // teams) until the next Pick teams scene. The host sees the proposal, can change it (also add or remove teams) and
   // confirms; then moves on. `carryover`: the team scores when teams are made again. `captains`: each team gets a captain.
-  z.object({ ...look, key: GameKeySchema, kind: z.literal('teams'), prompt: z.string().trim().min(1).max(2000), durationMs: z.null(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('teams'), prompt: ScenePromptSchema, durationMs: z.null(),
     form: FormationSchema, carryover: z.enum(CARRYOVERS).optional(), captains: z.boolean().optional() }).strict(),
   // Format 2: the party picks one route. It is the only stage of its node, each
   // option is connected by one edge naming it, and it never awards points. It
   // has no `play`: who decides is part of `decide`.
-  z.object({ ...look, key: GameKeySchema, kind: z.literal('route'), prompt: z.string().trim().min(1).max(2000), durationMs: StageDurationSchema.nullable(),
+  z.object({ ...look, key: GameKeySchema, kind: z.literal('route'), prompt: ScenePromptSchema, durationMs: StageDurationSchema.nullable(),
     options: z.array(ChoiceOptionSchema).min(2).max(8)
       .refine(options => new Set(options.map(option => option.key)).size === options.length && new Set(options.map(option => option.label.trim().toLowerCase())).size === options.length, 'Route options must be unique'),
     decide: z.discriminatedUnion('method', [

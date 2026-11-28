@@ -190,7 +190,7 @@ export function useDraft(gameId: string, historyIdentity: string | undefined) {
   const rehearse = (startNodeKey: string | null, only = false, bench = false) => openRoom(`/api/host/games/${gameId}/rehearse`, { expectedRevision: revision.current, startNodeKey, ...(only ? { only: true } : {}), sessionId: newId(), commandId: newId() },
     code => code === 'INVALID_DEFINITION' ? (startNodeKey ? 'This scene cannot be played on its own: it needs something earlier in the game, such as the teams it plays in. Use Rehearse from here on an earlier scene.' : 'Fix the problems listed before rehearsing.')
       : code === 'REVISION_CONFLICT' ? 'Someone just changed the game. Try again in a moment.' : 'Rehearsing did not work. Check the server is running and try again.', `${bench ? 'bench' : 'rehearse'}-${gameId}`,
-      bench ? sessionId => `/?bench=${sessionId}` : undefined);
+      sessionId => `/?${bench ? 'bench' : 'room'}=${sessionId}&fromEditor=${gameId}`);
 
   return { draft, loadError, definition, positions, setPositions, issues: displayIssues, save, saveNow: flush, notice, setNotice, busy, load, change, publish, play, rehearse, adopt, refresh, readOnly, setReadOnly, can, mayEdit,
     undo: () => restore('undo'), redo: () => restore('redo'), restore,

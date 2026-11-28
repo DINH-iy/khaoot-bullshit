@@ -101,17 +101,25 @@ export function createAuthoring(client: PrismaClient) {
     const original = game.builtInKey ? builtInGames.find(entry => entry.key === game.builtInKey) : undefined;
     return { ...summary(game, draft, latest, inspected), definition: draft.definition, issues: inspected.issues, builtIn: original ? { key: original.key, title: original.definition.title } : null };
   };
+  const listedGames = (creatorId: string, access: EditorAccess) => ({
+    creatorId, archivedAt: null, builtInKey: null, draft: { isNot: null }, ...visibleTo(access),
+  });
   const api = {
     async list(creatorId: string, access: EditorAccess): Promise<GameSummary[]> {
       // Games with a draft are authored games; built-in games played by the owner have none. The owner's own
       // versions of built-in games are shown with the built-in game instead. Each says who made it.
-      const games = await client.game.findMany({ where: { creatorId, archivedAt: null, builtInKey: null, draft: { isNot: null }, ...visibleTo(access) },
+      const games = await client.game.findMany({ where: listedGames(creatorId, access),
         include: { draft: true, versions: { orderBy: { number: 'desc' }, take: 1 }, author: { select: { name: true } },
           shares: access.personId ? { where: { personId: access.personId }, select: { role: { select: { permissions: true } } } } : { take: 0, select: { role: { select: { permissions: true } } } } }, orderBy: { updatedAt: 'desc' }, take: 100 });
       return games.map(game => summary(game, game.draft!, game.versions[0] ?? null, undefined, {
         author: game.authorPersonId ? { name: game.author?.name ?? 'Former editor', you: game.authorPersonId === access.personId } : null,
         shared: access.personId !== null && game.authorPersonId !== access.personId,
         can: seesAll(access) || game.authorPersonId === access.personId ? ALL_GAME : new Set((game.shares[0]?.role.permissions ?? []).filter((permission): permission is GamePermission => (GAME_PERMISSIONS as readonly string[]).includes(permission))) }));
+    },
+    async activity(creatorId: string, access: EditorAccess) {
+      const games = await client.game.findMany({ where: listedGames(creatorId, access),
+        select: { id: true, draft: { select: { updatedAt: true } } }, orderBy: { updatedAt: 'desc' }, take: 100 });
+      return games.flatMap(game => game.draft ? [{ gameId: game.id, updatedAt: game.draft.updatedAt.toISOString() }] : []);
     },
     /** Creates a game with its first draft. Repeating the request returns the same game. */
     async create(creatorId: string, input: unknown, access: EditorAccess = OWNER_ACCESS): Promise<Draft> {

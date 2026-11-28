@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GameIdSchema, RoomSnapshotSchema, formatRoomCode } from '@party/contracts';
 import { roomApi } from './api.js';
-import { isUnavailablePageError, replaceWithHome } from '../navigation.js';
+import { isUnavailablePageError, previewEditorId, replaceWithHome } from '../navigation.js';
 import { hostMenuHref, useHostAccess } from '../owner/use-host-access.js';
 import { FaIcon } from '../presentation/icons.js';
 import { TryoutControls } from './tryout/controls.js';
 import { PhoneDevicePicker, usePhoneDevice } from '../ui/phone-devices.js';
+import { useTexts } from '../i18n/texts.js';
+import { HOST_TEXTS } from './host.text.js';
 import './test-bench.css';
 
 const COUNT_KEY = 'party_bench_phones'; const REAL_KEY = 'party_bench_real';
@@ -25,6 +27,8 @@ export function TestBench({ sessionId }: { sessionId: string }) {
   const benchRoom = loaded?.id === activeId ? loaded : undefined;
   const hostAccess = useHostAccess({ enabled: benchRoom?.tryout === true, refreshOnFocus: true });
   const hostHref = hostMenuHref(hostAccess?.role);
+  const t = useTexts(HOST_TEXTS);
+  const editorId = previewEditorId(location.search);
   const changeRoom = (id: string) => {
     const url = new URL(location.href);
     if (id === sessionId) url.searchParams.delete('tryout');
@@ -66,7 +70,18 @@ export function TestBench({ sessionId }: { sessionId: string }) {
       <p className="bench-title"><strong>Test bench</strong>{benchRoom && <> · room <code>{formatRoomCode(benchRoom.code)}</code></>}</p>
       <p className="bench-hint">The host screen on the left; each phone is its own player and joins by itself. Add or remove phones with − and +.</p>
       {activeId !== sessionId ? <button type="button" className="bench-mode" onClick={() => changeRoom(sessionId)}>Back to test bench</button>
-        : hostHref && <a className="bench-mode bench-back" href={hostHref}>{hostAccess?.role === 'owner' ? 'Back to host menu' : 'Back to your games'}</a>}
+        : editorId ? <a className="bench-mode bench-back" href={`/?edit=${editorId}`} onClick={event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          try {
+            const opener = window.opener as Window | null;
+            if (!opener || opener.closed || new URL(opener.location.href).searchParams.get('edit') !== editorId) return;
+            opener.focus();
+            event.preventDefault();
+            window.close();
+          } catch { /* The same-origin editor link also works when its original tab is gone. */ }
+        }}><FaIcon name="arrow-right" turn={180} />{t('backToEditor')}</a>
+        : benchRoom.tryout ? hostHref && <a className="bench-mode bench-back" href={hostHref}>{hostAccess?.role === 'owner' ? 'Back to host menu' : 'Back to your games'}</a>
+        : <a className="bench-mode bench-back" href={`/?room=${sessionId}`}><FaIcon name="arrow-right" turn={180} />{t('backToRoom')}</a>}
       {/* Every phone takes the chosen model's screen size (the same choice as the editor's phone previews). */}
       <PhoneDevicePicker className="bench-device" label="Phone model" />
       <label className="bench-real"><input type="checkbox" checked={real} onChange={event => changeReal(event.target.checked)} />Real phones can join too</label>

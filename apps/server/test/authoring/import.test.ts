@@ -21,6 +21,11 @@ describe('importing a game from text', () => {
     expect(game).toMatchObject({ idleCloseMinutes: 30, autoRevealSeconds: 2, presentation: { theme: { preset: 'neptune', font: 'rounded', headingFont: 'condensed', sliderStyle: 'dial' }, translations: { nl: { 'answer.saved': 'Je antwoord is binnen!' } } } });
     const stage = (key: string) => game.nodes.find(node => node.key === key)!.stages[0]!;
     expect(stage('welcome')).toMatchObject({ youtube: { videoId: 'M7lc1UVf-VE', startSeconds: 5, endSeconds: 15 }, mediaLayout: { position: 'left', size: 'wide' } });
+    expect(inspectDefinition(definition).definition?.nodes.find(node => node.key === 'welcome')?.stages[0]).toMatchObject({
+      hostNotes: 'Welcome everyone.\n\nWait until everyone has joined before continuing.',
+      prompt: 'Grab your phone.\n\nClosest cuts and best guesses earn points.',
+      textBoxes: [{ key: 'reminder', size: 'small', verticalAlign: 'bottom', lines: 2, marks: [{ start: 7, end: 15, italic: true, color: '#ffcc55' }] }],
+    });
     expect(stage('warmup')).toMatchObject({ translations: { nl: { prompt: 'Welke dag is het?', labels: { friday: 'Vrijdag' } } } });
     expect(stage('warmup')).toMatchObject({ kind: 'collect', durationMs: 15000, input: { kind: 'choice', options: [{ key: 'friday', label: 'Friday' }, { key: 'monday' }, { key: 'sunday' }] }, scoring: { kind: 'correct-choice', correctChoiceKey: 'friday', awardMilli: '5000' } });
     expect(stage('excuse-vote')).toMatchObject({ kind: 'vote', source: { nodeKey: 'excuse', stageKey: 'main' }, awardPerVoteMilli: '5000', voteMode: 'ranked', voteLimit: 3, resultCards: 'manual', durationMs: 40000 });

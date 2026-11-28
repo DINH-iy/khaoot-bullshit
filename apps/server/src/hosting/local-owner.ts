@@ -2,7 +2,7 @@ import { gameFacts } from './game-facts.js';
 import { recordAction } from '../admin/actions.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Draft } from '@party/contracts';
-import { ClaimRoomSchema, GameIdSchema, HostAccessSchema, HostGameSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
+import { ClaimRoomSchema, GameActivitySchema, GameIdSchema, HostAccessSchema, HostGameSchema, HostMenuSchema, HostRoomSchema, MAX_DRAFT_BYTES, RestartRoomSchema } from '@party/contracts';
 import type { Config } from '../config.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash } from '../game/definition.js';
@@ -103,7 +103,7 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
           return { key: game.key, title: definition.title, description: game.description, stageCount: maxPathStages(definition), branches: allStages(definition).some(entry => entry.stage.kind === 'route'), timed: allStages(definition).some(entry => entry.stage.durationMs !== null), ...gameFacts(definition),
             custom: own ? { gameId: own.gameId, inUse: own.versionId !== null, unpublished: own.unpublished } : null };
         }),
-        myGames: await authoring.list(creator.id, { personId: access.personId }),
+        myGames: await authoring.list(creator.id, access),
         role, permissions: [...access.permissions],
         rooms: rooms.map(room => ({ sessionId: room.id, roomCode: room.roomCode, title: room.gameVersion.game.title, status: room.status, playerCount: room._count.players })),
       }) };
@@ -203,6 +203,14 @@ export function registerLocalHosting(app: FastifyInstance, client: PrismaClient,
   const gameParam = (request: FastifyRequest) => { const id = GameIdSchema.safeParse((request.params as { gameId?: string }).gameId); roomAssert(id.success, 'INVALID_COMMAND'); return id.data; };
   app.get('/api/host/games', async (request, reply) => {
     try { const access = await requireEditor(request); return { ok: true, data: await authoring.list((await ownerCreator()).id, access) }; } catch (error) { return fail(reply, error); }
+  });
+  app.get('/api/host/games/activity', async (request, reply) => {
+    try {
+      const access = await requireEditor(request);
+      const games = await authoring.activity((await ownerCreator()).id, access);
+      reply.header('cache-control', 'no-store');
+      return { ok: true, data: GameActivitySchema.parse(games.map(game => ({ ...game, editorOpen: live?.hasEditor(game.gameId) ?? false }))) };
+    } catch (error) { return fail(reply, error); }
   });
   app.get('/api/host/graphs', async (request, reply) => {
     try {

@@ -1,6 +1,6 @@
 import { ROUND_CONTROL_TEXTS } from '../../room/round-control.text.js';
 import { useEffect, useState } from 'react';
-import { isSharedPrediction, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
+import { isSharedPrediction, MAX_HOST_NOTES_LENGTH, placePoints, pointsAtStake, PlacesSchema, type DefinitionIssue, type Places, type PrefabContent } from '@party/contracts';
 import { SceneTranslationFields } from './fields/translation-fields.js';
 import { Section } from '../controls/section.js';
 import { ExplainFields, stakeSummary } from './fields/explain-fields.js';
@@ -21,6 +21,8 @@ import { DrawingFields } from './fields/drawing-fields.js';
 import { DuelFields } from './fields/duel-fields.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
+import type { SceneTextTarget } from './text-edits.js';
+import { SceneTextSettings } from './fields/text-boxes.js';
 import { MediaField } from './fields/media-field.js';
 import { musicSummary, SceneMusicFields } from './fields/music-fields.js';
 import { DEFAULT_TEAM_NAMES, MINIGAME_KEYS, TEAM_MINIGAMES, type MinigameKey } from '@party/contracts';
@@ -67,7 +69,7 @@ const scoreboardShows = () => [{ value: 'players', label: t('showPlayers') }, { 
  * (open), the points, and who plays. The kind of scene (which minigame, how a
  * duel is won) is chosen when adding it, so it is shown here, not asked again.
  */
-export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void }) {
+export function StageFields({ definition, node, index, onChange, addTeams, mediaOpen, openMedia, closeMedia, textTarget, selectText, readOnly }: { definition: Definition; node: Node; index: number; onChange: Change; addTeams: (stage: Stage) => void; mediaOpen: boolean; openMedia: () => void; closeMedia: () => void; textTarget: SceneTextTarget; selectText: (target: SceneTextTarget) => void; readOnly: boolean }) {
   const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const stage = node.stages[index]!; const group = `${node.key}:${index}`;
   const edit = (change: (current: Stage) => Stage, field = '') => onChange(updateStage(definition, node.key, index, change), `${group}:${field}`);
@@ -102,6 +104,7 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
         <div>{WRITING_STARTERS.map(starter => <button key={starter.key} type="button" className="small-button" title={starter.prompt}
           onClick={() => edit(current => ({ ...current, prompt: starter.prompt }), 'writing-starter')}>{starter.name}</button>)}</div>
       </details>}
+      {!readOnly && <SceneTextSettings key={group} stage={stage} selectedTarget={textTarget} onSelect={selectText} edit={edit} />}
       {['collect', 'challenge', 'info'].includes(stage.kind) && <MediaField stage={stage} open={mediaOpen} onOpen={openMedia} onClose={closeMedia} onChange={next => edit(() => next, 'media')} />}
       {timed && stage.kind !== 'minigame' && <label className="ed-inline">{t(stage.kind === 'duel' ? 'bettingTime' : isDrawScene(stage) ? 'drawTimer' : 'timer')}
         <span className="ed-unit"><input type="number" inputMode="numeric" min={1} max={3600}
@@ -165,6 +168,19 @@ export function StageFields({ definition, node, index, onChange, addTeams, media
 
     <SceneTranslationFields stage={stage} onChange={next => edit(() => next, 'translations')} />
 
+    <Section title={t('hostNotes')} memory="Host notes">
+      <label>{t('hostScript')}<textarea rows={4} maxLength={MAX_HOST_NOTES_LENGTH} value={String(stage['hostNotes'] ?? '')}
+        placeholder={t('hostNotesPlaceholder')} onChange={event => {
+          const value = event.target.value;
+          edit(current => {
+            const next = { ...current };
+            if (value.length) next['hostNotes'] = value;
+            else delete next['hostNotes'];
+            return next;
+          }, 'hostNotes');
+        }} /></label>
+      <p className="hint">{t('hostNotesHint')}</p>
+    </Section>
     {hasPoints && <Section title={t('points')} memory="Points" summary={pointsSummary(stage)}>
       {stage.kind === 'collect' && input?.kind === 'choice' && <>
         <Segmented label={t('scoring')} stacked value={scoring?.kind === 'correct-choice' ? 'correct' : 'none'} choices={[{ value: 'correct', label: t('correctGives') }, { value: 'none', label: t('noPoints'), hint: t('opinion') }]}

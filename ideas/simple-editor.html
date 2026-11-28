@@ -1,0 +1,449 @@
+<div id="simple-game-concept">
+  <nav class="demo" aria-label="Concept screens">
+    <button type="button" class="cursor-interaction" data-screen="editor" aria-pressed="true">Editor preview</button>
+    <button type="button" class="cursor-interaction" data-screen="owner" aria-pressed="false">Owner settings</button>
+  </nav>
+  <section class="window" data-panel="editor" aria-label="Game editor">
+    <header class="top">
+      <div><p class="sub">Game editor</p><h2>Family quiz night</h2></div>
+      <div class="actions"><span class="sub" data-status aria-live="polite">All changes saved</span><button type="button" class="cursor-interaction" data-undo disabled>Undo</button><button type="button" class="primary cursor-interaction" data-preview aria-expanded="false">Preview scene</button></div>
+    </header>
+    <nav class="workspace-nav" aria-label="Editor views">
+      <button type="button" class="cursor-interaction" data-view="scenes" aria-pressed="true">Scenes</button>
+      <button type="button" class="cursor-interaction" data-view="look" aria-pressed="false">Look &amp; feel</button>
+    </nav>
+    <div class="layout" data-view-panel="scenes">
+      <aside class="scenes" aria-label="Scenes">
+        <h3>Scenes</h3>
+        <ol data-scenes></ol>
+        <button type="button" class="cursor-interaction" data-add aria-expanded="false">+ Add scene</button>
+        <div class="add-options" data-add-options hidden>
+          <button type="button" class="cursor-interaction" data-kind="Question">Quiz question</button>
+          <button type="button" class="cursor-interaction" data-kind="Message">Message</button>
+        </div>
+      </aside>
+      <main class="content">
+        <div class="form" data-form>
+          <div><p class="sub" data-position></p><h3 data-heading></h3></div>
+          <label class="field"><span data-label>Question</span><textarea rows="2" data-prompt></textarea></label>
+          <fieldset data-answers>
+            <legend>Answers</legend>
+            <p class="sub">Select the correct answer.</p>
+            <div data-answer-list></div>
+          </fieldset>
+          <div>
+            <div class="actions">
+              <button type="button" class="cursor-interaction" data-media-toggle aria-expanded="false" aria-controls="simple-scene-media">+ Add media</button>
+              <button type="button" class="cursor-interaction" data-options aria-expanded="false">Show more options</button>
+              <span class="sub" data-media-summary aria-live="polite" hidden></span>
+            </div>
+            <section class="media-panel" id="simple-scene-media" data-media-panel aria-label="Scene media" hidden>
+              <div class="actions" aria-label="Media type">
+                <button type="button" class="cursor-interaction" data-media-kind="picture" aria-pressed="true">Picture</button>
+                <button type="button" class="cursor-interaction" data-media-kind="music" aria-pressed="false">Music</button>
+                <button type="button" class="cursor-interaction" data-media-kind="video" aria-pressed="false">Video</button>
+              </div>
+              <p data-media-current></p>
+              <div class="actions">
+                <button type="button" class="cursor-interaction" data-upload>Upload picture</button>
+                <input type="file" data-file hidden>
+                <button type="button" class="cursor-interaction" data-library-toggle aria-expanded="false" aria-controls="simple-media-library">Choose from library</button>
+                <button type="button" class="danger cursor-interaction" data-remove-media hidden>Remove picture</button>
+              </div>
+              <div class="actions" id="simple-media-library" data-library hidden></div>
+              <div class="actions" data-remove-confirm hidden>
+                <p>Remove this file from the scene?</p>
+                <button type="button" class="danger confirm cursor-interaction" data-confirm-remove>Remove file</button>
+                <button type="button" class="cursor-interaction" data-cancel-remove>Cancel</button>
+              </div>
+            </section>
+            <div class="timing" data-timing hidden><label class="field">Time to answer
+              <select class="cursor-interaction" data-time><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">60 seconds</option></select>
+            </label></div>
+          </div>
+        </div>
+        <div class="preview game-look" data-preview-panel data-theme="classic" hidden>
+          <p>Shared screen preview</p><h3 data-preview-prompt></h3><p data-preview-media hidden></p><ol data-preview-answers></ol>
+        </div>
+      </main>
+    </div>
+    <section class="content look" data-view-panel="look" aria-label="Look &amp; feel" hidden>
+      <div class="look-choices">
+        <h3>Choose a look</h3>
+        <div class="presets" aria-label="Game looks">
+          <button type="button" class="cursor-interaction" data-preset="classic" aria-pressed="true"><span class="game-look swatch" data-theme="classic" aria-hidden="true"></span>Classic</button>
+          <button type="button" class="cursor-interaction" data-preset="party" aria-pressed="false"><span class="game-look swatch" data-theme="party" aria-hidden="true"></span>Party</button>
+          <button type="button" class="cursor-interaction" data-preset="contrast" aria-pressed="false"><span class="game-look swatch" data-theme="contrast" aria-hidden="true"></span>High contrast</button>
+        </div>
+      </div>
+      <div class="preview game-look" data-look-example data-theme="classic">
+        <p>Shared screen preview</p>
+        <h3>Which planet is known as the Red Planet?</h3>
+        <ol><li>Mars</li><li>Venus</li><li>Earth</li><li>Jupiter</li></ol>
+      </div>
+    </section>
+  </section>
+  <section class="window" data-panel="owner" aria-label="Owner settings" hidden>
+    <header class="top"><div><p class="sub">Owner / People</p><h2>Marianne</h2></div></header>
+    <div class="content profile">
+      <h3>Editor experience</h3>
+      <label class="field">Editor layout
+        <select class="cursor-interaction" data-mode><option value="simple">Simple editor</option><option value="standard">Standard editor</option></select>
+      </label>
+      <p class="sub" data-mode-note aria-live="polite">Marianne opens her games in the Simple editor.</p>
+    </div>
+  </section>
+</div>
+<style>
+#simple-game-concept {
+  color-scheme: light dark;
+  --paper: light-dark(#fff, #1b1e25);
+  --panel: light-dark(#f5f6f8, #222630);
+  --ink: light-dark(#232731, #f1f3fa);
+  --sub: light-dark(#525c6c, #b7c0d0);
+  --line: light-dark(#d6dbe4, #444c5b);
+  --accent: light-dark(#314f9b, #b8c8ff);
+  --on-accent: light-dark(#fff, #182343);
+  --picked: light-dark(#e8eefc, #303d61);
+  color: var(--ink);
+  font: 400 16px/1.45 system-ui, sans-serif;
+}
+#simple-game-concept * { box-sizing: border-box; }
+#simple-game-concept [hidden] { display: none !important; }
+#simple-game-concept h2, #simple-game-concept h3, #simple-game-concept p { margin: 0; }
+#simple-game-concept h2 { font-size: 1.4em; }
+#simple-game-concept h3 { font-size: 1.18em; }
+#simple-game-concept .sub { color: var(--sub); font-size: .875em; }
+#simple-game-concept .demo, #simple-game-concept .actions, #simple-game-concept .workspace-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#simple-game-concept .demo { margin-bottom: 12px; }
+#simple-game-concept button, #simple-game-concept textarea, #simple-game-concept select, #simple-game-concept input:not([type=radio]) {
+  font: inherit; color: inherit; background: var(--paper); border: 1px solid var(--line); border-radius: 7px; min-width: 0; min-height: 44px; padding: 8px 12px;
+}
+#simple-game-concept :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#simple-game-concept button[aria-pressed=true] { background: var(--picked); border-color: var(--accent); }
+#simple-game-concept button.primary { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+#simple-game-concept button:disabled { opacity: .5; }
+#simple-game-concept .window { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+#simple-game-concept .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+#simple-game-concept .workspace-nav { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+#simple-game-concept .layout { display: grid; grid-template-columns: minmax(175px, 25%) minmax(0, 1fr); }
+#simple-game-concept .scenes { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 14px; }
+#simple-game-concept .scenes ol { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+#simple-game-concept .scenes li button { width: 100%; text-align: left; }
+#simple-game-concept .add-options { display: grid; justify-items: start; gap: 8px; margin-top: 8px; }
+#simple-game-concept .content { padding: 24px; min-width: 0; }
+#simple-game-concept .form, #simple-game-concept .profile { display: grid; gap: 18px; }
+#simple-game-concept .form { max-width: 620px; }
+#simple-game-concept .field { display: grid; gap: 6px; font-weight: 600; }
+#simple-game-concept textarea { width: 100%; resize: vertical; }
+#simple-game-concept fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+#simple-game-concept legend { padding: 0; font-weight: 600; }
+#simple-game-concept [data-answer-list] { display: grid; gap: 8px; margin-top: 8px; }
+#simple-game-concept .answer { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 8px; }
+#simple-game-concept .radio-target { display: grid; place-items: center; min-height: 44px; background: var(--panel); border-radius: 7px; }
+#simple-game-concept input[type=radio] { accent-color: var(--accent); }
+#simple-game-concept .timing { margin-top: 10px; max-width: 220px; }
+#simple-game-concept .profile .field { max-width: 260px; }
+#simple-game-concept .media-panel { display: grid; gap: 12px; padding: 14px; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+#simple-game-concept button.danger { border-color: light-dark(#a32730, #ff999f); color: light-dark(#a32730, #ff999f); }
+#simple-game-concept button.danger.confirm { background: #a32730; border-color: #a32730; color: #fff; }
+#simple-game-concept .look { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+#simple-game-concept .look-choices, #simple-game-concept .presets { display: grid; gap: 8px; }
+#simple-game-concept .presets button { display: flex; align-items: center; gap: 10px; text-align: left; }
+#simple-game-concept .game-look[data-theme=classic] { --game-bg: #e6edff; --game-ink: #142648; --game-tile: #fff; }
+#simple-game-concept .game-look[data-theme=party] { --game-bg: #412279; --game-ink: #fff; --game-tile: #613a9a; }
+#simple-game-concept .game-look[data-theme=contrast] { --game-bg: #151515; --game-ink: #fff19a; --game-tile: #2e2e2e; }
+#simple-game-concept .swatch { width: 24px; height: 20px; border-radius: 4px; border: 1px solid var(--line); background: linear-gradient(135deg, var(--game-bg) 50%, var(--game-ink) 50%); flex: none; }
+#simple-game-concept .preview { padding: 24px; border-radius: 10px; background: var(--game-bg); color: var(--game-ink); display: grid; gap: 14px; overflow-wrap: anywhere; }
+#simple-game-concept .preview ol { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(160px,100%),1fr)); list-style-position: inside; gap: 8px; padding: 0; margin: 0; }
+#simple-game-concept .preview li { padding: 10px 12px; background: var(--game-tile); border-radius: 7px; }
+@media (max-width: 580px) {
+  #simple-game-concept .layout, #simple-game-concept .look { grid-template-columns: minmax(0,1fr); }
+  #simple-game-concept .scenes { border-right: 0; border-bottom: 1px solid var(--line); }
+  #simple-game-concept .scenes ol { display: flex; flex-wrap: wrap; }
+  #simple-game-concept .content, #simple-game-concept .top { padding: 16px; }
+}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('simple-game-concept');
+  const find = (name) => root.querySelector('[data-' + name + ']');
+  const makeQuestion = (prompt, answers, title = 'Quiz question') => ({ kind: 'Question', title, prompt, answers, correct: 0, time: '30' });
+  const scenes = [
+    { kind: 'Message', title: 'Welcome', prompt: 'Welcome to family quiz night!' },
+    makeQuestion('What is the capital of France?', ['Paris', 'Rome', 'Madrid', 'Berlin'], 'Capital cities'),
+    makeQuestion('Which planet is known as the Red Planet?', ['Mars', 'Venus', 'Earth', 'Jupiter'], 'The solar system'),
+    { kind: 'Message', title: 'Closing message', prompt: 'Thanks for playing!' }
+  ];
+  const mediaTypes = {
+    picture: { accept: 'image/*', example: 'Family photo.jpg' },
+    music: { accept: 'audio/*', example: 'Quiz music.mp3' },
+    video: { accept: 'video/*', example: 'Family holiday.mp4' }
+  };
+  const history = [];
+  let selected = 1;
+  let preview = false;
+  let options = false;
+  let view = 'scenes';
+  let theme = 'classic';
+  let mediaOpen = false;
+  let libraryOpen = false;
+  let removing = false;
+  let mediaKind = 'picture';
+
+  function listScenes() {
+    find('scenes').replaceChildren(...scenes.map((scene, index) => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      const label = scene.title || scene.kind;
+      button.type = 'button';
+      button.className = 'cursor-interaction';
+      button.textContent = (index + 1) + '. ' + label;
+      button.setAttribute('aria-pressed', String(index === selected));
+      button.addEventListener('click', () => {
+        selected = index;
+        options = false;
+        preview = false;
+        mediaOpen = false;
+        render();
+        find('scenes').children[index].firstElementChild.focus();
+      });
+      item.append(button);
+      return item;
+    }));
+  }
+
+  function remember() {
+    history.push({ scenes: structuredClone(scenes), selected, theme });
+    find('undo').disabled = false;
+  }
+
+  function announce(message = 'Changes saved in preview') {
+    find('status').textContent = message;
+  }
+
+  function renderPreview() {
+    const scene = scenes[selected];
+    find('form').hidden = preview;
+    find('preview-panel').hidden = !preview;
+    find('preview').textContent = preview ? 'Back to editing' : 'Preview scene';
+    find('preview').setAttribute('aria-expanded', String(preview));
+    find('preview-prompt').textContent = scene.prompt || 'Untitled ' + scene.kind.toLowerCase();
+    const files = Object.values(scene.media || {});
+    find('preview-media').textContent = files.join(' · ');
+    find('preview-media').hidden = files.length === 0;
+    find('preview-answers').replaceChildren(...(scene.answers || []).map(text => {
+      const answer = document.createElement('li');
+      answer.textContent = text || 'Empty answer';
+      return answer;
+    }));
+    find('preview-answers').hidden = !scene.answers;
+  }
+
+  function renderOptions() {
+    find('timing').hidden = !options;
+    find('options').textContent = options ? 'Hide more options' : 'Show more options';
+    find('options').setAttribute('aria-expanded', String(options));
+  }
+
+  function renderTheme() {
+    find('preview-panel').dataset.theme = theme;
+    find('look-example').dataset.theme = theme;
+    root.querySelectorAll('[data-preset]').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.preset === theme));
+    });
+  }
+
+  function renderMedia() {
+    const media = scenes[selected].media || {};
+    const file = media[mediaKind];
+    const count = Object.keys(media).length;
+    find('media-toggle').textContent = count ? 'Scene media' : '+ Add media';
+    find('media-toggle').setAttribute('aria-expanded', String(mediaOpen));
+    find('media-panel').hidden = !mediaOpen;
+    find('media-summary').textContent = count === 1 ? '1 file attached' : count + ' files attached';
+    find('media-summary').hidden = count === 0;
+    find('media-current').textContent = file || 'No ' + mediaKind + ' added';
+    find('upload').textContent = 'Upload ' + mediaKind;
+    find('file').accept = mediaTypes[mediaKind].accept;
+    find('remove-media').textContent = 'Remove ' + mediaKind;
+    find('remove-media').hidden = !file || removing;
+    find('remove-confirm').hidden = !file || !removing;
+    find('library').hidden = !libraryOpen;
+    find('library-toggle').setAttribute('aria-expanded', String(libraryOpen));
+    root.querySelectorAll('[data-media-kind]').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.mediaKind === mediaKind));
+    });
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'cursor-interaction';
+    option.textContent = mediaTypes[mediaKind].example;
+    option.addEventListener('click', () => attachMedia(option.textContent));
+    find('library').replaceChildren(option);
+  }
+
+  function attachMedia(filename) {
+    remember();
+    const scene = scenes[selected];
+    scene.media = { ...scene.media, [mediaKind]: filename };
+    libraryOpen = false;
+    removing = false;
+    renderMedia();
+    find('media-toggle').focus();
+    announce();
+  }
+
+  function render() {
+    const scene = scenes[selected];
+    listScenes();
+    find('position').textContent = 'Scene ' + (selected + 1) + ' of ' + scenes.length;
+    find('heading').textContent = scene.kind === 'Question' ? 'Edit quiz question' : 'Edit message';
+    find('label').textContent = scene.kind;
+    find('prompt').value = scene.prompt;
+    find('answers').hidden = !scene.answers;
+    find('options').hidden = !scene.answers;
+    find('time').value = scene.time || '30';
+    find('answer-list').replaceChildren(...(scene.answers || []).map((value, index) => {
+      const row = document.createElement('div');
+      row.className = 'answer';
+      const target = document.createElement('label');
+      target.className = 'radio-target cursor-interaction';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'simple-editor-correct';
+      radio.checked = scene.correct === index;
+      radio.setAttribute('aria-label', 'Mark answer ' + (index + 1) + ' correct');
+      radio.addEventListener('change', () => {
+        remember();
+        scene.correct = index;
+        announce();
+      });
+      target.append(radio);
+      const input = document.createElement('input');
+      input.value = value;
+      input.setAttribute('aria-label', 'Answer ' + (index + 1));
+      input.addEventListener('change', () => {
+        remember();
+        scene.answers[index] = input.value;
+        announce();
+      });
+      row.append(target, input);
+      return row;
+    }));
+    renderOptions();
+    renderTheme();
+    renderMedia();
+    renderPreview();
+  }
+
+  root.querySelectorAll('[data-screen]').forEach(button => button.addEventListener('click', () => {
+    root.querySelectorAll('[data-screen]').forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+    root.querySelectorAll('[data-panel]').forEach(panel => { panel.hidden = panel.dataset.panel !== button.dataset.screen; });
+  }));
+  find('mode').addEventListener('change', event => {
+    find('mode-note').textContent = 'Marianne opens her games in the ' + event.target.selectedOptions[0].text + '.';
+  });
+  root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => {
+    view = button.dataset.view;
+    root.querySelectorAll('[data-view]').forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+    root.querySelectorAll('[data-view-panel]').forEach(panel => { panel.hidden = panel.dataset.viewPanel !== view; });
+    find('preview').hidden = view !== 'scenes';
+  }));
+  root.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
+    if (theme === button.dataset.preset) return;
+    remember();
+    theme = button.dataset.preset;
+    renderTheme();
+    announce('Game look set to ' + button.textContent.trim());
+  }));
+  find('preview').addEventListener('click', () => { preview = !preview; renderPreview(); });
+  find('options').addEventListener('click', () => {
+    options = !options;
+    if (options) mediaOpen = false;
+    renderOptions();
+    renderMedia();
+  });
+  find('media-toggle').addEventListener('click', () => {
+    mediaOpen = !mediaOpen;
+    libraryOpen = false;
+    removing = false;
+    if (mediaOpen) options = false;
+    renderMedia();
+    renderOptions();
+  });
+  root.querySelectorAll('[data-media-kind]').forEach(button => button.addEventListener('click', () => {
+    mediaKind = button.dataset.mediaKind;
+    libraryOpen = false;
+    removing = false;
+    renderMedia();
+  }));
+  find('upload').addEventListener('click', () => find('file').click());
+  find('file').addEventListener('change', event => {
+    const file = event.target.files[0];
+    if (file) attachMedia(file.name);
+    event.target.value = '';
+  });
+  find('library-toggle').addEventListener('click', () => {
+    libraryOpen = !libraryOpen;
+    renderMedia();
+  });
+  find('remove-media').addEventListener('click', () => {
+    removing = true;
+    renderMedia();
+    find('confirm-remove').focus();
+  });
+  find('cancel-remove').addEventListener('click', () => {
+    removing = false;
+    renderMedia();
+    find('remove-media').focus();
+  });
+  find('confirm-remove').addEventListener('click', () => {
+    remember();
+    delete scenes[selected].media[mediaKind];
+    removing = false;
+    renderMedia();
+    find('upload').focus();
+    announce();
+  });
+  find('add').addEventListener('click', () => {
+    const panel = find('add-options');
+    panel.hidden = !panel.hidden;
+    find('add').setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  root.querySelectorAll('[data-kind]').forEach(button => button.addEventListener('click', () => {
+    remember();
+    const kind = button.dataset.kind;
+    scenes.splice(selected + 1, 0, kind === 'Question' ? makeQuestion('', ['', '', '', '']) : { kind, prompt: '' });
+    selected += 1;
+    preview = false;
+    options = false;
+    mediaOpen = false;
+    find('add-options').hidden = true;
+    find('add').setAttribute('aria-expanded', 'false');
+    render();
+    find('prompt').focus();
+    announce();
+  }));
+  find('prompt').addEventListener('change', event => {
+    remember();
+    scenes[selected].prompt = event.target.value;
+    announce();
+  });
+  find('time').addEventListener('change', event => {
+    remember();
+    scenes[selected].time = event.target.value;
+    announce();
+  });
+  find('undo').addEventListener('click', () => {
+    const previous = history.pop();
+    scenes.splice(0, scenes.length, ...previous.scenes);
+    selected = previous.selected;
+    theme = previous.theme;
+    removing = false;
+    render();
+    find('undo').disabled = history.length === 0;
+    announce('Last edit undone');
+  });
+  render();
+})();
+</script>

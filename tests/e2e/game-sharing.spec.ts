@@ -19,8 +19,14 @@ test('editors see only their own games and games shared with them; the owner see
   try {
     expect((await editor.request.post(`${baseURL}/api/people/claim`, { headers, data: { token: key } })).ok()).toBe(true);
     const editorGame = `Ed quiz ${tag}`; const ownerGame = `Owner quiz ${tag}`;
-    expect((await editor.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId: randomUUID(), title: editorGame, startFrom: null } })).ok()).toBe(true);
-    expect((await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId: randomUUID(), title: ownerGame, startFrom: null } })).ok()).toBe(true);
+    const editorGameId = randomUUID(); const ownerGameId = randomUUID();
+    const activityIds = async () => {
+      const response = await editor.request.get(`${baseURL}/api/host/games/activity`, { headers });
+      expect(response.ok()).toBe(true);
+      return (await response.json()).data.map((game: { gameId: string }) => game.gameId);
+    };
+    expect((await editor.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId: editorGameId, title: editorGame, startFrom: null } })).ok()).toBe(true);
+    expect((await page.request.post(`${baseURL}/api/host/games`, { headers, data: { gameId: ownerGameId, title: ownerGame, startFrom: null } })).ok()).toBe(true);
 
     // The owner sees both, the editor's with its maker's name.
     await page.goto(`${baseURL}/?host=1`);
@@ -32,6 +38,8 @@ test('editors see only their own games and games shared with them; the owner see
     const theirs = editor.getByRole('region', { name: 'Your games' });
     await expect(theirs.locator('.my-game').filter({ hasText: editorGame })).toContainText('by you');
     await expect(theirs.locator('.my-game').filter({ hasText: ownerGame })).toHaveCount(0);
+    expect(await activityIds()).toContain(editorGameId);
+    expect(await activityIds()).not.toContain(ownerGameId);
 
     // The owner shares their game with the editor from the editor's Invite people panel.
     await mine.getByRole('link', { name: `Edit ${ownerGame}` }).click();
@@ -46,6 +54,7 @@ test('editors see only their own games and games shared with them; the owner see
     if (process.env['TEAM_SHOTS']) await page.screenshot({ path: `${process.env['TEAM_SHOTS']}/sharing.png` });
     await editor.reload();
     await expect(theirs.locator('.my-game').filter({ hasText: ownerGame })).toContainText('by the owner · shared with you');
+    expect(await activityIds()).toContain(ownerGameId);
     await expect(theirs.locator('.my-game').filter({ hasText: ownerGame }).getByRole('button', { name: /^Remove/ })).toHaveCount(0);
     if (process.env['TEAM_SHOTS']) await editor.screenshot({ path: `${process.env['TEAM_SHOTS']}/editor-games.png` });
     await theirs.getByRole('link', { name: `Edit ${ownerGame}` }).click();

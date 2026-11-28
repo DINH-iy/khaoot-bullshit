@@ -66,6 +66,9 @@ export const GameSummarySchema = z.object({
   can: z.array(z.string()).optional(),
 }).strict();
 export type GameSummary = z.infer<typeof GameSummarySchema>;
+export const GameActivitySchema = z.array(z.object({
+  gameId: GameIdSchema, updatedAt: z.string().datetime(), editorOpen: z.boolean(),
+}).strict()).max(100);
 /**
  * Who may see and edit a game: the owner always; an editor when they made it or it is shared with them.
  * The game's author and the owner choose whom to share it with; only the owner changes who made it

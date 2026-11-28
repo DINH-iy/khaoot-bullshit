@@ -38,6 +38,24 @@ describe('show-only scenes', () => {
     expect((await prisma.gameSession.findUniqueOrThrow({ where: { id: f.sessionId } })).status).toBe('FINISHED');
   });
 
+  it('keeps multiline presenter notes private and only shows the current slide’s notes', async () => {
+    const hostNotes = 'Read the welcome.\n\nPause for the room.';
+    const definition = parseDefinition({
+      ...game,
+      nodes: game.nodes.map(node => node.key === 'intro' ? { ...node, stages: [{ ...node.stages[0], hostNotes }] } : node),
+    });
+    const f = await fixture(1, definition);
+    const intro = (await hostCommand(f, 'session.start')).stageRunId!;
+    expect((await readSessionView(prisma, f.host, f.sessionId)).stage?.hostNotes).toBe(hostNotes);
+    for (const viewer of [{ role: 'player' as const, playerId: f.players[0]!.id }, { role: 'display' as const, sessionId: f.sessionId }]) {
+      const view = await readSessionView(prisma, viewer, f.sessionId);
+      expect(view.stage?.prompt).toBe('Welcome to the show');
+      expect(view.stage).not.toHaveProperty('hostNotes');
+    }
+    await hostCommand(f, 'stage.advance', { stageRunId: intro });
+    expect((await readSessionView(prisma, f.host, f.sessionId)).stage).not.toHaveProperty('hostNotes');
+  });
+
   it('lets the countdown end an info scene without moving on by itself', async () => {
     let now = Date.now(); const clock = () => new Date(now); const timed = createGameService(prisma, undefined, clock);
     const f = await fixture(1, game);

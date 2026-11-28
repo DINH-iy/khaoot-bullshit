@@ -1,3 +1,5 @@
+import { GameIdSchema } from '@party/contracts';
+
 // Moving to another screen of the app without reloading the page (the arcade: lobby ⇄ round). The page stays
 // loaded, so nothing goes blank and no tap is lost; main.tsx shows the screen for the new address.
 const EVENT = 'party:navigate';
@@ -22,4 +24,9 @@ export function isUnavailablePageError(cause: unknown) {
 
 export function replaceWithHome() {
   location.replace('/');
+}
+
+/** Editor origin of an authored rehearsal, used for a same-origin return link. */
+export function previewEditorId(search: string) {
+  return GameIdSchema.safeParse(new URLSearchParams(search).get('fromEditor')).data;
 }

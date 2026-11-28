@@ -95,7 +95,7 @@ test('Group 4 authoring offers prompt starters, an Intro, a Space preset, and un
   await popup.getByRole('button', { name: 'Start practice' }).click();
   await popup.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(popup.getByRole('status')).toContainText('off');
-  await popup.getByRole('button', { name: 'Close', exact: true }).click();
+  await popup.getByRole('button', { name: 'Back to editor', exact: true }).click();
 
   await page.getByRole('tab', { name: 'Look & feel' }).click();
   await page.getByLabel('Change the look of').click();

@@ -19,3 +19,55 @@
   .media-right .has-media:not(.room-player *) { grid-template-columns: minmax(0, 1fr) minmax(0, var(--media-track)); }
 }
 .composition-copy :is(h2, p) { overflow-wrap: anywhere; }
+
+/* Use the composition's width for the same typography in the editor and during play. */
+.scene-composition {
+  --slide-heading-size: calc(4.5cqi * var(--r-scale));
+  --slide-body-size: calc(3.6cqi * var(--r-scale));
+  --slide-small-size: calc(2.4cqi * var(--r-scale));
+}
+.room-player .scene-composition {
+  --slide-heading-size: calc(1.35rem * var(--r-scale));
+  --slide-body-size: calc(1.15rem * var(--r-scale));
+  --slide-small-size: calc(.95rem * var(--r-scale));
+}
+.composition-copy > *, .stage-heading-row > h2 { white-space: pre-wrap; }
+.scene-composition .composition-copy .scene-slide-text,
+.scene-composition .composition-copy .scene-text-mirror::after {
+  margin: 0;
+  min-width: 0;
+  color: var(--box-color, inherit);
+  font-family: var(--box-font, var(--slide-text-font));
+  font-size: calc(var(--slide-text-size) * var(--box-scale, 1));
+  font-weight: var(--box-weight, var(--slide-text-weight));
+  font-style: var(--box-style, normal);
+  letter-spacing: var(--slide-text-spacing, normal);
+  line-height: 1.3;
+  text-decoration: var(--box-decoration, none);
+  text-transform: var(--slide-text-transform, none);
+  text-align: var(--slide-text-align);
+  white-space: var(--box-white-space, pre-wrap);
+  overflow-wrap: var(--box-wrap, anywhere);
+}
+.composition-copy :is(p, h2).scene-slide-text {
+  block-size: var(--box-height, auto);
+  align-content: var(--box-vertical, start);
+  overflow: var(--box-overflow, visible);
+}
+.composition-copy :is(p, h2).scene-slide-text::after { content: '\200b'; }
+.scene-text-heading {
+  --slide-text-size: var(--slide-heading-size);
+  --slide-text-font: var(--r-heading-font);
+  --slide-text-weight: 900;
+  --slide-text-spacing: .02em;
+}
+.room.caps .scene-text-heading { --slide-text-transform: uppercase; --slide-text-spacing: .04em; }
+.scene-text-body, .scene-text-small {
+  --slide-text-font: var(--r-font);
+  --slide-text-weight: 700;
+}
+.scene-text-body { --slide-text-size: var(--slide-body-size); }
+.scene-text-small { --slide-text-size: var(--slide-small-size); }
+.scene-text-left { --slide-text-align: left; }
+.scene-text-center { --slide-text-align: center; }
+.scene-text-right { --slide-text-align: right; }

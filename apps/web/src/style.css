@@ -102,7 +102,6 @@ li { margin-bottom: 12px; } .small-button { margin-left: 12px; }
 .route-choice { margin: 12px 0; }
 .route-decision { font-size: 1.15rem; }
 .route-pending { font-weight: 600; }
-.info-text { font-size: clamp(1.15rem, 3.5vw, 1.6rem); line-height: 1.5; white-space: pre-wrap; }
 .scoreboard-scene { border-width: 2px; }
 .button-link { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border-radius: 9px; border: 1px solid light-dark(#555, #bbb); background: light-dark(#222, #eee); color: light-dark(#fff, #161616); text-decoration: none; }
 .steps { padding-left: 1.4rem; } .steps li { margin-bottom: 6px; }

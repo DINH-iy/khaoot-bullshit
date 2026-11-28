@@ -48,4 +48,4 @@
   .bench-tryout label { min-width: 0; }
 }
 .bench .bench-device { width: auto; min-height: 38px; color-scheme: dark; }
-.bench a.bench-back { display: inline-flex; align-items: center; text-decoration: none; }
+.bench a.bench-back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; text-decoration: none; }

@@ -51,6 +51,7 @@ import './room.css';
 import { LookContext, themeClass, useThemeStyle, useBuiltLook, useLook, useMoment, useText, type LookInput } from '../presentation/look.js';
 import { useSiteThemeState } from '../presentation/site-look.js';
 import { LeaveRoom } from '../room-extras/leave-room.js';
+import { SceneTextBoxes, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../presentation/scene-text.js';
 import { SceneComposition } from '../presentation/scene-composition.js';
 import { MediaHostControls, StageMedia, StageYouTube } from './stage-media.js';
 import { MusicPlayer } from './music-player.js';
@@ -67,6 +68,7 @@ const r = (key: keyof typeof ROOM_TEXTS.en, values?: Record<string, string | num
 import { ROUND_CONTROL_TEXTS } from './round-control.text.js';
 import { ROOM_MANAGEMENT_TEXTS } from './room-management.text.js';
 import { HostPlayerList } from './host-player-list.js';
+import { previewEditorId } from '../navigation.js';
 import { HOST_TEXTS } from './host.text.js';
 import { answerFit } from './answer-fit.js';
 import { Mark } from '../presentation/mark-icons.js';
@@ -290,6 +292,7 @@ export function RoomScreen() {
   }, [presentation, inArcade, siteTheme, joinLook]);
   const look = useBuiltLook(lookInput); const t = look.text;
   // The host's own controls follow the language chosen in this browser; players' words stay the game's texts (t).
+  const fromEditor = previewEditorId(initial.search);
   const h = useTexts(HOST_TEXTS); const management = useTexts(ROOM_MANAGEMENT_TEXTS); const rounds = useTexts(ROUND_CONTROL_TEXTS);
   const lookStyle = useThemeStyle(look.theme); const lookClass = themeClass(look.theme);
   // Animation moments.
@@ -369,6 +372,11 @@ export function RoomScreen() {
     : null;
   // What is happening now, in a word or two, above the round.
   const forming = Boolean(stage?.teams?.forming);
+  const stageHeading = stage && (forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard && !stage.promptStyle ? r('scoreboard')
+    : stage.minigame?.graph && !stage.promptStyle && isDefaultGraphQuestion(stage.prompt)
+      ? graphText(state.tryout || stage.minigame.graph.chart.yLabel === 'Books lent (thousands)' ? 'sampleQuestion' : 'trendQuestion')
+      : stage.prompt));
+  const headingStyle = stageHeading === stage?.prompt ? stage?.promptStyle : withoutMarks(stage?.promptStyle);
   // Teams are made first; then the explanation; then the round itself.
   const explaining = !forming && Boolean(stage?.explain);
   const phase = !stage || showOnly ? null : state?.view.status === 'PAUSED' ? t('phase.paused') : forming ? t('phase.teams') : explaining ? t('explain.title')
@@ -464,14 +472,15 @@ export function RoomScreen() {
               && <MediaHostControls onControl={action => room.sendMediaControl(stage.id, action)} />
             }
           </div> : null}>
-            {stage.info && <p className="stage-banner">{stage.info.title}</p>}
+            {stage.info && <p {...sceneTextProps(stage.titleStyle, 'heading')}><SceneTextContent text={stage.info.title} format={stage.titleStyle} /></p>}
             {/* While teams are picked, the round's question waits: one thing at a time. */}
             {/* The title, with the round's main action (such as Send) next to it when the round puts one there. */}
-            <div className="stage-heading-row"><h2 id="stage-heading" className={stage.info ? 'visually-hidden' : undefined}>{forming ? t('phase.teams') : stage.info?.title ?? (stage.scoreboard ? r('scoreboard')
-              : stage.minigame?.graph && isDefaultGraphQuestion(stage.prompt)
-                ? graphText(state.tryout || stage.minigame.graph.chart.yLabel === 'Books lent (thousands)' ? 'sampleQuestion' : 'trendQuestion')
-                : stage.prompt)}</h2><div ref={setActionSlot} className="stage-action-slot" /></div>
-            {stage.info && <p className="info-text">{stage.prompt}</p>}
+            <div className="stage-heading-row"><h2 id="stage-heading" {...(stage.info ? { className: 'visually-hidden' }
+              : !forming && (headingStyle || usesSlideTypography(stage.kind)) ? sceneTextProps(headingStyle) : {})}>
+              <SceneTextContent text={stageHeading ?? ''} format={headingStyle} />
+            </h2><div ref={setActionSlot} className="stage-action-slot" /></div>
+            {stage.info && <p {...sceneTextProps(stage.promptStyle)}><SceneTextContent text={stage.prompt} format={stage.promptStyle} /></p>}
+            {showingScene && <SceneTextBoxes boxes={stage.textBoxes} />}
           </SceneComposition>
           {forming && role === 'player' && <p className="wait-note">{t('wait.forming')}</p>}
           {stage.teams && <div ref={teamMomentRef}>
@@ -549,6 +558,10 @@ export function RoomScreen() {
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: 30_000 })}>{h('reopen30')}</button>
             <button className="ghost" disabled={disabled} onClick={() => command('stage.reopen', { stageRunId: stage.id, durationMs: null })}>{h('reopenNoLimit')}</button></Popover>}
         </div>
+        {stage?.hostNotes && <details className="host-notes" key={stage.id} open>
+          <summary>{h('hostNotes')} <FaIcon name="chevron-down" /></summary>
+          <p tabIndex={0}>{stage.hostNotes}</p>
+        </details>}
         <SeatRequests state={state} sessionId={state.view.sessionId} onError={setError} />
         <NameRequests state={state} sessionId={state.view.sessionId} onError={setError} />
         {/* Everything less frequent behind four icons; one sheet at a time, under the icons. */}
@@ -573,7 +586,7 @@ export function RoomScreen() {
             <div className="invite-code"><h3>{h('invitePlayers')}</h3><BigCode roomCode={state.roomCode} copy /><JoinLink url={publicJoinUrl(location.origin, state.roomCode)} copy /></div></div>
           {/* Testing alone: the host screen with phones next to it, each its own player (virtual phones; real ones can join too). */}
           <div className="invite-display"><FaIcon name="users" /><p><strong>{h('testWithPhones')}</strong> {h('testWithPhonesText')}</p>
-            <a className="invite-bench invite-action" href={`/?bench=${sessionId}`} target="_blank" rel="noreferrer">{h('openTestBench')}</a></div>
+            <a className="invite-bench invite-action" href={`/?bench=${sessionId}${fromEditor ? `&fromEditor=${fromEditor}` : ''}`} target="_blank" rel="noreferrer">{h('openTestBench')}</a></div>
           <div className="invite-display"><FaIcon name="tv" /><p><strong>{h('sharedScreen')}</strong> {h('sharedScreenText')}</p>
             {displayUrl ? <span className="invite-display-open"><a className="invite-action" href={displayUrl} target="_blank" rel="noreferrer">{h('openDisplay')}</a><CopyIcon text={displayUrl} label={h('copyDisplayLink')} icon="link" /></span>
               : <button className="ghost" onClick={() => { void roomApi<{ token: string }>(`/api/rooms/${sessionId}/display`, {}).then(result => setDisplayUrl(`${location.origin}/?room=${sessionId}&display=1#access=${result.token}`)).catch(() => setError(h('displayFailed'))); }}>{h('createDisplayLink')}</button>}</div>

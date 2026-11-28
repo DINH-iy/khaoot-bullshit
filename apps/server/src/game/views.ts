@@ -182,6 +182,10 @@ export async function readSessionView(client: PrismaClient, trustedActor: Truste
           explain: current.status === 'ACTIVE' && readExplain(current.presentation) ? introView(entry.stage, readExplain(current.presentation)!.readyIds) : null,
           youtube: entry.stage.youtube,
           mediaLayout: entry.stage.mediaLayout,
+          textBoxes: entry.stage.textBoxes,
+          ...(actor.data.role === 'host' && entry.stage.hostNotes?.trim() ? { hostNotes: entry.stage.hostNotes } : {}),
+          promptStyle: entry.stage.promptStyle,
+          titleStyle: entry.stage.kind === 'info' ? entry.stage.titleStyle : undefined,
           media: entry.stage.media ? { ...entry.stage.media, url: sceneMediaUrl(entry.stage.media.id) } : null,
           info: entry.stage.kind === 'info' ? { title: entry.stage.title } : null, scoreboard: entry.stage.kind === 'scoreboard' ? { show: entry.stage.show } : null,
           ...(current.status === 'ACTIVE' && session.status === 'RUNNING' && typeof (current.presentation as { drawingStartsAt?: unknown }).drawingStartsAt === 'string'

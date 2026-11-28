@@ -8,8 +8,8 @@
   color: var(--r-text); max-width: none; margin: 0; padding: 0 0 48px; min-height: 100dvh; font-family: var(--r-font); font-size: calc(16px * var(--r-scale));
   background: radial-gradient(1200px 700px at 15% -10%, var(--r-bg1), transparent), linear-gradient(180deg, var(--r-bg1), var(--r-bg2));
 }
-.room h1, .room h2, .room h3, .room .stage-banner, .room .big-code, .room .brand { font-family: var(--r-heading-font); }
-.room.caps h2, .room.caps .stage-banner, .room.caps h3 { text-transform: uppercase; letter-spacing: .04em; }
+.room h1, .room h2, .room h3, .room .big-code, .room .brand { font-family: var(--r-heading-font); }
+.room.caps h2, .room.caps h3 { text-transform: uppercase; letter-spacing: .04em; }
 /* Backgrounds */
 .room.bg-solid { background: var(--r-bg1); }
 .room.bg-gradient { background: linear-gradient(160deg, var(--r-bg1), var(--r-bg2)); }
@@ -87,8 +87,6 @@
 .big-code { margin: 8px 0 0; font-size: clamp(2.6rem, 9vw, 5rem); font-weight: 900; letter-spacing: .12em; color: var(--r-accent); }
 .stage-card { display: grid; gap: 16px; }
 .stage-card h2 { margin: 0; font-size: clamp(1.4rem, 3.6vw, 2.4rem); line-height: 1.2; }
-.stage-banner { margin: 0; text-align: center; font-size: clamp(2rem, 7vw, 4.4rem); font-weight: 900; letter-spacing: .02em; }
-.stage-card .info-text { margin: 0; text-align: center; font-size: clamp(1.15rem, 3vw, 1.8rem); }
 .progress-line, .wait-note { margin: 0; color: var(--r-muted); }
 .answer-in { margin: 0; padding: 18px; border-radius: 16px; text-align: center; font-size: 1.3rem; font-weight: 800; background: rgb(94 230 168 / .15); color: var(--r-ok); }
 /* Under a ballot the note keeps the usual gap instead of touching the entries. */
@@ -110,6 +108,11 @@
 
 /* Host panel */
 .room-controls { display: grid; gap: 14px; position: sticky; top: 16px; }
+.host-notes { min-width: 0; border: 1px solid var(--r-line); border-radius: 12px; }
+.host-notes summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; font-weight: 700; list-style: none; cursor: pointer; }
+.host-notes summary::-webkit-details-marker { display: none; }
+.host-notes[open] summary svg { transform: rotate(180deg); }
+.host-notes p { max-height: 12rem; overflow: auto; margin: 0; padding: 0 12px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .room-controls h3 { margin: 0; font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--r-muted); }
 .control-block { display: grid; gap: 10px; }
 .room-controls .join-qr img { width: 140px; background: #fff; padding: 6px; border-radius: 10px; }
@@ -635,6 +638,7 @@
 .room .result-page-actions span { color: var(--r-muted); }
 /* The round's title with its main action (Send…) beside it; the slot takes no room when empty. */
 .stage-heading-row { display: flex; align-items: center; gap: 12px; }
+.stage-heading-row:has(> .visually-hidden) { display: contents; }
 .stage-heading-row > h2 { flex: 1; min-width: 0; }
 .stage-action-slot { flex: none; display: flex; }
 .stage-action-slot:empty { display: none; }

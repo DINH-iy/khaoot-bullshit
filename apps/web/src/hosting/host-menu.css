@@ -91,7 +91,10 @@ main.host-page > section { margin: 0; }
 .custom-badge { color: light-dark(#5b31bf, #c9b6ff); font-weight: 700; opacity: 1 !important; }
 .restore-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 600; }
 /* Who made a game (and whether it was shared with you), as a small label under its title. */
-.my-game-author { flex-basis: 100%; color: light-dark(#5d5873, #b8b2cf); font-size: .85rem; font-weight: 700; }
+.my-game-meta { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; color: light-dark(#5d5873, #b8b2cf); font-size: .85rem; }
+.my-game-author { font-weight: 700; }
+.game-editor-open { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.game-editor-open::before { content: ''; width: .5rem; height: .5rem; border-radius: 50%; background: light-dark(#19724b, #97edbc); }
 
 /* The host menu's dialogs (New game, Import): a title row with a close button, the content below; a wide one for Import. */
 .host-dialog { width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow: auto; border: 1px solid light-dark(#e3def2, #3a3550); border-radius: 18px;

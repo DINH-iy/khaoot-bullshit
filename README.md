@@ -309,6 +309,10 @@ What is next, with open questions, is in the [product plan](APP_PLAN.md#owner-qu
 
 The approved [interactive example](docs/design/editor-reference.html) shows Flow and Scene views of the same branching game. [Design notes](docs/design/README.md) preserve the user-supplied workspace styling references and explain the mockup limitations. The Flow, Scene and Look & feel editors are implemented in `apps/web/src/editor`; the reference remains the design direction.
 
+In **Your games**, each card shows when its draft was last edited and whether it is open in an editor. Open an authored game's virtual-phone **Test bench** from the editor to use **Back to editor**. It returns to the original editing tab when available. A **Host notes** section on each scene part saves a script or reminders. The active notes appear in the host's controls during rehearsal and live play.
+
+In the Scene editor's **Content** settings, add an editable text box from Blank, Heading, Instructions or Points by place. Use **Format text** for horizontal alignment, vertical alignment in fixed-height boxes, and other whole-box settings. Select letters or words on the shared-screen canvas to open the selection toolbar. Blank lines, text box order and styling carry through to the room. The points template is display text. Configure actual awards in the round's scoring settings.
+
 The [private admin health example](docs/design/admin-health-reference.html) preserves the proposed diagnostics layout and local demonstration controls. Its measurements are illustrative; the actual dashboard remains unimplemented.
 
 ## PostgreSQL and code-first migrations

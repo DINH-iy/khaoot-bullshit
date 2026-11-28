@@ -10,17 +10,19 @@ import { useLanguage } from '../../i18n/language.js';
 import { translate, useTexts } from '../../i18n/texts.js';
 import { DrawBoard } from '../../room/minigame-draw.js';
 import { ClockFace } from '../../room/stage-timer.js';
+import { HOST_TEXTS } from '../../room/host.text.js';
 import { PLAY_TEXTS } from '../../room/play.text.js';
 import { buildLook, LookContext, themeClass, useThemeStyle } from '../../presentation/look.js';
 import { GameSymbol } from '../../presentation/game-symbol.js';
 import { gameDescription, gameName } from '../../presentation/catalog.text.js';
 import { Mark } from '../../presentation/mark-icons.js';
+import { SceneTextBoxes, SceneTextContent, sceneTextProps, usesSlideTypography, withoutMarks } from '../../presentation/scene-text.js';
 import { SceneComposition } from '../../presentation/scene-composition.js';
 import { StageMedia, StageYouTube } from '../../room/stage-media.js';
 import { formatRemaining } from '../../room/stage-timer.js';
 import { answerFit } from '../../room/answer-fit.js';
 import { layerOf } from '../look/layer.js';
-import { isDrawScene, optionsOf, quizKind, uniqueKey, type Definition, type Node, type Stage } from '../model.js';
+import { isDrawScene, withRemappedText, optionsOf, quizKind, uniqueKey, type Definition, type Node, type Stage } from '../model.js';
 import { FIELDS_TEXTS } from './fields.text.js';
 import { INSPECTOR_TEXTS } from './inspector.text.js';
 import { SCENE_PRESENTATION_TEXTS } from './scene-presentation.text.js';
@@ -28,6 +30,9 @@ import { MinigamePractice } from './minigame-practice.js';
 import { ScenePractice } from './scene-practice.js';
 import { PhoneFrame } from '../../ui/phone-devices.js';
 import { PRACTICE_TEXTS } from './scene-practice.text.js';
+import { CanvasText } from './fields/text-boxes.js';
+import { sceneTextBoxes, sceneTextStyle, updateBoxText, updateTextFormat, type SceneTextTarget } from './text-edits.js';
+import { TEXT_BOX_TEXTS } from './fields/text-boxes.text.js';
 
 // `both`: the shared screen and the phone side by side (Look & feel's “This scene”).
 type Device = 'sharedScreen' | 'phone' | 'both';
@@ -35,6 +40,7 @@ interface PreviewProps { definition: Definition; node: Node; index: number }
 interface CanvasControls {
   readOnly: boolean;
   edit: (change: (stage: Stage) => Stage, field: string) => void;
+  selectText: (target: SceneTextTarget) => void;
   editMedia: () => void;
 }
 
@@ -46,10 +52,16 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const t = useTexts(FIELDS_TEXTS);
   const fields = useTexts(INSPECTOR_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
+  const boxText = useTexts(TEXT_BOX_TEXTS);
   const graphText = useTexts(GRAPH_TEXTS);
   const radioGroup = useId();
   const language = useLanguage();
   const stage = node.stages[index]!;
+  const boxes = sceneTextBoxes(stage);
+  const promptStyle = sceneTextStyle(stage, 'promptStyle');
+  const titleStyle = sceneTextStyle(stage, 'titleStyle');
+  const editMainText = (field: 'prompt' | 'title', value: string, caret: number) => canvas?.edit(current =>
+    withRemappedText(current, { ...current, [field]: value }, field, caret), field);
   const gameLook = layerOf(definition, { kind: 'game' });
   const sceneLook = layerOf(definition, { kind: 'scene', nodeKey: node.key, stageIndex: index });
   const look = buildLook({ ...mergePresentationTexts(gameLook, sceneLook), themes: [gameLook.theme, sceneLook.theme] }, language);
@@ -57,6 +69,9 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const translations = canvas ? undefined : (stage['translations'] as SceneTranslations | undefined)?.[language];
   const prompt = translations?.prompt ?? stage.prompt ?? '';
   const title = translations?.title ?? String(stage.title ?? '');
+  const visiblePromptStyle = prompt === stage.prompt ? promptStyle : withoutMarks(promptStyle);
+  const visibleTitleStyle = title === stage.title ? titleStyle : withoutMarks(titleStyle);
+  const slideTypography = Boolean(promptStyle) || usesSlideTypography(stage.kind);
   const label = stage.kind === 'info' ? title : prompt;
   const promptLabel = fields(stage.kind === 'info' ? 'lInfo' : 'lQuestion');
   const timer = typeof stage.durationMs === 'number' && !(stage.kind === 'minigame' && stage['game'] === 'stop-clock') ? look.text('timer.left', { time: formatRemaining(stage.durationMs) }) : null;
@@ -80,8 +95,6 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
   const draw = isDrawScene(stage); const drawHint = translate(PLAY_TEXTS, 'drawWho');
   const scoring = stage['scoring'] as { kind?: string; correctChoiceKey?: string } | undefined;
   const choices = input?.kind === 'choice' ? input.options : undefined;
-  const mediaButton = canvas && ['collect', 'challenge', 'info'].includes(stage.kind)
-    ? <button type="button" className="canvas-media-button" disabled={canvas.readOnly} onClick={canvas.editMedia}>{labels(media || clip ? 'editMedia' : 'addMedia')}</button> : null;
   const sharedMedia = contentMedia('display');
   const game = stage['game'];
   const minigame = stage.kind === 'minigame' && typeof game === 'string' && isMinigameKey(game) ? game : undefined;
@@ -99,13 +112,27 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
     {minigameIntro}
   </> : null;
   return <div className={canvas ? 'preview scene-canvas' : 'preview'}>
-    {device !== 'phone' && <figure className="tv"><figcaption>{t('sharedScreen')}</figcaption>
+    {device !== 'phone' && <figure className="tv"><figcaption>{t('sharedScreen')}
+      {canvas && !canvas.readOnly && usesSlideTypography(stage.kind) && <button type="button" className="canvas-media-button" onClick={canvas.editMedia}>
+        {labels(media || clip ? 'editMedia' : 'addMedia')}
+      </button>}
+    </figcaption>
       <div className={`tv-screen room room-display ${classes}`} style={style}>
-        <SceneComposition layout={layout} media={mediaButton ? <div className={`canvas-media${sharedMedia ? '' : ' empty'}`}>{sharedMedia}{mediaButton}</div> : sharedMedia}>
-          {stage.kind === 'info' && (canvas ? <input className="tv-banner canvas-title" aria-label={fields('title')} placeholder={fields('title')} value={title} maxLength={120} readOnly={canvas.readOnly}
-            onChange={event => canvas.edit(current => ({ ...current, title: event.target.value }), 'title')} /> : <p className="tv-banner">{title}</p>)}
-          {canvas ? <CanvasPrompt value={prompt} label={promptLabel} readOnly={canvas.readOnly}
-            onChange={value => canvas.edit(current => ({ ...current, prompt: value }), 'prompt')} /> : <p className="tv-prompt">{prompt}</p>}
+        <SceneComposition layout={layout} media={sharedMedia}>
+          {stage.kind === 'info' && (canvas ? <CanvasText title value={title} label={fields('title')} readOnly={canvas.readOnly}
+            format={titleStyle} onFocus={() => canvas.selectText('titleStyle')}
+            onMarks={canvas.readOnly ? undefined : marks => canvas.edit(current => updateTextFormat(current, 'titleStyle', { marks: marks.length ? marks : undefined }), 'title-marks')}
+            onChange={(value, caret) => editMainText('title', value, caret)} />
+            : <p {...sceneTextProps(visibleTitleStyle, 'heading')}><SceneTextContent text={title} format={visibleTitleStyle} /></p>)}
+          {canvas ? <CanvasText main value={prompt} label={promptLabel} readOnly={canvas.readOnly}
+            format={promptStyle} onFocus={() => canvas.selectText('promptStyle')}
+            onMarks={canvas.readOnly ? undefined : marks => canvas.edit(current => updateTextFormat(current, 'promptStyle', { marks: marks.length ? marks : undefined }), 'prompt-marks')}
+            onChange={(value, caret) => editMainText('prompt', value, caret)} />
+            : slideTypography ? <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={prompt} format={visiblePromptStyle} /></p> : <p className="tv-prompt">{prompt}</p>}
+          {canvas && !canvas.readOnly ? boxes.map((box, position) => <CanvasText key={box.key} value={box.text} label={boxText('box', { number: position + 1 })}
+            format={box} readOnly={false} onFocus={() => canvas.selectText(`box:${box.key}`)}
+            onMarks={marks => canvas.edit(current => updateTextFormat(current, `box:${box.key}`, { marks: marks.length ? marks : undefined }), `textBox-${box.key}-marks`)}
+            onChange={(value, caret) => canvas.edit(current => updateBoxText(current, box.key, value, caret), `textBox-${box.key}-text`)} />) : <SceneTextBoxes boxes={boxes} />}
         </SceneComposition>
         {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}
@@ -131,8 +158,12 @@ export function ScenePreview({ definition, node, index, device, canvas, interact
       </div></figure>}
     {device !== 'sharedScreen' && <PhoneFrame caption={t('phone')} pickerLabel={t('phoneModel')} picker={phonePicker}><div className={`phone-screen room room-player ${classes}${compactPhone ? ' compact-game-preview' : ''}`} style={style}>
         <SceneComposition layout={layout} media={contentMedia('player')}>
-          <p className="phone-prompt">{phoneLabel}</p>
-          {stage.kind === 'info' && <p className="phone-hint">{prompt}</p>}
+          {stage.kind === 'info' ? <>
+            <p {...sceneTextProps(visibleTitleStyle, 'heading')}><SceneTextContent text={phoneLabel} format={visibleTitleStyle} /></p>
+            <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={prompt} format={visiblePromptStyle} /></p>
+          </> : slideTypography ? <p {...sceneTextProps(visiblePromptStyle)}><SceneTextContent text={phoneLabel}
+            format={phoneLabel === prompt ? visiblePromptStyle : withoutMarks(visiblePromptStyle)} /></p> : <p className="phone-prompt">{phoneLabel}</p>}
+          <SceneTextBoxes boxes={boxes} />
         </SceneComposition>
         {!interactive && timer && <p className="timer">{theme.timerStyle === 'clock' && typeof stage.durationMs === 'number' ? <ClockFace left={stage.durationMs} total={stage.durationMs} ending={false} up={false} clockwise={theme.timerTurn !== 'counterclockwise'} /> : timer}</p>}
         {minigameCard}
@@ -173,29 +204,12 @@ function MinigamePreview({ stage, game, text, compact }: { stage: Stage; game: k
   </div>;
 }
 
-/** The canvas question grows with its text until the author drags its corner; from then on it keeps the author's height. */
-function CanvasPrompt({ value, label, readOnly, onChange }: { value: string; label: string; readOnly: boolean; onChange: (value: string) => void }) {
-  const field = useRef<HTMLTextAreaElement>(null);
-  const [sized, setSized] = useState(false);
-  useEffect(() => {
-    const element = field.current;
-    if (!element || sized) return;
-    // Only the browser's resize handle writes an inline height on this field.
-    const watch = new MutationObserver(() => { if (element.style.height) setSized(true); });
-    watch.observe(element, { attributes: true, attributeFilter: ['style'] });
-    return () => watch.disconnect();
-  }, [sized]);
-  return <div className="canvas-prompt-box" data-text={value || label} data-sized={sized || undefined}>
-    <textarea ref={field} className="tv-prompt canvas-prompt" rows={1} aria-label={label} placeholder={label}
-      value={value} readOnly={readOnly} maxLength={2000} onChange={event => onChange(event.target.value)} />
-  </div>;
-}
-
-export function ScenePreviewDialog({ onClose, initialDevice, compactIntro = false, ...preview }: PreviewProps & {
-  initialDevice: Device; onClose: () => void; compactIntro?: boolean;
+export function ScenePreviewDialog({ onClose, initialDevice, compactIntro = false, returnToEditor, ...preview }: PreviewProps & {
+  initialDevice: Device; onClose: () => void; compactIntro?: boolean; returnToEditor?: boolean;
 }) {
   const t = useTexts(FIELDS_TEXTS);
   const labels = useTexts(SCENE_PRESENTATION_TEXTS);
+  const host = useTexts(HOST_TEXTS);
   const practice = useTexts(PRACTICE_TEXTS);
   const [device, setDevice] = useState(initialDevice);
   const [part, setPart] = useState(preview.index);
@@ -213,7 +227,7 @@ export function ScenePreviewDialog({ onClose, initialDevice, compactIntro = fals
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="scene-preview-window">
       <header><h2 id={title}>{t('preview')}</h2>
-        <button type="button" className="small-button" autoFocus onClick={onClose}>{labels('close')}</button>
+        <button type="button" className="small-button" autoFocus onClick={onClose}>{device === 'phone' && returnToEditor ? host('backToEditor') : labels('close')}</button>
       </header>
       <div className="segmented" role="group" aria-label={labels('devices')}>
         {(['sharedScreen', 'phone'] as const).map(choice => <button key={choice} type="button" aria-pressed={device === choice} onClick={() => setDevice(choice)}>{t(choice)}</button>)}

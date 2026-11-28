@@ -1,8 +1,9 @@
 import { SHARE_TEXTS } from '../editor/shell/share.text.js';
 import { Dropdown } from '../ui/dropdown.js';
-import { useState, type ReactNode } from 'react';
-import { DraftSchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
+import { useEffect, useState, type ReactNode } from 'react';
+import { DraftSchema, GameActivitySchema, type DefinitionIssue, type HostMenu } from '@party/contracts';
 import { newId, roomApi } from '../room/api.js';
+import { useLanguage } from '../i18n/language.js';
 import { translate, useTexts } from '../i18n/texts.js';
 import { HOSTING_TEXTS } from './hosting.text.js';
 import { HostDialog } from './host-dialog.js';
@@ -24,11 +25,44 @@ function Badges({ game }: { game: Game }) {
   </p>;
 }
 
+function useGameActivity(enabled: boolean) {
+  const [activity, setActivity] = useState<Map<string, { updatedAt: string; editorOpen: boolean }>>(() => new Map());
+  useEffect(() => {
+    if (!enabled) return;
+    let canceled = false;
+    let pending = false;
+    const refresh = async () => {
+      if (document.hidden || pending) return;
+      pending = true;
+      try {
+        const data = GameActivitySchema.parse(await roomApi('/api/host/games/activity'));
+        if (!canceled) setActivity(new Map(data.map(game => [game.gameId, game])));
+      } catch {
+        if (!canceled) setActivity(current => new Map([...current].map(([id, game]) => [id, { ...game, editorOpen: false }])));
+      } finally { pending = false; }
+    };
+    void refresh();
+    const interval = window.setInterval(refresh, 20_000);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      canceled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [enabled]);
+  return activity;
+}
+
 /** The owner's own games: create, see problems per scene, publish, and open a room for the published version. */
 /** openRoom is null for editors: they publish and rehearse, but only the owner opens real rooms. */
 export function MyGames({ menu, reload, openRoom, builtIn = null }: { menu: HostMenu; reload: () => void; openRoom: ((gameId: string) => void) | null; builtIn?: ReactNode }) {
   const [title, setTitle] = useState(''); const [startFrom, setStartFrom] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const t = useTexts(HOSTING_TEXTS); const s = useTexts(SHARE_TEXTS);
+  const activity = useGameActivity(menu.myGames.length > 0);
+  const language = useLanguage();
+  const editedDate = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' });
   const [problems, setProblems] = useState<Record<string, DefinitionIssue[]>>({}); const [removing, setRemoving] = useState<string | null>(null);
   // Making a game and importing one open in a dialog, so the list stays the page.
   const [dialog, setDialog] = useState<'new' | 'import' | null>(null);
@@ -47,10 +81,17 @@ export function MyGames({ menu, reload, openRoom, builtIn = null }: { menu: Host
         <button type="button" onClick={() => setDialog('import')}><Icon name="paste" size={18} /> {t('importOpen')}</button>
         <button type="button" onClick={copyAi}><Icon name={copied ? 'check' : 'copy'} size={18} /> {t(copied ? 'instructionsCopied' : 'copyAi')}</button></span>}</div>
     {error && <p role="alert" className="error">{error}</p>}
-    {menu.myGames.length === 0 ? <p className="my-games-empty">{t('noGamesYet')}</p> : <ul className="plain-list my-games">{menu.myGames.map(game => <li key={game.gameId} className="my-game">
+    {menu.myGames.length === 0 ? <p className="my-games-empty">{t('noGamesYet')}</p> : <ul className="plain-list my-games">{menu.myGames.map(game => {
+      const status = activity.get(game.gameId);
+      const updatedAt = status && status.updatedAt > game.updatedAt ? status.updatedAt : game.updatedAt;
+      return <li key={game.gameId} className="my-game">
       <div className="my-game-info"><h3>{game.title}</h3><Badges game={game} />
         {/* Who made it: the owner sees each editor's games by name; an editor sees who shared a game with them. */}
-        {(game.author || game.shared) && <span className="my-game-author">{game.author?.you ? s('byYou') : game.author ? s('byAuthor', { name: game.author.name }) : s('byOwner')}{game.shared ? ` · ${s('shared')}` : ''}</span>}</div>
+        <div className="my-game-meta">
+          {(game.author || game.shared) && <span className="my-game-author">{game.author?.you ? s('byYou') : game.author ? s('byAuthor', { name: game.author.name }) : s('byOwner')}{game.shared ? ` · ${s('shared')}` : ''}</span>}
+          <time dateTime={updatedAt}>{t('lastEdited', { date: editedDate.format(new Date(updatedAt)) })}</time>
+          {status?.editorOpen && <span className="game-editor-open">{t('editorOpen')}</span>}
+        </div></div>
       <div className="my-game-actions">
         <a className="button-link primary" href={`/?edit=${game.gameId}`} aria-label={t('editLabel', { title: game.title })}>{t('edit')}</a>
         {game.issueCount > 0 && (problems[game.gameId]
@@ -67,7 +108,7 @@ export function MyGames({ menu, reload, openRoom, builtIn = null }: { menu: Host
       </div>
       {removing === game.gameId && <p className="my-game-note">{t('removeNote')}</p>}
       {problems[game.gameId] && <ul className="my-game-problems" aria-label={t('problemsIn', { title: game.title })}>{problems[game.gameId]!.map((issue, index) => <li key={index}>{issue.nodeKey ? (issue.stageIndex !== null ? t('scenePartProblem', { scene: issue.nodeKey, part: issue.stageIndex + 1 }) : t('sceneProblem', { scene: issue.nodeKey })) : ''}{issue.message}</li>)}</ul>}
-    </li>)}</ul>}
+    </li>; })}</ul>}
     {/* The built-in games, under the host's own: open a room for one, or (the owner) change it. */}
     {builtIn && <div className="builtin-section"><h3>{t('builtInGames')}</h3>{builtIn}</div>}
     {dialog === 'import' && <HostDialog id="import-heading" title={t('importHeading')} wide onClose={() => setDialog(null)}><ImportGame /></HostDialog>}

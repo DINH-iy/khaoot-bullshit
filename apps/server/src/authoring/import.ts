@@ -10,6 +10,7 @@ import { DEFAULT_TEAM_NAMES, HEAD_TO_HEAD_GAMES, HEAD_TO_HEAD_KEYS, isMinigameKe
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown, fallback = '') => typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : fallback;
+const sceneText = (value: unknown, fallback: string) => typeof value === 'string' ? value : text(value, fallback);
 /** A wheel's own colours from the text: 2 to 8 valid "#rrggbb" (or see-through "#rrggbbaa") values, or nothing. */
 function wheelColors(raw: unknown): { colors?: string[] } {
   const colors = Array.isArray(raw) ? raw.map(entry => String(entry).trim().toLowerCase()).filter(entry => HEX_COLOR.test(entry)).slice(0, 8) : [];
@@ -72,7 +73,7 @@ function stageFrom(raw: Json, key: string): Json {
   const requested = TYPES[text(raw['type']).toLowerCase()] ?? (Array.isArray(raw['answers'] ?? raw['options']) ? 'quiz' : 'info');
   // A single-scene draw uses the minigame fields and one ordinary next connection.
   const type = requested === 'minigame-draw' && 'draw' in raw ? 'minigame' : requested;
-  const prompt = text(raw['prompt'] ?? raw['question'] ?? raw['text'] ?? raw['title'], 'Untitled');
+  const prompt = sceneText(raw['prompt'] ?? raw['question'] ?? raw['text'] ?? raw['title'], 'Untitled');
   const durationMs = seconds(raw);
   // `"inTeams": true` is short for playing the round in the teams made by the last Pick teams scene.
   const play = isObject(raw['play']) ? { play: raw['play'] } : raw['inTeams'] === true ? { play: { kind: 'teams', lineup: { kind: 'game' }, answers: raw['captain'] === true ? 'captain' : 'everyone', points: 'both' } } : {};
@@ -86,7 +87,7 @@ function stageFrom(raw: Json, key: string): Json {
   const media = SceneMediaSchema.safeParse(raw['media']);
   // `music`: what the scene does with the game's music; "keep", "quiet" and "stop" can be written as text, a song of its own only from the library.
   const music = SceneMusicSchema.safeParse(typeof raw['music'] === 'string' ? { mode: raw['music'] } : raw['music']);
-  const extras = { ...spun, ...explain, ...Object.fromEntries(['resultCards', 'countdownSeconds', 'voteMode', 'voteLimit'].filter(field => raw[field] !== undefined).map(field => [field, raw[field]])), ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
+  const extras = { ...spun, ...explain, ...Object.fromEntries(['resultCards', 'countdownSeconds', 'voteMode', 'voteLimit', 'textBoxes', 'promptStyle', 'titleStyle', 'hostNotes'].filter(field => raw[field] !== undefined).map(field => [field, raw[field]])), ...(raw['mediaLayout'] !== undefined ? { mediaLayout: raw['mediaLayout'] } : {}), ...(raw['youtube'] !== undefined ? { youtube: raw['youtube'] } : {}), ...(raw['translations'] !== undefined ? { translations: raw['translations'] } : {}), ...(raw['wheelClear'] === true ? { wheelClear: true } : {}), ...(media.success ? { media: media.data } : {}), ...(music.success ? { music: music.data } : {}) };
   return isObject(raw['look'] ?? raw['presentation']) ? { ...stage, ...extras, presentation: raw['look'] ?? raw['presentation'] } : { ...stage, ...extras };
 }
 /**
@@ -119,12 +120,12 @@ function judgedFrom(raw: Json): Json {
 }
 function stageOfType(raw: Json, key: string, type: string, prompt: string, durationMs: ReturnType<typeof seconds>, play: Json): Json {
   switch (type) {
-    case 'info': return { key, kind: 'info', title: text(raw['title'], prompt).slice(0, 120), prompt: text(raw['text'] ?? raw['prompt'], prompt), durationMs };
+    case 'info': return { key, kind: 'info', title: sceneText(raw['title'], prompt).slice(0, 120), prompt: sceneText(raw['text'] ?? raw['prompt'], prompt), durationMs };
     // Pick teams: `"teams": 3` (equal teams, default 2) or a full `form`; `"how"`: random, host or players (default players).
     case 'teams': {
       const how = ['random', 'skill', 'host', 'players'].includes(text(raw['how'] ?? raw['formation'])) ? text(raw['how'] ?? raw['formation']) : 'players';
       const count = Math.max(2, Math.min(12, Math.round(Number(raw['teams']) || 2)));
-      return { key, kind: 'teams', prompt: text(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how, ...(text(raw['colors']) === 'teams' ? { colors: 'teams' } : {}),
+      return { key, kind: 'teams', prompt: sceneText(raw['title'] ?? raw['prompt'], 'Pick your teams'), durationMs: null, form: isObject(raw['form']) ? raw['form'] : { split: { kind: 'count', teams: count }, formation: how, ...(text(raw['colors']) === 'teams' ? { colors: 'teams' } : {}),
           // `"captains": "elected"`: each team votes for its captain (`true`: the host assigns them, or at random).
           ...(raw['captains'] === 'elected' ? { captainPick: 'elected' } : {}),
           // `names`: the teams' own names, one per team (the standard colour names fill any missing ones).
@@ -133,7 +134,7 @@ function stageOfType(raw: Json, key: string, type: string, prompt: string, durat
         // `scores`: the team scores when teams are made again (a later Pick teams scene). Standard: "fresh".
         ...((CARRYOVERS as readonly string[]).includes(text(raw['scores'])) && text(raw['scores']) !== 'fresh' ? { carryover: text(raw['scores']) } : {}) };
     }
-    case 'scoreboard': return { key, kind: 'scoreboard', prompt: text(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
+    case 'scoreboard': return { key, kind: 'scoreboard', prompt: sceneText(raw['title'] ?? raw['prompt'], 'Standings'), show: ['players', 'teams', 'both'].includes(text(raw['show'])) ? text(raw['show']) : 'players', durationMs };
     case 'minigame': {
       // `game` by key or by name ("Tap race"); unknown names stay a placeholder to choose in the editor.
       const keyOf = (value: unknown) => { const name = text(value).toLowerCase().trim().replace(/\s+/g, '-'); return MINIGAME_KEYS.find(entry => entry === name || MINIGAMES[entry].name.toLowerCase().replace(/\s+/g, '-') === name); };

@@ -9,12 +9,14 @@ import { GraphPlaybackActionSchema, GraphPlaybackSchema } from './minigames/draw
 import { PoolBallBehaviorSchema, PoolMatchSecondsSchema, PoolStartSchema } from './minigames/eight-ball/pool.js';
 import { PlayerLookSchema } from './players.js';
 import { DrawingSchema } from './drawing.js';
+import { GameKeySchema } from './game-key.js';
+import { ScenePromptSchema, SceneTextBoxesSchema, SceneTextStyleSchema, SceneTitleSchema } from './scene-text.js';
 import { MediaLayoutSchema, PublicMusicSchema, PublicSceneMediaSchema, YouTubeClipSchema } from './media.js';
 
 /** How team captains are picked: assigned (by the host, else at random) or elected by their teammates. */
 export const CAPTAIN_PICKS = ['assigned', 'elected'] as const;
 export type CaptainPick = typeof CAPTAIN_PICKS[number];
-export const GameKeySchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/);
+export { GameKeySchema } from './game-key.js';
 export const GameIdSchema = z.string().uuid().transform(value => value.toLowerCase());
 export const RevisionSchema = z.number().int().min(0).max(2_147_483_646);
 // Public JSON represents exact fixed-point points as decimal integer strings.
@@ -293,16 +295,22 @@ export const PublicDuelSchema = z.object({
   ]),
 }).strict();
 export const SceneTranslationsSchema = z.partialRecord(z.enum(GAME_LANGUAGES), z.object({
-  prompt: z.string().trim().min(1).max(2000).optional(),
-  title: z.string().trim().min(1).max(120).optional(),
+  prompt: ScenePromptSchema.optional(),
+  title: SceneTitleSchema.optional(),
   explanation: z.string().trim().min(1).max(1000).optional(),
   labels: z.record(GameKeySchema, z.string().trim().min(1).max(240)).refine(labels => Object.keys(labels).length <= 12).optional(),
 }).strict());
 export type SceneTranslations = z.infer<typeof SceneTranslationsSchema>;
+export const MAX_HOST_NOTES_LENGTH = 4000;
+export const HostNotesSchema = z.string().max(MAX_HOST_NOTES_LENGTH);
 export const PublicStageSchema = z.object({
   id: GameIdSchema, nodeKey: GameKeySchema, stageKey: GameKeySchema,
   kind: z.enum(['collect', 'challenge', 'vote', 'route', 'info', 'scoreboard', 'minigame', 'duel', 'teams']), prompt: z.string().min(1).max(2000),
   translations: SceneTranslationsSchema.optional(),
+  textBoxes: SceneTextBoxesSchema.optional(),
+  promptStyle: SceneTextStyleSchema.optional(),
+  titleStyle: SceneTextStyleSchema.optional(),
+  hostNotes: HostNotesSchema.optional(),
   input: InputSchema.nullable(), status: z.enum(['ACTIVE', 'CLOSED', 'VOID']),
   // Server clock. A running timed stage has deadlineAt; a paused one keeps the
   // frozen remainder instead. Both are null when the stage has no time limit.

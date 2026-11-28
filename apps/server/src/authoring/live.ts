@@ -66,6 +66,7 @@ export function createEditorLive(io: Server, roomSecret: string, log: FastifyBas
   return {
     /** A ticket to join one game's editors. Only call this for someone already allowed to edit that game. */
     ticket: (creatorId: string, gameId: string, personId: string | null = null) => new SignJWT(personId ? { game: gameId, person: personId } : { game: gameId }).setProtectedHeader({ alg: 'HS256' }).setSubject(creatorId).setAudience(AUDIENCE).setIssuedAt().setExpirationTime(`${TICKET_SECONDS}s`).sign(key),
+    hasEditor: (gameId: string) => (editors.adapter.rooms.get(room(gameId))?.size ?? 0) > 0,
     /** Hands a newly saved draft to everyone who has the game open. */
     saved: (draft: Draft) => { editors.to(room(draft.gameId)).emit('editor.draft', draft); },
     /** Closes an editor's open editors at once: their rights were taken away, or their phones signed out. */

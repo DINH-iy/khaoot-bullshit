@@ -1,4 +1,5 @@
 import type { SessionView } from '@party/contracts';
+import { withoutMarks } from './scene-text.js';
 import type { Language } from '../i18n/language.js';
 
 type Stage = NonNullable<SessionView['stage']>;
@@ -13,6 +14,8 @@ export function localizeStage(stage: Stage, language: Language): Stage {
   return {
     ...stage,
     prompt: translation.prompt ?? stage.prompt,
+    promptStyle: translation.prompt && translation.prompt !== stage.prompt ? withoutMarks(stage.promptStyle) : stage.promptStyle,
+    titleStyle: translation.title && translation.title !== stage.info?.title ? withoutMarks(stage.titleStyle) : stage.titleStyle,
     info: stage.info && { ...stage.info, title: translation.title ?? stage.info.title },
     explain: stage.explain && { ...stage.explain, text: translation.explanation ?? stage.explain.text },
     input: input?.kind === 'choice' ? { ...input, options: input.options.map(option => ({ ...option, label: label(option) })) }

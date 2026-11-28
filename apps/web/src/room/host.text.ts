@@ -3,6 +3,7 @@ import { defineTexts } from '../i18n/texts.js';
 // The host's controls in a room: the panel, its sheets, room settings and people (room-screen.tsx, room-extras/room-settings.tsx,
 // room-people.tsx, seat-reclaim.tsx). Words players and the shared screen see stay the game's texts.
 export const HOST_TEXTS = defineTexts('host', {
+  hostNotes: 'Host notes', backToEditor: 'Back to editor', backToRoom: 'Back to room',
   hostControls: 'Host controls', roundTools: 'Round tools', more: 'More', addSeconds: 'Add {seconds} seconds', addSecondsHidden: ' (add {seconds} seconds)',
   setTheTime: 'Set the time', removeLimit: 'Remove time limit', timeLeft: 'Time left (seconds)', setTime: 'Set time',
   reopenAnswers: 'Reopen answers', reopen30: 'Reopen for 30 seconds', reopenNoLimit: 'Reopen without time limit',
@@ -37,6 +38,7 @@ export const HOST_TEXTS = defineTexts('host', {
     seatFailed: 'That did not go through. The request may have expired; the list is up to date again.',
 }, {
   nl: {
+    hostNotes: 'Hostnotities', backToEditor: 'Terug naar de editor', backToRoom: 'Terug naar de kamer',
     hostControls: 'Hostbediening', roundTools: 'Rondegereedschap', more: 'Meer', addSeconds: '{seconds} seconden erbij', addSecondsHidden: ' ({seconds} seconden erbij)',
     setTheTime: 'Tijd instellen', removeLimit: 'Tijdslimiet weghalen', timeLeft: 'Resterende tijd (seconden)', setTime: 'Tijd instellen',
     reopenAnswers: 'Antwoorden heropenen', reopen30: '30 seconden heropenen', reopenNoLimit: 'Heropenen zonder tijdslimiet',
@@ -68,6 +70,7 @@ export const HOST_TEXTS = defineTexts('host', {
     seatFailed: 'Dat ging niet door. Het verzoek is misschien verlopen; de lijst is weer bij.',
   },
   de: {
+    hostNotes: 'Notizen für den Host', backToEditor: 'Zurück zum Editor', backToRoom: 'Zurück zum Raum',
     hostControls: 'Host-Steuerung', roundTools: 'Rundenwerkzeuge', more: 'Mehr', addSeconds: '{seconds} Sekunden dazu', addSecondsHidden: ' ({seconds} Sekunden dazu)',
     setTheTime: 'Zeit einstellen', removeLimit: 'Zeitlimit entfernen', timeLeft: 'Verbleibende Zeit (Sekunden)', setTime: 'Zeit setzen',
     reopenAnswers: 'Antworten wieder öffnen', reopen30: 'Für 30 Sekunden öffnen', reopenNoLimit: 'Ohne Zeitlimit öffnen',
@@ -99,6 +102,7 @@ export const HOST_TEXTS = defineTexts('host', {
     seatFailed: 'Das ging nicht durch. Die Anfrage ist vielleicht abgelaufen; die Liste ist wieder aktuell.',
   },
   ro: {
+    hostNotes: 'Notițele gazdei', backToEditor: 'Înapoi la editor', backToRoom: 'Înapoi la cameră',
     hostControls: 'Comenzile gazdei', roundTools: 'Unelte pentru rundă', more: 'Mai mult', addSeconds: 'Adaugă {seconds} secunde', addSecondsHidden: ' (adaugă {seconds} secunde)',
     setTheTime: 'Setează timpul', removeLimit: 'Elimină limita de timp', timeLeft: 'Timp rămas (secunde)', setTime: 'Setează',
     reopenAnswers: 'Redeschide răspunsurile', reopen30: 'Redeschide pentru 30 de secunde', reopenNoLimit: 'Redeschide fără limită de timp',
